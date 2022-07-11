@@ -1,4 +1,6 @@
-from .src.decorator import pytreeclass
-from .src.viz import tree_box, tree_diagram
+from .src import viz
+from .src.decorator import pytreeclass, static_field
 
-__version__ = "0.0.1"
+__all__ = ("viz", "pytreeclas", "static_field")
+
+__version__ = "0.0.2"
