@@ -1,28 +1,24 @@
-from dataclasses import field
-
-import jax
 import jax.numpy as jnp
-import numpy as np
 
-from pytreeclass import pytreeclass
+from pytreeclass import tree,static_field
 
 
-@pytreeclass
+@tree
 class Test:
     a: float
     b: float
     c: float
-    name: str = field(metadata={'static': True})
+    name: str = static_field()
 
 
 def test_ops():
 
-    @pytreeclass
+    @tree
     class Test:
         a: float
         b: float
         c: float
-        name: str = field(metadata={'static': True})
+        name: str = static_field(metadata={'static': True})
 
     A = Test(10, 20, 30, 'A')
     # binary operations
@@ -33,11 +29,11 @@ def test_ops():
     assert A.reduce_mean() == jnp.array(60)
     assert abs(A) == A
 
-    @pytreeclass
+    @tree
     class Test:
         a: int
         b: int
-        name: str = field(metadata={'static': True})
+        name: str = static_field()
 
     A = Test(-10, 20, 'A')
 

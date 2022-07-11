@@ -10,7 +10,7 @@ from jax import tree_map
 from jax.tree_util import tree_reduce
 
 from .utils import is_treeclass_leaf
-from .viz import tree_indent
+from .tree_viz import tree_indent
 
 
 def append_math_op(func):
