@@ -8,6 +8,8 @@
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.7%203.8%203.9%203.10-red)
 ![codestyle](https://img.shields.io/badge/code%20style-yapf-lightgrey)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1bkYr-5HidtRSXFFBlvYqFa5pc5fQK_7-?usp=sharing)
+
 
 <!-- [![Downloads](https://static.pepy.tech/personalized-badge/kernex?period=month&units=international_system&left_color=black&right_color=blue&left_text=Downloads)](https://pepy.tech/project/kernex) -->
 
@@ -22,7 +24,7 @@ pip install pytreeclass
 A JAX compatible `dataclass` like datastructure with the following functionalities
 
 - Create PyTorch like NN classes like [equinox](https://github.com/patrick-kidger/equinox) and [Treex](https://github.com/cgarciae/treex)
-- Provides Keras-like `model.summary()` and `plot_model` visualizations for pytrees wrapped with `treeclass`.
+- Provides Keras-like `model.summary()` and `plot_model` visualizations for pytrees wrapped with `tree`.
 - Apply math/numpy operations like [tree-math](https://github.com/google/tree-math)
 - Registering user-defined reduce operations on each class.
 - Some fancy indexing syntax functionalities like `x[x>0]` on pytrees
@@ -33,8 +35,11 @@ A JAX compatible `dataclass` like datastructure with the following functionaliti
 
 ```python
 # construct a Pytorch like NN classes with JAX
+import jax
+from jax import numpy as jnp
+from pytreeclass import tree,static_field,tree_viz
 
-@treeclass
+@tree
 class Linear :
 
  weight : jnp.ndarray
@@ -47,7 +52,7 @@ class Linear :
  def __call__(self,x):
    return x @ self.weight + self.bias
 
-@treeclass
+@tree
 class StackedLinear:
    l1 : Linear
    l2 : Linear
@@ -83,7 +88,7 @@ def loss_func(model,x,y):
 def update(model,x,y):
    value,grads = jax.value_and_grad(loss_func)(model,x,y)
    # no need to use `jax.tree_map` to update the model
-   #  as it model is wrapped by treeclass
+   #  as it model is wrapped by @tree
    return value , model-1e-3*grads
 
 for _ in range(1,2001):
@@ -102,7 +107,7 @@ plt.legend()
 <details> <summary>Visualize</summary>
 
 ```python
->>> print(kernex.viz.summary(model))
+>>> print(tree_viz.summary(model))
 ┌──────┬───────┬─────────┬───────────────────┐
 │Type  │Param #│Size     │Config             │
 ├──────┼───────┼─────────┼───────────────────┤
@@ -124,7 +129,7 @@ Inexact size:	66.004 KB
 Other size:	0.000 B
 ==============================================
 
->>> print(kernex.viz.tree_box(model,array=x))
+>>> print(tree_viz.tree_box(model,array=x))
 # using jax.eval_shape (no-flops operation)
 ┌──────────────────────────────────────┐
 │StackedLinear(Parent)                 │
@@ -146,7 +151,7 @@ Other size:	0.000 B
 │└────────────┴────────┴──────────────┘│
 └──────────────────────────────────────┘
 
->>> print(kernex.viz.tree_diagram(model))
+>>> print(tree_viz.tree_diagram(model))
 
 StackedLinear
     ├── l1=Linear
@@ -167,11 +172,7 @@ StackedLinear
 <summary>Perform Math operations on JAX pytrees</summary>
 
 ```python
-from kernex import treeclass,static_field
-import jax
-from jax import numpy as jnp
-
-@treeclass
+@tree
 class Test :
   a : float
   b : float
