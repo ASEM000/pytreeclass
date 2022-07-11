@@ -14,7 +14,7 @@
 ## 🛠️ Installation<a id="Installation"></a>
 
 ```python
-pip install
+pip install pytreeclass
 ```
 
 ## 📖 Description<a id="Description"></a>
