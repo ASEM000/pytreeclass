@@ -43,8 +43,7 @@ def resolve_line(cols):
             cols[index][-1] = "┴"
             cols[index + 1].pop(0)
 
-        elif cols[index][-1] == "┤" and cols[index + 1][0] in ["├", "─", "└"
-                                                               ]:  #
+        elif cols[index][-1] == "┤" and cols[index + 1][0] in ["├", "─", "└"]:  #
             cols[index][-1] = "┼"
             cols[index + 1].pop(0)
 

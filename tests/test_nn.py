@@ -4,12 +4,12 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from pytreeclass import tree
+from pytreeclass import treeclass
 
 
 def test_nn():
 
-    @tree
+    @treeclass
     class Linear:
 
         weight: jnp.ndarray
@@ -23,7 +23,7 @@ def test_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @tree
+    @treeclass
     class StackedLinear:
         layers: Sequence[Linear]
 
@@ -66,7 +66,7 @@ def test_nn():
 
 def test_nn_with_func_input():
 
-    @tree
+    @treeclass
     class Linear:
 
         weight: jnp.ndarray

@@ -1,9 +1,9 @@
 import jax.numpy as jnp
 
-from pytreeclass import tree,static_field
+from pytreeclass import treeclass,static_field
 
 
-@tree
+@treeclass
 class Test:
     a: float
     b: float
@@ -13,7 +13,7 @@ class Test:
 
 def test_ops():
 
-    @tree
+    @treeclass
     class Test:
         a: float
         b: float
@@ -29,7 +29,7 @@ def test_ops():
     assert A.reduce_mean() == jnp.array(60)
     assert abs(A) == A
 
-    @tree
+    @treeclass
     class Test:
         a: int
         b: int

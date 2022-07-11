@@ -37,9 +37,9 @@ A JAX compatible `dataclass` like datastructure with the following functionaliti
 # construct a Pytorch like NN classes with JAX
 import jax
 from jax import numpy as jnp
-from pytreeclass import tree,static_field,tree_viz
+from pytreeclass import treeclass,static_field,tree_viz
 
-@tree
+@treeclass
 class Linear :
 
  weight : jnp.ndarray
@@ -52,7 +52,7 @@ class Linear :
  def __call__(self,x):
    return x @ self.weight + self.bias
 
-@tree
+@treeclass
 class StackedLinear:
    l1 : Linear
    l2 : Linear
@@ -88,7 +88,7 @@ def loss_func(model,x,y):
 def update(model,x,y):
    value,grads = jax.value_and_grad(loss_func)(model,x,y)
    # no need to use `jax.tree_map` to update the model
-   #  as it model is wrapped by @tree
+   #  as it model is wrapped by @treeclass
    return value , model-1e-3*grads
 
 for _ in range(1,2001):
@@ -172,7 +172,7 @@ StackedLinear
 <summary>Perform Math operations on JAX pytrees</summary>
 
 ```python
-@tree
+@treeclass
 class Test :
   a : float
   b : float

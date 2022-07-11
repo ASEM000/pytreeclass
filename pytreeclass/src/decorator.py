@@ -12,7 +12,7 @@ def static_field(**kwargs):
     return field(**{**kwargs, **{"metadata": {"static": True}}})
 
 
-def tree(cls):
+def treeclass(cls):
     """Class JAX  compaitable decorator for `dataclass`"""
 
     user_defined_init = "__init__" in cls.__dict__
