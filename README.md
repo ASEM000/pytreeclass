@@ -5,7 +5,7 @@
 |[**Description**](#Description)
 |[**Examples**](#Examples)
 
-![Tests](https://github.com/ASEM000/kernex/actions/workflows/tests.yml/badge.svg)
+![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.7%203.8%203.9%203.10-red)
 ![codestyle](https://img.shields.io/badge/code%20style-yapf-lightgrey)
 
@@ -14,7 +14,7 @@
 ## 🛠️ Installation<a id="Installation"></a>
 
 ```python
-pip install
+pip install pytreeclass
 ```
 
 ## 📖 Description<a id="Description"></a>
