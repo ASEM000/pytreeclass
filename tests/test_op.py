@@ -1,6 +1,7 @@
 import jax.numpy as jnp
+import pytest
 
-from pytreeclass import treeclass,static_field
+from pytreeclass import static_field, treeclass
 
 
 @treeclass
@@ -81,3 +82,13 @@ def test_register_op():
 
     assert A.reduce_product() == 6000
     assert (A * A).reduce_mean() == 1400
+
+
+def test_op_false():
+
+    @treeclass(op=False)
+    class Test:
+        a: int
+
+    with pytest.raises(TypeError):
+        Test(1) + Test(2)
