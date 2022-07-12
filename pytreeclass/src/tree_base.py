@@ -12,7 +12,6 @@ from jax.tree_util import tree_reduce
 from .utils import is_treeclass_leaf
 from .tree_viz import tree_indent
 
-
 def append_math_op(func):
     """binary and unary magic operations"""
 
@@ -65,10 +64,15 @@ class treeBase:
         static, dynamic = dict(), dict()
 
         for field in self.__dataclass_fields__.values():
-            value = self.__dict__[field.name]
+            
+            if field.name in self.__dict__ :
+                value = self.__dict__[field.name]
+            else :
+                # the user did not declare all variables defined in fields
+                raise ValueError(f"field={field.name} is not declared.")
 
-            if ("static"
-                    in field.metadata) and field.metadata["static"] is True:
+
+            if ("static"in field.metadata) and field.metadata["static"] is True:
                 static[field.name] = value
 
             else:
