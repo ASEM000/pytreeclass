@@ -17,8 +17,10 @@ def treeclass(cls):
 
     user_defined_init = "__init__" in cls.__dict__
 
-    dCls = dataclass(unsafe_hash=True, init=not user_defined_init,
-                     repr=False)(cls)
+    dCls = dataclass(unsafe_hash=True,
+                     init=not user_defined_init,
+                     repr=False,
+                     eq=False)(cls)
 
     newCls = type(cls.__name__, (dCls, treeBase, treeOpBase), {})
 
