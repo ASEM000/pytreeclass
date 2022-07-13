@@ -23,12 +23,10 @@ def append_math_op(func):
             return tree_map(lambda x: func(x), self)
 
         elif isinstance(rhs, (int, float, complex, bool)):  # binary operation
-            return (tree_map(lambda x: func(x, rhs), self)
-                    if rhs is not None else self)
+            return tree_map(lambda x: func(x, rhs), self) if rhs is not None else self
 
         elif isinstance(rhs, type(self)):  # class instance
-            return tree_map(lambda x, y: func(x, y)
-                            if y is not None else x, self, rhs)
+            return tree_map(lambda x, y: func(x, y) if y is not None else x, self, rhs)
 
         else:
             raise NotImplementedError(f"Found type(rhs) = {type(rhs)}")
@@ -52,14 +50,13 @@ def append_reduced_numpy_op(func, reduce_op, init_val):
     @functools.wraps(func)
     def call(self, *args, **kwargs):
         return tree_reduce(
-            lambda acc, cur: reduce_op(acc, func(cur, *args, **kwargs)), self,
-            init_val)
+            lambda acc, cur: reduce_op(acc, func(cur, *args, **kwargs)), self, init_val
+        )
 
     return call
 
 
 class treeBase:
-
     @property
     def tree_fields(self):
         static, dynamic = dict(), dict()
@@ -72,8 +69,7 @@ class treeBase:
                 # the user did not declare all variables defined in fields
                 raise ValueError(f"field={field.name} is not declared.")
 
-            if ("static"
-                    in field.metadata) and field.metadata["static"] is True:
+            if ("static" in field.metadata) and field.metadata["static"] is True:
                 static[field.name] = value
 
             else:
@@ -90,8 +86,7 @@ class treeBase:
         dynamic_vals, dynamic_keys = children, aux[0]
 
         static_keys, static_vals = aux[1].keys(), aux[1].values()
-        attrs = dict(
-            zip((*dynamic_keys, *static_keys), (*dynamic_vals, *static_vals)))
+        attrs = dict(zip((*dynamic_keys, *static_keys), (*dynamic_vals, *static_vals)))
 
         newCls = cls.__new__(cls)
         for k, v in attrs.items():
@@ -111,8 +106,11 @@ class treeBase:
 
     def __str__(self):
         params_dict = {**self.tree_fields[0], **self.tree_fields[1]}
-        return (f"{type(self).__name__}(" +
-                ",".join([f"{k}={v}" for k, v in params_dict.items()]) + ")")
+        return (
+            f"{type(self).__name__}("
+            + ",".join([f"{k}={v}" for k, v in params_dict.items()])
+            + ")"
+        )
 
     def asdict(self):
         return {**self.tree_fields[0], **self.tree_fields[1]}
@@ -129,8 +127,10 @@ class treeBase:
 
             def reduced_call(*args, **kwargs):
                 return tree_reduce(
-                    lambda acc, cur: reduce_op(acc, func(cur, *args, **kwargs)
-                                               ), self, init_val)
+                    lambda acc, cur: reduce_op(acc, func(cur, *args, **kwargs)),
+                    self,
+                    init_val,
+                )
 
             setattr(self, f"reduce_{name}", reduced_call)
 
@@ -187,10 +187,7 @@ class treeOpBase:
     reduce_mean = append_reduced_numpy_op(jnp.mean, op.add, 0)
 
     def __or__(self, rhs):
-        return tree_map(lambda x, y: x or y,
-                        self,
-                        rhs,
-                        is_leaf=lambda x: x is None)
+        return tree_map(lambda x, y: x or y, self, rhs, is_leaf=lambda x: x is None)
 
     def __getitem__(self, *args):
         """return a new class with non chosen fields = None"""
@@ -211,9 +208,9 @@ class treeOpBase:
             for field in newCls.__dataclass_fields__.values():
                 argv = args[0].__dict__[field.name]
 
-                is_static = (("static" not in field.metadata)
-                             or ("static" in field.metadata
-                                 and field.metadata["static"] is False))
+                is_static = ("static" not in field.metadata) or (
+                    "static" in field.metadata and field.metadata["static"] is False
+                )
 
                 if (argv is False) and is_static:
                     newCls.__dict__[field.name] = None

@@ -21,13 +21,12 @@ def treeclass(*args, **kwargs):
     def wrapper(cls, op: bool = True):
         user_defined_init = "__init__" in cls.__dict__
 
-        dCls = dataclass(unsafe_hash=True,
-                         init=not user_defined_init,
-                         repr=False,
-                         eq=False)(cls)
+        dCls = dataclass(
+            unsafe_hash=True, init=not user_defined_init, repr=False, eq=False
+        )(cls)
 
         base_classes = (dCls, treeBase)
-        base_classes += (treeOpBase, ) if op else ()
+        base_classes += (treeOpBase,) if op else ()
 
         newCls = type(cls.__name__, base_classes, {})
 
@@ -41,10 +40,8 @@ def treeclass(*args, **kwargs):
         return functools.partial(wrapper, op=op)
 
 
-def run_once(*args, **kwargs):
-
-    def run_once_wrapper(func, raise_error=True):
-
+def singlerun(*args, **kwargs):
+    def singlerun_wrapper(func, raise_error=True):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             if not wrapper.run:
@@ -54,20 +51,19 @@ def run_once(*args, **kwargs):
             else:
                 if raise_error:
                     raise ValueError(
-                        f"Function {func!r} is wrapped with @run_once is called more than once."
+                        f"Function {func!r} is wrapped with @singlerun is called more than once."
                     )
                 else:
                     warnings.warn(
-                        f"Function {func!r} wrapped with @run_once is called more than once."
+                        f"Function {func!r} wrapped with @singlerun is called more than once."
                     )
 
         wrapper.run = False
         return wrapper
 
     if len(args) > 0 and inspect.isfunction(args[0]):
-        return run_once_wrapper(args[0], True)
+        return singlerun_wrapper(args[0], True)
 
     elif len(args) == 0 and len(kwargs) > 0:
-        raise_error = kwargs[
-            "raise_error"] if "raise_error" in kwargs else False
-        return functools.partial(run_once_wrapper, raise_error=raise_error)
+        raise_error = kwargs["raise_error"] if "raise_error" in kwargs else False
+        return functools.partial(singlerun_wrapper, raise_error=raise_error)
