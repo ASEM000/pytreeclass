@@ -8,7 +8,6 @@ from pytreeclass import treeclass
 
 
 def test_nn():
-
     @treeclass
     class Linear:
 
@@ -17,7 +16,7 @@ def test_nn():
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(
-                key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
+                key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)  # fmt: skip
             self.bias = jnp.ones((1, out_dim))
 
         def __call__(self, x):
@@ -51,7 +50,7 @@ def test_nn():
     model = StackedLinear(layers=[1, 128, 128, 1], key=jax.random.PRNGKey(0))
 
     def loss_func(model, x, y):
-        return jnp.mean((model(x) - y)**2)
+        return jnp.mean((model(x) - y) ** 2)
 
     @jax.jit
     def update(model, x, y):
@@ -65,7 +64,6 @@ def test_nn():
 
 
 def test_nn_with_func_input():
-
     @treeclass
     class Linear:
 
@@ -75,18 +73,16 @@ def test_nn_with_func_input():
 
         def __init__(self, key, in_dim, out_dim, act_func):
             self.act_func = act_func
-            self.weight = jax.random.normal(
-                key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
+            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
+                2 / in_dim
+            )
             self.bias = jnp.ones((1, out_dim))
 
         def __call__(self, x):
             return self.act_func(x @ self.weight + self.bias)
 
-    layer = Linear(key=jax.random.PRNGKey(0),
-                   in_dim=1,
-                   out_dim=1,
-                   act_func=jax.nn.tanh)
+    layer = Linear(key=jax.random.PRNGKey(0), in_dim=1, out_dim=1, act_func=jax.nn.tanh)
     x = jnp.linspace(0, 1, 100)[:, None]
-    y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
+    # y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
     layer(x)
     return True

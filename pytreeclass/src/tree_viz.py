@@ -357,6 +357,7 @@ def summary(model, array=None) -> str:
 
     if array is not None:
         params_shape = sequential_model_shape_eval(model, array)
+
     else:
         params_shape = [None] * len(dynamic_leaves)
 

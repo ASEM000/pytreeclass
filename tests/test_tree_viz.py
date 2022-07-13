@@ -71,13 +71,25 @@ class StackedLinear:
         return x
 
 
-x = jnp.linspace(0,1,100)[:,None]
-y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01 
+x = jnp.linspace(0, 1, 100)[:, None]
+y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
 
-model = StackedLinear(in_dim=1,out_dim=1,key=jax.random.PRNGKey(0))
+model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
 
 
 def test_model():
-    assert tree_viz.summary(model) == "┌──────┬───────┬─────────┬───────────────────┐\n│Type  │Param #│Size     │Config             │\n├──────┼───────┼─────────┼───────────────────┤\n│Linear│256    │1.000 KB │bias=f32[1,128]    │\n│      │       │         │weight=f32[1,128]  │\n├──────┼───────┼─────────┼───────────────────┤\n│Linear│16,512 │64.500 KB│bias=f32[1,128]    │\n│      │       │         │weight=f32[128,128]│\n├──────┼───────┼─────────┼───────────────────┤\n│Linear│129    │516.000 B│bias=f32[1,1]      │\n│      │       │         │weight=f32[128,1]  │\n└──────┴───────┴─────────┴───────────────────┘\nTotal params :\t16,897\nInexact params:\t16,897\nOther params:\t0\n----------------------------------------------\nTotal size :\t66.004 KB\nInexact size:\t66.004 KB\nOther size:\t0.000 B\n=============================================="
-    assert tree_viz.tree_box(model,array=x) == "┌──────────────────────────────────────┐\n│StackedLinear(Parent)                 │\n├──────────────────────────────────────┤\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,1]   ││\n││ Linear(l1) │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear(l2) │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear(l3) │────────┼──────────────┤│\n││            │ Output │ f32[100,1]   ││\n│└────────────┴────────┴──────────────┘│\n└──────────────────────────────────────┘"
-    assert tree_viz.tree_diagram(model) == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   └── bias=f32[1,128] \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   └── bias=f32[1,128] \n    └──l3=Linear\n        ├── weight=f32[128,1]\n        └── bias=f32[1,1]       "
+    assert (
+        tree_viz.summary(model)
+        # trunk-ignore(flake8/E501)
+        == "┌──────┬───────┬─────────┬───────────────────┐\n│Type  │Param #│Size     │Config             │\n├──────┼───────┼─────────┼───────────────────┤\n│Linear│256    │1.000 KB │bias=f32[1,128]    │\n│      │       │         │weight=f32[1,128]  │\n├──────┼───────┼─────────┼───────────────────┤\n│Linear│16,512 │64.500 KB│bias=f32[1,128]    │\n│      │       │         │weight=f32[128,128]│\n├──────┼───────┼─────────┼───────────────────┤\n│Linear│129    │516.000 B│bias=f32[1,1]      │\n│      │       │         │weight=f32[128,1]  │\n└──────┴───────┴─────────┴───────────────────┘\nTotal params :\t16,897\nInexact params:\t16,897\nOther params:\t0\n----------------------------------------------\nTotal size :\t66.004 KB\nInexact size:\t66.004 KB\nOther size:\t0.000 B\n=============================================="
+    )
+    assert (
+        tree_viz.tree_box(model, array=x)
+        # trunk-ignore(flake8/E501)
+        == "┌──────────────────────────────────────┐\n│StackedLinear(Parent)                 │\n├──────────────────────────────────────┤\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,1]   ││\n││ Linear(l1) │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear(l2) │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear(l3) │────────┼──────────────┤│\n││            │ Output │ f32[100,1]   ││\n│└────────────┴────────┴──────────────┘│\n└──────────────────────────────────────┘"
+    )
+    assert (
+        tree_viz.tree_diagram(model)
+        # trunk-ignore(flake8/E501)
+        == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   └── bias=f32[1,128] \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   └── bias=f32[1,128] \n    └──l3=Linear\n        ├── weight=f32[128,1]\n        └── bias=f32[1,1]       "
+    )

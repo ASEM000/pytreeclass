@@ -8,7 +8,7 @@ from jax.tree_util import tree_reduce
 
 
 def is_treeclass(model):
-    return hasattr(model, 'tree_fields')
+    return hasattr(model, "tree_fields")
 
 
 def is_treeclass_leaf(model):
@@ -16,8 +16,9 @@ def is_treeclass_leaf(model):
     if is_treeclass(model):
         fields = model.__dataclass_fields__.values()
 
-        return (is_treeclass(model) and not any(
-            [is_treeclass(model.__dict__[field.name]) for field in fields]))
+        return is_treeclass(model) and not any(
+            [is_treeclass(model.__dict__[field.name]) for field in fields]
+        )
     else:
         return False
 
@@ -35,7 +36,7 @@ def node_class_name(node):
 
 
 def node_size(node):
-    '''get size of `trainable` and `non-trainable` parameters '''
+    """get size of `trainable` and `non-trainable` parameters"""
 
     # store trainable in real , nontrainable in imag
     if isinstance(node, (jnp.ndarray, np.ndarray)):
@@ -54,7 +55,7 @@ def node_size(node):
 
 
 def node_count(node):
-    '''count number of `trainable` and `non-trainable` parameters '''
+    """count number of `trainable` and `non-trainable` parameters"""
     if isinstance(node, (jnp.ndarray, np.ndarray)):
 
         if jnp.issubdtype(node, jnp.inexact):
@@ -74,11 +75,17 @@ def node_count(node):
 
 
 def node_format(node):
-    '''format shape and dtype of jnp.array'''
+    """format shape and dtype of jnp.array"""
 
     if isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
-        replace_tuple = (("int", "i"), ("float", "f"), ("complex", "c"),
-                         ("(", "["), (")", "]"), (" ", ""))
+        replace_tuple = (
+            ("int", "i"),
+            ("float", "f"),
+            ("complex", "c"),
+            ("(", "["),
+            (")", "]"),
+            (" ", ""),
+        )
 
         formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
 
@@ -102,8 +109,7 @@ def leaves_param_count(leaves):
 def leaves_param_size(leaves):
     """returns param count for each leave"""
     return [
-        tree_reduce(lambda acc, x: acc + node_size(x), leave, 0)
-        for leave in leaves
+        tree_reduce(lambda acc, x: acc + node_size(x), leave, 0) for leave in leaves
     ]
 
 
@@ -119,9 +125,6 @@ def leaves_param_count_and_size(leaves):
         cur_param_size = node_size(x)
         prev_param_count, prev_param_size = acc
 
-        return (cur_param_count + prev_param_count,
-                cur_param_size + prev_param_size)
+        return (cur_param_count + prev_param_count, cur_param_size + prev_param_size)
 
-    return [
-        tree_reduce(reduce_func, leave, (complex(0, 0), 0)) for leave in leaves
-    ]
+    return [tree_reduce(reduce_func, leave, (complex(0, 0), 0)) for leave in leaves]
