@@ -18,14 +18,18 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+          fetch-depth: ‘2’
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest wheel optax jaxlib
+          python -m pip install pytest wheel optax jaxlib coverage
       - name: Pytest Check
         run: |
           python -m pip install .
-          python -m pytest tests
+          coverage -m pytest tests
 
-      # - name: Trunk Check
-      #   uses: trunk-io/trunk-action@v1.0.3
+      - name: Codecov
+        uses: codecov/codecov-action@v3.1.0
+
+
