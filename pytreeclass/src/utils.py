@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import field
+from functools import singledispatch, update_wrapper
 
 import jax
 import jax.numpy as jnp
@@ -163,6 +164,9 @@ def leaves_param_count_and_size(leaves):
     return [tree_reduce(reduce_func, leave, (complex(0, 0), 0)) for leave in leaves]
 
 
+""" Porting utils """
+
+
 class cached_property:
     def __init__(self, func):
         self.name = func.__name__
@@ -172,3 +176,15 @@ class cached_property:
         attr = self.func(instance)
         setattr(instance, self.name, attr)
         return attr
+
+
+def singledispatchmethod(func):
+    # https://stackoverflow.com/a/24602374/10879163
+    dispatcher = singledispatch(func)
+
+    def wrapper(*args, **kw):
+        return dispatcher.dispatch(args[1].__class__)(*args, **kw)
+
+    wrapper.register = dispatcher.register
+    update_wrapper(wrapper, func)
+    return wrapper

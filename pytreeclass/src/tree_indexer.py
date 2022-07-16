@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import copy
-import functools
 
 import jax
 import jax.numpy as jnp
 
-from pytreeclass.src.utils import is_treeclass_leaf_bool
+from pytreeclass.src.utils import is_treeclass_leaf_bool, singledispatchmethod
 
 
 def node_setter(lhs, where, set_value):
@@ -86,7 +85,7 @@ class treeIndexer:
     @property
     def at(self):
         class indexer:
-            @functools.singledispatchmethod
+            @singledispatchmethod
             def __getitem__(inner_self, *args):
                 raise NotImplementedError(
                     f"indexing with type{(tuple(type(arg) for arg in args))} is not implemented."
