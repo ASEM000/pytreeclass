@@ -8,6 +8,3 @@ coverage:
         base: auto
         paths:
           - "pytreeclass"
-        # advanced
-        branches:
-          - master

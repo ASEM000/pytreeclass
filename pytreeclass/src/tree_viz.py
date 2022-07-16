@@ -291,7 +291,7 @@ def tree_diagram(model):
 
     recurse(model, [1])
 
-    return fmt.expandtabs(4)
+    return fmt.expandtabs(2)
 
 
 def tree_indent(model):
@@ -332,7 +332,7 @@ def tree_indent(model):
     recurse(model, [1])
     fmt += ")" if len(model.treeclass_leaves) > 1 else ""
 
-    return fmt.expandtabs(4)
+    return fmt.expandtabs(2)
 
 
 def tree_str(model):
@@ -381,7 +381,7 @@ def tree_str(model):
     recurse(model, [1])
     fmt += ")" if len(model.treeclass_leaves) > 1 else ""
 
-    return fmt.expandtabs(4)
+    return fmt.expandtabs(2)
 
 
 def summary(model, array=None) -> str:

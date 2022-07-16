@@ -32,17 +32,15 @@ A JAX compatible `dataclass` like datastructure with the following functionaliti
 
 ## 🔢 Examples<a id="Examples"></a>
 
-<details><summary>Write PyTorch like NN classes</summary>
+<details><summary>Create PyTorch like NN classes</summary>
 
 ```python
-# construct a Pytorch like NN classes with JAX
 import jax
 from jax import numpy as jnp
 from pytreeclass import treeclass,static_field,tree_viz
 
 @treeclass
 class Linear :
-
  weight : jnp.ndarray
  bias   : jnp.ndarray
 
@@ -59,13 +57,12 @@ class StackedLinear:
    l2 : Linear
    l3 : Linear
 
-   def __init__(self,key,in_dim,out_dim):
-
+   def __init__(self,key,in_dim,out_dim,hidden_dim):
        keys= jax.random.split(key,3)
 
-       self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=128)
-       self.l2 = Linear(key=keys[1],in_dim=128,out_dim=128)
-       self.l3 = Linear(key=keys[2],in_dim=128,out_dim=out_dim)
+       self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
+       self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
+       self.l3 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
 
    def __call__(self,x):
        x = self.l1(x)
@@ -80,7 +77,11 @@ class StackedLinear:
 x = jnp.linspace(0,1,100)[:,None]
 y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 
-model = StackedLinear(in_dim=1,out_dim=1,key=jax.random.PRNGKey(0))
+model = StackedLinear(
+            in_dim=1,
+            out_dim=1,
+            hidden_dim=10,
+            key=jax.random.PRNGKey(0))
 
 def loss_func(model,x,y):
    return jnp.mean((model(x)-y)**2 )
@@ -92,22 +93,27 @@ def update(model,x,y):
    #  as it model is wrapped by @treeclass
    return value , model-1e-3*grads
 
-for _ in range(1,2001):
+for _ in range(1,10_001):
    value,model = update(model,x,y)
 
-plt.scatter(x,model(x),color='r',label = 'Prediction')
-plt.scatter(x,y,color='k',label='True')
+plt.plot(x,model(x),'--r',label = 'Prediction',linewidth=3)
+plt.plot(x,y,'--k',label='True',linewidth=3)
 plt.legend()
-
 ```
 
-![image](assets/regression_example.png)
+![image](assets/regression_example.svg)
 
 </details>
 
-<details> <summary>Visualize</summary>
+<details> <summary>Visualize Pytrees</summary>
 
 ```python
+>>> print(f"{model!r}")
+StackedLinear(
+  l1=Linear(weight=f32[1,10],bias=f32[1,10])
+  l2=Linear(weight=f32[10,10],bias=f32[1,10])
+  l3=Linear(weight=f32[10,1],bias=f32[1,1]))
+
 >>> print(tree_viz.summary(model))
 ┌──────┬───────┬─────────┬───────────────────┐
 │Type  │Param #│Size     │Config             │
@@ -132,6 +138,8 @@ Other size:	0.000 B
 
 >>> print(tree_viz.tree_box(model,array=x))
 # using jax.eval_shape (no-flops operation)
+# ** note ** : the created modules in __init__ should be in the same order
+# where they are called in __call__
 ┌──────────────────────────────────────┐
 │StackedLinear(Parent)                 │
 ├──────────────────────────────────────┤
@@ -164,6 +172,54 @@ StackedLinear
     └──l3=Linear
         ├── weight=f32[128,1]
         └── bias=f32[1,1]
+
+```
+
+</details>
+
+<details>
+
+<summary>Using out-of-place indexing `.at[].set()` and `.at[].get()` on Pytrees</summary>
+
+Similar to JAX pytreeclass provides `.at` property for out-of-place update.
+
+```python
+
+# get layer1
+layer1 = model.l1
+
+# layer1 repr
+>>> print(f"{layer1!r}")
+Linear(weight=f32[1,10],bias=f32[1,10])
+
+# layer1 str
+>>> print(f"{layer1!s}")
+Linear(
+  weight=
+    [[-2.55655     1.674097    0.07847876  0.48010758 -1.9021134  -0.95792925
+       0.27486905  0.6492373  -0.51447827  1.077894  ]],
+  bias=
+    [[1.0345106  0.9914236  0.9971589  0.9965508  1.1548151  0.99296653
+      0.9731281  0.9994397  0.9537985  1.0100957 ]])
+
+# get only positive values
+>>> print(layer1.at[layer1>0].get())
+Linear(
+  weight=
+    [1.674097   0.07847876 0.48010758 0.27486905 0.6492373  1.077894  ],
+  bias=
+    [1.0345106  0.9914236  0.9971589  0.9965508  1.1548151  0.99296653
+     0.9731281  0.9994397  0.9537985  1.0100957 ])
+
+# set negative values to 0
+>>> print(layer1.at[layer1<0].set(0))
+Linear(
+  weight=
+    [[0.         1.674097   0.07847876 0.48010758 0.         0.
+      0.27486905 0.6492373  0.         1.077894  ]],
+  bias=
+    [[1.0345106  0.9914236  0.9971589  0.9965508  1.1548151  0.99296653
+      0.9731281  0.9994397  0.9537985  1.0100957 ]])
 
 ```
 

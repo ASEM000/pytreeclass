@@ -134,3 +134,6 @@ class treeIndexer:
                 return getterSetterIndexer()
 
         return indexer()
+
+    def __getitem__(self, *args):
+        return self.at.__getitem__(*args).get()
