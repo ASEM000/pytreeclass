@@ -2,17 +2,13 @@ from __future__ import annotations
 
 import functools
 import inspect
-import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import jax
 
-from .tree_base import treeBase, treeOpBase
-
-
-def static_field(**kwargs):
-    """ignore from pytree computations"""
-    return field(**{**kwargs, **{"metadata": {"static": True}}})
+from .tree_base import treeBase
+from .tree_indexer import treeIndexer
+from .tree_op_base import treeOpBase
 
 
 def treeclass(*args, **kwargs):
@@ -25,7 +21,7 @@ def treeclass(*args, **kwargs):
             unsafe_hash=True, init=not user_defined_init, repr=False, eq=False
         )(cls)
 
-        base_classes = (dCls, treeBase)
+        base_classes = (dCls, treeBase, treeIndexer)
         base_classes += (treeOpBase,) if op else ()
 
         newCls = type(cls.__name__, base_classes, {})
@@ -38,32 +34,3 @@ def treeclass(*args, **kwargs):
     elif len(args) == 0 and len(kwargs) > 0:
         op = kwargs["op"] if "op" in kwargs else False
         return functools.partial(wrapper, op=op)
-
-
-def singlerun(*args, **kwargs):
-    def singlerun_wrapper(func, raise_error=True):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            if not wrapper.run:
-                result = func(*args, **kwargs)
-                wrapper.run = True
-                return result
-            else:
-                if raise_error:
-                    raise ValueError(
-                        f"Function {func!r} is wrapped with @singlerun is called more than once."
-                    )
-                else:
-                    warnings.warn(
-                        f"Function {func!r} wrapped with @singlerun is called more than once."
-                    )
-
-        wrapper.run = False
-        return wrapper
-
-    if len(args) > 0 and inspect.isfunction(args[0]):
-        return singlerun_wrapper(args[0], True)
-
-    elif len(args) == 0 and len(kwargs) > 0:
-        raise_error = kwargs["raise_error"] if "raise_error" in kwargs else False
-        return functools.partial(singlerun_wrapper, raise_error=raise_error)

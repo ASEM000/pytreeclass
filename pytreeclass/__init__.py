@@ -1,6 +1,9 @@
 from .src import tree_viz
-from .src.decorator import singlerun, static_field, treeclass
+from .src.decorator import treeclass
+from .src.utils import static_field
 
-__all__ = ("tree_viz", "treeclass", "static_field", "singlerun")
+# from .src.utils import singlecall
+
+__all__ = ("tree_viz", "treeclass", "static_field")
 
 __version__ = "0.0.4"

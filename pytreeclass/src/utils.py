@@ -1,4 +1,5 @@
 import sys
+from dataclasses import field
 
 import jax
 import jax.numpy as jnp
@@ -7,8 +8,20 @@ from jax import tree_map
 from jax.tree_util import tree_reduce
 
 
+def static_field(**kwargs):
+    """ignore from pytree computations"""
+    return field(**{**kwargs, **{"metadata": {"static": True}}})
+
+
 def is_treeclass(model):
     return hasattr(model, "tree_fields")
+
+
+def is_treeclass_leaf_bool(node):
+    if isinstance(node, jnp.ndarray):
+        return node.dtype == "bool"
+    else:
+        return isinstance(node, bool)
 
 
 def is_treeclass_leaf(model):
@@ -21,6 +34,24 @@ def is_treeclass_leaf(model):
         )
     else:
         return False
+
+
+def is_treeclass_equal(lhs, rhs):
+    """assert all leaves are same . use jnp.all on jnp.arrays"""
+
+    def assert_node(lhs_node, rhs_node):
+        if isinstance(lhs_node, jnp.ndarray):
+            return jnp.all(lhs_node == rhs_node)
+        else:
+            return lhs_node == rhs_node
+
+    lhs_leaves = jax.tree_leaves(lhs)
+    rhs_leaves = jax.tree_leaves(rhs)
+
+    for lhs_node, rhs_node in zip(lhs_leaves, rhs_leaves):
+        if not assert_node(lhs_node, rhs_node):
+            return False
+    return True
 
 
 def sequential_model_shape_eval(model, array):
@@ -128,3 +159,14 @@ def leaves_param_count_and_size(leaves):
         return (cur_param_count + prev_param_count, cur_param_size + prev_param_size)
 
     return [tree_reduce(reduce_func, leave, (complex(0, 0), 0)) for leave in leaves]
+
+
+class cached_property:
+    def __init__(self, func):
+        self.name = func.__name__
+        self.func = func
+
+    def __get__(self, instance, owner):
+        attr = self.func(instance)
+        setattr(instance, self.name, attr)
+        return attr

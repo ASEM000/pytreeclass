@@ -1,4 +1,4 @@
-<h1 align="center" >🌲pytreeclass🌲</h1>
+<h1 align="center" style="font-family:Monospace" >🌲Pytreeclass🌲</h1>
 <h2 align="center">Write pytorch-like layers with keras-like visualizations in JAX.</h2>
 
 [**Installation**](#Installation)
@@ -25,7 +25,7 @@ pip install pytreeclass
 A JAX compatible `dataclass` like datastructure with the following functionalities
 
 - Create PyTorch like NN classes like [equinox](https://github.com/patrick-kidger/equinox) and [Treex](https://github.com/cgarciae/treex)
-- Provides Keras-like `model.summary()` and `plot_model` visualizations for pytrees wrapped with `tree`.
+- Provides Keras-like `model.summary()` and `plot_model` visualizations for pytrees wrapped with `@treeclass`.
 - Apply math/numpy operations like [tree-math](https://github.com/google/tree-math)
 - Registering user-defined reduce operations on each class.
 - Some fancy indexing syntax functionalities like `x[x>0]` on pytrees
