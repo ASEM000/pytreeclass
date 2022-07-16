@@ -93,3 +93,22 @@ def test_model():
         # trunk-ignore(flake8/E501)
         == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   └── bias=f32[1,128] \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   └── bias=f32[1,128] \n    └──l3=Linear\n        ├── weight=f32[128,1]\n        └── bias=f32[1,1]       "
     )
+
+
+def test_repr_str():
+    @treeclass
+    class Test:
+        a: float
+        b: float
+        c: float
+        name: str
+
+    A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), "A")
+    str_string = f"{A!s}"
+    repr_string = f"{A!r}"
+
+    assert (
+        str_string
+        == "Test(\n    a=\n        10,\n    b=\n        20,\n    c=\n        [1 2 3 4 5],\n    name=\n        A)"
+    )
+    assert repr_string == "Test(\n    a=10,\n    b=20,\n    c=i32[5,],\n    name='A')"

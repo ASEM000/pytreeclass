@@ -335,6 +335,55 @@ def tree_indent(model):
     return fmt.expandtabs(4)
 
 
+def tree_str(model):
+    """
+    === Explanation
+        pretty print treeclass model with indentation
+
+    === Args
+        tree : boolean to create tree-structure
+    """
+
+    def recurse(model, parent_level_count):
+
+        nonlocal fmt
+
+        if is_treeclass(model):
+            cur_children_count = len(model.__dataclass_fields__)
+
+            newline = cur_children_count > 1
+
+            for i, field in enumerate(model.__dataclass_fields__.values()):
+                cur_node = model.__dict__[field.name]
+                fmt += "\n" + "\t" * len(parent_level_count) if newline else ""
+
+                if is_treeclass(cur_node):
+                    layer_class_name = f"{cur_node.__class__.__name__}"
+                    fmt += f"{field.name}={layer_class_name}" + "("
+                    recurse(cur_node, parent_level_count + [cur_children_count - i])
+
+                else:
+                    formatted_str = (
+                        "\t" * (len(parent_level_count) + 1) + f"{cur_node!s}"
+                    )
+                    formatted_str = ("\n" + "\t" * (len(parent_level_count) + 1)).join(
+                        formatted_str.split("\n")
+                    )
+                    fmt += (
+                        f"{field.name}=\n"
+                        + formatted_str
+                        + ("," if i < (cur_children_count - 1) else ")")
+                    )
+
+                    recurse(cur_node, parent_level_count + [1])
+
+    fmt = f"{(model.__class__.__name__)}("
+    recurse(model, [1])
+    fmt += ")" if len(model.treeclass_leaves) > 1 else ""
+
+    return fmt.expandtabs(4)
+
+
 def summary(model, array=None) -> str:
     """
     === Explanation

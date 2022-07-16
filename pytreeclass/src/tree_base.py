@@ -5,7 +5,7 @@ from jax.tree_util import tree_reduce
 
 from .decorator_util import cached_property
 from .tree_util import is_treeclass_leaf
-from .tree_viz import tree_indent
+from .tree_viz import tree_indent, tree_str
 
 
 class treeBase:
@@ -60,16 +60,19 @@ class treeBase:
     def __hash__(self):
         return hash(tuple(jax.tree_flatten(self)[0]))
 
-    def __repr__(self):
+    @cached_property
+    def __treeclass_repr__(self):
         return tree_indent(self)
 
+    @cached_property
+    def __treeclass_str__(self):
+        return tree_str(self)
+
+    def __repr__(self):
+        return self.__treeclass_repr__
+
     def __str__(self):
-        params_dict = {**self.tree_fields[0], **self.tree_fields[1]}
-        return (
-            f"{type(self).__name__}("
-            + ",".join([f"{k}={v}" for k, v in params_dict.items()])
-            + ")"
-        )
+        return self.__treeclass_str__
 
     def asdict(self):
         return {**self.tree_fields[0], **self.tree_fields[1]}

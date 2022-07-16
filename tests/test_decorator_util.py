@@ -35,10 +35,6 @@ def test_dispatch():
     def _(x):
         return x + 1
 
-    @func.register(int)
-    def _(x):
-        return x + 1
-
     @func.register(float)
     def _(x):
         return x + 100
@@ -49,10 +45,6 @@ def test_dispatch():
     @dispatch(argnum=1)
     def func(x, y):
         ...
-
-    @func.register(int)
-    def _(x, y):
-        return y + 1
 
     @func.register(int)
     def _(x, y):
