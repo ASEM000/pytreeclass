@@ -1,5 +1,5 @@
 from pytreeclass import treeclass
-from pytreeclass.src.utils import (
+from pytreeclass.src.tree_util import (
     is_treeclass,
     is_treeclass_leaf,
     leaves_param_count_and_size,

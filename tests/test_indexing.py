@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest
 
 from pytreeclass import treeclass
-from pytreeclass.src.utils import is_treeclass_equal
+from pytreeclass.src.tree_util import is_treeclass_equal
 
 
 @treeclass

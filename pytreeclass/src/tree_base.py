@@ -4,7 +4,8 @@ import jax
 from jax.tree_util import tree_reduce
 
 from .tree_viz import tree_indent
-from .utils import cached_property, is_treeclass_leaf
+from .tree_util import is_treeclass_leaf
+from .decorator_util import cached_property
 
 
 class treeBase:

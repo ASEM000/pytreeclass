@@ -1,6 +1,6 @@
 from .src import tree_viz
 from .src.decorator import treeclass
-from .src.utils import static_field
+from .src.tree_util import static_field
 
 # from .src.utils import singlecall
 

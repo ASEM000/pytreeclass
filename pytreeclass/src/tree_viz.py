@@ -4,7 +4,7 @@ import math
 
 from jax import tree_flatten
 
-from .utils import (
+from .tree_util import (
     is_treeclass,
     is_treeclass_leaf,
     leaves_param_count_and_size,
