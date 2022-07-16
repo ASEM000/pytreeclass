@@ -3,9 +3,9 @@ from __future__ import annotations
 import jax
 from jax.tree_util import tree_reduce
 
-from .tree_viz import tree_indent
-from .tree_util import is_treeclass_leaf
 from .decorator_util import cached_property
+from .tree_util import is_treeclass_leaf
+from .tree_viz import tree_indent
 
 
 class treeBase:

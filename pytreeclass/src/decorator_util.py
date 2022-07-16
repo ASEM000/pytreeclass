@@ -15,10 +15,10 @@ class cached_property:
         return attr
 
 
-def singledispatchmethod(*args, **kwargs):
+def dispatch(*args, **kwargs):
     # based on https://stackoverflow.com/a/24602374/10879163
 
-    def _singledispatchmethod(func, argnum=1):
+    def dispatch_wrapper(func, argnum=1):
         """singledispatch by arg position"""
         dispatcher = functools.singledispatch(func)
 
@@ -30,8 +30,11 @@ def singledispatchmethod(*args, **kwargs):
         return wrapper
 
     if len(args) > 0 and inspect.isfunction(args[0]):
-        return _singledispatchmethod(args[0], 1)
+        return dispatch_wrapper(args[0], 1)
 
     elif len(args) == 0 and len(kwargs) > 0:
         argnum = kwargs["argnum"] if "argnum" in kwargs else 1
-        return functools.partial(_singledispatchmethod, argnum=argnum)
+        return functools.partial(dispatch_wrapper, argnum=argnum)
+
+
+singledispatchmethod = functools.partial(dispatch, argnum=1)

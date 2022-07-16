@@ -5,8 +5,8 @@ import copy
 import jax
 import jax.numpy as jnp
 
+from pytreeclass.src.decorator_util import singledispatchmethod
 from pytreeclass.src.tree_util import is_treeclass_leaf_bool
-from pytreeclass.src.decorator_util import singledispatchmethod 
 
 
 def node_setter(lhs, where, set_value):

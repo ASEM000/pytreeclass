@@ -79,7 +79,7 @@ def hbox(*text):
     boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
     fmt = ""
 
-    for i, line in enumerate(zip(*boxes)):
+    for _, line in enumerate(zip(*boxes)):
         fmt += resolve_line(line) + "\n"
     return fmt
 
