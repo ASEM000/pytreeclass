@@ -5,7 +5,7 @@ import copy
 import jax
 import jax.numpy as jnp
 
-from pytreeclass.src.decorator_util import singledispatchmethod
+from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import is_treeclass_leaf_bool
 
 
@@ -45,17 +45,35 @@ def param_indexing_getter(model, *where: tuple[str, ...]):
     return modelCopy
 
 
-def param_indexing_setter(model, *where: tuple[str], set_value):
-    modelCopy = model
-    for field in model.__dataclass_fields__.values():
-        value = modelCopy.__dict__[field.name]
+def param_indexing_setter(model, set_value, *where: tuple[str]):
 
-        excluded_by_type = isinstance(value, str)
-        excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
-        excluded = excluded_by_meta or excluded_by_type
-        if field.name in where and not excluded:
-            modelCopy.__dict__[field.name] = node_setter(value, True, set_value)
-    return modelCopy
+    print(type(set_value))
+
+    @dispatch(argnum=1)
+    def _param_indexing_setter(model, set_value, *where: tuple[str]):
+        raise NotImplementedError(f"Invalid set_value type = {type(set_value)}.")
+
+    @_param_indexing_setter.register(float)
+    @_param_indexing_setter.register(int)
+    @_param_indexing_setter.register(complex)
+    @_param_indexing_setter.register(jnp.ndarray)
+    def set_scalar(model, set_value, *where: tuple[str]):
+        modelCopy = model
+        for field in model.__dataclass_fields__.values():
+            value = modelCopy.__dict__[field.name]
+
+            excluded_by_type = isinstance(value, str)
+            excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
+            excluded = excluded_by_meta or excluded_by_type
+            if field.name in where and not excluded:
+                modelCopy.__dict__[field.name] = node_setter(value, True, set_value)
+        return modelCopy
+
+    # @_param_indexing_setter.register(type(model))
+    # def set_model(model, set_value, *where: tuple[str]):
+    #     raise NotImplemented("Not yet implemented.")
+
+    return _param_indexing_setter(model, set_value, *where)
 
 
 def boolean_indexing_getter(model, where):
@@ -70,7 +88,7 @@ def boolean_indexing_getter(model, where):
     return jax.tree_unflatten(lhs_treedef, lhs_leaves)
 
 
-def boolean_indexing_setter(model, where, set_value):
+def boolean_indexing_setter(model, set_value, where):
 
     lhs_leaves, lhs_treedef = jax.tree_flatten(model)
     where_leaves, rhs_treedef = jax.tree_flatten(where)
@@ -86,7 +104,7 @@ class treeIndexer:
     @property
     def at(self):
         class indexer:
-            @singledispatchmethod
+            @dispatch(argnum=1)
             def __getitem__(inner_self, *args):
                 raise NotImplementedError(
                     f"indexing with type{(tuple(type(arg) for arg in args))} is not implemented."
@@ -108,7 +126,7 @@ class treeIndexer:
                     def set(getter_setter_self, set_value):
                         # select by param name
                         return param_indexing_setter(
-                            copy.copy(self), *flatten_args, set_value=set_value
+                            copy.copy(self), set_value, *flatten_args
                         )
 
                 return getterSetterIndexer()
@@ -129,7 +147,7 @@ class treeIndexer:
 
                     def set(getter_setter_self, set_value):
                         # select by class boolean
-                        return boolean_indexing_setter(self, arg, set_value)
+                        return boolean_indexing_setter(self, set_value, arg)
 
                 return getterSetterIndexer()
 

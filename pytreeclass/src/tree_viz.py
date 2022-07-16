@@ -291,7 +291,7 @@ def tree_diagram(model):
 
     recurse(model, [1])
 
-    return fmt.expandtabs(2)
+    return fmt.expandtabs(4)
 
 
 def tree_indent(model):

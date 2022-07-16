@@ -1,8 +1,4 @@
-from pytreeclass.src.decorator_util import (
-    cached_property,
-    dispatch,
-    singledispatchmethod,
-)
+from pytreeclass.src.decorator_util import cached_property, dispatch
 
 
 def test_cached_property():
@@ -60,7 +56,7 @@ def test_dispatch():
 
 def test_singledispatchmethod():
     class test:
-        @singledispatchmethod
+        @dispatch(argnum=1)
         def plus(self, x):
             ...
 

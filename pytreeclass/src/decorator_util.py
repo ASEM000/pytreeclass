@@ -35,6 +35,3 @@ def dispatch(*args, **kwargs):
     elif len(args) == 0 and len(kwargs) > 0:
         argnum = kwargs["argnum"] if "argnum" in kwargs else 1
         return functools.partial(dispatch_wrapper, argnum=argnum)
-
-
-singledispatchmethod = functools.partial(dispatch, argnum=1)
