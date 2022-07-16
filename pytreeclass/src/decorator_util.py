@@ -16,6 +16,7 @@ class cached_property:
 
 
 def dispatch(*args, **kwargs):
+    """functools.singledispatch with option of choosing the position of the dispatched argument"""
     # based on https://stackoverflow.com/a/24602374/10879163
 
     def dispatch_wrapper(func, argnum=1):

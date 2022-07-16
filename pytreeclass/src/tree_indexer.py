@@ -47,8 +47,6 @@ def param_indexing_getter(model, *where: tuple[str, ...]):
 
 def param_indexing_setter(model, set_value, *where: tuple[str]):
 
-    print(type(set_value))
-
     @dispatch(argnum=1)
     def _param_indexing_setter(model, set_value, *where: tuple[str]):
         raise NotImplementedError(f"Invalid set_value type = {type(set_value)}.")
@@ -154,4 +152,5 @@ class treeIndexer:
         return indexer()
 
     def __getitem__(self, *args):
+        # alias for .at[].get()
         return self.at.__getitem__(*args).get()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import jax
-from jax.tree_util import tree_reduce
 
 from .decorator_util import cached_property
 from .tree_util import is_treeclass_leaf
@@ -76,22 +75,3 @@ class treeBase:
 
     def asdict(self):
         return {**self.tree_fields[0], **self.tree_fields[1]}
-
-    def register_op(self, func, *, name, reduce_op=None, init_val=None):
-        """register a math operation"""
-
-        def element_call(*args, **kwargs):
-            return jax.tree_map(lambda node: func(node, *args, **kwargs), self)
-
-        setattr(self, name, element_call)
-
-        if (reduce_op is not None) and (init_val is not None):
-
-            def reduced_call(*args, **kwargs):
-                return tree_reduce(
-                    lambda acc, cur: reduce_op(acc, func(cur, *args, **kwargs)),
-                    self,
-                    init_val,
-                )
-
-            setattr(self, f"reduce_{name}", reduced_call)

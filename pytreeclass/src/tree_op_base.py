@@ -104,10 +104,25 @@ class treeOpBase:
 
     def __or__(self, rhs):
         def node_or(x, y):
-            if isinstance(x, jnp.ndarray):
-                return x
-
-            else:
-                return x or y
+            return x if isinstance(x, jnp.ndarray) else (x or y)
 
         return tree_map(node_or, self, rhs, is_leaf=lambda x: x is None)
+
+    def register_op(self, func, *, name, reduce_op=None, init_val=None):
+        """register a math operation"""
+
+        def element_call(*args, **kwargs):
+            return tree_map(lambda node: func(node, *args, **kwargs), self)
+
+        setattr(self, name, element_call)
+
+        if (reduce_op is not None) and (init_val is not None):
+
+            def reduced_call(*args, **kwargs):
+                return tree_reduce(
+                    lambda acc, cur: reduce_op(acc, func(cur, *args, **kwargs)),
+                    self,
+                    init_val,
+                )
+
+            setattr(self, f"reduce_{name}", reduced_call)
