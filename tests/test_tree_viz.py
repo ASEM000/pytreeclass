@@ -27,7 +27,7 @@ def test_tree_diagram():
     class test:
         a: int = 1
 
-    correct = "test\n    └── a=1 "
+    correct = "test\n  └── a=1 "
     assert tree_viz.tree_diagram(test()) == correct
 
 
@@ -91,7 +91,7 @@ def test_model():
     assert (
         tree_viz.tree_diagram(model)
         # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   └── bias=f32[1,128] \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   └── bias=f32[1,128] \n    └──l3=Linear\n        ├── weight=f32[128,1]\n        └── bias=f32[1,1]       "
+        == "StackedLinear\n  ├── l1=Linear\n  │ ├── weight=f32[1,128]\n  │ └── bias=f32[1,128] \n  ├── l2=Linear\n  │ ├── weight=f32[128,128]\n  │ └── bias=f32[1,128] \n  └──l3=Linear\n    ├── weight=f32[128,1]\n    └── bias=f32[1,1]   "
     )
 
 
@@ -109,6 +109,6 @@ def test_repr_str():
 
     assert (
         str_string
-        == "Test(\n    a=\n        10,\n    b=\n        20,\n    c=\n        [1 2 3 4 5],\n    name=\n        A)"
+        == "Test(\n  a=\n    10,\n  b=\n    20,\n  c=\n    [1 2 3 4 5],\n  name=\n    A)"
     )
-    assert repr_string == "Test(\n    a=10,\n    b=20,\n    c=i32[5,],\n    name='A')"
+    assert repr_string == "Test(\n  a=10,\n  b=20,\n  c=i32[5,],\n  name='A')"
