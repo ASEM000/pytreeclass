@@ -28,7 +28,7 @@ def _parse_requirements(path):
 setup(
     name="pytreeclass",
     version=_get_version(),
-    url="https://github.com/ASEM000/",
+    url="https://github.com/ASEM000/pytreeclass",
     license="MIT",
     author="Mahmoud Asem",
     description=("JAX compatible dataclass."),
