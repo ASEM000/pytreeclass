@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import field
+from typing import Any
+
 import jax
 
 from .decorator_util import cached_property
@@ -12,23 +15,21 @@ class treeBase:
     def tree_fields(self):
         static, dynamic = dict(), dict()
 
-        for field in self.__dataclass_fields__.values():
-            if field.name in self.__dict__:
-                value = self.__dict__[field.name]
+        for fi in self.__dataclass_fields__.values():
+            if fi.name in self.__dict__:
+                value = self.__dict__[fi.name]
             else:
                 # the user did not declare all variables defined in fields
-                raise ValueError(f"field={field.name} is not declared.")
+                raise ValueError(f"field={fi.name} is not declared.")
 
             excluded_by_type = isinstance(value, str)
-            excluded_by_meta = ("static" in field.metadata) and field.metadata[
-                "static"
-            ] is True
+            excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
 
             if excluded_by_type or excluded_by_meta:
-                static[field.name] = value
+                static[fi.name] = value
 
             else:
-                dynamic[field.name] = value
+                dynamic[fi.name] = value
 
         return (dynamic, static)
 
@@ -75,3 +76,23 @@ class treeBase:
 
     def asdict(self):
         return {**self.tree_fields[0], **self.tree_fields[1]}
+
+    def node(
+        self, value: Any, key: str = None, static: bool = False, repr: bool = True
+    ):
+        """add item to dataclass fields to bee seen by jax computations"""
+
+        unnamed_count = sum([1 for k in self.__dict__ if k.startswith("unnamed")])
+        field_key = f"unnamed_{unnamed_count}" if key is None else key
+
+        # create field
+        field_value = field(repr=repr, metadata={"static": static})
+
+        setattr(field_value, "name", field_key)
+        setattr(field_value, "type", type(value))
+
+        # register it to class
+        self.__dataclass_fields__.update({field_key: field_value})
+        self.__dict__[field_key] = value
+
+        return value
