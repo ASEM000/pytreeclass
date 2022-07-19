@@ -1,9 +1,10 @@
 <h1 align="center" style="font-family:Monospace" >🌲Pytreeclass🌲</h1>
-<h2 align="center">Write pytorch-like layers with keras-like visualizations in JAX.</h2>
+<h2 align="center">Write pytorch-like layers with rich visualizations in JAX.</h2>
 
 [**Installation**](#Installation)
 |[**Description**](#Description)
-|[**Examples**](#Examples)
+|[**Quick Example**](#QuickExample)
+|[**More**](#More)
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.7%203.8%203.9%203.10-red)
@@ -25,31 +26,30 @@ pip install pytreeclass
 A JAX compatible `dataclass` like datastructure with the following functionalities
 
 - Create PyTorch like NN classes like [equinox](https://github.com/patrick-kidger/equinox) and [Treex](https://github.com/cgarciae/treex)
-- Provides Keras-like `model.summary()` and `plot_model` visualizations for pytrees wrapped with `@treeclass`.
+- Provides rich visualizations for pytrees wrapped with `@treeclass`.
+- Boolean indexing on Pytrees in functional style similar to jax.numpy. e.g. `x.at[x<0].set(0) `
 - Apply math/numpy operations like [tree-math](https://github.com/google/tree-math)
-- Registering user-defined reduce operations on each class.
-- Some fancy indexing syntax functionalities like `x[x>0]` on pytrees
 
-## 🔢 Examples<a id="Examples"></a>
 
-<details><summary>Create PyTorch like NN classes</summary>
+## ⏩ Quick Example <a id="QuickExample">
 
+### 🏗️ Create simple MLP
 ```python
 import jax
 from jax import numpy as jnp
-from pytreeclass import treeclass,static_field,tree_viz
+from pytreeclass import treeclass,tree_viz
 
 @treeclass
 class Linear :
- weight : jnp.ndarray
- bias   : jnp.ndarray
+   weight : jnp.ndarray
+   bias   : jnp.ndarray
 
- def __init__(self,key,in_dim,out_dim):
-   self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
-   self.bias = jnp.ones((1,out_dim))
+   def __init__(self,key,in_dim,out_dim):
+       self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
+       self.bias = jnp.ones((1,out_dim))
 
- def __call__(self,x):
-   return x @ self.weight + self.bias
+   def __call__(self,x):
+       return x @ self.weight + self.bias
 
 @treeclass
 class StackedLinear:
@@ -72,8 +72,147 @@ class StackedLinear:
        x = self.l3(x)
 
        return x
+```
+### 🎨 Visualize
+
+<div align="center">
+<table>
+<tr>
+ <td align = "center"> summary </td> <td align = "center">tree_box</td><td align = "center">tree_diagram</td>
+</tr>
+<tr>
+ 
+<td>
+
+```python
+ 
+ **summary**
+>>> print(tree_viz.summary(model))
+┌──────┬───────┬─────────┬─────────────────┐
+│Type  │Param #│Size     │Config           │
+├──────┼───────┼─────────┼─────────────────┤
+│Linear│20     │80.000 B │bias=f32[1,10]   │
+│      │       │         │weight=f32[1,10] │
+├──────┼───────┼─────────┼─────────────────┤
+│Linear│110    │440.000 B│bias=f32[1,10]   │
+│      │       │         │weight=f32[10,10]│
+├──────┼───────┼─────────┼─────────────────┤
+│Linear│11     │44.000 B │bias=f32[1,1]    │
+│      │       │         │weight=f32[10,1] │
+└──────┴───────┴─────────┴─────────────────┘
+Total params :	141
+Inexact params:	141
+Other params:	0
+--------------------------------------------
+Total size :	564.000 B
+Inexact size:	564.000 B
+Other size:	0.000 B
+============================================
+```
+</td>
+
+ <td>
+ 
+```python
+>>> print(tree_viz.tree_box(model,array=x))
+# using jax.eval_shape (no-flops operation)
+# ** note ** : the created modules 
+# in __init__ should be in the same order
+# where they are called in __call__
+┌─────────────────────────────────────┐
+│StackedLinear(Parent)                │
+├─────────────────────────────────────┤
+│┌────────────┬────────┬─────────────┐│
+││            │ Input  │ f32[100,1]  ││
+││ Linear(l1) │────────┼─────────────┤│
+││            │ Output │ f32[100,10] ││
+│└────────────┴────────┴─────────────┘│
+│┌────────────┬────────┬─────────────┐│
+││            │ Input  │ f32[100,10] ││
+││ Linear(l2) │────────┼─────────────┤│
+││            │ Output │ f32[100,10] ││
+│└────────────┴────────┴─────────────┘│
+│┌────────────┬────────┬─────────────┐│
+││            │ Input  │ f32[100,10] ││
+││ Linear(l3) │────────┼─────────────┤│
+││            │ Output │ f32[100,1]  ││
+│└────────────┴────────┴─────────────┘│
+└─────────────────────────────────────┘
+```
+</td>
+ 
+<td>
+
+```python
+ >>> print(tree_viz.tree_diagram(model))
+StackedLinear
+    ├── l1=Linear
+    │   ├── weight=f32[1,10]
+    │   └── bias=f32[1,10]  
+    ├── l2=Linear
+    │   ├── weight=f32[10,10]
+    │   └── bias=f32[1,10]  
+    └──l3=Linear
+        ├── weight=f32[10,1]
+        └── bias=f32[1,1]  
+```
+ </td> 
+
+</tr>
+ 
+<tr>
+ 
+ </tr>
+</table>
 
 
+
+ 
+
+  
+<table>
+<tr><td align = "center" > mermaid.io (Native support in Github/Notion)</td></tr>
+<tr>
+ 
+<td>
+
+```python
+# generate mermaid diagrams
+# print(tree_viz.tree_mermaid(model)) # generate core syntax
+>>> tree_viz.save_viz(model,filename="test_mermaid",method="tree_mermaid_md") 
+# use `method="tree_mermaid_html"` to save as html
+ ```
+
+ 
+```mermaid
+
+flowchart TD
+    id15696277213149321320[StackedLinear]
+    id15696277213149321320 --> id159132120600507116(l1\nLinear)
+    id159132120600507116 --- id7500441386962467209["weight\nf32[1,10]"]
+    id159132120600507116 --- id10793958738030044218["bias\nf32[1,10]"]
+    id15696277213149321320 --> id10009280772564895168(l2\nLinear)
+    id10009280772564895168 --- id11951215191344350637["weight\nf32[10,10]"]
+    id10009280772564895168 --- id1196345851686744158["bias\nf32[1,10]"]
+    id15696277213149321320 --> id7572222925824649475(l3\nLinear)
+    id7572222925824649475 --- id4749243995442935477["weight\nf32[10,1]"]
+    id7572222925824649475 --- id8042761346510512486["bias\nf32[1,1]"]
+```
+ 
+</td>
+ 
+
+</tr>
+ </table>
+
+ </div>
+
+## 🔢 More<a id="More"></a>
+
+<details><summary>Train from scratch</summary>
+ 
+```python
+ 
 x = jnp.linspace(0,1,100)[:,None]
 y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 
@@ -100,78 +239,8 @@ plt.plot(x,model(x),'--r',label = 'Prediction',linewidth=3)
 plt.plot(x,y,'--k',label='True',linewidth=3)
 plt.legend()
 ```
-
+ 
 ![image](assets/regression_example.svg)
-
-</details>
-
-<details> <summary>Visualize Pytrees</summary>
-
-```python
->>> print(f"{model!r}")
-StackedLinear(
-  l1=Linear(weight=f32[1,10],bias=f32[1,10])
-  l2=Linear(weight=f32[10,10],bias=f32[1,10])
-  l3=Linear(weight=f32[10,1],bias=f32[1,1]))
-
->>> print(tree_viz.summary(model))
-┌──────┬───────┬─────────┬─────────────────┐
-│Type  │Param #│Size     │Config           │
-├──────┼───────┼─────────┼─────────────────┤
-│Linear│20     │80.000 B │bias=f32[1,10]   │
-│      │       │         │weight=f32[1,10] │
-├──────┼───────┼─────────┼─────────────────┤
-│Linear│110    │440.000 B│bias=f32[1,10]   │
-│      │       │         │weight=f32[10,10]│
-├──────┼───────┼─────────┼─────────────────┤
-│Linear│11     │44.000 B │bias=f32[1,1]    │
-│      │       │         │weight=f32[10,1] │
-└──────┴───────┴─────────┴─────────────────┘
-Total params :	141
-Inexact params:	141
-Other params:	0
---------------------------------------------
-Total size :	564.000 B
-Inexact size:	564.000 B
-Other size:	0.000 B
-============================================
-
->>> print(tree_viz.tree_box(model,array=x))
-# using jax.eval_shape (no-flops operation)
-# ** note ** : the created modules in __init__ should be in the same order
-# where they are called in __call__
-┌─────────────────────────────────────┐
-│StackedLinear(Parent)                │
-├─────────────────────────────────────┤
-│┌────────────┬────────┬─────────────┐│
-││            │ Input  │ f32[100,1]  ││
-││ Linear(l1) │────────┼─────────────┤│
-││            │ Output │ f32[100,10] ││
-│└────────────┴────────┴─────────────┘│
-│┌────────────┬────────┬─────────────┐│
-││            │ Input  │ f32[100,10] ││
-││ Linear(l2) │────────┼─────────────┤│
-││            │ Output │ f32[100,10] ││
-│└────────────┴────────┴─────────────┘│
-│┌────────────┬────────┬─────────────┐│
-││            │ Input  │ f32[100,10] ││
-││ Linear(l3) │────────┼─────────────┤│
-││            │ Output │ f32[100,1]  ││
-│└────────────┴────────┴─────────────┘│
-└─────────────────────────────────────┘
-
->>> print(tree_viz.tree_diagram(model))
-StackedLinear
-    ├── l1=Linear
-    │   ├── weight=f32[1,10]
-    │   └── bias=f32[1,10]  
-    ├── l2=Linear
-    │   ├── weight=f32[10,10]
-    │   └── bias=f32[1,10]  
-    └──l3=Linear
-        ├── weight=f32[10,1]
-        └── bias=f32[1,1]  
-```
 
 </details>
 
@@ -224,7 +293,7 @@ Linear(
 </details>
 
 <details>
-<summary>Perform Math operations on JAX pytrees</summary>
+<summary>Perform Math operations on Pytrees</summary>
 
 ```python
 @treeclass
