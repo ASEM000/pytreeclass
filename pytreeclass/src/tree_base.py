@@ -77,22 +77,24 @@ class treeBase:
     def asdict(self):
         return {**self.tree_fields[0], **self.tree_fields[1]}
 
-    def node(
-        self, value: Any, key: str = None, static: bool = False, repr: bool = True
-    ):
-        """add item to dataclass fields to bee seen by jax computations"""
+    def register_node(self, node_defs: dict):
+        def register_single_node(
+            value: Any, key: str = None, static: bool = False, repr: bool = True
+        ) -> Any:
+            """add item to dataclass fields to bee seen by jax computations"""
 
-        unnamed_count = sum([1 for k in self.__dict__ if k.startswith("unnamed")])
-        field_key = f"unnamed_{unnamed_count}" if key is None else key
+            unnamed_count = sum([1 for k in self.__dict__ if k.startswith("unnamed")])
+            field_key = f"unnamed_{unnamed_count}" if key is None else key
 
-        # create field
-        field_value = field(repr=repr, metadata={"static": static})
+            # create field
+            field_value = field(repr=repr, metadata={"static": static})
 
-        setattr(field_value, "name", field_key)
-        setattr(field_value, "type", type(value))
+            setattr(field_value, "name", field_key)
+            setattr(field_value, "type", type(value))
 
-        # register it to class
-        self.__dataclass_fields__.update({field_key: field_value})
-        self.__dict__[field_key] = value
+            # register it to class
+            self.__dataclass_fields__.update({field_key: field_value})
+            self.__dict__[field_key] = value
 
-        return value
+        for key, value in node_defs.items():
+            register_single_node(key=key, value=value)

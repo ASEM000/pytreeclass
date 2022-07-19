@@ -1,7 +1,9 @@
+import os
+
 import jax
 from jax import numpy as jnp
 
-from pytreeclass import tree_viz, treeclass
+from pytreeclass import static_field, tree_viz, treeclass
 
 
 def test_vbox():
@@ -112,3 +114,52 @@ def test_repr_str():
         == "Test(\n  a=\n    10,\n  b=\n    20,\n  c=\n    [1 2 3 4 5],\n  name=\n    A)"
     )
     assert repr_string == "Test(\n  a=10,\n  b=20,\n  c=i32[5,],\n  name='A')"
+
+
+def test_mermaid():
+    @treeclass
+    class level0:
+        a: int
+        b: int = static_field()
+
+    @treeclass
+    class level1:
+        c: int = 2
+        d: level0 = level0(10, 20)
+
+    @treeclass
+    class level2:
+        e: level1 = level1()
+        f: level0 = level0(100, 200)
+
+    a = level2()
+
+    pred = tree_viz.tree_mermaid(a)
+    # trunk-ignore(flake8/E501)
+    true = 'flowchart TD\n    id15696277213149321320[level2]\n    id15696277213149321320 --> id159132120600507116(e\\nlevel1)\n    id159132120600507116 --- id7500441386962467209["c\\n2"]\n    id159132120600507116 --> id10793958738030044218(d\\nlevel0)\n    id10793958738030044218 --- id11402079688081435459["a\\n10"]\n    id10793958738030044218 -.- id8965021841341189766["b\\n20"]\n    id15696277213149321320 --> id10009280772564895168(f\\nlevel0)\n    id10009280772564895168 --- id11951215191344350637["a\\n100"]\n    id10009280772564895168 -.- id1196345851686744158["b\\n200"]'
+    assert true == pred
+
+
+def test_viz_save():
+
+    @treeclass 
+    class level0 :
+        a : int  
+        b : int  = static_field()
+
+    @treeclass
+    class level1 :
+        d : level0  = level0(10,20)
+
+    @treeclass
+    class level2:
+        e : level1 = level1()
+        f : level0 = level0(100,200)
+    
+    model = level2()
+
+    assert tree_viz.viz_save(model, os.path.join("assets","test_diagram"),method="tree_diagram") is None 
+    assert tree_viz.viz_save(model, os.path.join("assets","test_summary"),method="summary") is None 
+    assert tree_viz.viz_save(model, os.path.join("assets","test_box"),method="tree_box") is None 
+    assert tree_viz.viz_save(model, os.path.join("assets","test_mermaid_html"),method="tree_mermaid_html") is None 
+    assert tree_viz.viz_save(model, os.path.join("assets","test_mermaid_md"),method="tree_mermaid_md") is None 

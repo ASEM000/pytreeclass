@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import math
 
 from jax import tree_flatten
@@ -465,3 +466,75 @@ def summary(model, array=None) -> str:
     )
 
     return layer_table + "\n" + param_summary
+
+
+def tree_mermaid(model):
+    def node_id(input):
+        return ctypes.c_size_t(hash(input)).value
+
+    def recurse(model, cur_depth, prev_id):
+
+        nonlocal fmt
+
+        if is_treeclass(model):
+
+            for i, field in enumerate(model.__dataclass_fields__.values()):
+                cur_node = model.__dict__[field.name]
+                cur_order = i
+                fmt += "\n"
+
+                if is_treeclass(cur_node):
+                    layer_class_name = cur_node.__class__.__name__
+                    cur = (cur_depth, cur_order)
+                    cur_id = node_id((*cur, prev_id))
+                    fmt += f"\tid{prev_id} --> id{cur_id}({field.name}\\n{layer_class_name})"
+                    recurse(cur_node, cur_depth + 1, cur_id)
+
+                else:
+                    cur = (cur_depth, cur_order)
+                    cur_id = node_id((*cur, prev_id))
+                    is_static = "static" in field.metadata and field.metadata["static"]
+                    connector = "-.-" if is_static else "---"
+                    fmt += f'\tid{prev_id} {connector} id{cur_id}["{field.name}\\n{node_format(cur_node)}"]'
+                    recurse(cur_node, cur_depth + 1, cur_id)
+
+    cur_id = node_id((0, 0, -1, 0))
+    fmt = f"flowchart TD\n\tid{cur_id}[{model.__class__.__name__}]"
+    recurse(model, 1, cur_id)
+    return fmt.expandtabs(4)
+
+
+def viz_save(model, filename, method="tree_mermaid_md"):
+
+    if method == "tree_mermaid_md":
+        fmt = "```mermaid\n" + tree_mermaid(model) + "\n```"
+
+        with open(f"{filename}.md", "w") as f:
+            f.write(fmt)
+
+    elif method == "tree_mermaid_html":
+        fmt = "<html><body><script src='https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js'></script>"
+        fmt += "<script>mermaid.initialize({ startOnLoad: true });</script><div class='mermaid'>"
+        fmt += tree_mermaid(model)
+        fmt += "</div></body></html>"
+
+        with open(f"{filename}.html", "w") as f:
+            f.write(fmt)
+
+    elif method == "tree_diagram":
+        fmt = tree_diagram(model)
+
+        with open(f"{filename}.txt", "w") as f:
+            f.write(fmt)
+
+    elif method == "tree_box":
+        fmt = tree_box(model)
+
+        with open(f"{filename}.txt", "w") as f:
+            f.write(fmt)
+
+    elif method == "summary":
+        fmt = summary(model)
+
+        with open(f"{filename}.txt", "w") as f:
+            f.write(fmt)

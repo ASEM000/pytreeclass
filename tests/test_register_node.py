@@ -21,17 +21,19 @@ def test_node():
             return x @ self.weight + self.bias
 
     @treeclass
-    class test:
+    class MLP:
         def __init__(self, layers, key=jax.random.PRNGKey(0)):
 
             keys = jax.random.split(key, len(layers))
 
-            for i, (ki, in_dim, out_dim) in enumerate(
-                zip(keys, layers[:-1], layers[1:])
-            ):
-                self.node(
-                    key=f"l{i}", value=Linear(key=ki, in_dim=in_dim, out_dim=out_dim)
-                )
+            self.register_node(
+                {
+                    f"l{i}": Linear(key=ki, in_dim=in_dim, out_dim=out_dim)
+                    for i, (ki, in_dim, out_dim) in enumerate(
+                        zip(keys, layers[:-1], layers[1:])
+                    )
+                }
+            )
 
         def __call__(self, x):
             x = self.l0(x)
@@ -41,7 +43,7 @@ def test_node():
             x = self.l2(x)
             return x
 
-    model = test(layers=[1, 128, 128, 1])
+    model = MLP(layers=[1, 128, 128, 1])
     x = jnp.linspace(0, 1, 100)[:, None]
     y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
     print(tree_viz.tree_diagram(model))
