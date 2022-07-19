@@ -74,7 +74,9 @@ class StackedLinear:
        return x
        
 model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0)) 
-      
+
+x = jnp.linspace(0,1,100)[:,None]
+y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 ```
 ### 🎨 Visualize
 
