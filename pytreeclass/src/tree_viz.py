@@ -504,7 +504,7 @@ def tree_mermaid(model):
     return fmt.expandtabs(4)
 
 
-def viz_save(model, filename, method="tree_mermaid_md"):
+def save_viz(model, filename, method="tree_mermaid_md"):
 
     if method == "tree_mermaid_md":
         fmt = "```mermaid\n" + tree_mermaid(model) + "\n```"
