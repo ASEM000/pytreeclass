@@ -41,7 +41,9 @@ from pytreeclass import treeclass,tree_viz
 
 @treeclass
 class Linear :
-   weight : jnp.ndarray
+   # any variable not wrapped with @treeclass
+   # should be declared as dataclass field here
+   weight : jnp.ndarray 
    bias   : jnp.ndarray
 
    def __init__(self,key,in_dim,out_dim):
@@ -53,9 +55,6 @@ class Linear :
 
 @treeclass
 class StackedLinear:
-   l1 : Linear
-   l2 : Linear
-   l3 : Linear
 
    def __init__(self,key,in_dim,out_dim,hidden_dim):
        keys= jax.random.split(key,3)
