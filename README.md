@@ -171,6 +171,29 @@ StackedLinear
     └──l3=Linear
         ├── weight=f32[10,1]
         └── bias=f32[1,1]  
+
+```
+
+```python
+# generate mermaid diagrams
+# print(tree_viz.tree_mermaid(model)) # generate core syntax
+>>> tree_viz.save_viz(model,"test_mermaid",method="tree_mermaid_md") 
+# saves md file `method="tree_mermaid_html"` saves as html
+```
+```mermaid
+
+flowchart TD
+    id15696277213149321320[StackedLinear]
+    id15696277213149321320 --> id159132120600507116(l1\nLinear)
+    id159132120600507116 --- id7500441386962467209["weight\nf32[1,10]"]
+    id159132120600507116 --- id10793958738030044218["bias\nf32[1,10]"]
+    id15696277213149321320 --> id10009280772564895168(l2\nLinear)
+    id10009280772564895168 --- id11951215191344350637["weight\nf32[10,10]"]
+    id10009280772564895168 --- id1196345851686744158["bias\nf32[1,10]"]
+    id15696277213149321320 --> id7572222925824649475(l3\nLinear)
+    id7572222925824649475 --- id4749243995442935477["weight\nf32[10,1]"]
+    id7572222925824649475 --- id8042761346510512486["bias\nf32[1,1]"]
+
 ```
 
 </details>
