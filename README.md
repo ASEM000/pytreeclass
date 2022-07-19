@@ -72,6 +72,9 @@ class StackedLinear:
        x = self.l3(x)
 
        return x
+       
+model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0)) 
+      
 ```
 ### 🎨 Visualize
 
@@ -216,11 +219,6 @@ flowchart TD
 x = jnp.linspace(0,1,100)[:,None]
 y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 
-model = StackedLinear(
-            in_dim=1,
-            out_dim=1,
-            hidden_dim=10,
-            key=jax.random.PRNGKey(0))
 
 def loss_func(model,x,y):
    return jnp.mean((model(x)-y)**2 )
