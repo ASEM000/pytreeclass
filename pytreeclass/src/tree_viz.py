@@ -245,7 +245,8 @@ def tree_box(model, array=None):
             )
 
     shapes = sequential_model_shape_eval(model, array) if array is not None else None
-    return recurse(model, "Parent")
+    fmt = recurse(model, "Parent")
+    return fmt.expandtabs(4)
 
 
 def tree_diagram(model):
@@ -471,7 +472,8 @@ def summary(model, array=None) -> str:
         f"{'='*table_width}"
     )
 
-    return layer_table + "\n" + param_summary
+    fmt = layer_table + "\n" + param_summary
+    return fmt.expandtabs(4)
 
 
 def tree_mermaid(model):
@@ -512,6 +514,14 @@ def tree_mermaid(model):
 
 def save_viz(model, filename, method="tree_mermaid_md"):
 
+    methods_keys = [
+        "tree_mermaid_md",
+        "tree_mermaid_html",
+        "tree_diagram",
+        "tree_box",
+        "summary",
+    ]
+
     if method == "tree_mermaid_md":
         fmt = "```mermaid\n" + tree_mermaid(model) + "\n```"
 
@@ -544,3 +554,8 @@ def save_viz(model, filename, method="tree_mermaid_md"):
 
         with open(f"{filename}.txt", "w") as f:
             f.write(fmt)
+
+    else:
+        raise ValueError(f"method must be in {methods_keys}")
+
+    print("Saving done.")

@@ -25,11 +25,10 @@ pip install pytreeclass
 
 A JAX compatible `dataclass` like datastructure with the following functionalities
 
-- Create PyTorch like NN classes like [equinox](https://github.com/patrick-kidger/equinox) and [Treex](https://github.com/cgarciae/treex)
-- Provides rich visualizations for pytrees wrapped with `@treeclass`.
-- Boolean indexing on Pytrees in functional style similar to jax.numpy. e.g. `x.at[x<0].set(0) `
-- Apply math/numpy operations like [tree-math](https://github.com/google/tree-math)
-
+- Create *PyTorch like NN classes* like [equinox](https://github.com/patrick-kidger/equinox) and [Treex](https://github.com/cgarciae/treex)
+- Provides rich *visualizations* for pytrees wrapped with `@treeclass`.
+- *Boolean indexing* on Pytrees in functional style similar to jax.numpy. e.g. `x.at[x<0].set(0) `
+- *Apply math/numpy operations* like [tree-math](https://github.com/google/tree-math)
 
 ## ⏩ Quick Example <a id="QuickExample">
 
@@ -105,13 +104,13 @@ y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 │Linear│11     │44.000 B │bias=f32[1,1]    │
 │      │       │         │weight=f32[10,1] │
 └──────┴───────┴─────────┴─────────────────┘
-Total params :	141
-Inexact params:	141
-Other params:	0
+Total params :  141
+Inexact params: 141
+Other params:   0
 --------------------------------------------
-Total size :	564.000 B
-Inexact size:	564.000 B
-Other size:	0.000 B
+Total size :    564.000 B
+Inexact size:   564.000 B
+Other size: 0.000 B
 ============================================
 ```
 </td>
