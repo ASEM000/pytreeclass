@@ -323,20 +323,25 @@ def tree_indent(model):
                 fmt += "\n" + "\t" * len(parent_level_count) if newline else ""
 
                 if is_treeclass(cur_node):
+
                     layer_class_name = f"{cur_node.__class__.__name__}"
                     fmt += f"{field.name}={layer_class_name}" + "("
                     recurse(cur_node, parent_level_count + [cur_children_count - i])
 
                 else:
                     fmt += f"{field.name}={node_format(cur_node)}" + (
-                        "," if i < (cur_children_count - 1) else ")"
+                        ","
+                        if i < (cur_children_count - 1)
+                        else (")" if parent_level_count[-1] > 1 else "")
                     )
 
                     recurse(cur_node, parent_level_count + [1])
 
-    fmt = f"{(model.__class__.__name__)}("
+    fmt = ""
+    # fmt = f"{(model.__class__.__name__)}("
     recurse(model, [1])
-    fmt += ")" if len(model.treeclass_leaves) > 1 else ""
+
+    fmt = f"{(model.__class__.__name__)}({fmt})"
 
     return fmt.expandtabs(2)
 

@@ -6,15 +6,34 @@ from typing import Any
 import jax
 
 from .decorator_util import cached_property
-from .tree_util import is_treeclass_leaf
+from .tree_util import is_treeclass, is_treeclass_leaf
 from .tree_viz import tree_indent, tree_str
 
 
 class treeBase:
-    @property
+    @cached_property
     def tree_fields(self):
         static, dynamic = dict(), dict()
 
+        # register other variables defined in other context
+        # if their values is an instance of treeclass
+        # leaves seen by jax is frozen once tree_fields is called.
+        # this enable the user to create leaves after the instantiation of the class
+        # However , freezes it once a JAX operation that requires tree_flatten is applied
+        # or in general tree_fields/tree_flatten is called
+        # this design enables avoiding declaration repeatition in dataclass fields
+        for var_name, var_value in self.__dict__.items():
+            if isinstance(var_name, str) and is_treeclass(var_value):
+
+                # create field
+                field_value = field()
+                setattr(field_value, "name", var_name)
+                setattr(field_value, "type", type(var_value))
+
+                # register it to class
+                self.__dataclass_fields__.update({var_name: field_value})
+
+        # register all dataclass fields
         for fi in self.__dataclass_fields__.values():
             if fi.name in self.__dict__:
                 value = self.__dict__[fi.name]

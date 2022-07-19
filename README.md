@@ -30,10 +30,10 @@ A JAX compatible `dataclass` like datastructure with the following functionaliti
 - Boolean indexing on Pytrees in functional style similar to jax.numpy. e.g. `x.at[x<0].set(0) `
 - Apply math/numpy operations like [tree-math](https://github.com/google/tree-math)
 
-
 ## ⏩ Quick Example <a id="QuickExample">
 
 ### 🏗️ Create simple MLP
+
 ```python
 import jax
 from jax import numpy as jnp
@@ -72,12 +72,13 @@ class StackedLinear:
        x = self.l3(x)
 
        return x
-       
-model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0)) 
+
+model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 
 x = jnp.linspace(0,1,100)[:,None]
 y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 ```
+
 ### 🎨 Visualize
 
 <div align="center">
@@ -90,7 +91,7 @@ y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 <td>
 
 ```python
- 
+
  **summary**
 >>> print(tree_viz.summary(model))
 ┌──────┬───────┬─────────┬─────────────────┐
@@ -114,6 +115,7 @@ Inexact size:	564.000 B
 Other size:	0.000 B
 ============================================
 ```
+
 </td>
 
  <td>
@@ -153,15 +155,16 @@ Other size:	0.000 B
 StackedLinear
     ├── l1=Linear
     │   ├── weight=f32[1,10]
-    │   └── bias=f32[1,10]  
+    │   └── bias=f32[1,10]
     ├── l2=Linear
     │   ├── weight=f32[10,10]
-    │   └── bias=f32[1,10]  
+    │   └── bias=f32[1,10]
     └──l3=Linear
         ├── weight=f32[10,1]
-        └── bias=f32[1,1]  
+        └── bias=f32[1,1]
 ```
- </td> 
+
+ </td>
 
 </tr>
  
@@ -170,11 +173,6 @@ StackedLinear
  </tr>
 </table>
 
-
-
- 
-
-  
 <table>
 <tr><td align = "center" > mermaid.io (Native support in Github/Notion)</td></tr>
 <tr>
@@ -184,11 +182,10 @@ StackedLinear
 ```python
 # generate mermaid diagrams
 # print(tree_viz.tree_mermaid(model)) # generate core syntax
->>> tree_viz.save_viz(model,filename="test_mermaid",method="tree_mermaid_md") 
+>>> tree_viz.save_viz(model,filename="test_mermaid",method="tree_mermaid_md")
 # use `method="tree_mermaid_html"` to save as html
- ```
+```
 
- 
 ```mermaid
 
 flowchart TD
@@ -203,9 +200,8 @@ flowchart TD
     id7572222925824649475 --- id4749243995442935477["weight\nf32[10,1]"]
     id7572222925824649475 --- id8042761346510512486["bias\nf32[1,1]"]
 ```
- 
+
 </td>
- 
 
 </tr>
  </table>
@@ -221,25 +217,28 @@ flowchart TD
 x = jnp.linspace(0,1,100)[:,None]
 y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 
-
 def loss_func(model,x,y):
-   return jnp.mean((model(x)-y)**2 )
+return jnp.mean((model(x)-y)\*\*2 )
 
 @jax.jit
 def update(model,x,y):
-   value,grads = jax.value_and_grad(loss_func)(model,x,y)
-   # no need to use `jax.tree_map` to update the model
-   #  as it model is wrapped by @treeclass
-   return value , model-1e-3*grads
+value,grads = jax.value_and_grad(loss_func)(model,x,y)
 
-for _ in range(1,10_001):
-   value,model = update(model,x,y)
+# no need to use `jax.tree_map` to update the model
+
+# as it model is wrapped by @treeclass
+
+return value , model-1e-3\*grads
+
+for \_ in range(1,10_001):
+value,model = update(model,x,y)
 
 plt.plot(x,model(x),'--r',label = 'Prediction',linewidth=3)
 plt.plot(x,y,'--k',label='True',linewidth=3)
 plt.legend()
-```
- 
+
+````
+
 ![image](assets/regression_example.svg)
 
 </details>
@@ -288,7 +287,7 @@ Linear(
     [[1.0345106  0.9914236  0.9971589  0.9965508  1.1548151  0.99296653
       0.9731281  0.9994397  0.9537985  1.0100957 ]])
 
-```
+````
 
 </details>
 
