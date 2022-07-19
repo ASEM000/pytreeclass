@@ -311,7 +311,7 @@ def tree_indent(model):
         if is_treeclass(model):
             cur_children_count = len(model.__dataclass_fields__)
 
-            newline = cur_children_count > 2
+            newline = cur_children_count > 1
 
             for i, field in enumerate(model.__dataclass_fields__.values()):
                 cur_node = model.__dict__[field.name]
@@ -392,11 +392,12 @@ def summary(model, array=None) -> str:
 
     === Example:
 
-
-
     """
 
-    dynamic_leaves = [leave.tree_fields[0] for leave in model.treeclass_leaves]
+    dynamic_leaves = [
+        leaf.tree_fields[0] if is_treeclass(leaf) else leaf
+        for leaf in model.treeclass_leaves
+    ]
 
     leaves_name = [node_class_name(leaf) for leaf in model.treeclass_leaves]
     params_count, params_size = zip(*leaves_param_count_and_size(dynamic_leaves))
