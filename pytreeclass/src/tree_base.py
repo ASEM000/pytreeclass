@@ -41,7 +41,7 @@ class treeBase:
 
         # register all dataclass fields
         for fi in self.__dataclass_fields__.values():
-            # field value is defined in class methods
+            # field value is defined in class dict
             if fi.name in self.__dict__:
                 value = self.__dict__[fi.name]
 
@@ -51,7 +51,7 @@ class treeBase:
                 value = fi.default
 
             else:
-                # the user did not declare all variables defined in fields
+                # the user did not declare a variable defined in field
                 raise ValueError(f"field={fi.name} is not declared.")
 
             # str is always excluded
@@ -60,7 +60,7 @@ class treeBase:
 
             if excluded_by_type or excluded_by_meta:
                 static[fi.name] = value
-
+            
             else:
                 dynamic[fi.name] = value
 
@@ -91,7 +91,7 @@ class treeBase:
         return jax.tree_util.tree_flatten(self)
 
     def __hash__(self):
-        return hash(tuple(jax.tree_flatten(self)[0]))
+        return hash(tuple(*self.flatten_leaves))
 
     @cached_property
     def __treeclass_repr__(self):
