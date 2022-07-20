@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import field
+from dataclasses import MISSING, field
 from typing import Any
 
 import jax
@@ -14,7 +14,6 @@ class treeBase:
     @cached_property
     def tree_fields(self):
         static, dynamic = dict(), dict()
-
         # register other variables defined in other context
         # if their values is an instance of treeclass
         # leaves seen by jax is frozen once tree_fields is called.
@@ -22,8 +21,15 @@ class treeBase:
         # However , freezes it once a JAX operation that requires tree_flatten is applied
         # or in general tree_fields/tree_flatten is called
         # this design enables avoiding declaration repeatition in dataclass fields
+        # tree_fields is called in tree_viz, repr, and str operations.
         for var_name, var_value in self.__dict__.items():
-            if isinstance(var_name, str) and is_treeclass(var_value):
+            # check if a variable in self.__dict__ is treeclass
+            # that is not defined in fields
+            if (
+                isinstance(var_name, str)
+                and is_treeclass(var_value)
+                and var_name not in self.__dataclass_fields__.keys()
+            ):
 
                 # create field
                 field_value = field()
@@ -35,12 +41,20 @@ class treeBase:
 
         # register all dataclass fields
         for fi in self.__dataclass_fields__.values():
+            # field value is defined in class methods
             if fi.name in self.__dict__:
                 value = self.__dict__[fi.name]
+
+            # field value is defined in field default
+            elif fi.default is not MISSING:
+                self.__dict__[fi.name] = fi.default
+                value = fi.default
+
             else:
                 # the user did not declare all variables defined in fields
                 raise ValueError(f"field={fi.name} is not declared.")
 
+            # str is always excluded
             excluded_by_type = isinstance(value, str)
             excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
 

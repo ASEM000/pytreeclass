@@ -21,10 +21,7 @@ def treeclass(*args, **kwargs):
             unsafe_hash=True, init=not user_defined_init, repr=False, eq=False
         )(cls)
 
-        base_classes = (
-            dCls,
-            treeBase,
-        )
+        base_classes = (dCls, treeBase)
         base_classes += (treeOpBase, treeIndexer) if op else ()
 
         newCls = type(cls.__name__, base_classes, {})

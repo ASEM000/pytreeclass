@@ -271,23 +271,18 @@ def tree_diagram(model):
                 fmt += "\n" + "".join(
                     [(("│" if lvl > 1 else "") + "\t") for lvl in parent_level_count]
                 )
-                static_mark = (
-                    "x" if ("static" in fi.metadata and fi.metadata["static"]) else "─"
-                )
 
                 if is_treeclass(cur_node):
 
                     layer_class_name = cur_node.__class__.__name__
 
                     fmt += (
-                        f"├{static_mark}─ " if i < (cur_children_count - 1) else "└──"
+                        "├── " if i < (cur_children_count - 1) else "└──"
                     ) + f"{fi.name}={layer_class_name}"
                     recurse(cur_node, parent_level_count + [cur_children_count - i])
 
                 else:
-                    fmt += (
-                        f"├{static_mark}─ " if i < (cur_children_count - 1) else "└── "
-                    )
+                    fmt += "├── " if i < (cur_children_count - 1) else "└── "
                     fmt += f"{fi.name}={node_format(cur_node)}"
                     recurse(cur_node, parent_level_count + [1])
 
