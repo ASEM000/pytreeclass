@@ -11,7 +11,7 @@ class cached_property:
 
     def __get__(self, instance, owner):
         attr = self.func(instance)
-        setattr(instance, self.name, attr)
+        object.__setattr__(instance, self.name, attr)
         return attr
 
 

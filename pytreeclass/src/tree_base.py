@@ -11,8 +11,17 @@ from .tree_viz import tree_indent, tree_str
 
 
 class treeBase:
+
+    def __setattr__(self, name, value):
+        if hasattr(self, "frozen_treeclass") :
+            raise ValueError("Cannot set value to a frozen treeclass.")
+        object.__setattr__(self, name, value)
+
     @cached_property
     def tree_fields(self):
+        # freeze the treeclass once the tree is traversed.
+        object.__setattr__(self, "frozen_treeclass", True)
+        
         static, dynamic = dict(), dict()
         # register other variables defined in other context
         # if their values is an instance of treeclass
@@ -60,7 +69,7 @@ class treeBase:
 
             if excluded_by_type or excluded_by_meta:
                 static[fi.name] = value
-            
+
             else:
                 dynamic[fi.name] = value
 

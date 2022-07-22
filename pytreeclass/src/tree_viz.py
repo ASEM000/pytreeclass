@@ -277,7 +277,7 @@ def tree_diagram(model):
                     layer_class_name = cur_node.__class__.__name__
 
                     fmt += (
-                        "├── " if i < (cur_children_count - 1) else "└──"
+                        "├── " if i < (cur_children_count - 1) else "└── "
                     ) + f"{fi.name}={layer_class_name}"
                     recurse(cur_node, parent_level_count + [cur_children_count - i])
 
@@ -528,19 +528,13 @@ def save_viz(model, filename, method="tree_mermaid_md"):
             f.write(fmt)
 
     elif method == "tree_diagram":
-        fmt = tree_diagram(model)
-
         with open(f"{filename}.txt", "w") as f:
-            f.write(fmt)
+            f.write(tree_diagram(model))
 
     elif method == "tree_box":
-        fmt = tree_box(model)
-
         with open(f"{filename}.txt", "w") as f:
-            f.write(fmt)
+            f.write(tree_box(model))
 
     elif method == "summary":
-        fmt = summary(model)
-
         with open(f"{filename}.txt", "w") as f:
-            f.write(fmt)
+            f.write(summary(model))
