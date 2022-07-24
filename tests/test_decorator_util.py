@@ -74,5 +74,3 @@ def test_singledispatchmethod():
     assert A.plus(1) == 2
     assert A.plus(1.0) == 101.0
     assert A.plus(complex(1.0)) == complex(101.0)
-
-

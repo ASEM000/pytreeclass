@@ -272,17 +272,22 @@ def tree_diagram(model):
                     [(("│" if lvl > 1 else "") + "\t") for lvl in parent_level_count]
                 )
 
+                is_static = "static" in fi.metadata and fi.metadata["static"]
+                mark = "x" if is_static else ("#" if model.frozen else "─")
+
                 if is_treeclass(cur_node):
 
                     layer_class_name = cur_node.__class__.__name__
 
                     fmt += (
-                        "├── " if i < (cur_children_count - 1) else "└── "
+                        f"├{mark}─ " if i < (cur_children_count - 1) else f"└{mark}─ "
                     ) + f"{fi.name}={layer_class_name}"
                     recurse(cur_node, parent_level_count + [cur_children_count - i])
 
                 else:
-                    fmt += "├── " if i < (cur_children_count - 1) else "└── "
+                    fmt += (
+                        f"├{mark}─ " if i < (cur_children_count - 1) else f"└{mark}─ "
+                    )
                     fmt += f"{fi.name}={node_format(cur_node)}"
                     recurse(cur_node, parent_level_count + [1])
 
@@ -398,6 +403,7 @@ def summary(model, array=None) -> str:
     === Example:
 
     """
+    # TODO : handle frzoen params
 
     dynamic_leaves = [
         leaf.tree_fields[0] if is_treeclass(leaf) else {"": leaf}

@@ -1,36 +1,46 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import MISSING, field
 from typing import Any
 
 import jax
 
-from .decorator_util import cached_property
 from .tree_util import is_treeclass, is_treeclass_leaf
 from .tree_viz import tree_indent, tree_str
 
 
 class treeBase:
+    def freeze(self):
+        new_cls = copy.copy(self)
+        object.__setattr__(new_cls, "__frozen_treeclass__", True)
+        return new_cls
+
+    def unfreeze(self):
+        new_cls = copy.copy(self)
+        object.__setattr__(new_cls, "__frozen_treeclass__", False)
+        return new_cls
+
+    @property
+    def frozen(self):
+        if hasattr(self, "__frozen_treeclass__"):
+            return self.__frozen_treeclass__
+        return False
 
     def __setattr__(self, name, value):
-        if hasattr(self, "frozen_treeclass") :
-            raise ValueError("Cannot set value to a frozen treeclass.")
+        if self.frozen:
+            raise ValueError("Cannot set a value to a frozen treeclass.")
         object.__setattr__(self, name, value)
 
-    @cached_property
+    @property
     def tree_fields(self):
-        # freeze the treeclass once the tree is traversed.
         object.__setattr__(self, "frozen_treeclass", True)
-        
+
         static, dynamic = dict(), dict()
         # register other variables defined in other context
-        # if their values is an instance of treeclass
-        # leaves seen by jax is frozen once tree_fields is called.
-        # this enable the user to create leaves after the instantiation of the class
-        # However , freezes it once a JAX operation that requires tree_flatten is applied
-        # or in general tree_fields/tree_flatten is called
-        # this design enables avoiding declaration repeatition in dataclass fields
-        # tree_fields is called in tree_viz, repr, and str operations.
+        # if their value is an instance of treeclass
+        # to avoid redefining them as dataclass fields.
+
         for var_name, var_value in self.__dict__.items():
             # check if a variable in self.__dict__ is treeclass
             # that is not defined in fields
@@ -63,15 +73,19 @@ class treeBase:
                 # the user did not declare a variable defined in field
                 raise ValueError(f"field={fi.name} is not declared.")
 
-            # str is always excluded
-            excluded_by_type = isinstance(value, str)
-            excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
-
-            if excluded_by_type or excluded_by_meta:
+            if self.frozen:
                 static[fi.name] = value
 
             else:
-                dynamic[fi.name] = value
+                # str is always excluded
+                excluded_by_type = isinstance(value, str)
+                excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
+
+                if self.frozen or excluded_by_type or excluded_by_meta:
+                    static[fi.name] = value
+
+                else:
+                    dynamic[fi.name] = value
 
         return (dynamic, static)
 
@@ -91,22 +105,22 @@ class treeBase:
             object.__setattr__(newCls, k, v)
         return newCls
 
-    @cached_property
+    @property
     def treeclass_leaves(self):
         return jax.tree_util.tree_leaves(self, is_treeclass_leaf)
 
-    @cached_property
+    @property
     def flatten_leaves(self):
         return jax.tree_util.tree_flatten(self)
 
     def __hash__(self):
         return hash(tuple(*self.flatten_leaves))
 
-    @cached_property
+    @property
     def __treeclass_repr__(self):
         return tree_indent(self)
 
-    @cached_property
+    @property
     def __treeclass_str__(self):
         return tree_str(self)
 

@@ -43,7 +43,7 @@ from pytreeclass import treeclass,tree_viz
 class Linear :
    # any variable not wrapped with @treeclass
    # should be declared as dataclass field here
-   weight : jnp.ndarray 
+   weight : jnp.ndarray
    bias   : jnp.ndarray
 
    def __init__(self,key,in_dim,out_dim):
@@ -217,7 +217,7 @@ x = jnp.linspace(0,1,100)[:,None]
 y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 
 def loss_func(model,x,y):
-return jnp.mean((model(x)-y)\*\*2 )
+return jnp.mean((model(x)-y)**2 )
 
 @jax.jit
 def update(model,x,y):
@@ -227,9 +227,9 @@ value,grads = jax.value_and_grad(loss_func)(model,x,y)
 
 # as it model is wrapped by @treeclass
 
-return value , model-1e-3\*grads
+return value , model-1e-3*grads
 
-for \_ in range(1,10_001):
+for _ in range(1,10_001):
 value,model = update(model,x,y)
 
 plt.plot(x,model(x),'--r',label = 'Prediction',linewidth=3)
