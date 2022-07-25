@@ -207,3 +207,21 @@ def summary_line(leaf):
         name = f"{node_class_name(leaf)}\n(frozen)"
         count, size = reduce_count_and_size(static)
         return (name, count, size)
+
+
+def freeze_nodes(model):
+    """inplace freezing"""
+    if is_treeclass(model):
+        object.__setattr__(model, "__frozen_treeclass__", True)
+        for kw, leaf in model.__dataclass_fields__.items():
+            freeze_nodes(model.__dict__[kw])
+    return model
+
+
+def unfreeze_nodes(model):
+    """inplace freezing"""
+    if is_treeclass(model):
+        object.__setattr__(model, "__frozen_treeclass__", False)
+        for kw, leaf in model.__dataclass_fields__.items():
+            unfreeze_nodes(model.__dict__[kw])
+    return model

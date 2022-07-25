@@ -6,20 +6,18 @@ from typing import Any
 
 import jax
 
-from .tree_util import is_treeclass, is_treeclass_leaf
+from .tree_util import freeze_nodes, is_treeclass, is_treeclass_leaf, unfreeze_nodes
 from .tree_viz import tree_indent, tree_str
 
 
 class treeBase:
     def freeze(self):
         new_cls = copy.copy(self)
-        object.__setattr__(new_cls, "__frozen_treeclass__", True)
-        return new_cls
+        return freeze_nodes(new_cls)
 
     def unfreeze(self):
         new_cls = copy.copy(self)
-        object.__setattr__(new_cls, "__frozen_treeclass__", False)
-        return new_cls
+        return unfreeze_nodes(new_cls)
 
     @property
     def frozen(self):
@@ -39,6 +37,7 @@ class treeBase:
         # register other variables defined in other context
         # if their value is an instance of treeclass
         # to avoid redefining them as dataclass fields.
+        static["__frozen_treeclass__"] = self.frozen
 
         for var_name, var_value in self.__dict__.items():
             # check if a variable in self.__dict__ is treeclass
@@ -80,7 +79,18 @@ class treeBase:
                 excluded_by_type = isinstance(value, str)
                 excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
 
-                if self.frozen or excluded_by_type or excluded_by_meta:
+                if excluded_by_type:
+                    # add static type to metadata
+                    static[fi.name] = value
+                    updated_field = self.__dataclass_fields__[fi.name]
+                    object.__setattr__(
+                        updated_field,
+                        "metadata",
+                        {**updated_field.metadata, **{"static": True}},
+                    )
+                    self.__dataclass_fields__[fi.name] = updated_field
+
+                elif excluded_by_meta:
                     static[fi.name] = value
 
                 else:
@@ -99,10 +109,10 @@ class treeBase:
         static_keys, static_vals = aux[1].keys(), aux[1].values()
         attrs = dict(zip((*dynamic_keys, *static_keys), (*dynamic_vals, *static_vals)))
 
-        newCls = cls.__new__(cls)
+        new_cls = cls.__new__(cls)
         for k, v in attrs.items():
-            object.__setattr__(newCls, k, v)
-        return newCls
+            object.__setattr__(new_cls, k, v)
+        return new_cls
 
     @property
     def treeclass_leaves(self):
@@ -122,7 +132,9 @@ class treeBase:
         return tree_str(self)
 
     def asdict(self):
-        return {**self.tree_fields[0], **self.tree_fields[1]}
+        dynamic, static = self.tree_fields
+        static.pop("__frozen_treeclass__", None)
+        return {**dynamic, **static}
 
     def register_node(self, node_defs: dict):
         def register_single_node(
