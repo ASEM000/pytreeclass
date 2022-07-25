@@ -34,7 +34,6 @@ class treeBase:
 
     @property
     def tree_fields(self):
-        object.__setattr__(self, "frozen_treeclass", True)
 
         static, dynamic = dict(), dict()
         # register other variables defined in other context
@@ -116,19 +115,11 @@ class treeBase:
     def __hash__(self):
         return hash(tuple(*self.flatten_leaves))
 
-    @property
-    def __treeclass_repr__(self):
+    def __repr__(self):
         return tree_indent(self)
 
-    @property
-    def __treeclass_str__(self):
-        return tree_str(self)
-
-    def __repr__(self):
-        return self.__treeclass_repr__
-
     def __str__(self):
-        return self.__treeclass_str__
+        return tree_str(self)
 
     def asdict(self):
         return {**self.tree_fields[0], **self.tree_fields[1]}

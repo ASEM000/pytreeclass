@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import ctypes
-import math
 
 from jax import tree_flatten
 
 from .tree_util import (
+    format_count,
+    format_size,
     is_treeclass,
     is_treeclass_leaf,
-    leaves_param_count_and_size,
-    leaves_param_format,
-    node_class_name,
     node_format,
     sequential_model_shape_eval,
+    summary_line,
 )
 
 
@@ -396,84 +395,55 @@ def tree_str(model):
 
 
 def summary(model, array=None) -> str:
-    """
-    === Explanation
-        return a printable string containing summary of treeclass leaves.
 
-    === Example:
+    ROW = [["Type ", "Param #", "Size ", "Config", "Output"]]
 
-    """
-    # TODO : handle frzoen params
-
-    dynamic_leaves = [
-        leaf.tree_fields[0] if is_treeclass(leaf) else {"": leaf}
-        for leaf in model.treeclass_leaves
-    ]
-
-    leaves_name = [node_class_name(leaf) for leaf in model.treeclass_leaves]
-    params_count, params_size = zip(*leaves_param_count_and_size(dynamic_leaves))
-    params_repr = leaves_param_format(dynamic_leaves)
-
-    total_param_count = 0
-    total_param_size = 0
+    dynamic_count, static_count = 0, 0
+    dynamic_size, static_size = 0, 0
 
     if array is not None:
-        params_shape = sequential_model_shape_eval(model, array)
+        params_shape = sequential_model_shape_eval(model, array)[1:]
 
-    else:
-        params_shape = [None] * len(dynamic_leaves)
+    for index, leaf in enumerate(model.treeclass_leaves):
+        name, count, size = summary_line(leaf)
 
-    ROW = [["Type ", "Output ", "Param #", "Size ", "Config"]]
+        shape = node_format(params_shape[index]) if array is not None else ""
 
-    order_kw = ["B", "KB", "MB", "GB"]
+        if leaf.frozen:
+            static_count += count
+            static_size += size
+            fmt = "\n".join(
+                [f"{k}={node_format(v)}" for k, v in leaf.tree_fields[1].items()]
+            )
 
-    for (pname, pcount, psize, prepr, pshape) in zip(
-        leaves_name, params_count, params_size, params_repr, params_shape
-    ):
+        else:
+            dynamic_count += count
+            dynamic_size += size
+            fmt = "\n".join(
+                [f"{k}={node_format(v)}" for k, v in leaf.tree_fields[0].items()]
+            )
 
-        cur_type = f"{pname}"
-        cur_count = f"{int(pcount.real+pcount.imag):,}"
-        cur_size = psize.real + psize.imag
-        cur_size_order = int(math.log(cur_size, 1024)) if cur_size > 0 else 0
-        cur_size = f"{(cur_size)/(1024**cur_size_order):.3f} {order_kw[cur_size_order]}"
-        cur_repr = "\n".join([f" {k}={v}" for k, v in prepr.items()]).replace(" ", "")
-        cur_shape = node_format(pshape) if array is not None else None
-
-        total_param_count += pcount
-        total_param_size += psize
-
-        ROW += [[cur_type, cur_shape, cur_count, cur_size, cur_repr]]
+        ROW += [[name, format_count(count, True), format_size(size, True), fmt, shape]]
 
     COL = [list(c) for c in zip(*ROW)]
-
     if array is None:
-        COL.pop(1)
+        COL.pop()
 
     layer_table = table(COL)
-
     table_width = len(layer_table.split("\n")[0])
 
     # summary row
-    total_dparam = total_param_count.real
-    total_sparam = total_param_count.imag
-
-    total_dparam_size = total_param_size.real
-    dorder = int(math.log(total_dparam_size, 1024)) if total_dparam_size > 0 else 0  #
-
-    total_sparam_size = total_param_size.imag
-    sorder = int(math.log(total_sparam_size, 1024)) if total_sparam_size > 0 else 0  #
-
-    total_param_size = total_dparam_size + total_sparam_size
-    torder = int(math.log(total_param_size, 1024)) if total_param_size > 0 else 0  #
+    total_count = static_count + dynamic_count
+    total_size = static_size + dynamic_size
 
     param_summary = (
-        f"Total params :\t{int(total_dparam+total_sparam):,}\n"
-        f"Inexact params:\t{int(total_dparam):,}\n"
-        f"Other params:\t{int(total_sparam):,}\n"
+        f"Total # :\t\t{format_count(total_count)}\n"
+        f"Dynamic #:\t\t{format_count(dynamic_count)}\n"
+        f"Static/Frozen #:\t{format_count(static_count)}\n"
         f"{'-'*table_width}\n"
-        f"Total size :\t{total_param_size/(1024**torder):.3f} {order_kw[torder]}\n"
-        f"Inexact size:\t{total_dparam_size/(1024**dorder):.3f} {order_kw[dorder]}\n"
-        f"Other size:\t{total_sparam_size/(1024**sorder):.3f} {order_kw[sorder]}\n"
+        f"Total size :\t\t{format_size(total_size)}\n"
+        f"Dynamic size:\t\t{format_size(dynamic_size)}\n"
+        f"Static/Frozen size:\t{format_size(static_size)}\n"
         f"{'='*table_width}"
     )
 

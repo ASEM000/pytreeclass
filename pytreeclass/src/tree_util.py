@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import math
 import sys
 from dataclasses import field
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax import tree_map
 from jax.tree_util import tree_reduce
 
 
@@ -131,33 +131,79 @@ def node_format(node):
         return f"{node!r}"
 
 
-def leaves_param_count(leaves):
-    """returns param count for each leave"""
-    return [
-        tree_reduce(lambda acc, x: acc + node_count(x), leave, complex(0, 0))
-        for leave in leaves
-    ]
+def node_count_and_size(node):
+    """calculate number and size of `trainable` and `non-trainable` parameters"""
+
+    if isinstance(node, (jnp.ndarray, np.ndarray)):
+        # inexact(trainable) array
+        if jnp.issubdtype(node, jnp.inexact):
+            count = complex(int(jnp.array(node.shape).prod()), 0)
+            size = complex(int(node.nbytes), 0)
+
+        # exact paramter
+        else:
+            count = complex(0, int(jnp.array(node.shape).prod()))
+            size = complex(0, int(node.nbytes))
+
+    # inexact non-array
+    elif isinstance(node, (float, complex)):
+        count = complex(1, 0)
+        size = complex(sys.getsizeof(node), 0)
+
+    # exact non-array
+    elif isinstance(node, int):
+        count = complex(0, 1)
+        size = complex(sys.getsizeof(node), 0)
+
+    # others
+    else:
+        count = complex(0, 0)
+        size = complex(0, sys.getsizeof(node))
+
+    return (count, size)
 
 
-def leaves_param_size(leaves):
-    """returns param count for each leave"""
-    return [
-        tree_reduce(lambda acc, x: acc + node_size(x), leave, 0) for leave in leaves
-    ]
+def reduce_count_and_size(leaf):
+    """reduce params count and params size of a tree of leaves"""
+
+    def reduce_func(acc, node):
+        lhs_count, lhs_size = acc
+        rhs_count, rhs_size = node_count_and_size(node)
+        return (lhs_count + rhs_count, lhs_size + rhs_size)
+
+    return tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
 
 
-def leaves_param_format(leaves):
-    return tree_map(lambda x: node_format(x), [leave for leave in leaves])
+def format_size(node_size, newline=False):
+    """return formatted size from inexact(exact) complex number"""
+    mark = "\n" if newline else ""
+    order_kw = ["B", "KB", "MB", "GB"]
+
+    # define order of magnitude
+    real_size_order = int(math.log(node_size.real, 1024)) if node_size.real > 0 else 0
+    imag_size_order = int(math.log(node_size.imag, 1024)) if node_size.imag > 0 else 0
+    return (
+        f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
+        f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
+    )
 
 
-def leaves_param_count_and_size(leaves):
-    """returns param count and param size for each leave"""
+def format_count(node_count, newline=False):
+    mark = "\n" if newline else ""
+    return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
 
-    def reduce_func(acc, x):
-        cur_param_count = node_count(x)
-        cur_param_size = node_size(x)
-        prev_param_count, prev_param_size = acc
 
-        return (cur_param_count + prev_param_count, cur_param_size + prev_param_size)
+def summary_line(leaf):
 
-    return [tree_reduce(reduce_func, leave, (complex(0, 0), 0)) for leave in leaves]
+    dynamic, static = leaf.tree_fields
+    is_dynamic = not leaf.frozen
+
+    if is_dynamic:
+        name = f"{node_class_name(leaf)}"
+        count, size = reduce_count_and_size(dynamic)
+        return (name, count, size)
+
+    else:
+        name = f"{node_class_name(leaf)}\n(frozen)"
+        count, size = reduce_count_and_size(static)
+        return (name, count, size)
