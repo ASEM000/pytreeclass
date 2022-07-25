@@ -38,11 +38,12 @@ A JAX compatible `dataclass` like datastructure with the following functionaliti
 import jax
 from jax import numpy as jnp
 from pytreeclass import treeclass,tree_viz
+import matplotlib.pyplot as plt
 
 @treeclass
 class Linear :
-   # any variable not wrapped with @treeclass
-   # should be declared as dataclass field here
+   # Any variable not wrapped with @treeclass
+   # should be declared as a dataclass field here
    weight : jnp.ndarray
    bias   : jnp.ndarray
 
@@ -56,21 +57,23 @@ class Linear :
 @treeclass
 class StackedLinear:
 
-   def __init__(self,key,in_dim,out_dim,hidden_dim):
-       keys= jax.random.split(key,3)
+    def __init__(self,key,in_dim,out_dim,hidden_dim):
+        keys= jax.random.split(key,3)
 
-       self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
-       self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
-       self.l3 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
+        # Declaring l1,l2,l3 as dataclass_fields is optional
+        # as they are already wrapped with @treeclass
+        self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
+        self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
+        self.l3 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
 
-   def __call__(self,x):
-       x = self.l1(x)
-       x = jax.nn.tanh(x)
-       x = self.l2(x)
-       x = jax.nn.tanh(x)
-       x = self.l3(x)
+    def __call__(self,x):
+        x = self.l1(x)
+        x = jax.nn.tanh(x)
+        x = self.l2(x)
+        x = jax.nn.tanh(x)
+        x = self.l3(x)
 
-       return x
+        return x
 
 model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 
@@ -207,35 +210,39 @@ flowchart TD
 
  </div>
 
+### ✂️ Model surgery
+```python
+# freeze l1
+model.l1 = model.l1.freeze()
+
+# set non-negative values in l2 to 0
+model.l2 = model.l2.at[model.l2<0].set(0)
+```
+
 ## 🔢 More<a id="More"></a>
 
 <details><summary>Train from scratch</summary>
  
 ```python
- 
 x = jnp.linspace(0,1,100)[:,None]
 y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 
 def loss_func(model,x,y):
-return jnp.mean((model(x)-y)**2 )
+    return jnp.mean((model(x)-y)**2 )
 
 @jax.jit
 def update(model,x,y):
-value,grads = jax.value_and_grad(loss_func)(model,x,y)
+    value,grads = jax.value_and_grad(loss_func)(model,x,y)
+    # no need to use `jax.tree_map` to update the model
+    # as it model is wrapped by @treeclass
+    return value , model-1e-3*grads
 
-# no need to use `jax.tree_map` to update the model
-
-# as it model is wrapped by @treeclass
-
-return value , model-1e-3*grads
-
-for _ in range(1,10_001):
-value,model = update(model,x,y)
+for _ in range(1,20_001):
+    value,model = update(model,x,y)
 
 plt.plot(x,model(x),'--r',label = 'Prediction',linewidth=3)
 plt.plot(x,y,'--k',label='True',linewidth=3)
 plt.legend()
-
 ````
 
 ![image](assets/regression_example.svg)
@@ -249,44 +256,56 @@ plt.legend()
 Similar to JAX pytreeclass provides `.at` property for out-of-place update.
 
 ```python
-
 # get layer1
 layer1 = model.l1
+```
 
+```python
 # layer1 repr
 >>> print(f"{layer1!r}")
-Linear(weight=f32[1,10],bias=f32[1,10])
 
+Linear(
+  weight=f32[1,10],
+  bias=f32[1,10])
+ ```
+  
+```python
 # layer1 str
 >>> print(f"{layer1!s}")
+
 Linear(
   weight=
-    [[-2.55655     1.674097    0.07847876  0.48010758 -1.9021134  -0.95792925
-       0.27486905  0.6492373  -0.51447827  1.077894  ]],
+    [[-2.5491788   1.674097    0.07813213  0.47670904 -1.8760327  -0.9941608
+       0.2808009   0.6522513  -0.53470623  1.0796958 ]],
   bias=
-    [[1.0345106  0.9914236  0.9971589  0.9965508  1.1548151  0.99296653
-      0.9731281  0.9994397  0.9537985  1.0100957 ]])
+    [[1.0368661  0.98985153 1.0104426  0.9997676  1.2349331  0.9800282
+      0.9618377  0.99291945 0.9431369  1.0172408 ]])
+```
 
-# get only positive values
->>> print(layer1.at[layer1>0].get())
-Linear(
-  weight=
-    [1.674097   0.07847876 0.48010758 0.27486905 0.6492373  1.077894  ],
-  bias=
-    [1.0345106  0.9914236  0.9971589  0.9965508  1.1548151  0.99296653
-     0.9731281  0.9994397  0.9537985  1.0100957 ])
-
+```python
 # set negative values to 0
 >>> print(layer1.at[layer1<0].set(0))
+
 Linear(
   weight=
-    [[0.         1.674097   0.07847876 0.48010758 0.         0.
-      0.27486905 0.6492373  0.         1.077894  ]],
+    [[0.         1.674097   0.07813213 0.47670904 0.         0.
+      0.2808009  0.6522513  0.         1.0796958 ]],
   bias=
-    [[1.0345106  0.9914236  0.9971589  0.9965508  1.1548151  0.99296653
-      0.9731281  0.9994397  0.9537985  1.0100957 ]])
+    [[1.0368661  0.98985153 1.0104426  0.9997676  1.2349331  0.9800282
+      0.9618377  0.99291945 0.9431369  1.0172408 ]])
+```
 
-````
+```python
+# get only positive values
+>>> print(layer1.at[layer1>0].get())
+
+Linear(
+  weight=
+    [1.674097   0.07813213 0.47670904 0.2808009  0.6522513  1.0796958 ],
+  bias=
+    [1.0368661  0.98985153 1.0104426  0.9997676  1.2349331  0.9800282
+     0.9618377  0.99291945 0.9431369  1.0172408 ])
+```
 
 </details>
 
