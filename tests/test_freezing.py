@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from pytreeclass import tree_viz, treeclass
 from pytreeclass.src.tree_util import freeze_nodes, unfreeze_nodes
-
+import numpy as np 
 
 def test_freezing_unfreezing():
     @treeclass
@@ -17,9 +17,9 @@ def test_freezing_unfreezing():
     b = a.freeze()
     c = a.unfreeze()
 
-    assert jax.tree_leaves(a) == [1, 2]
-    assert jax.tree_leaves(b) == []
-    assert jax.tree_leaves(c) == [1, 2]
+    assert jax.tree_util.tree_leaves(a) == [1, 2]
+    assert jax.tree_util.tree_leaves(b) == []
+    assert jax.tree_util.tree_leaves(c) == [1, 2]
 
     @treeclass
     class A:
@@ -90,7 +90,7 @@ def test_freezing_unfreezing():
     for _ in range(1, 10_001):
         value, model = update(model, x, y)
 
-    assert value == 3.9368904
+    assert value == jnp.array(3.9368904)
 
     @treeclass
     class Stacked:
