@@ -111,7 +111,7 @@ class treeIndexer:
             @__getitem__.register(tuple)
             def __param_getitiem__(inner_self, *args):
                 # indexing by param name
-                flatten_args = jax.tree_leaves(args)
+                flatten_args = jax.tree_util.tree_leaves(args)
                 if not all(isinstance(arg, str) for arg in flatten_args):
                     raise ValueError("Invalid indexing argument")
 
@@ -133,7 +133,7 @@ class treeIndexer:
                 # indexing by model
 
                 if not all(
-                    is_treeclass_leaf_bool(leaf) for leaf in jax.tree_leaves(arg)
+                    is_treeclass_leaf_bool(leaf) for leaf in jax.tree_util.tree_leaves(arg)
                 ):
                     raise ValueError("model leaves argument must be boolean.")
 

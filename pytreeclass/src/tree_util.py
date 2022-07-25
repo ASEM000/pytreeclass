@@ -47,8 +47,8 @@ def is_treeclass_equal(lhs, rhs):
         else:
             return lhs_node == rhs_node
 
-    lhs_leaves = jax.tree_leaves(lhs)
-    rhs_leaves = jax.tree_leaves(rhs)
+    lhs_leaves = jax.tree_util.tree_leaves(lhs)
+    rhs_leaves = jax.tree_util.tree_leaves(rhs)
 
     for lhs_node, rhs_node in zip(lhs_leaves, rhs_leaves):
         if not assert_node(lhs_node, rhs_node):

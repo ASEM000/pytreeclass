@@ -90,7 +90,7 @@ def test_freezing_unfreezing():
     for _ in range(1, 10_001):
         value, model = update(model, x, y)
 
-    assert value == jnp.array(3.9368904)
+    np.testing.assert_allclose(value , jnp.array(3.9368),atol=1e-3)
 
     @treeclass
     class Stacked:
