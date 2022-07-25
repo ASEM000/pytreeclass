@@ -2,10 +2,11 @@ from dataclasses import field
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from pytreeclass import tree_viz, treeclass
 from pytreeclass.src.tree_util import freeze_nodes, unfreeze_nodes
-import numpy as np 
+
 
 def test_freezing_unfreezing():
     @treeclass
@@ -90,7 +91,7 @@ def test_freezing_unfreezing():
     for _ in range(1, 10_001):
         value, model = update(model, x, y)
 
-    np.testing.assert_allclose(value , jnp.array(3.9368),atol=1e-3)
+    np.testing.assert_allclose(value, jnp.array(3.9368), atol=1e-3)
 
     @treeclass
     class Stacked:

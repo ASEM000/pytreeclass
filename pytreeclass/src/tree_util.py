@@ -68,45 +68,6 @@ def node_class_name(node):
     return node.__class__.__name__
 
 
-def node_size(node):
-    """get size of `trainable` and `non-trainable` parameters"""
-
-    # store trainable in real , nontrainable in imag
-    if isinstance(node, (jnp.ndarray, np.ndarray)):
-
-        if jnp.issubdtype(node, jnp.inexact):
-            return complex(int(node.nbytes), 0)
-
-        else:
-            return complex(0, int(node.nbytes))
-
-    elif isinstance(node, (float, complex)):
-        return complex(sys.getsizeof(node), 0)
-
-    else:
-        return complex(0, sys.getsizeof(node))
-
-
-def node_count(node):
-    """count number of `trainable` and `non-trainable` parameters"""
-    if isinstance(node, (jnp.ndarray, np.ndarray)):
-
-        if jnp.issubdtype(node, jnp.inexact):
-            return complex(int(jnp.array(node.shape).prod()), 0)
-
-        else:
-            return complex(0, int(jnp.array(node.shape).prod()))
-
-    elif isinstance(node, (float, complex)):
-        return complex(1, 0)
-
-    elif isinstance(node, int):
-        return complex(0, 1)
-
-    else:
-        return complex(0, 0)
-
-
 def node_format(node):
     """format shape and dtype of jnp.array"""
 
