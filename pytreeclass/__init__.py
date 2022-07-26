@@ -4,4 +4,4 @@ from .src.tree_util import static_field
 
 __all__ = ("tree_viz", "treeclass", "static_field")
 
-__version__ = "0.0.5"
+__version__ = "0.0.6"
