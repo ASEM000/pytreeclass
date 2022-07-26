@@ -1,4 +1,3 @@
-
 # source https://raw.githubusercontent.com/deepmind/dm-haiku/main/docs/conf.py
 
 
@@ -21,8 +20,9 @@ import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
-import pytreeclass
 import sphinxcontrib.katex as katex
+
+import pytreeclass
 
 # -- Project information -----------------------------------------------------
 
