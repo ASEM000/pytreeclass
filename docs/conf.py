@@ -162,3 +162,12 @@ nbsphinx_execute = "never"
 nbsphinx_codecell_lexer = "ipython"
 nbsphinx_kernel_name = "python"
 nbsphinx_timeout = 180
+nbsphinx_prolog = r"""
+{% set docname = 'docs/' + env.doc2path(env.docname, base=None) %}
+.. only:: html
+    .. role:: raw-html(raw)
+        :format: html
+    .. nbinfo::
+        Interactive online version:
+        :raw-html:`<a href="https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/{{ docname }}"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>`
+"""
