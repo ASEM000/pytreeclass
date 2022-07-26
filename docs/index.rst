@@ -18,6 +18,7 @@ Install from pip::
    :maxdepth: 1
 
    notebooks/[pytreeclass]_Introduction
+   notebooks/[pytreeclass]_out_of_place_indexing
 
 MIT License.
 
