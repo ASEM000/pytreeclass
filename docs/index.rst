@@ -17,7 +17,7 @@ Install from pip::
    :caption: Getting Started
    :maxdepth: 1
 
-   notebooks/introduction
+   notebooks/[pytreeclass]_Introduction
 
 MIT License.
 
