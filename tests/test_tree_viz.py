@@ -186,9 +186,6 @@ def test_summary_md():
             )
             self.bias = jnp.ones((1, out_dim))
 
-        def __call__(self, x):
-            return x @ self.weight + self.bias
-
     @treeclass
     class StackedLinear:
         def __init__(self, key, in_dim, out_dim, hidden_dim):
@@ -198,18 +195,6 @@ def test_summary_md():
             self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
             self.l2 = Linear(key=keys[1], in_dim=hidden_dim, out_dim=hidden_dim)
             self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
-
-        def __call__(self, x):
-            x = self.l1(x)
-            x = jax.nn.tanh(x)
-            x = self.l2(x)
-            x = jax.nn.tanh(x)
-            x = self.l3(x)
-
-            return x
-
-    # x = jnp.linspace(0, 1, 100)[:, None]
-    # y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
 
     model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
 
