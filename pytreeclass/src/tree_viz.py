@@ -551,6 +551,82 @@ def tree_mermaid(model):
     return fmt.expandtabs(4)
 
 
+def cell(text):
+    return f"<td align = 'center'> {text} </td>"
+
+
+def summary_md(model, array=None) -> str:
+
+    fmt = (
+        "<table>\n"
+        "<tr>\n"
+        "<td align = 'center'> Type </td>\n"
+        "<td align = 'center'> Param #</td>\n"
+        "<td align = 'center'> Size </td>\n"
+        "<td align = 'center'> Config </td>\n"
+        "<td align = 'center'> Output </td>\n"
+        "</tr>\n"
+    )
+
+    dynamic_count, static_count = 0, 0
+    dynamic_size, static_size = 0, 0
+
+    if array is not None:
+        params_shape = sequential_model_shape_eval(model, array)[1:]
+
+    for index, leaf in enumerate(model.treeclass_leaves):
+        name, count, size = summary_line(leaf)
+
+        shape = node_format(params_shape[index]) if array is not None else ""
+
+        if leaf.frozen:
+            static_count += count
+            static_size += size
+            config = "<br>".join(
+                [
+                    f"{k}={node_format(v)}"
+                    for k, v in leaf.tree_fields[1].items()
+                    if k != "__frozen_treeclass__"
+                ]
+            )
+
+        else:
+            dynamic_count += count
+            dynamic_size += size
+            config = "<br>".join(
+                [f"{k}={node_format(v)}" for k, v in leaf.tree_fields[0].items()]
+            )
+
+        fmt += (
+            "<tr>"
+            + cell(name)
+            + cell(format_count(count, True))
+            + cell(format_size(size, True))
+            + cell(config)
+            + cell(shape)
+            + "</tr>"
+        )
+
+    # summary row
+    total_count = static_count + dynamic_count
+    total_size = static_size + dynamic_size
+
+    fmt += "</table>"
+
+    param_summary = (
+        "<table>"
+        f"<tr><td>Total #</td><td>{format_count(total_count)}</td></tr>"
+        f"<tr><td>Dynamic #</td><td>{format_count(dynamic_count)}</td></tr>"
+        f"<tr><td>Static/Frozen #</td><td>{format_count(static_count)}</td></tr>"
+        f"<tr><td>Total size</td><td>{format_size(total_size)}</td></tr>"
+        f"<tr><td>Dynamic size</td><td>{format_size(dynamic_size)}</td></tr>"
+        f"<tr><td>Static/Frozen size</td><td>{format_size(static_size)}</td></tr>"
+        "</table>"
+    )
+
+    return fmt + "\n\n#### Summary\n" + param_summary
+
+
 def save_viz(model, filename, method="tree_mermaid_md"):
 
     if method == "tree_mermaid_md":
@@ -579,3 +655,7 @@ def save_viz(model, filename, method="tree_mermaid_md"):
     elif method == "summary":
         with open(f"{filename}.txt", "w") as f:
             f.write(summary(model))
+
+    elif method == "summary_md":
+        with open(f"{filename}.md", "w") as f:
+            f.write(summary_md(model))

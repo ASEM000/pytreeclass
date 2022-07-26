@@ -1,4 +1,5 @@
 import os
+from dataclasses import field
 
 import jax
 from jax import numpy as jnp
@@ -163,3 +164,56 @@ def test_save_viz():
         )
         is None
     )
+    assert (
+        tree_viz.save_viz(
+            model, os.path.join("tests", "test_summary_md"), method="summary_md"
+        )
+        is None
+    )
+
+
+def test_summary_md():
+    @treeclass
+    class Linear:
+
+        weight: jnp.ndarray
+        bias: jnp.ndarray
+        notes: str = field(default="string")
+
+        def __init__(self, key, in_dim, out_dim):
+            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
+                2 / in_dim
+            )
+            self.bias = jnp.ones((1, out_dim))
+
+        def __call__(self, x):
+            return x @ self.weight + self.bias
+
+    @treeclass
+    class StackedLinear:
+        def __init__(self, key, in_dim, out_dim, hidden_dim):
+
+            keys = jax.random.split(key, 3)
+
+            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
+            self.l2 = Linear(key=keys[1], in_dim=hidden_dim, out_dim=hidden_dim)
+            self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
+
+        def __call__(self, x):
+            x = self.l1(x)
+            x = jax.nn.tanh(x)
+            x = self.l2(x)
+            x = jax.nn.tanh(x)
+            x = self.l3(x)
+
+            return x
+
+    # x = jnp.linspace(0, 1, 100)[:, None]
+    # y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
+
+    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
+
+    # trunk-ignore(flake8/E501)
+    fmt = "<table>\n<tr>\n<td align = 'center'> Type </td>\n<td align = 'center'> Param #</td>\n<td align = 'center'> Size </td>\n<td align = 'center'> Config </td>\n<td align = 'center'> Output </td>\n</tr>\n<tr><td align = 'center'> Linear </td><td align = 'center'> 20\n(0) </td><td align = 'center'> 80.00B\n(0.00B) </td><td align = 'center'> weight=f32[1,10]<br>bias=f32[1,10] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> Linear </td><td align = 'center'> 110\n(0) </td><td align = 'center'> 440.00B\n(0.00B) </td><td align = 'center'> weight=f32[10,10]<br>bias=f32[1,10] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> Linear </td><td align = 'center'> 11\n(0) </td><td align = 'center'> 44.00B\n(0.00B) </td><td align = 'center'> weight=f32[10,1]<br>bias=f32[1,1] </td><td align = 'center'>  </td></tr></table>\n\n#### Summary\n<table><tr><td>Total #</td><td>141(0)</td></tr><tr><td>Dynamic #</td><td>141(0)</td></tr><tr><td>Static/Frozen #</td><td>0(0)</td></tr><tr><td>Total size</td><td>564.00B(0.00B)</td></tr><tr><td>Dynamic size</td><td>564.00B(0.00B)</td></tr><tr><td>Static/Frozen size</td><td>0.00B(0.00B)</td></tr></table>"
+    pred = tree_viz.summary_md(model)
+    assert pred == fmt
