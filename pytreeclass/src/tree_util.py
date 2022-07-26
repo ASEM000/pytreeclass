@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import sys
 from dataclasses import field
 
@@ -64,34 +63,6 @@ def sequential_model_shape_eval(model, array):
     return shape
 
 
-def node_class_name(node):
-    return node.__class__.__name__
-
-
-def node_format(node):
-    """format shape and dtype of jnp.array"""
-
-    if isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
-        replace_tuple = (
-            ("int", "i"),
-            ("float", "f"),
-            ("complex", "c"),
-            ("(", "["),
-            (")", "]"),
-            (" ", ""),
-        )
-
-        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
-
-        # trunk-ignore
-        for lhs, rhs in replace_tuple:
-            formatted_string = formatted_string.replace(lhs, rhs)
-        return formatted_string
-
-    else:
-        return f"{node!r}"
-
-
 def node_count_and_size(node):
     """calculate number and size of `trainable` and `non-trainable` parameters"""
 
@@ -133,41 +104,6 @@ def reduce_count_and_size(leaf):
         return (lhs_count + rhs_count, lhs_size + rhs_size)
 
     return tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
-
-
-def format_size(node_size, newline=False):
-    """return formatted size from inexact(exact) complex number"""
-    mark = "\n" if newline else ""
-    order_kw = ["B", "KB", "MB", "GB"]
-
-    # define order of magnitude
-    real_size_order = int(math.log(node_size.real, 1024)) if node_size.real > 0 else 0
-    imag_size_order = int(math.log(node_size.imag, 1024)) if node_size.imag > 0 else 0
-    return (
-        f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
-        f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
-    )
-
-
-def format_count(node_count, newline=False):
-    mark = "\n" if newline else ""
-    return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
-
-
-def summary_line(leaf):
-
-    dynamic, static = leaf.tree_fields
-    is_dynamic = not leaf.frozen
-
-    if is_dynamic:
-        name = f"{node_class_name(leaf)}"
-        count, size = reduce_count_and_size(dynamic)
-        return (name, count, size)
-
-    else:
-        name = f"{node_class_name(leaf)}\n(frozen)"
-        count, size = reduce_count_and_size(static)
-        return (name, count, size)
 
 
 def freeze_nodes(model):

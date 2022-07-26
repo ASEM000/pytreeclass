@@ -1,18 +1,78 @@
 from __future__ import annotations
 
 import ctypes
+import math
 
+import jax
+import jax.numpy as jnp
 from jax import tree_flatten
 
 from .tree_util import (
-    format_count,
-    format_size,
     is_treeclass,
     is_treeclass_leaf,
-    node_format,
+    reduce_count_and_size,
     sequential_model_shape_eval,
-    summary_line,
 )
+
+
+def format_size(node_size, newline=False):
+    """return formatted size from inexact(exact) complex number"""
+    mark = "\n" if newline else ""
+    order_kw = ["B", "KB", "MB", "GB"]
+
+    # define order of magnitude
+    real_size_order = int(math.log(node_size.real, 1024)) if node_size.real > 0 else 0
+    imag_size_order = int(math.log(node_size.imag, 1024)) if node_size.imag > 0 else 0
+    return (
+        f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
+        f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
+    )
+
+
+def format_count(node_count, newline=False):
+    mark = "\n" if newline else ""
+    return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
+
+
+def node_format(node):
+    """format shape and dtype of jnp.array"""
+
+    if isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
+        replace_tuple = (
+            ("int", "i"),
+            ("float", "f"),
+            ("complex", "c"),
+            ("(", "["),
+            (")", "]"),
+            (" ", ""),
+        )
+
+        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
+
+        # trunk-ignore
+        for lhs, rhs in replace_tuple:
+            formatted_string = formatted_string.replace(lhs, rhs)
+        return formatted_string
+
+    else:
+        return f"{node!r}"
+
+
+def summary_line(leaf):
+
+    dynamic, static = leaf.tree_fields
+    is_dynamic = not leaf.frozen
+    class_name = leaf.__class__.__name__
+
+    if is_dynamic:
+        name = f"{class_name}"
+        count, size = reduce_count_and_size(dynamic)
+        return (name, count, size)
+
+    else:
+        name = f"{class_name}\n(frozen)"
+        count, size = reduce_count_and_size(static)
+        return (name, count, size)
 
 
 def resolve_line(cols):
@@ -413,7 +473,11 @@ def summary(model, array=None) -> str:
             static_count += count
             static_size += size
             fmt = "\n".join(
-                [f"{k}={node_format(v)}" for k, v in leaf.tree_fields[1].items()]
+                [
+                    f"{k}={node_format(v)}"
+                    for k, v in leaf.tree_fields[1].items()
+                    if k != "__frozen_treeclass__"
+                ]
             )
 
         else:
@@ -452,6 +516,7 @@ def summary(model, array=None) -> str:
 
 def tree_mermaid(model):
     def node_id(input):
+        """hash a node by its location in a tree"""
         return ctypes.c_size_t(hash(input)).value
 
     def recurse(model, cur_depth, prev_id):

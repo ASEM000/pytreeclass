@@ -5,6 +5,7 @@
 |[**Description**](#Description)
 |[**Quick Example**](#QuickExample)
 |[**More**](#More)
+|[**Applications**](#Applications)
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.7%203.8%203.9%203.10-red)
@@ -75,10 +76,10 @@ class StackedLinear:
 
         return x
 
-model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
+>>> model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 
-x = jnp.linspace(0,1,100)[:,None]
-y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
+>>> x = jnp.linspace(0,1,100)[:,None]
+>>> y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 ```
 
 ### 🎨 Visualize
@@ -94,7 +95,7 @@ y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 
 ```python
 
- **summary**
+
 >>> print(tree_viz.summary(model))
 ┌──────┬───────┬───────┬─────────────────┐
 │Type  │Param #│Size   │Config           │
@@ -153,7 +154,7 @@ Static/Frozen size:	0.00B(0.00B)
 <td>
 
 ```python
- >>> print(tree_viz.tree_diagram(model))
+>>> print(tree_viz.tree_diagram(model))
 StackedLinear
     ├── l1=Linear
     │   ├── weight=f32[1,10]
@@ -213,10 +214,23 @@ flowchart TD
 ### ✂️ Model surgery
 ```python
 # freeze l1
-model.l1 = model.l1.freeze()
+>>> model.l1 = model.l1.freeze()
 
 # set non-negative values in l2 to 0
-model.l2 = model.l2.at[model.l2<0].set(0)
+>>> model.l2 = model.l2.at[model.l2<0].set(0)
+
+# frozen nodes are marked with #
+>>> print(tree_viz.tree_diagram(model))
+StackedLinear
+    ├── l1=Linear
+    │   ├#─ weight=f32[1,10]
+    │   └#─ bias=f32[1,10]  
+    ├── l2=Linear
+    │   ├── weight=f32[10,10]
+    │   └── bias=f32[1,10]  
+    └── l3=Linear
+        ├── weight=f32[10,1]
+        └── bias=f32[1,1] 
 ```
 
 ## 🔢 More<a id="More"></a>
@@ -224,8 +238,8 @@ model.l2 = model.l2.at[model.l2<0].set(0)
 <details><summary>Train from scratch</summary>
  
 ```python
-x = jnp.linspace(0,1,100)[:,None]
-y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
+>>> x = jnp.linspace(0,1,100)[:,None]
+>>> y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 
 def loss_func(model,x,y):
     return jnp.mean((model(x)-y)**2 )
@@ -263,7 +277,6 @@ layer1 = model.l1
 ```python
 # layer1 repr
 >>> print(f"{layer1!r}")
-
 Linear(
   weight=f32[1,10],
   bias=f32[1,10])
@@ -272,7 +285,6 @@ Linear(
 ```python
 # layer1 str
 >>> print(f"{layer1!s}")
-
 Linear(
   weight=
     [[-2.5491788   1.674097    0.07813213  0.47670904 -1.8760327  -0.9941608
@@ -285,7 +297,6 @@ Linear(
 ```python
 # set negative values to 0
 >>> print(layer1.at[layer1<0].set(0))
-
 Linear(
   weight=
     [[0.         1.674097   0.07813213 0.47670904 0.         0.
@@ -298,7 +309,6 @@ Linear(
 ```python
 # get only positive values
 >>> print(layer1.at[layer1>0].get())
-
 Linear(
   weight=
     [1.674097   0.07813213 0.47670904 0.2808009  0.6522513  1.0796958 ],
@@ -315,58 +325,64 @@ Linear(
 ```python
 @treeclass
 class Test :
-  a : float
-  b : float
-  c : float
-  name : str = static_field() # ignore from jax computations
-
-
+    a : float
+    b : float
+    c : float
+    name : str 
+```
+```python
 # basic operations
-A = Test(10,20,30,'A')
-assert (A + A) == Test(20,40,60,'A')
-assert (A - A) == Test(0,0,0,'A')
-assert (A*A).reduce_mean() == 1400
-assert (A + 1) == Test(11,21,31,'A')
-
-# selective operations
-
+>>> A = Test(10,20,30,'A')
+>>> (A + A)                 # Test(20,40,60,'A')
+>>> (A - A)                 # Test(0,0,0,'A')
+>>> (A*A).reduce_mean()     # 1400
+>>> (A + 1)                 # Test(11,21,31,'A')
+```
+```python
 # only add 1 to field `a`
 # all other fields are set to None and returns the same class
-assert (A['a'] + 1) == Test(11,None,None,'A')
+>>> assert (A['a'] + 1) == Test(11,None,None,'A')
 
 # use `|` to merge classes by performing ( left_node or  right_node )
-Aa = A['a'] + 10 # Test(a=20,b=None,c=None,name=A)
-Ab = A['b'] + 10 # Test(a=None,b=30,c=None,name=A)
+>>> Aa = A['a'] + 10 # Test(a=20,b=None,c=None,name=A)
+>>> Ab = A['b'] + 10 # Test(a=None,b=30,c=None,name=A)
 
-assert (Aa | Ab | A ) == Test(20,30,30,'A')
+>>> assert (Aa | Ab | A ) == Test(20,30,30,'A')
 
 # indexing by class
-assert A[A>10]  == Test(a=None,b=20,c=30,name='A')
-
-
+>>> A[A>10]  # Test(a=None,b=20,c=30,name='A')
+```
+```python
 # Register custom operations
-B = Test([10,10],20,30,'B')
-B.register_op( func=lambda node:node+1,name='plus_one')
-assert B.plus_one() == Test(a=[11, 11],b=21,c=31,name='B')
+>>> B = Test([10,10],20,30,'B')
+>>> B.register_op( func=lambda node:node+1,name='plus_one')
+>>> B.plus_one()  # Test(a=[11, 11],b=21,c=31,name='B')
 
 
 # Register custom reduce operations ( similar to functools.reduce)
-C = Test(jnp.array([10,10]),20,30,'C')
+>>> C = Test(jnp.array([10,10]),20,30,'C')
 
-C.register_op(
-    func=jnp.prod,            # function applied on each node
-    name='product',           # name of the function
-    reduce_op=lambda x,y:x*y, # function applied between nodes (accumulated * current node)
-    init_val=1                # initializer for the reduce function
+>>> C.register_op(
+        func=jnp.prod,            # function applied on each node
+        name='product',           # name of the function
+        reduce_op=lambda x,y:x*y, # function applied between nodes (accumulated * current node)
+        init_val=1                # initializer for the reduce function
                 )
 
 # product applies only on each node
 # and returns an instance of the same class
-assert C.product() == Test(a=100,b=20,c=30,name='C')
+>>> C.product() # Test(a=100,b=20,c=30,name='C')
 
 # `reduce_` + name of the registered function (`product`)
 # reduces the class and returns a value
-assert C.reduce_product() == 60000
+>>> C.reduce_product() # 60000
 ```
 
 </details>
+
+
+## 📝 Applications<a id="Applications"></a>
+
+| Description  |  Link
+|---|---|
+| Physics informed neural network (PINN)  | [PINN](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX)  |
