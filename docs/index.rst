@@ -17,8 +17,9 @@ Install from pip::
    :caption: Getting Started
    :maxdepth: 1
 
-   notebooks/[pytreeclass]_Introduction
-   notebooks/[pytreeclass]_out_of_place_indexing
+   notebooks/introduction
+   notebooks/stateful_computations
+   notebooks/out-of-place indexing
 
 MIT License.
 

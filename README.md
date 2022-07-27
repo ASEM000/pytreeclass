@@ -6,6 +6,7 @@
 |[**Quick Example**](#QuickExample)
 |[**More**](#More)
 |[**Applications**](#Applications)
+|[**Acknowledgements**](#Acknowledgements)
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.7%203.8%203.9%203.10-red)
@@ -27,10 +28,10 @@ pip install pytreeclass
 
 A JAX compatible `dataclass` like datastructure with the following functionalities
 
-- Create PyTorch like NN classes like [equinox](https://github.com/patrick-kidger/equinox) and [Treex](https://github.com/cgarciae/treex)
+- Create PyTorch like NN classes 
 - Provides rich visualizations for pytrees wrapped with `@treeclass`.
 - Boolean indexing on Pytrees in functional style similar to jax.numpy. e.g. `x.at[x<0].set(0) `
-- Apply math/numpy operations like [tree-math](https://github.com/google/tree-math)
+- Apply math/numpy operations on pytrees 
 
 ## ⏩ Quick Example <a id="QuickExample">
 
@@ -384,6 +385,13 @@ class Test :
 
 ## 📝 Applications<a id="Applications"></a>
 
-| Description  |  Link
-|---|---|
-| Physics informed neural network (PINN)  | [PINN](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX)  |
+| Description |
+|---|
+| [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX)  |
+
+
+## 📙 Acknowledgements<a id="Acknowledgements"></a>
+
+- [equinox](https://github.com/patrick-kidger/equinox)
+- [Treex](https://github.com/cgarciae/treex)
+- [tree-math](https://github.com/google/tree-math)
