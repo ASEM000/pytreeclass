@@ -26,14 +26,12 @@ def test_node():
 
             keys = jax.random.split(key, len(layers))
 
-            self.register_node(
-                {
-                    f"l{i}": Linear(key=ki, in_dim=in_dim, out_dim=out_dim)
-                    for i, (ki, in_dim, out_dim) in enumerate(
-                        zip(keys, layers[:-1], layers[1:])
-                    )
-                }
-            )
+            for i, (ki, in_dim, out_dim) in enumerate(
+                zip(keys, layers[:-1], layers[1:])
+            ):
+                self.register_node(
+                    Linear(key=ki, in_dim=in_dim, out_dim=out_dim), name=f"l{i}"
+                )
 
         def __call__(self, x):
             x = self.l0(x)

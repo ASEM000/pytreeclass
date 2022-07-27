@@ -53,6 +53,22 @@ def test_dispatch():
     assert func("a", 1) == 2
     assert func(None, 1.0) == 101.0
 
+    # dispatch by keyword argument
+    @dispatch(argnum="name")
+    def func(x, y, *, name):
+        ...
+
+    @func.register(int)
+    def _(x, y, *, name):
+        return "int"
+
+    @func.register(str)
+    def _(x, y, *, name):
+        return "str"
+
+    assert func(1, 2, name=1) == "int"
+    assert func(1, 1, name="s") == "str"
+
 
 def test_singledispatchmethod():
     class test:

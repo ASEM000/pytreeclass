@@ -190,24 +190,20 @@ class treeBase:
         static.pop("__frozen_treeclass__", None)
         return {**dynamic, **static}
 
-    def register_node(self, node_defs: dict):
-        def register_single_node(
-            value: Any, key: str = None, static: bool = False, repr: bool = True
-        ) -> Any:
-            """Add item to dataclass fields to bee seen by jax computations"""
+    def register_node(
+        self, node: Any, *, name: str, static: bool = False, repr: bool = True
+    ) -> Any:
+        """Add item to dataclass fields to bee seen by jax computations"""
 
-            unnamed_count = sum([1 for k in self.__dict__ if k.startswith("unnamed")])
-            field_key = f"unnamed_{unnamed_count}" if key is None else key
-
+        if name not in self.__dataclass_fields__:
             # create field
             field_value = field(repr=repr, metadata={"static": static})
 
-            setattr(field_value, "name", field_key)
-            setattr(field_value, "type", type(value))
+            setattr(field_value, "name", name)
+            setattr(field_value, "type", type(node))
 
             # register it to class
-            self.__dataclass_fields__.update({field_key: field_value})
-            self.__dict__[field_key] = value
+            self.__dataclass_fields__.update({name: field_value})
+            self.__dict__[name] = node
 
-        for key, value in node_defs.items():
-            register_single_node(key=key, value=value)
+        return self.__dict__[name]

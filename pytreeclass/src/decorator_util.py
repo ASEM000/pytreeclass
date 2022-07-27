@@ -5,7 +5,6 @@ import inspect
 
 
 class cached_property:
-
     def __init__(self, func):
         self.name = func.__name__
         self.func = func
@@ -17,23 +16,50 @@ class cached_property:
 
 
 def dispatch(*args, **kwargs):
-    """functools.singledispatch with option of choosing the position of the dispatched argument"""
-    # based on https://stackoverflow.com/a/24602374/10879163
+    """functools.singledispatch with option of choosing the position of the dispatched argument
+    or keyword argument.
 
-    def dispatch_wrapper(func, argnum=1):
-        """singledispatch by arg position"""
+    For multiple dispatch use the following pattern
+
+    >>> @dispatch(argnum=0)
+    ... def a(x,y): ...
+
+    >>> @a.register(int)
+    ... @dispatch(argnum=1)
+    ... def b(x,y) : ...
+
+    >>> @b.register(int)
+    ... def _(x,y):
+    ...     return "int,int"
+    """
+
+    def dispatch_wrapper(func, argnum: int | str = 1):
+        """singledispatch by arg position/kw arg name"""
         dispatcher = functools.singledispatch(func)
 
         def wrapper(*ar, **kw):
-            return dispatcher.dispatch(ar[argnum].__class__)(*ar, **kw)
+            if isinstance(argnum, int):
+                # based on https://stackoverflow.com/a/24602374/10879163
+                return dispatcher.dispatch(ar[argnum].__class__)(*ar, **kw)
+
+            elif isinstance(argnum, str):
+                # dispatch by keyword argument
+                return dispatcher.dispatch(kw[argnum].__class__)(*ar, **kw)
+
+            else:
+                raise ValueError("argnum must be int or str")
 
         wrapper.register = dispatcher.register
         functools.update_wrapper(wrapper, func)
         return wrapper
 
-    if len(args) > 0 and inspect.isfunction(args[0]):
-        return dispatch_wrapper(args[0], 1)
+    if len(args) == 1 and inspect.isfunction(args[0]):
+        # @dispatch
+        # def f(..):
+        return dispatch_wrapper(args[0], 0)
 
     elif len(args) == 0 and len(kwargs) > 0:
-        argnum = kwargs["argnum"] if "argnum" in kwargs else 1
+        # @dispatch(argnum=x)
+        # def f(..):
+        argnum = kwargs["argnum"] if "argnum" in kwargs else 0
         return functools.partial(dispatch_wrapper, argnum=argnum)
