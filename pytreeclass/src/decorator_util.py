@@ -33,7 +33,7 @@ def dispatch(*args, **kwargs):
     ...     return "int,int"
     """
 
-    def dispatch_wrapper(func, argnum: int | str = 1):
+    def dispatch_wrapper(func, argnum=1):
         """singledispatch by arg position/kw arg name"""
         dispatcher = functools.singledispatch(func)
 
