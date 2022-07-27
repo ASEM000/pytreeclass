@@ -4,9 +4,11 @@
 [**Installation**](#Installation)
 |[**Description**](#Description)
 |[**Quick Example**](#QuickExample)
+|[**StatefulComputation**](#StatefulComputation)
 |[**More**](#More)
 |[**Applications**](#Applications)
 |[**Acknowledgements**](#Acknowledgements)
+
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.7%203.8%203.9%203.10-red)
@@ -234,6 +236,138 @@ StackedLinear
         ├── weight=f32[10,1]
         └── bias=f32[1,1] 
 ```
+
+## 📜 Stateful computations<a id="StatefulComputation"></a>
+[JAX reference](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state)
+
+Under jax.jit jax requires states to be explicit, this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
+
+The following code snippets compares between the two concepts by comparing MLP's implementation.
+<table>
+<tr>
+<td>Explicit state </td>
+<td>Class instance as state</td>
+</tr>
+
+<tr>
+
+<td>
+
+```python
+import jax 
+import jax.numpy as jnp
+
+def init_params(layers):
+  keys = jax.random.split(
+      jax.random.PRNGKey(0),len(layers)-1
+  )
+    
+  params = list()
+  init_func = jax.nn.initializers.he_normal()
+  for key,n_in,n_out in zip(
+    keys,
+    layers[:-1],
+    layers[1:]
+  ):
+    
+    W = init_func(key,(n_in,n_out))
+    B = jax.random.uniform(key,shape=(n_out,))
+    params.append({'W':W,'B':B})
+  return params
+
+def fwd(params,x):
+  *hidden,last = params
+  for layer in hidden :
+    x = jax.nn.tanh(x@layer['W']+layer['B'])
+  return x@last['W'] + last['B']
+
+def loss_func(params,x,y):
+  pred = fwd(params,x)
+  return jnp.mean((pred-y)**2)
+
+@jax.jit
+def update(params,x,y):
+  # gradient w.r.t to params
+  value,grads= jax.value_and_grad(loss_func,0)(params,x,y)
+  params =  jax.tree_map(
+    lambda params,grads : params-1e-3*grads, params,grads
+  )
+  return value,params
+
+x = jnp.linspace(0,1,100).reshape(100,1)
+y = x**2 -1 
+
+params = init_params([1] +[5]*4+[1] )
+
+epochs = 10_000
+for _ in range(1,epochs+1):
+  value , params = update(params,x,y)
+
+  # print loss and epoch info
+  if _ %(1_000) ==0:
+    print(f'Epoch={_}\tloss={value:.3e}')
+ ```
+</td>
+
+<td>
+
+```python
+import jax
+import jax.numpy as jnp
+
+@treeclass
+class MLP:
+  Layers : list
+
+  def __init__(self,layers):
+    keys = jax.random.split(
+        jax.random.PRNGKey(0),len(layers)-1
+      )
+    self.Layers = list()
+    init_func = jax.nn.initializers.he_normal()
+    for key,n_in,n_out in zip(keys,layers[:-1],layers[1:]):
+      lb, ub = -(1 / jnp.sqrt(n_in)), (1 / jnp.sqrt(n_in))
+      W = init_func(key,(n_in,n_out))
+      B = jax.random.uniform(key,shape=(n_out,))
+      self.Layers.append({'W':W,'B':B})
+
+  def __call__(self,x):
+    *hidden,last = self.Layers
+    for layer in hidden :
+      x = jax.nn.tanh(x@layer['W']+layer['B'])
+    return x@last['W'] + last['B']
+
+def loss_func(model,x,y):
+  pred = model(x)
+  return jnp.mean((pred-y)**2)
+
+@jax.jit
+def update(model,x,y):
+  # gradient w.r.t to model
+  value , grads= jax.value_and_grad(loss_func,0)(model,x,y)
+  model = jax.tree_map(
+    lambda model,grads : model-1e-3*grads, model,grads
+  )
+  return value , model
+
+x = jnp.linspace(0,1,100).reshape(100,1)
+y = x**2 -1
+
+model = MLP([1] +[5]*4+[1] )
+
+epochs = 10_000
+for _ in range(1,epochs+1):
+  value , model = update(model,x,y)
+
+  # print loss and epoch info
+  if _ %(1_000) ==0:
+    print(f'Epoch={_}\tloss={value:.3e}')
+```
+</td>
+
+</tr>
+
+</table>
 
 ## 🔢 More<a id="More"></a>
 
