@@ -5,6 +5,7 @@ import inspect
 
 
 class cached_property:
+
     def __init__(self, func):
         self.name = func.__name__
         self.func = func

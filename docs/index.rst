@@ -21,9 +21,17 @@ Install from pip::
    notebooks/stateful_computations
    notebooks/out-of-place indexing
 
+.. toctree::
+    :caption: API Documentation
+    :maxdepth: 1
+    
+    API/base
+
 MIT License.
 
 Indices
 =======
 
 * :ref:`genindex`
+
+
