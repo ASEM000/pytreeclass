@@ -325,8 +325,12 @@ class MLP:
       )
     self.Layers = list()
     init_func = jax.nn.initializers.he_normal()
-    for key,n_in,n_out in zip(keys,layers[:-1],layers[1:]):
-      lb, ub = -(1 / jnp.sqrt(n_in)), (1 / jnp.sqrt(n_in))
+    for key,n_in,n_out in zip(
+      keys,
+      layers[:-1],
+      layers[1:]
+     ):
+
       W = init_func(key,(n_in,n_out))
       B = jax.random.uniform(key,shape=(n_out,))
       self.Layers.append({'W':W,'B':B})
@@ -370,34 +374,6 @@ for _ in range(1,epochs+1):
 </table>
 
 ## 🔢 More<a id="More"></a>
-
-<details><summary>Train from scratch</summary>
- 
-```python
->>> x = jnp.linspace(0,1,100)[:,None]
->>> y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
-
-def loss_func(model,x,y):
-    return jnp.mean((model(x)-y)**2 )
-
-@jax.jit
-def update(model,x,y):
-    value,grads = jax.value_and_grad(loss_func)(model,x,y)
-    # no need to use `jax.tree_map` to update the model
-    # as it model is wrapped by @treeclass
-    return value , model-1e-3*grads
-
-for _ in range(1,20_001):
-    value,model = update(model,x,y)
-
-plt.plot(x,model(x),'--r',label = 'Prediction',linewidth=3)
-plt.plot(x,y,'--k',label='True',linewidth=3)
-plt.legend()
-````
-
-![image](assets/regression_example.svg)
-
-</details>
 
 <details>
 
