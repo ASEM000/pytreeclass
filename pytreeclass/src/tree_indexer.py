@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -9,7 +10,17 @@ from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import is_treeclass_leaf_bool
 
 
-def node_setter(lhs, where, set_value):
+def node_setter(lhs: Any, where: bool, set_value):
+    """Set pytree node value.
+
+    Args:
+        lhs: Node value.
+        where: Conditional.
+        set_value: Set value of shape 1.
+
+    Returns:
+        Modified node value.
+    """
     # do not change non-chosen values
     # assert isinstance(where, bool)
 
@@ -22,7 +33,6 @@ def node_setter(lhs, where, set_value):
 def node_getter(lhs, where):
     # not jittable as size can changes
     # does not change pytreestructure ,
-    # but changes array sizes if fill_value=None
 
     if isinstance(lhs, jnp.ndarray):
         return lhs[where]
@@ -133,7 +143,8 @@ class treeIndexer:
                 # indexing by model
 
                 if not all(
-                    is_treeclass_leaf_bool(leaf) for leaf in jax.tree_util.tree_leaves(arg)
+                    is_treeclass_leaf_bool(leaf)
+                    for leaf in jax.tree_util.tree_leaves(arg)
                 ):
                     raise ValueError("model leaves argument must be boolean.")
 

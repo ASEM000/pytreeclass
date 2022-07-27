@@ -15,10 +15,12 @@ def static_field(**kwargs):
 
 
 def is_treeclass(model):
+    """check if a class is treeclass"""
     return hasattr(model, "tree_fields")
 
 
 def is_treeclass_leaf_bool(node):
+    """assert if treeclass leaf is boolean (for boolen indexing)"""
     if isinstance(node, jnp.ndarray):
         return node.dtype == "bool"
     else:
@@ -26,7 +28,7 @@ def is_treeclass_leaf_bool(node):
 
 
 def is_treeclass_leaf(model):
-
+    """assert if a node is treeclass leaf"""
     if is_treeclass(model):
         fields = model.__dataclass_fields__.values()
 
@@ -56,6 +58,7 @@ def is_treeclass_equal(lhs, rhs):
 
 
 def sequential_model_shape_eval(model, array):
+    """Evaluate shape propagation of assumed sequential modules"""
     leaves = jax.tree_util.tree_leaves(model, is_treeclass_leaf)
     shape = [jax.eval_shape(lambda x: x, array)]
     for leave in leaves:
@@ -116,7 +119,7 @@ def freeze_nodes(model):
 
 
 def unfreeze_nodes(model):
-    """inplace freezing"""
+    """inplace unfreezing"""
     if is_treeclass(model):
         object.__setattr__(model, "__frozen_treeclass__", False)
         for kw, leaf in model.__dataclass_fields__.items():

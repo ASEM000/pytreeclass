@@ -12,15 +12,41 @@ from .tree_viz import tree_indent, tree_str
 
 class treeBase:
     def freeze(self):
+        """Freeze treeclass.
+
+        Returns:
+            New frozen instance.
+
+        Example:
+
+        >>> model = model.freeze()
+        >>> assert model.frozen == True
+        """
+
         new_cls = copy.copy(self)
         return freeze_nodes(new_cls)
 
     def unfreeze(self):
+        """Unfreeze treeclass.
+
+        Returns:
+            New unfrozen instance.
+
+        Example :
+
+        >>> model = model.unfreeze()
+        >>> assert model.frozen == False
+        """
         new_cls = copy.copy(self)
         return unfreeze_nodes(new_cls)
 
     @property
-    def frozen(self):
+    def frozen(self) -> bool:
+        """Show treeclass frozen status.
+
+        Returns:
+            Frozen state boolean.
+        """
         if hasattr(self, "__frozen_treeclass__"):
             return self.__frozen_treeclass__
         return False
@@ -32,11 +58,17 @@ class treeBase:
 
     @property
     def tree_fields(self):
+        """Computes the dynamic and static fields.
+
+        Returns:
+            Pair of dynamic and static dictionaries.
+        """
 
         static, dynamic = dict(), dict()
         # register other variables defined in other context
         # if their value is an instance of treeclass
         # to avoid redefining them as dataclass fields.
+
         static["__frozen_treeclass__"] = self.frozen
 
         for var_name, var_value in self.__dict__.items():
@@ -71,16 +103,18 @@ class treeBase:
                 # the user did not declare a variable defined in field
                 raise ValueError(f"field={fi.name} is not declared.")
 
+            # if the parent is frozen, freeze all dataclass fields children
             if self.frozen:
                 static[fi.name] = value
 
             else:
-                # str is always excluded
+                # exclude any string
+                # and mutate the class field static metadata for this variable for future instances
                 excluded_by_type = isinstance(value, str)
                 excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
 
                 if excluded_by_type:
-                    # add static type to metadata
+                    # add static type to metadata to class and its instance
                     static[fi.name] = value
                     updated_field = self.__dataclass_fields__[fi.name]
                     object.__setattr__(
@@ -99,11 +133,28 @@ class treeBase:
         return (dynamic, static)
 
     def tree_flatten(self):
+        """Flatten rule for `jax.tree_flatten`
+
+        Returns:
+            Tuple of dynamic values and (dynamic keys,aux dict)
+        """
         dynamic, static = self.tree_fields
         return (dynamic.values(), (dynamic.keys(), static))
 
     @classmethod
     def tree_unflatten(cls, aux, children):
+        """Unflatten rule for `jax.tree_unflatten`
+
+        Args:
+            aux:
+                Pytree definition
+                includes Dynamic nodes keys , static dictionary and frozen state
+            children:
+                Dynamic nodes values
+
+        Returns:
+            New class instance
+        """
         dynamic_vals, dynamic_keys = children, aux[0]
 
         static_keys, static_vals = aux[1].keys(), aux[1].values()
@@ -116,10 +167,12 @@ class treeBase:
 
     @property
     def treeclass_leaves(self):
+        """Tree leaves of treeclass"""
         return jax.tree_util.tree_leaves(self, is_treeclass_leaf)
 
     @property
     def flatten_leaves(self):
+        """Flatten treeleaves"""
         return jax.tree_util.tree_flatten(self)
 
     def __hash__(self):
@@ -132,6 +185,7 @@ class treeBase:
         return tree_str(self)
 
     def asdict(self):
+        """Dictionary representation of dataclass_fields"""
         dynamic, static = self.tree_fields
         static.pop("__frozen_treeclass__", None)
         return {**dynamic, **static}
@@ -140,7 +194,7 @@ class treeBase:
         def register_single_node(
             value: Any, key: str = None, static: bool = False, repr: bool = True
         ) -> Any:
-            """add item to dataclass fields to bee seen by jax computations"""
+            """Add item to dataclass fields to bee seen by jax computations"""
 
             unnamed_count = sum([1 for k in self.__dict__ if k.startswith("unnamed")])
             field_key = f"unnamed_{unnamed_count}" if key is None else key
