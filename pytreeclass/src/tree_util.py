@@ -6,7 +6,7 @@ from dataclasses import field
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax.tree_util import tree_reduce
+from jax.tree_util import tree_leaves, tree_reduce
 
 
 def static_field(**kwargs):
@@ -48,8 +48,8 @@ def is_treeclass_equal(lhs, rhs):
         else:
             return lhs_node == rhs_node
 
-    lhs_leaves = jax.tree_util.tree_leaves(lhs)
-    rhs_leaves = jax.tree_util.tree_leaves(rhs)
+    lhs_leaves = tree_leaves(lhs)
+    rhs_leaves = tree_leaves(rhs)
 
     for lhs_node, rhs_node in zip(lhs_leaves, rhs_leaves):
         if not assert_node(lhs_node, rhs_node):
@@ -59,7 +59,7 @@ def is_treeclass_equal(lhs, rhs):
 
 def sequential_model_shape_eval(model, array):
     """Evaluate shape propagation of assumed sequential modules"""
-    leaves = jax.tree_util.tree_leaves(model, is_treeclass_leaf)
+    leaves = tree_leaves(model, is_treeclass_leaf)
     shape = [jax.eval_shape(lambda x: x, array)]
     for leave in leaves:
         shape += [jax.eval_shape(leave, shape[-1])]

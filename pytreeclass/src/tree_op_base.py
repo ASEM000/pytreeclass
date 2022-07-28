@@ -4,8 +4,7 @@ import functools
 import operator as op
 
 import jax.numpy as jnp
-from jax import tree_map
-from jax.tree_util import tree_reduce
+from jax.tree_util import tree_map, tree_reduce
 
 
 def append_math_op(func):

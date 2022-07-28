@@ -4,7 +4,7 @@ import copy
 from dataclasses import MISSING, field
 from typing import Any
 
-import jax
+from jax.tree_util import tree_flatten, tree_leaves
 
 from .tree_util import freeze_nodes, is_treeclass, is_treeclass_leaf, unfreeze_nodes
 from .tree_viz import tree_indent, tree_str
@@ -168,12 +168,12 @@ class treeBase:
     @property
     def treeclass_leaves(self):
         """Tree leaves of treeclass"""
-        return jax.tree_util.tree_leaves(self, is_treeclass_leaf)
+        return tree_leaves(self, is_treeclass_leaf)
 
     @property
     def flatten_leaves(self):
         """Flatten treeleaves"""
-        return jax.tree_util.tree_flatten(self)
+        return tree_flatten(self)
 
     def __hash__(self):
         return hash(tuple(*self.flatten_leaves))

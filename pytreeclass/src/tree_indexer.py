@@ -5,6 +5,7 @@ from typing import Any
 
 import jax
 import jax.numpy as jnp
+from jax.tree_util import tree_flatten, tree_leaves, tree_unflatten
 
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import is_treeclass_leaf_bool
@@ -86,7 +87,7 @@ def param_indexing_setter(model, set_value, *where: tuple[str]):
 def boolean_indexing_getter(model, where):
 
     lhs_leaves, lhs_treedef = model.flatten_leaves
-    where_leaves, where_treedef = jax.tree_flatten(where)
+    where_leaves, where_treedef = tree_flatten(where)
     lhs_leaves = [
         node_getter(lhs_leaf, where_leaf)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
@@ -97,14 +98,14 @@ def boolean_indexing_getter(model, where):
 
 def boolean_indexing_setter(model, set_value, where):
 
-    lhs_leaves, lhs_treedef = jax.tree_flatten(model)
-    where_leaves, rhs_treedef = jax.tree_flatten(where)
+    lhs_leaves, lhs_treedef = tree_flatten(model)
+    where_leaves, rhs_treedef = tree_flatten(where)
     lhs_leaves = [
         node_setter(lhs_leaf, where_leaf, set_value=set_value,)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)  # fmt: skip
     ]
 
-    return jax.tree_unflatten(lhs_treedef, lhs_leaves)
+    return tree_unflatten(lhs_treedef, lhs_leaves)
 
 
 class treeIndexer:
@@ -121,7 +122,7 @@ class treeIndexer:
             @__getitem__.register(tuple)
             def __param_getitiem__(inner_self, *args):
                 # indexing by param name
-                flatten_args = jax.tree_util.tree_leaves(args)
+                flatten_args = tree_leaves(args)
                 if not all(isinstance(arg, str) for arg in flatten_args):
                     raise ValueError("Invalid indexing argument")
 
@@ -142,10 +143,7 @@ class treeIndexer:
             def __model_getitiem__(inner_self, arg):
                 # indexing by model
 
-                if not all(
-                    is_treeclass_leaf_bool(leaf)
-                    for leaf in jax.tree_util.tree_leaves(arg)
-                ):
+                if not all(is_treeclass_leaf_bool(leaf) for leaf in tree_leaves(arg)):
                     raise ValueError("model leaves argument must be boolean.")
 
                 class getterSetterIndexer:
