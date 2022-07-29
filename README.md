@@ -1,4 +1,4 @@
-<h1 align="center" style="font-family:Monospace" >🌲Pytreeclass🌲</h1>
+<h1 align="center" style="font-family:Monospace" >Py🌲Class</h1>
 <h2 align="center">Write pytorch-like layers with rich visualizations in JAX.</h2>
 
 [**Installation**](#Installation)
@@ -28,7 +28,7 @@ pip install pytreeclass
 
 ## 📖 Description<a id="Description"></a>
 
-A JAX compatible `dataclass` like datastructure with the following functionalities
+PyTreeClass offers a JAX compatible `dataclass` like datastructure with the following functionalities
 
 - Create PyTorch like NN classes 
 - Provides rich visualizations for pytrees wrapped with `@pytc.treeclass`.
