@@ -66,7 +66,7 @@ class StackedLinear:
         keys= jax.random.split(key,3)
 
         # Declaring l1,l2,l3 as dataclass_fields is optional
-        # as they are already wrapped with @treeclass
+        # as l1,l2,l3 are Linear class that is wrapped with @treeclass
         self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
         self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
         self.l3 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
@@ -79,7 +79,7 @@ class StackedLinear:
         x = self.l3(x)
 
         return x
-
+        
 >>> model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 
 >>> x = jnp.linspace(0,1,100)[:,None]
@@ -374,6 +374,36 @@ for _ in range(1,epochs+1):
 </table>
 
 ## 🔢 More<a id="More"></a>
+
+<details><summary>More compact boilerplate</summary>
+
+```python
+# more compact definition 
+# with class definition at runtime call
+@treeclass
+class StackedLinear2:
+
+    def __init__(self,key):
+        self.keys = jax.random.split(key,3)
+
+    def __call__(self,x):
+        # The Linear layers are defined on the first call
+        # and retrieved on the subsequent calls
+        # this pattern is useful if module definition depends runtime data.
+        
+        in_dim = out_dim = x.shape[-1]
+        k1,k2,k3 = self.keys
+
+        x = self.register_node(Linear(k1,in_dim,10),name="l1")(x)
+        x = jax.nn.tanh(x)
+        x = self.register_node(Linear(k2,10,10),name="l2")(x)
+        x = jax.nn.tanh(x)
+        x = self.register_node(Linear(k3,10,out_dim),name="l3")(x)
+
+        return x
+```
+
+</details>
 
 <details>
 
