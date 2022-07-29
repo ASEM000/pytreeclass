@@ -207,6 +207,13 @@ flowchart TD
     id7572222925824649475 --- id4749243995442935477["weight\nf32[10,1]"]
     id7572222925824649475 --- id8042761346510512486["bias\nf32[1,1]"]
 ```
+<div align="center",font-weight="bold">✨ Generate shareable vizualization links ✨</div>
+
+```python
+>>> tree_viz.tree_mermaid(model,link=True)
+'Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id=*********'
+```
+
 
 </td>
 
