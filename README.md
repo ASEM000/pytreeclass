@@ -303,7 +303,7 @@ def update(params,x,y):
   # gradient w.r.t to params
   value,grads= value_and_grad(loss_func)(params,x,y)
   params =  jax.tree_map(
-    lambda params,grads : params-1e-3*grads, params,grads
+    lambda x,y : x-1e-3*y, params,grads
   )
   return value,params
 
@@ -366,7 +366,7 @@ def update(model,x,y):
   # gradient w.r.t to model
   value , grads= value_and_grad(loss_func)(model,x,y)
   model = tree_map(
-    lambda model,grads : model-1e-3*grads, model,grads
+    lambda x,y : x-1e-3*y, model,grads
   )
   return value , model
 
