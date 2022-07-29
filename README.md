@@ -1,4 +1,4 @@
-<h1 align="center" style="font-family:Monospace" >🌲Pytreeclass🌲</h1>
+<h1 align="center" style="font-family:Monospace" >Py🌲Class</h1>
 <h2 align="center">Write pytorch-like layers with rich visualizations in JAX.</h2>
 
 [**Installation**](#Installation)
@@ -28,7 +28,7 @@ pip install pytreeclass
 
 ## 📖 Description<a id="Description"></a>
 
-A JAX compatible `dataclass` like datastructure with the following functionalities
+PyTreeClass offers a JAX compatible `dataclass` like datastructure with the following functionalities
 
 - Create PyTorch like NN classes 
 - Provides rich visualizations for pytrees wrapped with `@pytc.treeclass`.
@@ -253,6 +253,7 @@ StackedLinear
 Under jax.jit jax requires states to be explicit, this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
 
 The following code snippets compares between the two concepts by comparing MLP's implementation.
+<div align="center">
 <table>
 <tr>
 <td>Explicit state </td>
@@ -294,6 +295,8 @@ def fwd(params,x):
   for layer in hidden :
     x = nn.tanh(x@layer['W']+layer['B'])
   return x@last['W'] + last['B']
+
+
 
 @value_and_grad
 def loss_func(params,x,y):
@@ -392,34 +395,46 @@ for _ in range(1,epochs+1):
 </tr>
 
 </table>
+</div>
 
 ## 🔢 More<a id="More"></a>
 
 <details><summary>More compact boilerplate</summary>
 
+Standard definition of nodes in `__init__` and calling in `__call__`
 ```python
-# more compact definition 
-# with class definition at runtime call
 @pytc.treeclass
-class StackedLinear2:
+class StackedLinear:
+    def __init__(self,key,in_dim,out_dim,hidden_dim):
+        keys= jax.random.split(key,3)
+        self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
+        self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
+        self.l3 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
 
+    def __call__(self,x):
+        x = self.l1(x)
+        x = jax.nn.tanh(x)
+        x = self.l2(x)
+        x = jax.nn.tanh(x)
+        x = self.l3(x)
+        return x
+```
+Using `register_node`:
+- More compact definition with node definition at runtime call
+- The Linear layers are defined on the first call and retrieved on the subsequent calls
+- This pattern is useful if module definition depends runtime data.
+```python
+@pytc.treeclass
+class StackedLinear:
     def __init__(self,key):
         self.keys = jax.random.split(key,3)
 
     def __call__(self,x):
-        # The Linear layers are defined on the first call
-        # and retrieved on the subsequent calls
-        # this pattern is useful if module definition depends runtime data.
-        
-        in_dim = out_dim = x.shape[-1]
-        k1,k2,k3 = self.keys
-
-        x = self.register_node(Linear(k1,in_dim,10),name="l1")(x)
+        x = self.register_node(Linear(self.keys[0],x.shape[-1],10),name="l1")(x)
         x = jax.nn.tanh(x)
-        x = self.register_node(Linear(k2,10,10),name="l2")(x)
+        x = self.register_node(Linear(self.keys[1],10,10),name="l2")(x)
         x = jax.nn.tanh(x)
-        x = self.register_node(Linear(k3,10,out_dim),name="l3")(x)
-
+        x = self.register_node(Linear(self.keys[2],10,x.shape[-1]),name="l3")(x)
         return x
 ```
 
@@ -545,10 +560,7 @@ class Test :
 
 
 ## 📝 Applications<a id="Applications"></a>
-
-| Description |
-|---|
-| [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX)  |
+- [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
 
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
