@@ -61,7 +61,7 @@ def dispatch(*args, **kwargs):
         return dispatch_wrapper(args[0], 0)
 
     elif len(args) == 0 and len(kwargs) > 0:
-        # @dispatch(argnum=x)
+        # @dispatch(argnum=...)
         # def f(..):
         argnum = kwargs["argnum"] if "argnum" in kwargs else 0
         return functools.partial(dispatch_wrapper, argnum=argnum)

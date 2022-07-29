@@ -35,6 +35,40 @@ def test_getter_by_param():
     assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
 
+def test_getter_by_slice():
+    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
+
+    B = A.at[0:1].get()
+    assert is_treeclass_equal(B, Test(10, None, None, None, "A"))
+
+    B = A.at[0:2].get()
+    assert is_treeclass_equal(B, Test(10, 20, None, None, "A"))
+
+    B = A.at[:-1].get()
+    assert is_treeclass_equal(B, Test(10, 20, 30, None, "A"))
+
+    B = A.at[:].get()
+    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+
+def test_getter_by_int():
+    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
+
+    B = A.at[0].get()
+    assert is_treeclass_equal(B, Test(10, None, None, None, "A"))
+
+    B = A.at[1].get()
+    assert is_treeclass_equal(B, Test(None, 20, None, None, "A"))
+
+    B = A.at[2].get()
+    assert is_treeclass_equal(B, Test(None, None, 30, None, "A"))
+
+    B = A.at[3].get()
+    assert is_treeclass_equal(
+        B, Test(None, None, None, jnp.array([1, 2, 3, 4, 5]), "A")
+    )
+
+
 def test_getter_by_model():
     @treeclass
     class level1:
@@ -71,8 +105,8 @@ def test_getter_by_model():
     with pytest.raises(ValueError):
         B = A.at[A].get()
 
-    with pytest.raises(NotImplementedError):
-        B = A.at[0].get()
+    # with pytest.raises(NotImplementedError):
+    B = A.at[0].get()
 
 
 def test_setter_by_param():
@@ -86,6 +120,32 @@ def test_setter_by_param():
 
     B = A.at["a", "b", "c"].set(0)
     assert is_treeclass_equal(B, Test(0, 0, 0, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+
+def test_setter_by_slice():
+    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
+
+    B = A.at[0:1].set(0)
+    assert is_treeclass_equal(B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+    B = A.at[0:2].set(0)
+    assert is_treeclass_equal(B, Test(0, 0, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+    B = A.at[0:3].set(0)
+    assert is_treeclass_equal(B, Test(0, 0, 0, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+
+def test_setter_by_int():
+    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
+
+    B = A.at[0].set(0)
+    assert is_treeclass_equal(B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+    B = A.at[1].set(0)
+    assert is_treeclass_equal(B, Test(10, 0, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+    B = A.at[2].set(0)
+    assert is_treeclass_equal(B, Test(10, 20, 0, jnp.array([1, 2, 3, 4, 5]), "A"))
 
 
 def test_setter_by_model():
@@ -118,8 +178,8 @@ def test_setter_by_model():
     with pytest.raises(ValueError):
         B = A.at[A].set(0)
 
-    with pytest.raises(NotImplementedError):
-        B = A.at[0].set(0)
+    # with pytest.raises(NotImplementedError):
+    B = A.at[0].set(0)
 
 
 def test_apply_and_its_derivatives():
