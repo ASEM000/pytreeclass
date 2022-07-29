@@ -253,6 +253,7 @@ StackedLinear
 Under jax.jit jax requires states to be explicit, this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
 
 The following code snippets compares between the two concepts by comparing MLP's implementation.
+<div align="center">
 <table>
 <tr>
 <td>Explicit state </td>
@@ -392,6 +393,7 @@ for _ in range(1,epochs+1):
 </tr>
 
 </table>
+</div>
 
 ## 🔢 More<a id="More"></a>
 
@@ -545,10 +547,7 @@ class Test :
 
 
 ## 📝 Applications<a id="Applications"></a>
-
-| Description |
-|---|
-| [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX)  |
+- [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
 
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
