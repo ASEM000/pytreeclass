@@ -268,7 +268,8 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax.nn.initializers import he_normal
 from jax.tree_util import tree_map
-from jax import nn, value_and_grad
+from jax import nn, value_and_grad,jit
+import pytreeclass as pytc 
 
 def init_params(layers):
   keys = jr.split(
@@ -294,15 +295,16 @@ def fwd(params,x):
     x = nn.tanh(x@layer['W']+layer['B'])
   return x@last['W'] + last['B']
 
+@value_and_grad
 def loss_func(params,x,y):
   pred = fwd(params,x)
   return jnp.mean((pred-y)**2)
 
-@jax.jit
+@jit
 def update(params,x,y):
   # gradient w.r.t to params
-  value,grads= value_and_grad(loss_func)(params,x,y)
-  params =  jax.tree_map(
+  value,grads= loss_func(params,x,y)
+  params =  tree_map(
     lambda x,y : x-1e-3*y, params,grads
   )
   return value,params
@@ -329,15 +331,16 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax.nn.initializers import he_normal
 from jax.tree_util import tree_map
-from jax import nn, value_and_grad
+from jax import nn, value_and_grad,jit
+import pytreeclass as pytc 
 
 @pytc.treeclass
 class MLP:
   Layers : list
 
   def __init__(self,layers):
-    keys = jax.random.split(
-        jax.random.PRNGKey(0),len(layers)-1
+    keys = jr.split(
+        jr.PRNGKey(0),len(layers)-1
       )
     self.Layers = list()
     init_func = he_normal()
@@ -357,14 +360,15 @@ class MLP:
       x = nn.tanh(x@layer['W']+layer['B'])
     return x@last['W'] + last['B']
 
+@value_and_grad
 def loss_func(model,x,y):
   pred = model(x)
   return jnp.mean((pred-y)**2)
 
-@jax.jit
+@jit
 def update(model,x,y):
   # gradient w.r.t to model
-  value , grads= value_and_grad(loss_func)(model,x,y)
+  value , grads= loss_func(model,x,y)
   model = tree_map(
     lambda x,y : x-1e-3*y, model,grads
   )
