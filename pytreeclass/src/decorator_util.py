@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import inspect
 
@@ -33,7 +35,7 @@ def dispatch(*args, **kwargs):
     ...     return "int,int"
     """
 
-    def dispatch_wrapper(func, argnum=1):
+    def dispatch_wrapper(func, argnum: int | str = 0):
         """singledispatch by arg position/kw arg name"""
         dispatcher = functools.singledispatch(func)
 

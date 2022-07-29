@@ -31,7 +31,7 @@ pip install pytreeclass
 A JAX compatible `dataclass` like datastructure with the following functionalities
 
 - Create PyTorch like NN classes 
-- Provides rich visualizations for pytrees wrapped with `@treeclass`.
+- Provides rich visualizations for pytrees wrapped with `@pytc.treeclass`.
 - Boolean indexing on Pytrees in functional style similar to jax.numpy. e.g. `x.at[x<0].set(0) `
 - Apply math/numpy operations on pytrees 
 
@@ -42,12 +42,12 @@ A JAX compatible `dataclass` like datastructure with the following functionaliti
 ```python
 import jax
 from jax import numpy as jnp
-from pytreeclass import treeclass,tree_viz
+import pytreeclass as pytc
 import matplotlib.pyplot as plt
 
-@treeclass
+@pytc.treeclass
 class Linear :
-   # Any variable not wrapped with @treeclass
+   # Any variable not wrapped with @pytc.treeclass
    # should be declared as a dataclass field here
    weight : jnp.ndarray
    bias   : jnp.ndarray
@@ -59,14 +59,14 @@ class Linear :
    def __call__(self,x):
        return x @ self.weight + self.bias
 
-@treeclass
+@pytc.treeclass
 class StackedLinear:
 
     def __init__(self,key,in_dim,out_dim,hidden_dim):
         keys= jax.random.split(key,3)
 
         # Declaring l1,l2,l3 as dataclass_fields is optional
-        # as l1,l2,l3 are Linear class that is wrapped with @treeclass
+        # as l1,l2,l3 are Linear class that is wrapped with @pytc.treeclass
         self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
         self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
         self.l3 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
@@ -100,7 +100,7 @@ class StackedLinear:
 ```python
 
 
->>> print(tree_viz.summary(model))
+>>> print(model.summary())
 ┌──────┬───────┬───────┬─────────────────┐
 │Type  │Param #│Size   │Config           │
 ├──────┼───────┼───────┼─────────────────┤
@@ -128,7 +128,7 @@ Static/Frozen size:	0.00B(0.00B)
  <td>
  
 ```python
->>> print(tree_viz.tree_box(model,array=x))
+>>> print(model.tree_box(array=x))
 # using jax.eval_shape (no-flops operation)
 # ** note ** : the created modules 
 # in __init__ should be in the same order
@@ -158,7 +158,7 @@ Static/Frozen size:	0.00B(0.00B)
 <td>
 
 ```python
->>> print(tree_viz.tree_diagram(model))
+>>> print(model.tree_diagram())
 StackedLinear
     ├── l1=Linear
     │   ├── weight=f32[1,10]
@@ -188,8 +188,8 @@ StackedLinear
 
 ```python
 # generate mermaid diagrams
-# print(tree_viz.tree_mermaid(model)) # generate core syntax
->>> tree_viz.save_viz(model,filename="test_mermaid",method="tree_mermaid_md")
+# print(pytc.tree_viz.tree_mermaid(model)) # generate core syntax
+>>> pytc.tree_viz.save_viz(model,filename="test_mermaid",method="tree_mermaid_md")
 # use `method="tree_mermaid_html"` to save as html
 ```
 
@@ -210,7 +210,7 @@ flowchart TD
 <div align="center",font-weight="bold">✨ Generate shareable vizualization links ✨</div>
 
 ```python
->>> tree_viz.tree_mermaid(model,link=True)
+>>> pytc.tree_viz.tree_mermaid(model,link=True)
 'Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id=*********'
 ```
 
@@ -230,8 +230,11 @@ flowchart TD
 # set negative values in l2 to 0
 >>> model.l2 = model.l2.at[model.l2<0].set(0)
 
+# apply sin(x) to all values in l3
+>>> model.l3 = model.l3.at[model.l3==model.l3].apply(jnp.sin)
+
 # frozen nodes are marked with #
->>> print(tree_viz.tree_diagram(model))
+>>> print(model.tree_diagram())
 StackedLinear
     ├── l1=Linear
     │   ├#─ weight=f32[1,10]
@@ -247,7 +250,7 @@ StackedLinear
 ## 📜 Stateful computations<a id="StatefulComputation"></a>
 [JAX reference](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state)
 
-Under jax.jit jax requires states to be explicit, this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
+Under jax.jit jax requires states to be explicit, this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
 
 The following code snippets compares between the two concepts by comparing MLP's implementation.
 <table>
@@ -261,16 +264,19 @@ The following code snippets compares between the two concepts by comparing MLP's
 <td>
 
 ```python
-import jax 
 import jax.numpy as jnp
+import jax.random as jr
+from jax.nn.initializers import he_normal
+from jax.tree_util import tree_map
+from jax import nn, value_and_grad
 
 def init_params(layers):
-  keys = jax.random.split(
-      jax.random.PRNGKey(0),len(layers)-1
+  keys = jr.split(
+      jr.PRNGKey(0),len(layers)-1
   )
     
   params = list()
-  init_func = jax.nn.initializers.he_normal()
+  init_func = he_normal()
   for key,n_in,n_out in zip(
     keys,
     layers[:-1],
@@ -278,14 +284,14 @@ def init_params(layers):
   ):
     
     W = init_func(key,(n_in,n_out))
-    B = jax.random.uniform(key,shape=(n_out,))
+    B = jr.uniform(key,shape=(n_out,))
     params.append({'W':W,'B':B})
   return params
 
 def fwd(params,x):
   *hidden,last = params
   for layer in hidden :
-    x = jax.nn.tanh(x@layer['W']+layer['B'])
+    x = nn.tanh(x@layer['W']+layer['B'])
   return x@last['W'] + last['B']
 
 def loss_func(params,x,y):
@@ -295,7 +301,7 @@ def loss_func(params,x,y):
 @jax.jit
 def update(params,x,y):
   # gradient w.r.t to params
-  value,grads= jax.value_and_grad(loss_func,0)(params,x,y)
+  value,grads= value_and_grad(loss_func)(params,x,y)
   params =  jax.tree_map(
     lambda params,grads : params-1e-3*grads, params,grads
   )
@@ -319,10 +325,13 @@ for _ in range(1,epochs+1):
 <td>
 
 ```python
-import jax
 import jax.numpy as jnp
+import jax.random as jr
+from jax.nn.initializers import he_normal
+from jax.tree_util import tree_map
+from jax import nn, value_and_grad
 
-@treeclass
+@pytc.treeclass
 class MLP:
   Layers : list
 
@@ -331,7 +340,7 @@ class MLP:
         jax.random.PRNGKey(0),len(layers)-1
       )
     self.Layers = list()
-    init_func = jax.nn.initializers.he_normal()
+    init_func = he_normal()
     for key,n_in,n_out in zip(
       keys,
       layers[:-1],
@@ -339,13 +348,13 @@ class MLP:
      ):
 
       W = init_func(key,(n_in,n_out))
-      B = jax.random.uniform(key,shape=(n_out,))
+      B = jr.uniform(key,shape=(n_out,))
       self.Layers.append({'W':W,'B':B})
 
   def __call__(self,x):
     *hidden,last = self.Layers
     for layer in hidden :
-      x = jax.nn.tanh(x@layer['W']+layer['B'])
+      x = nn.tanh(x@layer['W']+layer['B'])
     return x@last['W'] + last['B']
 
 def loss_func(model,x,y):
@@ -355,8 +364,8 @@ def loss_func(model,x,y):
 @jax.jit
 def update(model,x,y):
   # gradient w.r.t to model
-  value , grads= jax.value_and_grad(loss_func,0)(model,x,y)
-  model = jax.tree_map(
+  value , grads= value_and_grad(loss_func)(model,x,y)
+  model = tree_map(
     lambda model,grads : model-1e-3*grads, model,grads
   )
   return value , model
@@ -387,7 +396,7 @@ for _ in range(1,epochs+1):
 ```python
 # more compact definition 
 # with class definition at runtime call
-@treeclass
+@pytc.treeclass
 class StackedLinear2:
 
     def __init__(self,key):
@@ -414,9 +423,10 @@ class StackedLinear2:
 
 <details>
 
-<summary>Using out-of-place indexing `.at[].set()` and `.at[].get()` on Pytrees</summary>
+<summary>Using out-of-place indexing on Pytrees</summary>
 
-Similar to JAX pytreeclass provides `.at` property for out-of-place update.
+
+Similar to [JAX](https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html#jax.numpy.ndarray.at) pytreeclass provides `.at` property for out-of-place update.
 
 ```python
 # get layer1
@@ -472,7 +482,7 @@ Linear(
 <summary>Perform Math operations on Pytrees</summary>
 
 ```python
-@treeclass
+@pytc.treeclass
 class Test :
     a : float
     b : float
@@ -539,6 +549,6 @@ class Test :
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 
-- [equinox](https://github.com/patrick-kidger/equinox)
+- [Equinox](https://github.com/patrick-kidger/equinox)
 - [Treex](https://github.com/cgarciae/treex)
 - [tree-math](https://github.com/google/tree-math)

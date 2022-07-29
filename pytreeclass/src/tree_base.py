@@ -7,7 +7,7 @@ from typing import Any
 from jax.tree_util import tree_flatten, tree_leaves
 
 from .tree_util import freeze_nodes, is_treeclass, is_treeclass_leaf, unfreeze_nodes
-from .tree_viz import tree_indent, tree_str
+from .tree_viz import summary, tree_box, tree_diagram, tree_indent, tree_str
 
 
 class treeBase:
@@ -178,12 +178,6 @@ class treeBase:
     def __hash__(self):
         return hash(tuple(*self.flatten_leaves))
 
-    def __repr__(self):
-        return tree_indent(self)
-
-    def __str__(self):
-        return tree_str(self)
-
     def asdict(self):
         """Dictionary representation of dataclass_fields"""
         dynamic, static = self.tree_fields
@@ -207,3 +201,18 @@ class treeBase:
             self.__dict__[name] = node
 
         return self.__dict__[name]
+
+    def __repr__(self):
+        return tree_indent(self)
+
+    def __str__(self):
+        return tree_str(self)
+
+    def summary(self, array=None):
+        return summary(self, array)
+
+    def tree_diagram(self):
+        return tree_diagram(self)
+
+    def tree_box(self, array=None):
+        return tree_box(self, array)

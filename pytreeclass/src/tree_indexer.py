@@ -5,7 +5,7 @@ from typing import Any
 
 import jax
 import jax.numpy as jnp
-from jax.tree_util import tree_flatten, tree_leaves, tree_unflatten
+from jax.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
 
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import is_treeclass_leaf_bool
@@ -43,6 +43,9 @@ def node_getter(lhs, where):
 
 
 def param_indexing_getter(model, *where: tuple[str, ...]):
+    if model.frozen:
+        return model
+
     modelCopy = copy.copy(model)
 
     for field in model.__dataclass_fields__.values():
@@ -66,6 +69,9 @@ def param_indexing_setter(model, set_value, *where: tuple[str]):
     @_param_indexing_setter.register(complex)
     @_param_indexing_setter.register(jnp.ndarray)
     def set_scalar(model, set_value, *where: tuple[str]):
+        if model.frozen:
+            return model
+
         modelCopy = model
         for field in model.__dataclass_fields__.values():
             value = modelCopy.__dict__[field.name]
@@ -85,6 +91,8 @@ def param_indexing_setter(model, set_value, *where: tuple[str]):
 
 
 def boolean_indexing_getter(model, where):
+    if model.frozen:
+        return model
 
     lhs_leaves, lhs_treedef = model.flatten_leaves
     where_leaves, where_treedef = tree_flatten(where)
@@ -97,6 +105,8 @@ def boolean_indexing_getter(model, where):
 
 
 def boolean_indexing_setter(model, set_value, where):
+    if model.frozen:
+        return model
 
     lhs_leaves, lhs_treedef = tree_flatten(model)
     where_leaves, rhs_treedef = tree_flatten(where)
@@ -137,6 +147,31 @@ class treeIndexer:
                             copy.copy(self), set_value, *flatten_args
                         )
 
+                    def apply(getter_setter_self, func):
+                        return tree_map(func, getter_setter_self.get())
+
+                    def add(getter_setter_self, set_value):
+                        return getter_setter_self.apply(lambda x: x + set_value)
+
+                    def multiply(getter_setter_self, set_value):
+                        return getter_setter_self.apply(lambda x: x * set_value)
+
+                    def divide(getter_setter_self, set_value):
+                        return getter_setter_self.apply(lambda x: x / set_value)
+
+                    def power(getter_setter_self, set_value):
+                        return getter_setter_self.apply(lambda x: x**set_value)
+
+                    def min(getter_setter_self, set_value):
+                        return getter_setter_self.apply(
+                            lambda x: jnp.minimum(x, set_value)
+                        )
+
+                    def max(getter_setter_self, set_value):
+                        return getter_setter_self.apply(
+                            lambda x: jnp.maximum(x, set_value)
+                        )
+
                 return getterSetterIndexer()
 
             @__getitem__.register(type(self))
@@ -154,6 +189,31 @@ class treeIndexer:
                     def set(getter_setter_self, set_value):
                         # select by class boolean
                         return boolean_indexing_setter(self, set_value, arg)
+
+                    def apply(getter_setter_self, func):
+                        return tree_map(func, getter_setter_self.get())
+
+                    def add(getter_setter_self, set_value):
+                        return getter_setter_self.apply(lambda x: x + set_value)
+
+                    def multiply(getter_setter_self, set_value):
+                        return getter_setter_self.apply(lambda x: x * set_value)
+
+                    def divide(getter_setter_self, set_value):
+                        return getter_setter_self.apply(lambda x: x / set_value)
+
+                    def power(getter_setter_self, set_value):
+                        return getter_setter_self.apply(lambda x: x**set_value)
+
+                    def min(getter_setter_self, set_value):
+                        return getter_setter_self.apply(
+                            lambda x: jnp.minimum(x, set_value)
+                        )
+
+                    def max(getter_setter_self, set_value):
+                        return getter_setter_self.apply(
+                            lambda x: jnp.maximum(x, set_value)
+                        )
 
                 return getterSetterIndexer()
 
