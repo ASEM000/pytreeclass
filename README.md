@@ -296,6 +296,8 @@ def fwd(params,x):
     x = nn.tanh(x@layer['W']+layer['B'])
   return x@last['W'] + last['B']
 
+
+
 @value_and_grad
 def loss_func(params,x,y):
   pred = fwd(params,x)
