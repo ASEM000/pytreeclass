@@ -218,15 +218,6 @@ class treeBase:
         return tree_box(self, array)
 
     def __setitem__(self, key, value):
-        """Set item in treeclass
-
-        Args:
-            key (_type_): _description_
-            value (_type_): _description_
-
-        Raises:
-            ValueError: If treeclass is frozen raises error
-        """
         if self.frozen:
             raise ValueError("Cannot set a value to a frozen treeclass.")
         self.__dict__[key] = value
