@@ -46,28 +46,11 @@ def _node_applier(lhs: Any, where: bool, func: Callable[[Any], Any]):
         return func(lhs) if where else lhs
 
 
-def _param_indexing_getter(model, *where: tuple[str, ...]):
+def _non_boolean_indexing_getter(model, *where: tuple[str | int, ...]):
 
-    modelCopy = copy.copy(model)
-
-    for field in model.__dataclass_fields__.values():
-        value = modelCopy.__dict__[field.name]
-        excluded_by_type = isinstance(value, str)
-        excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
-        excluded = excluded_by_type or excluded_by_meta
-        if field.name not in where and not excluded:
-            modelCopy.__dict__[field.name] = None
-
-    return modelCopy
-
-
-def _slice_indexing_getter(model, where: int | slice):
-
-    resolved_where = (
-        range(*where.indices(len(model.__dataclass_fields__)))
-        if isinstance(where, slice)
-        else (where,)
-    )
+    if model.frozen :
+        return model
+        
     modelCopy = copy.copy(model)
 
     for i, field in enumerate(model.__dataclass_fields__.values()):
@@ -75,85 +58,48 @@ def _slice_indexing_getter(model, where: int | slice):
         excluded_by_type = isinstance(value, str)
         excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
         excluded = excluded_by_type or excluded_by_meta
-        if i not in resolved_where and not excluded:
+
+        if not excluded and not (i in where or field.name in where):
             modelCopy.__dict__[field.name] = None
 
     return modelCopy
 
 
-def _param_indexing_setter(model, set_value, *where: tuple[str]):
+def _non_boolean_indexing_setter(model, set_value, *where: tuple[str | int, ...]):
 
-    assert isinstance(
-        set_value, (float, int, complex, jnp.ndarray)
-    ), f"Invalid set_value type = {type(set_value)}."
-
-    modelCopy = copy.copy(model)
-    for field in model.__dataclass_fields__.values():
-        value = modelCopy.__dict__[field.name]
-        excluded_by_type = isinstance(value, str)
-        excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
-        excluded = excluded_by_meta or excluded_by_type
-        if field.name in where and not excluded:
-            modelCopy.__dict__[field.name] = _node_setter(value, True, set_value)
-    return modelCopy
-
-
-def _param_indexing_applier(model, func, *where: tuple[str]):
-    assert isinstance(func, Callable), f"Invalid func type = {type(func)}."
+    if model.frozen :
+        return model
 
     modelCopy = copy.copy(model)
-    for field in model.__dataclass_fields__.values():
-        value = modelCopy.__dict__[field.name]
-        excluded_by_type = isinstance(value, str)
-        excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
-        excluded = excluded_by_meta or excluded_by_type
-        if field.name in where and not excluded:
-            modelCopy.__dict__[field.name] = _node_applier(value, True, func)
-    return modelCopy
 
-
-def _slice_indexing_setter(model, set_value, where: int | slice):
-
-    assert isinstance(
-        set_value, (float, int, complex, jnp.ndarray)
-    ), f"Invalid set_value type = {type(set_value)}."
-
-    resolved_where = (
-        range(*where.indices(len(model.__dataclass_fields__)))
-        if isinstance(where, slice)
-        else (where,)
-    )
-
-    modelCopy = copy.copy(model)
     for i, field in enumerate(model.__dataclass_fields__.values()):
         value = modelCopy.__dict__[field.name]
-
         excluded_by_type = isinstance(value, str)
         excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
-        excluded = excluded_by_meta or excluded_by_type
-        if i in resolved_where and not excluded:
+        excluded = excluded_by_type or excluded_by_meta
+
+        if not excluded and (i in where or field.name in where):
             modelCopy.__dict__[field.name] = _node_setter(value, True, set_value)
+
     return modelCopy
 
 
-def _slice_indexing_applier(model, func, where: int | slice):
-    assert isinstance(func, Callable), f"Invalid func type = {type(func)}."
+def _non_boolean_indexing_applier(model, set_value, *where: tuple[str | int, ...]):
 
-    resolved_where = (
-        range(*where.indices(len(model.__dataclass_fields__)))
-        if isinstance(where, slice)
-        else (where,)
-    )
+    if model.frozen :
+        return model
 
     modelCopy = copy.copy(model)
+
     for i, field in enumerate(model.__dataclass_fields__.values()):
         value = modelCopy.__dict__[field.name]
-
         excluded_by_type = isinstance(value, str)
         excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
-        excluded = excluded_by_meta or excluded_by_type
-        if i in resolved_where and not excluded:
-            modelCopy.__dict__[field.name] = _node_applier(value, True, func)
+        excluded = excluded_by_type or excluded_by_meta
+
+        if not excluded and (i in where or field.name in where):
+            modelCopy.__dict__[field.name] = _node_applier(value, True, set_value)
+
     return modelCopy
 
 
@@ -220,27 +166,29 @@ class treeIndexer:
                     f"Indexing with type{tuple(type(arg) for arg in args)} is not implemented."
                 )
 
+            @__getitem__.register(int)
             @__getitem__.register(str)
             @__getitem__.register(tuple)
+            @__getitem__.register(range)
             def _(inner_self, *args):
-                """indexing by param name"""
+                """Non-boolean indexing"""
                 flatten_args = tree_leaves(args)
-                if not all(isinstance(arg, str) for arg in flatten_args):
-                    raise ValueError("Invalid indexing argument")
 
                 class _getterSetterIndexer(_treeIndexerMethods):
                     def get(getter_setter_self):
-                        return _param_indexing_getter(self, *flatten_args)
+                        return _non_boolean_indexing_getter(self, *flatten_args)
 
                     def set(getter_setter_self, set_value):
                         if self.frozen:
                             raise ValueError("Cannot set to a frozen treeclass.")
-                        return _param_indexing_setter(self, set_value, *flatten_args)
+                        return _non_boolean_indexing_setter(
+                            self, set_value, *flatten_args
+                        )
 
                     def apply(getter_setter_self, func):
                         if self.frozen:
                             raise ValueError("Cannot apply to a frozen treeclass.")
-                        return _param_indexing_applier(self, func, *flatten_args)
+                        return _non_boolean_indexing_applier(self, func, *flatten_args)
 
                 return _getterSetterIndexer()
 
@@ -267,26 +215,11 @@ class treeIndexer:
 
                 return _getterSetterIndexer()
 
-            @__getitem__.register(int)
             @__getitem__.register(slice)
             def _(inner_self, arg):
-                """indexing by slice/int on tree leaves"""
-
-                class _getterSetterIndexer(_treeIndexerMethods):
-                    def get(getter_setter_self):
-                        return _slice_indexing_getter(self, arg)
-
-                    def set(getter_setter_self, set_value):
-                        if self.frozen:
-                            raise ValueError("Cannot set to a frozen treeclass.")
-                        return _slice_indexing_setter(self, set_value, arg)
-
-                    def apply(getter_setter_self, func):
-                        if self.frozen:
-                            raise ValueError("Cannot apply to a frozen treeclass.")
-                        return _slice_indexing_applier(self, func, arg)
-
-                return _getterSetterIndexer()
+                return inner_self.__getitem__(
+                    *range(*arg.indices(len(self.__dataclass_fields__)))
+                )
 
         return indexer()
 

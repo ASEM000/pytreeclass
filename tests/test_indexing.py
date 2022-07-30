@@ -272,24 +272,24 @@ def test_apply_and_its_derivatives():
     lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
     rhs = init.at["a"].power(2)
     assert is_treeclass_equal(lhs, rhs)
-    
+
     # by param
     with pytest.raises(ValueError):
         init.freeze().at["a"].apply(lambda x: x**2)
 
     with pytest.raises(ValueError):
         init.freeze().at["a", "b"].apply(lambda x: x**2)
-    
+
     # by slice
     with pytest.raises(ValueError):
         init.freeze().at[:].apply(lambda x: x**2)
-    
+
     with pytest.raises(ValueError):
         init.freeze().at[0].apply(lambda x: x**2)
-    
+
     # by pytree
     with pytest.raises(ValueError):
-        init.freeze().at[init>1].apply(lambda x: x**2)
-    
+        init.freeze().at[init > 1].apply(lambda x: x**2)
+
     with pytest.raises(ValueError):
-        init.freeze().at[init==1].apply(lambda x: x**2)
+        init.freeze().at[init == 1].apply(lambda x: x**2)
