@@ -30,14 +30,15 @@ pip install pytreeclass
 
 PyTreeClass offers a JAX compatible `dataclass` like datastructure with the following functionalities
 
-- Create PyTorch like NN classes 
-- Provides rich visualizations for pytrees wrapped with `@pytc.treeclass`.
-- Boolean indexing on Pytrees in functional style similar to jax.numpy. e.g. `x.at[x<0].set(0) `
-- Apply math/numpy operations on pytrees 
+- 🏗️ [Create PyTorch like NN classes](#Pytorch)
+- 🎨 [Visualize for pytrees decorated with `@pytc.treeclass`.](#Viz)
+- ☝️ [Indexing on Pytrees in functional style similar to `jax.numpy.at` ](#Indexing)
+- ➕ [Apply math/numpy operations on pytrees](#Math)
+
 
 ## ⏩ Quick Example <a id="QuickExample">
 
-### 🏗️ Create simple MLP
+### 🏗️ Create simple MLP <a id="Pytorch">
 
 ```python
 import jax
@@ -86,7 +87,7 @@ class StackedLinear:
 >>> y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 ```
 
-### 🎨 Visualize
+### 🎨 Visualize<a id="Viz">
 
 <div align="center">
 <table>
@@ -399,7 +400,7 @@ for _ in range(1,epochs+1):
 
 ## 🔢 More<a id="More"></a>
 
-<details><summary>More compact boilerplate</summary>
+<details><summary><mark>More compact boilerplate</mark></summary>
 
 Standard definition of nodes in `__init__` and calling in `__call__`
 ```python
@@ -440,65 +441,78 @@ class StackedLinear:
 
 </details>
 
-<details>
-
-<summary>Using out-of-place indexing on Pytrees</summary>
-
+### ☝️ Using out-of-place indexing on Pytrees <a id="Indexing">
 
 Similar to [JAX](https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html#jax.numpy.ndarray.at) pytreeclass provides `.at` property for out-of-place update.
-
 ```python
-# get layer1
-layer1 = model.l1
+@pytc.treeclass
+class Container:
+    a : int 
+    b : int
+    c : jnp.ndarray
 ```
 
+**`.at[].get()`**
+
+- _Note : All Getter operations preserve the Pytree structure._This is done by replacing unselected fields to None.
+- Array values are treated as leaves only during `.at[].` operations.
+
 ```python
-# layer1 repr
->>> print(f"{layer1!r}")
-Linear(
-  weight=f32[1,10],
-  bias=f32[1,10])
- ```
-  
-```python
-# layer1 str
->>> print(f"{layer1!s}")
-Linear(
-  weight=
-    [[-2.5491788   1.674097    0.07813213  0.47670904 -1.8760327  -0.9941608
-       0.2808009   0.6522513  -0.53470623  1.0796958 ]],
-  bias=
-    [[1.0368661  0.98985153 1.0104426  0.9997676  1.2349331  0.9800282
-      0.9618377  0.99291945 0.9431369  1.0172408 ]])
+>>> l = Container(a=1,b=10.,c=jnp.array([1,2,3,4,5]))
+
+# Getter by slice
+# Get all except the first field
+>>> l.at[1:].get() 
+Container(a=None,b=10.,c=jnp.array([1,2,3,4,5]))
+
+# Getter by param name
+# Select field b,c 
+>>> l.at["b","c"].get()
+Container(a=None,b=10.,c=jnp.array([1,2,3,4,5]))
+
+# Getter by boolean
+# Select all values larger than 1
+>>> l.at[l>1].get()
+Container(a=None,b=10.,c=jnp.array([2,3,4,5]))
 ```
 
+**`.at[].set()`**
 ```python
-# set negative values to 0
->>> print(layer1.at[layer1<0].set(0))
-Linear(
-  weight=
-    [[0.         1.674097   0.07813213 0.47670904 0.         0.
-      0.2808009  0.6522513  0.         1.0796958 ]],
-  bias=
-    [[1.0368661  0.98985153 1.0104426  0.9997676  1.2349331  0.9800282
-      0.9618377  0.99291945 0.9431369  1.0172408 ]])
+>>> l = Container(a=1,b=10.,c=jnp.array([1,2,3,4,5]))
+
+# Set field `b` and `c`` to 100
+>>> l.at["b","c"].set(100)  # 
+Container(a=1,b=100.,c=jnp.array([100,100,100,100,100]))
+
+# Set all excpet first field to 100
+>>> l.at[1:].set(100)
+Container(a=1,b=100.,c=jnp.array([100,100,100,100,100]))
+
+# Set all values larger than 1 to 100
+>>> l.at[l>1].set(100)
+Container(a=1,b=100.,c=jnp.array([1,100,100,100,100]))
 ```
 
+**`.at[].apply()`**
 ```python
-# get only positive values
->>> print(layer1.at[layer1>0].get())
-Linear(
-  weight=
-    [1.674097   0.07813213 0.47670904 0.2808009  0.6522513  1.0796958 ],
-  bias=
-    [1.0368661  0.98985153 1.0104426  0.9997676  1.2349331  0.9800282
-     0.9618377  0.99291945 0.9431369  1.0172408 ])
+>>> l = Container(a=1,b=10.,c=jnp.array([1,2,3,4,5]))
+
+# Apply f(x)=x+1 for `b`and `c`` 
+>>> l.at["b","c"].apply(lambda x:x+1)
+Container(a=None,b=11.,c=jnp.array([2, 3, 4, 5, 6]))
+
+# Apply f(x)=x+1 for all except the first field
+>>> l.at[1:].apply(lambda x:x+1)
+Container(a=None,b=11.,c=jnp.array([2, 3, 4, 5, 6]))
+
+# Apply f(x)=x+1 for all values larger than 1
+>>> l.at[1:].apply(lambda x:x+1)
+Container(a=None,b=11.,c=jnp.array([3, 4, 5, 6]))
 ```
 
-</details>
 
-<details>
-<summary>Perform Math operations on Pytrees</summary>
+### ➕ Perform Math operations on Pytrees <a id="Math">
+
 
 ```python
 @pytc.treeclass
@@ -556,7 +570,7 @@ class Test :
 >>> C.reduce_product() # 60000
 ```
 
-</details>
+
 
 
 ## 📝 Applications<a id="Applications"></a>
