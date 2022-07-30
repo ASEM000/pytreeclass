@@ -499,15 +499,15 @@ Container(a=1,b=100.,c=jnp.array([1,100,100,100,100]))
 
 # Apply f(x)=x+1 for `b`and `c`` 
 >>> l.at["b","c"].apply(lambda x:x+1)
-Container(a=None,b=11.,c=jnp.array([2, 3, 4, 5, 6]))
+Container(a=1,b=11.,c=jnp.array([2, 3, 4, 5, 6]))
 
 # Apply f(x)=x+1 for all except the first field
 >>> l.at[1:].apply(lambda x:x+1)
-Container(a=None,b=11.,c=jnp.array([2, 3, 4, 5, 6]))
+Container(a=1,b=11.,c=jnp.array([2, 3, 4, 5, 6]))
 
 # Apply f(x)=x+1 for all values larger than 1
->>> l.at[1:].apply(lambda x:x+1)
-Container(a=None,b=11.,c=jnp.array([3, 4, 5, 6]))
+>>> l.at[l>1].apply(lambda x:x+1)
+Container(a=1,b=11.,c=jnp.array([3, 4, 5, 6]))
 ```
 
 
