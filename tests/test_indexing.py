@@ -69,7 +69,7 @@ def test_getter_by_int():
     )
 
 
-def test_getter_by_model():
+def test_getter_by_pytree():
     @treeclass
     class level1:
         a: int
@@ -148,7 +148,7 @@ def test_setter_by_int():
     assert is_treeclass_equal(B, Test(10, 20, 0, jnp.array([1, 2, 3, 4, 5]), "A"))
 
 
-def test_setter_by_model():
+def test_setter_by_pytree():
     @treeclass
     class level1:
         a: int
@@ -191,6 +191,7 @@ def test_apply_and_its_derivatives():
 
     init = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
 
+    # By boolean pytree
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
     rhs = init.at[init == init].apply(lambda x: x**2)
     assert is_treeclass_equal(lhs, rhs)
@@ -221,6 +222,21 @@ def test_apply_and_its_derivatives():
 
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
     rhs = init.at[init == init].power(2)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(1, 2, jnp.array([1, 2, 3, 16, 25]))
+    rhs = init.at[init > 3].apply(lambda x: x**2)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
+    rhs = init.at[init > 0].apply(lambda x: x + 1)
+    assert is_treeclass_equal(lhs, rhs)
+
+    rhs = init.at[init > 100].apply(lambda x: (x + 1) * 10)
+    assert is_treeclass_equal(init, rhs)
+
+    lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
+    rhs = init.at[init > 0].add(1)
     assert is_treeclass_equal(lhs, rhs)
 
     # by param
@@ -256,3 +272,24 @@ def test_apply_and_its_derivatives():
     lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
     rhs = init.at["a"].power(2)
     assert is_treeclass_equal(lhs, rhs)
+    
+    # by param
+    with pytest.raises(ValueError):
+        init.freeze().at["a"].apply(lambda x: x**2)
+
+    with pytest.raises(ValueError):
+        init.freeze().at["a", "b"].apply(lambda x: x**2)
+    
+    # by slice
+    with pytest.raises(ValueError):
+        init.freeze().at[:].apply(lambda x: x**2)
+    
+    with pytest.raises(ValueError):
+        init.freeze().at[0].apply(lambda x: x**2)
+    
+    # by pytree
+    with pytest.raises(ValueError):
+        init.freeze().at[init>1].apply(lambda x: x**2)
+    
+    with pytest.raises(ValueError):
+        init.freeze().at[init==1].apply(lambda x: x**2)

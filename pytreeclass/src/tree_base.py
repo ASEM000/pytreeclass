@@ -6,7 +6,7 @@ from typing import Any
 
 from jax.tree_util import tree_flatten, tree_leaves
 
-from .tree_util import _freeze_nodes, is_treeclass, is_treeclass_leaf, _unfreeze_nodes
+from .tree_util import _freeze_nodes, _unfreeze_nodes, is_treeclass, is_treeclass_leaf
 from .tree_viz import summary, tree_box, tree_diagram, tree_indent, tree_str
 
 
@@ -216,3 +216,8 @@ class treeBase:
 
     def tree_box(self, array=None):
         return tree_box(self, array)
+
+    def __setitem__(self, key, value):
+        if self.frozen:
+            raise ValueError("Cannot set a value to a frozen treeclass.")
+        self.__dict__[key] = value
