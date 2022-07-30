@@ -163,9 +163,8 @@ def slice_indexing_setter(model, set_value, where: slice):
         if model.frozen:
             return model
 
-        resolved_where = list(
-            range(*where.indices(len(model.__dataclass_fields__.values())))
-        )
+        resolved_where = range(*where.indices(len(model.__dataclass_fields__.values())))
+
         modelCopy = copy.copy(model)
         for i, field in enumerate(model.__dataclass_fields__.values()):
             value = modelCopy.__dict__[field.name]
