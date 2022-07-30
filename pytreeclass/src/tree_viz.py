@@ -11,14 +11,14 @@ from jax import tree_flatten
 from .tree_util import (
     is_treeclass,
     is_treeclass_leaf,
-    reduce_count_and_size,
+    _reduce_count_and_size,
     sequential_model_shape_eval,
 )
 
 # Node formatting
 
 
-def format_size(node_size, newline=False):
+def _format_size(node_size, newline=False):
     """return formatted size from inexact(exact) complex number"""
     mark = "\n" if newline else ""
     order_kw = ["B", "KB", "MB", "GB"]
@@ -32,12 +32,12 @@ def format_size(node_size, newline=False):
     )
 
 
-def format_count(node_count, newline=False):
+def _format_count(node_count, newline=False):
     mark = "\n" if newline else ""
     return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
 
 
-def node_format(node):
+def _node_format(node):
     """format shape and dtype of jnp.array"""
 
     if isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
@@ -64,20 +64,20 @@ def node_format(node):
 # Box drawing
 
 
-def hbox(*text):
+def _hbox(*text):
 
-    boxes = list(map(vbox, text))
+    boxes = list(map(_vbox, text))
     boxes = [(box).split("\n") for box in boxes]
     max_col_height = max([len(b) for b in boxes])
     boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
     fmt = ""
 
     for _, line in enumerate(zip(*boxes)):
-        fmt += resolve_line(line) + "\n"
+        fmt += _resolve_line(line) + "\n"
     return fmt
 
 
-def hstack(boxes):
+def _hstack(boxes):
 
     boxes = [(box).split("\n") for box in boxes]
     max_col_height = max([len(b) for b in boxes])
@@ -87,29 +87,29 @@ def hstack(boxes):
 
     fmt = ""
 
-    cells = tuple(zip(*boxes))
+    _cells = tuple(zip(*boxes))
 
-    for i, line in enumerate(cells):
-        fmt += resolve_line(line) + ("\n" if i != (len(cells) - 1) else "")
+    for i, line in enumerate(_cells):
+        fmt += _resolve_line(line) + ("\n" if i != (len(_cells) - 1) else "")
 
     return fmt
 
 
-def vbox(*text):
+def _vbox(*text):
     """
     === Explanation
         create vertically stacked text boxes
 
     === Examples
 
-        >> vbox("a","b")
+        >> _vbox("a","b")
         ┌───┐
         │a  │
         ├───┤
         │b  │
         └───┘
 
-        >> vbox("a","","a")
+        >> _vbox("a","","a")
         ┌───┐
         │a  │
         ├───┤
@@ -147,16 +147,16 @@ def vbox(*text):
     return formatted
 
 
-def resolve_line(cols):
+def _resolve_line(cols):
     """
     === Explanation
         combine columns of single line by merging their borders
 
     === Examples
-        >>> resolve_line(['ab','b│','│c'])
+        >>> _resolve_line(['ab','b│','│c'])
         'abb│c'
 
-        >>> resolve_line(['ab','b┐','┌c'])
+        >>> _resolve_line(['ab','b┐','┌c'])
         'abb┬c'
 
     """
@@ -203,17 +203,17 @@ def resolve_line(cols):
     return "".join(map(lambda x: "".join(x), cols))
 
 
-def table(lines):
+def _table(lines):
     """
 
     === Explanation
-        create a table with self aligning rows and cols
+        create a _table with self aligning rows and cols
 
     === Args
         lines : list of lists of cols values
 
     === Examples
-        >>> print(table([['1\n','2'],['3','4000']]))
+        >>> print(_table([['1\n','2'],['3','4000']]))
             ┌─┬────────┐
             │1│3       │
             │ │        │
@@ -223,23 +223,23 @@ def table(lines):
 
 
     """
-    # align cells vertically
-    for i, cells in enumerate(zip(*lines)):
-        max_cell_height = max(map(lambda x: x.count("\n"), cells))
-        for j in range(len(cells)):
-            lines[j][i] += "\n" * (max_cell_height - lines[j][i].count("\n"))
-    cols = [vbox(*col) for col in lines]
+    # align _cells vertically
+    for i, _cells in enumerate(zip(*lines)):
+        max__cell_height = max(map(lambda x: x.count("\n"), _cells))
+        for j in range(len(_cells)):
+            lines[j][i] += "\n" * (max__cell_height - lines[j][i].count("\n"))
+    cols = [_vbox(*col) for col in lines]
 
-    return hstack(cols)
+    return _hstack(cols)
 
 
-def layer_box(name, indim=None, outdim=None):
+def _layer_box(name, indim=None, outdim=None):
     """
     === Explanation
         create a keras-like layer diagram
 
     ==== Examples
-        >>> print(layer_box("Test",(1,1,1),(1,1,1)))
+        >>> print(_layer_box("Test",(1,1,1),(1,1,1)))
         ┌──────┬────────┬───────────┐
         │      │ Input  │ (1, 1, 1) │
         │ Test │────────┼───────────┤
@@ -248,10 +248,10 @@ def layer_box(name, indim=None, outdim=None):
 
     """
 
-    return hstack(
+    return _hstack(
         [
-            vbox(f"\n {name} \n"),
-            table([[" Input ", " Output "], [f" {indim} ", f" {outdim} "]]),
+            _vbox(f"\n {name} \n"),
+            _table([[" Input ", " Output "], [f" {indim} ", f" {outdim} "]]),
         ]
     )
 
@@ -259,7 +259,7 @@ def layer_box(name, indim=None, outdim=None):
 # Summary utils
 
 
-def summary_line(leaf):
+def _summary_line(leaf):
 
     dynamic, static = leaf.tree_fields
     is_dynamic = not leaf.frozen
@@ -267,20 +267,20 @@ def summary_line(leaf):
 
     if is_dynamic:
         name = f"{class_name}"
-        count, size = reduce_count_and_size(dynamic)
+        count, size = _reduce_count_and_size(dynamic)
         return (name, count, size)
 
     else:
         name = f"{class_name}\n(frozen)"
-        count, size = reduce_count_and_size(static)
+        count, size = _reduce_count_and_size(static)
         return (name, count, size)
 
 
-def cell(text):
+def _cell(text):
     return f"<td align = 'center'> {text} </td>"
 
 
-def summary_str(model, array=None, render: str = "string") -> str:
+def _summary_str(model, array=None, render: str = "string") -> str:
 
     ROW = [["Type ", "Param #", "Size ", "Config", "Output"]]
 
@@ -291,16 +291,16 @@ def summary_str(model, array=None, render: str = "string") -> str:
         params_shape = sequential_model_shape_eval(model, array)[1:]
 
     for index, leaf in enumerate(model.treeclass_leaves):
-        name, count, size = summary_line(leaf)
+        name, count, size = _summary_line(leaf)
 
-        shape = node_format(params_shape[index]) if array is not None else ""
+        shape = _node_format(params_shape[index]) if array is not None else ""
 
         if leaf.frozen:
             static_count += count
             static_size += size
             fmt = "\n".join(
                 [
-                    f"{k}={node_format(v)}"
+                    f"{k}={_node_format(v)}"
                     for k, v in leaf.tree_fields[1].items()
                     if k != "__frozen_treeclass__"
                 ]
@@ -310,37 +310,37 @@ def summary_str(model, array=None, render: str = "string") -> str:
             dynamic_count += count
             dynamic_size += size
             fmt = "\n".join(
-                [f"{k}={node_format(v)}" for k, v in leaf.tree_fields[0].items()]
+                [f"{k}={_node_format(v)}" for k, v in leaf.tree_fields[0].items()]
             )
 
-        ROW += [[name, format_count(count, True), format_size(size, True), fmt, shape]]
+        ROW += [[name, _format_count(count, True), _format_size(size, True), fmt, shape]]
 
     COL = [list(c) for c in zip(*ROW)]
     if array is None:
         COL.pop()
 
-    layer_table = table(COL)
-    table_width = len(layer_table.split("\n")[0])
+    layer__table = _table(COL)
+    _table_width = len(layer__table.split("\n")[0])
 
     # summary row
     total_count = static_count + dynamic_count
     total_size = static_size + dynamic_size
 
     param_summary = (
-        f"Total # :\t\t{format_count(total_count)}\n"
-        f"Dynamic #:\t\t{format_count(dynamic_count)}\n"
-        f"Static/Frozen #:\t{format_count(static_count)}\n"
-        f"{'-'*table_width}\n"
-        f"Total size :\t\t{format_size(total_size)}\n"
-        f"Dynamic size:\t\t{format_size(dynamic_size)}\n"
-        f"Static/Frozen size:\t{format_size(static_size)}\n"
-        f"{'='*table_width}"
+        f"Total # :\t\t{_format_count(total_count)}\n"
+        f"Dynamic #:\t\t{_format_count(dynamic_count)}\n"
+        f"Static/Frozen #:\t{_format_count(static_count)}\n"
+        f"{'-'*_table_width}\n"
+        f"Total size :\t\t{_format_size(total_size)}\n"
+        f"Dynamic size:\t\t{_format_size(dynamic_size)}\n"
+        f"Static/Frozen size:\t{_format_size(static_size)}\n"
+        f"{'='*_table_width}"
     )
 
-    return layer_table + "\n" + param_summary
+    return layer__table + "\n" + param_summary
 
 
-def summary_md(model, array=None) -> str:
+def _summary_md(model, array=None) -> str:
 
     fmt = (
         "<table>\n"
@@ -360,16 +360,16 @@ def summary_md(model, array=None) -> str:
         params_shape = sequential_model_shape_eval(model, array)[1:]
 
     for index, leaf in enumerate(model.treeclass_leaves):
-        name, count, size = summary_line(leaf)
+        name, count, size = _summary_line(leaf)
 
-        shape = node_format(params_shape[index]) if array is not None else ""
+        shape = _node_format(params_shape[index]) if array is not None else ""
 
         if leaf.frozen:
             static_count += count
             static_size += size
             config = "<br>".join(
                 [
-                    f"{k}={node_format(v)}"
+                    f"{k}={_node_format(v)}"
                     for k, v in leaf.tree_fields[1].items()
                     if k != "__frozen_treeclass__"
                 ]
@@ -379,16 +379,16 @@ def summary_md(model, array=None) -> str:
             dynamic_count += count
             dynamic_size += size
             config = "<br>".join(
-                [f"{k}={node_format(v)}" for k, v in leaf.tree_fields[0].items()]
+                [f"{k}={_node_format(v)}" for k, v in leaf.tree_fields[0].items()]
             )
 
         fmt += (
             "<tr>"
-            + cell(name)
-            + cell(format_count(count, True))
-            + cell(format_size(size, True))
-            + cell(config)
-            + cell(shape)
+            + _cell(name)
+            + _cell(_format_count(count, True))
+            + _cell(_format_size(size, True))
+            + _cell(config)
+            + _cell(shape)
             + "</tr>"
         )
 
@@ -400,12 +400,12 @@ def summary_md(model, array=None) -> str:
 
     param_summary = (
         "<table>"
-        f"<tr><td>Total #</td><td>{format_count(total_count)}</td></tr>"
-        f"<tr><td>Dynamic #</td><td>{format_count(dynamic_count)}</td></tr>"
-        f"<tr><td>Static/Frozen #</td><td>{format_count(static_count)}</td></tr>"
-        f"<tr><td>Total size</td><td>{format_size(total_size)}</td></tr>"
-        f"<tr><td>Dynamic size</td><td>{format_size(dynamic_size)}</td></tr>"
-        f"<tr><td>Static/Frozen size</td><td>{format_size(static_size)}</td></tr>"
+        f"<tr><td>Total #</td><td>{_format_count(total_count)}</td></tr>"
+        f"<tr><td>Dynamic #</td><td>{_format_count(dynamic_count)}</td></tr>"
+        f"<tr><td>Static/Frozen #</td><td>{_format_count(static_count)}</td></tr>"
+        f"<tr><td>Total size</td><td>{_format_size(total_size)}</td></tr>"
+        f"<tr><td>Dynamic size</td><td>{_format_size(dynamic_size)}</td></tr>"
+        f"<tr><td>Static/Frozen size</td><td>{_format_size(static_size)}</td></tr>"
         "</table>"
     )
 
@@ -414,10 +414,10 @@ def summary_md(model, array=None) -> str:
 
 def summary(model, array=None, render: str = "string") -> str:
     if render in ["string", "str"]:
-        return summary_str(model, array=array)
+        return _summary_str(model, array=array)
 
     elif render in ["markdown", "md"]:
-        return summary_md(model, array=array)
+        return _summary_md(model, array=array)
 
     else:
         raise ValueError(
@@ -438,10 +438,10 @@ def tree_box(model, array=None):
         nonlocal shapes
 
         if is_treeclass_leaf(model):
-            box = layer_box(
+            box = _layer_box(
                 f"{model.__class__.__name__}({parent_name})",
-                node_format(shapes[0]) if array is not None else None,
-                node_format(shapes[1]) if array is not None else None,
+                _node_format(shapes[0]) if array is not None else None,
+                _node_format(shapes[1]) if array is not None else None,
             )
 
             if shapes is not None:
@@ -458,9 +458,9 @@ def tree_box(model, array=None):
                     level_nodes += [f"{recurse(cur_node,field.name)}"]
 
                 else:
-                    level_nodes += [vbox(f"{field.name}={node_format(cur_node)}")]
+                    level_nodes += [_vbox(f"{field.name}={_node_format(cur_node)}")]
 
-            return vbox(
+            return _vbox(
                 f"{model.__class__.__name__}({parent_name})", "\n".join(level_nodes)
             )
 
@@ -508,7 +508,7 @@ def tree_diagram(model):
                     fmt += (
                         f"├{mark}─ " if i < (cur_children_count - 1) else f"└{mark}─ "
                     )
-                    fmt += f"{fi.name}={node_format(cur_node)}"
+                    fmt += f"{fi.name}={_node_format(cur_node)}"
                     recurse(cur_node, parent_level_count + [1])
 
             fmt += "\t"
@@ -550,7 +550,7 @@ def tree_indent(model):
                     fmt += ")"
 
                 else:
-                    fmt += f"{field.name}={node_format(cur_node)}" + (
+                    fmt += f"{field.name}={_node_format(cur_node)}" + (
                         "," if i < (cur_children_count - 1) else ("")
                     )
 
@@ -646,7 +646,7 @@ def tree_mermaid(model, link=False):
                             "static" in field.metadata and field.metadata["static"]
                         )
                         connector = "-.-" if is_static else "---"
-                        fmt += f'\tid{prev_id} {connector} id{cur_id}["{field.name}\\n{node_format(cur_node)}"]'
+                        fmt += f'\tid{prev_id} {connector} id{cur_id}["{field.name}\\n{_node_format(cur_node)}"]'
                         recurse(cur_node, cur_depth + 1, cur_id)
 
         cur_id = node_id((0, 0, -1, 0))

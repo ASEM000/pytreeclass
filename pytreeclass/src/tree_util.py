@@ -66,7 +66,7 @@ def sequential_model_shape_eval(model, array):
     return shape
 
 
-def node_count_and_size(node):
+def _node_count_and_size(node):
     """calculate number and size of `trainable` and `non-trainable` parameters"""
 
     if isinstance(node, (jnp.ndarray, np.ndarray)):
@@ -98,30 +98,30 @@ def node_count_and_size(node):
     return (count, size)
 
 
-def reduce_count_and_size(leaf):
+def _reduce_count_and_size(leaf):
     """reduce params count and params size of a tree of leaves"""
 
     def reduce_func(acc, node):
         lhs_count, lhs_size = acc
-        rhs_count, rhs_size = node_count_and_size(node)
+        rhs_count, rhs_size = _node_count_and_size(node)
         return (lhs_count + rhs_count, lhs_size + rhs_size)
 
     return tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
 
 
-def freeze_nodes(model):
+def _freeze_nodes(model):
     """inplace freezing"""
     if is_treeclass(model):
         object.__setattr__(model, "__frozen_treeclass__", True)
         for kw, leaf in model.__dataclass_fields__.items():
-            freeze_nodes(model.__dict__[kw])
+            _freeze_nodes(model.__dict__[kw])
     return model
 
 
-def unfreeze_nodes(model):
+def _unfreeze_nodes(model):
     """inplace unfreezing"""
     if is_treeclass(model):
         object.__setattr__(model, "__frozen_treeclass__", False)
         for kw, leaf in model.__dataclass_fields__.items():
-            unfreeze_nodes(model.__dict__[kw])
+            _unfreeze_nodes(model.__dict__[kw])
     return model

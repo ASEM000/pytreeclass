@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from pytreeclass import tree_viz, treeclass
-from pytreeclass.src.tree_util import freeze_nodes, unfreeze_nodes
+from pytreeclass.src.tree_util import _freeze_nodes, _unfreeze_nodes
 
 
 def test_freezing_unfreezing():
@@ -105,12 +105,12 @@ def test_freezing_unfreezing():
 
     mdl = Stacked()
 
-    frozen_diagram = tree_viz.tree_diagram((freeze_nodes(mdl)))
+    frozen_diagram = tree_viz.tree_diagram((_freeze_nodes(mdl)))
     # trunk-ignore(flake8/E501)
     fmt = "Stacked\n    ├#─ mdl1=StackedLinear\n    │   ├#─ l1=Linear\n    │   │   ├#─ weight=f32[1,10]\n    │   │   ├#─ bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   ├#─ l2=Linear\n    │   │   ├#─ weight=f32[10,10]\n    │   │   ├#─ bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   └#─ l3=Linear\n    │       ├#─ weight=f32[10,1]\n    │       ├#─ bias=f32[1,1]\n    │       └x─ notes='string'      \n    └#─ mdl2=StackedLinear\n        ├#─ l1=Linear\n        │   ├#─ weight=f32[1,10]\n        │   ├#─ bias=f32[1,10]\n        │   └x─ notes='string'  \n        ├#─ l2=Linear\n        │   ├#─ weight=f32[10,10]\n        │   ├#─ bias=f32[1,10]\n        │   └x─ notes='string'  \n        └#─ l3=Linear\n            ├#─ weight=f32[10,1]\n            ├#─ bias=f32[1,1]\n            └x─ notes='string'          "
     assert fmt == frozen_diagram
 
-    unfrozen_diagram = tree_viz.tree_diagram(unfreeze_nodes(freeze_nodes(mdl)))
+    unfrozen_diagram = tree_viz.tree_diagram(_unfreeze_nodes(_freeze_nodes(mdl)))
     # trunk-ignore(flake8/E501)
     fmt = "Stacked\n    ├── mdl1=StackedLinear\n    │   ├── l1=Linear\n    │   │   ├── weight=f32[1,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   ├── l2=Linear\n    │   │   ├── weight=f32[10,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   └── l3=Linear\n    │       ├── weight=f32[10,1]\n    │       ├── bias=f32[1,1]\n    │       └x─ notes='string'      \n    └── mdl2=StackedLinear\n        ├── l1=Linear\n        │   ├── weight=f32[1,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        ├── l2=Linear\n        │   ├── weight=f32[10,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        └── l3=Linear\n            ├── weight=f32[10,1]\n            ├── bias=f32[1,1]\n            └x─ notes='string'          "
     assert fmt == unfrozen_diagram

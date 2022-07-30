@@ -6,7 +6,7 @@ from typing import Any
 
 from jax.tree_util import tree_flatten, tree_leaves
 
-from .tree_util import freeze_nodes, is_treeclass, is_treeclass_leaf, unfreeze_nodes
+from .tree_util import _freeze_nodes, is_treeclass, is_treeclass_leaf, _unfreeze_nodes
 from .tree_viz import summary, tree_box, tree_diagram, tree_indent, tree_str
 
 
@@ -24,7 +24,7 @@ class treeBase:
         """
 
         new_cls = copy.copy(self)
-        return freeze_nodes(new_cls)
+        return _freeze_nodes(new_cls)
 
     def unfreeze(self):
         """Unfreeze treeclass.
@@ -38,7 +38,7 @@ class treeBase:
         >>> assert model.frozen == False
         """
         new_cls = copy.copy(self)
-        return unfreeze_nodes(new_cls)
+        return _unfreeze_nodes(new_cls)
 
     @property
     def frozen(self) -> bool:

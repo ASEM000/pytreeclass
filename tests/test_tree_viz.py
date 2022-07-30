@@ -7,13 +7,13 @@ from jax import numpy as jnp
 from pytreeclass import static_field, tree_viz, treeclass
 
 
-def test_vbox():
+def test__vbox():
 
-    assert tree_viz.vbox("a", " a", "a ") == "┌──┐\n│a │\n├──┤\n│ a│\n├──┤\n│a │\n└──┘"
+    assert tree_viz._vbox("a", " a", "a ") == "┌──┐\n│a │\n├──┤\n│ a│\n├──┤\n│a │\n└──┘"
 
 
-def test_hbox():
-    assert tree_viz.hbox("a", "b", "c") == "┌─┬─┬─┐\n│a│b│c│\n└─┴─┴─┘\n"
+def test__hbox():
+    assert tree_viz._hbox("a", "b", "c") == "┌─┬─┬─┐\n│a│b│c│\n└─┴─┴─┘\n"
 
 
 def test_tree_box():

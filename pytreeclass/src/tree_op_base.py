@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jax.tree_util import tree_map, tree_reduce
 
 
-def append_math_op(func):
+def _append_math_op(func):
     """binary and unary magic operations"""
 
     @functools.wraps(func)
@@ -28,7 +28,7 @@ def append_math_op(func):
     return call
 
 
-def append_numpy_op(func):
+def _append_numpy_op(func):
     """array operations"""
 
     @functools.wraps(func)
@@ -38,7 +38,7 @@ def append_numpy_op(func):
     return call
 
 
-def append_reduced_numpy_op(func, reduce_op, init_val):
+def _append_reduced_numpy_op(func, reduce_op, init_val):
     """reduced array operations"""
 
     @functools.wraps(func)
@@ -52,54 +52,54 @@ def append_reduced_numpy_op(func, reduce_op, init_val):
 
 class treeOpBase:
 
-    __abs__ = append_math_op(op.abs)
-    __add__ = append_math_op(op.add)
-    __radd__ = append_math_op(op.add)
-    __eq__ = append_math_op(op.eq)
-    __floordiv__ = append_math_op(op.floordiv)
-    __ge__ = append_math_op(op.ge)
-    __gt__ = append_math_op(op.gt)
-    __inv__ = append_math_op(op.inv)
-    __invert__ = append_math_op(op.invert)
-    __le__ = append_math_op(op.le)
-    __lshift__ = append_math_op(op.lshift)
-    __lt__ = append_math_op(op.lt)
-    __matmul__ = append_math_op(op.matmul)
-    __mod__ = append_math_op(op.mod)
-    __mul__ = append_math_op(op.mul)
-    __rmul__ = append_math_op(op.mul)
-    __ne__ = append_math_op(op.ne)
-    __neg__ = append_math_op(op.neg)
-    __not__ = append_math_op(op.not_)
-    __pos__ = append_math_op(op.pos)
-    __pow__ = append_math_op(op.pow)
-    __rshift__ = append_math_op(op.rshift)
-    __sub__ = append_math_op(op.sub)
-    __rsub__ = append_math_op(op.sub)
-    __truediv__ = append_math_op(op.truediv)
-    __xor__ = append_math_op(op.xor)
+    __abs__ = _append_math_op(op.abs)
+    __add__ = _append_math_op(op.add)
+    __radd__ = _append_math_op(op.add)
+    __eq__ = _append_math_op(op.eq)
+    __floordiv__ = _append_math_op(op.floordiv)
+    __ge__ = _append_math_op(op.ge)
+    __gt__ = _append_math_op(op.gt)
+    __inv__ = _append_math_op(op.inv)
+    __invert__ = _append_math_op(op.invert)
+    __le__ = _append_math_op(op.le)
+    __lshift__ = _append_math_op(op.lshift)
+    __lt__ = _append_math_op(op.lt)
+    __matmul__ = _append_math_op(op.matmul)
+    __mod__ = _append_math_op(op.mod)
+    __mul__ = _append_math_op(op.mul)
+    __rmul__ = _append_math_op(op.mul)
+    __ne__ = _append_math_op(op.ne)
+    __neg__ = _append_math_op(op.neg)
+    __not__ = _append_math_op(op.not_)
+    __pos__ = _append_math_op(op.pos)
+    __pow__ = _append_math_op(op.pow)
+    __rshift__ = _append_math_op(op.rshift)
+    __sub__ = _append_math_op(op.sub)
+    __rsub__ = _append_math_op(op.sub)
+    __truediv__ = _append_math_op(op.truediv)
+    __xor__ = _append_math_op(op.xor)
 
-    imag = property(append_numpy_op(jnp.imag))
-    real = property(append_numpy_op(jnp.real))
-    conj = property(append_numpy_op(jnp.conj))
+    imag = property(_append_numpy_op(jnp.imag))
+    real = property(_append_numpy_op(jnp.real))
+    conj = property(_append_numpy_op(jnp.conj))
 
-    abs = append_numpy_op(jnp.abs)
-    amax = append_numpy_op(jnp.amax)
-    amin = append_numpy_op(jnp.amin)
-    arccos = append_numpy_op(jnp.arccos)
-    arcsin = append_numpy_op(jnp.arcsin)
-    sum = append_numpy_op(jnp.sum)
-    prod = append_numpy_op(jnp.prod)
-    mean = append_numpy_op(jnp.mean)
+    abs = _append_numpy_op(jnp.abs)
+    amax = _append_numpy_op(jnp.amax)
+    amin = _append_numpy_op(jnp.amin)
+    arccos = _append_numpy_op(jnp.arccos)
+    arcsin = _append_numpy_op(jnp.arcsin)
+    sum = _append_numpy_op(jnp.sum)
+    prod = _append_numpy_op(jnp.prod)
+    mean = _append_numpy_op(jnp.mean)
 
-    reduce_abs = append_reduced_numpy_op(jnp.abs, op.add, 0)
-    reduce_amax = append_reduced_numpy_op(jnp.amax, op.add, 0)
-    reduce_amin = append_reduced_numpy_op(jnp.amin, op.add, 0)
-    reduce_arccos = append_reduced_numpy_op(jnp.arccos, op.add, 0)
-    reduce_arcsin = append_reduced_numpy_op(jnp.arcsin, op.add, 0)
-    reduce_sum = append_reduced_numpy_op(jnp.sum, op.add, 0)
-    reduce_prod = append_reduced_numpy_op(jnp.prod, op.mul, 1)
-    reduce_mean = append_reduced_numpy_op(jnp.mean, op.add, 0)
+    reduce_abs = _append_reduced_numpy_op(jnp.abs, op.add, 0)
+    reduce_amax = _append_reduced_numpy_op(jnp.amax, op.add, 0)
+    reduce_amin = _append_reduced_numpy_op(jnp.amin, op.add, 0)
+    reduce_arccos = _append_reduced_numpy_op(jnp.arccos, op.add, 0)
+    reduce_arcsin = _append_reduced_numpy_op(jnp.arcsin, op.add, 0)
+    reduce_sum = _append_reduced_numpy_op(jnp.sum, op.add, 0)
+    reduce_prod = _append_reduced_numpy_op(jnp.prod, op.mul, 1)
+    reduce_mean = _append_reduced_numpy_op(jnp.mean, op.add, 0)
 
     def __or__(self, rhs):
         def node_or(x, y):

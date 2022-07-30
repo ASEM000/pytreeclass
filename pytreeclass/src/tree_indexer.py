@@ -11,7 +11,7 @@ from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import is_treeclass_leaf_bool
 
 
-def node_setter(lhs: Any, where: bool, set_value):
+def _node_setter(lhs: Any, where: bool, set_value):
     """Set pytree node value.
 
     Args:
@@ -31,7 +31,7 @@ def node_setter(lhs: Any, where: bool, set_value):
         return set_value if where else lhs
 
 
-def node_getter(lhs, where):
+def _node_getter(lhs, where):
     # not jittable as size can changes
     # does not change pytreestructure ,
 
@@ -42,7 +42,7 @@ def node_getter(lhs, where):
         return lhs if where else None
 
 
-def param_indexing_getter(model, *where: tuple[str, ...]):
+def _param_indexing_getter(model, *where: tuple[str, ...]):
     if model.frozen:
         return model
 
@@ -59,7 +59,7 @@ def param_indexing_getter(model, *where: tuple[str, ...]):
     return modelCopy
 
 
-def slice_indexing_getter(model, where: slice):
+def _slice_indexing_getter(model, where: slice):
     if model.frozen:
         return model
 
@@ -79,7 +79,7 @@ def slice_indexing_getter(model, where: slice):
     return modelCopy
 
 
-def int_indexing_getter(model, where: int):
+def _int_indexing_getter(model, where: int):
     if model.frozen:
         return model
 
@@ -96,15 +96,15 @@ def int_indexing_getter(model, where: int):
     return modelCopy
 
 
-def param_indexing_setter(model, set_value, *where: tuple[str]):
+def _param_indexing_setter(model, set_value, *where: tuple[str]):
     @dispatch(argnum=1)
-    def _param_indexing_setter(model, set_value, *where: tuple[str]):
+    def __param_indexing_setter(model, set_value, *where: tuple[str]):
         raise NotImplementedError(f"Invalid set_value type = {type(set_value)}.")
 
-    @_param_indexing_setter.register(float)
-    @_param_indexing_setter.register(int)
-    @_param_indexing_setter.register(complex)
-    @_param_indexing_setter.register(jnp.ndarray)
+    @__param_indexing_setter.register(float)
+    @__param_indexing_setter.register(int)
+    @__param_indexing_setter.register(complex)
+    @__param_indexing_setter.register(jnp.ndarray)
     def set_scalar(model, set_value, *where: tuple[str]):
         if model.frozen:
             return model
@@ -117,21 +117,21 @@ def param_indexing_setter(model, set_value, *where: tuple[str]):
             excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
             excluded = excluded_by_meta or excluded_by_type
             if field.name in where and not excluded:
-                modelCopy.__dict__[field.name] = node_setter(value, True, set_value)
+                modelCopy.__dict__[field.name] = _node_setter(value, True, set_value)
         return modelCopy
 
-    return _param_indexing_setter(model, set_value, *where)
+    return __param_indexing_setter(model, set_value, *where)
 
 
-def int_indexing_setter(model, set_value, where: int):
+def _int_indexing_setter(model, set_value, where: int):
     @dispatch(argnum=1)
-    def _int_indexing_setter(model, set_value, where):
+    def __int_indexing_setter(model, set_value, where):
         raise NotImplementedError(f"Invalid set_value type = {type(set_value)}.")
 
-    @_int_indexing_setter.register(float)
-    @_int_indexing_setter.register(int)
-    @_int_indexing_setter.register(complex)
-    @_int_indexing_setter.register(jnp.ndarray)
+    @__int_indexing_setter.register(float)
+    @__int_indexing_setter.register(int)
+    @__int_indexing_setter.register(complex)
+    @__int_indexing_setter.register(jnp.ndarray)
     def set_scalar(model, set_value, where):
         if model.frozen:
             return model
@@ -144,21 +144,21 @@ def int_indexing_setter(model, set_value, where: int):
             excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
             excluded = excluded_by_meta or excluded_by_type
             if (i == where) and not excluded:
-                modelCopy.__dict__[field.name] = node_setter(value, True, set_value)
+                modelCopy.__dict__[field.name] = _node_setter(value, True, set_value)
         return modelCopy
 
-    return _int_indexing_setter(model, set_value, where)
+    return __int_indexing_setter(model, set_value, where)
 
 
-def slice_indexing_setter(model, set_value, where: slice):
+def _slice_indexing_setter(model, set_value, where: slice):
     @dispatch(argnum=1)
-    def _slice_indexing_setter(model, set_value, where):
+    def __slice_indexing_setter(model, set_value, where):
         raise NotImplementedError(f"Invalid set_value type = {type(set_value)}.")
 
-    @_slice_indexing_setter.register(float)
-    @_slice_indexing_setter.register(int)
-    @_slice_indexing_setter.register(complex)
-    @_slice_indexing_setter.register(jnp.ndarray)
+    @__slice_indexing_setter.register(float)
+    @__slice_indexing_setter.register(int)
+    @__slice_indexing_setter.register(complex)
+    @__slice_indexing_setter.register(jnp.ndarray)
     def set_scalar(model, set_value, where):
         if model.frozen:
             return model
@@ -173,34 +173,34 @@ def slice_indexing_setter(model, set_value, where: slice):
             excluded_by_meta = ("static" in field.metadata) and field.metadata["static"] is True  # fmt: skip
             excluded = excluded_by_meta or excluded_by_type
             if i in resolved_where and not excluded:
-                modelCopy.__dict__[field.name] = node_setter(value, True, set_value)
+                modelCopy.__dict__[field.name] = _node_setter(value, True, set_value)
         return modelCopy
 
-    return _slice_indexing_setter(model, set_value, where)
+    return __slice_indexing_setter(model, set_value, where)
 
 
-def boolean_indexing_getter(model, where):
+def _boolean_indexing_getter(model, where):
     if model.frozen:
         return model
 
     lhs_leaves, lhs_treedef = model.flatten_leaves
     where_leaves, where_treedef = tree_flatten(where)
     lhs_leaves = [
-        node_getter(lhs_leaf, where_leaf)
+        _node_getter(lhs_leaf, where_leaf)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
     ]
 
     return jax.tree_unflatten(lhs_treedef, lhs_leaves)
 
 
-def boolean_indexing_setter(model, set_value, where):
+def _boolean_indexing_setter(model, set_value, where):
     if model.frozen:
         return model
 
     lhs_leaves, lhs_treedef = tree_flatten(model)
     where_leaves, rhs_treedef = tree_flatten(where)
     lhs_leaves = [
-        node_setter(lhs_leaf, where_leaf, set_value=set_value,)
+        _node_setter(lhs_leaf, where_leaf, set_value=set_value,)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)  # fmt: skip
     ]
 
@@ -250,10 +250,10 @@ class treeIndexer:
 
                 class getterSetterIndexer(treeIndexerMethods):
                     def get(getter_setter_self):
-                        return param_indexing_getter(self, *flatten_args)
+                        return _param_indexing_getter(self, *flatten_args)
 
                     def set(getter_setter_self, set_value):
-                        return param_indexing_setter(
+                        return _param_indexing_setter(
                             copy.copy(self), set_value, *flatten_args
                         )
 
@@ -268,10 +268,10 @@ class treeIndexer:
 
                 class getterSetterIndexer(treeIndexerMethods):
                     def get(getter_setter_self):
-                        return boolean_indexing_getter(self, arg)
+                        return _boolean_indexing_getter(self, arg)
 
                     def set(getter_setter_self, set_value):
-                        return boolean_indexing_setter(self, set_value, arg)
+                        return _boolean_indexing_setter(self, set_value, arg)
 
                 return getterSetterIndexer()
 
@@ -281,10 +281,10 @@ class treeIndexer:
 
                 class getterSetterIndexer(treeIndexerMethods):
                     def get(getter_setter_self):
-                        return int_indexing_getter(self, arg)
+                        return _int_indexing_getter(self, arg)
 
                     def set(getter_setter_self, set_value):
-                        return int_indexing_setter(self, set_value, arg)
+                        return _int_indexing_setter(self, set_value, arg)
 
                 return getterSetterIndexer()
 
@@ -294,10 +294,10 @@ class treeIndexer:
 
                 class getterSetterIndexer(treeIndexerMethods):
                     def get(getter_setter_self):
-                        return slice_indexing_getter(self, arg)
+                        return _slice_indexing_getter(self, arg)
 
                     def set(getter_setter_self, set_value):
-                        return slice_indexing_setter(self, set_value, arg)
+                        return _slice_indexing_setter(self, set_value, arg)
 
                 return getterSetterIndexer()
 
