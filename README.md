@@ -507,7 +507,7 @@ Container(a=1,b=11.,c=jnp.array([2, 3, 4, 5, 6]))
 
 # Apply f(x)=x+1 for all values larger than 1
 >>> l.at[l>1].apply(lambda x:x+1)
-Container(a=1,b=11.,c=jnp.array([3, 4, 5, 6]))
+Container(a=1,b=11.,c=jnp.array([1, 3, 4, 5, 6]))
 ```
 
 
