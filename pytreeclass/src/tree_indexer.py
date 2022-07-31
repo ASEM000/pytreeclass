@@ -37,7 +37,12 @@ def _node_getter(lhs, where):
     if isinstance(lhs, jnp.ndarray):
         return lhs[jnp.where(where)]
     elif is_treeclass(lhs):
-        return tree_map(lambda x: x if where else None, lhs)
+        return tree_map(
+            lambda x: x
+            if where
+            else (jnp.array([]) if isinstance(x, jnp.ndarray) else None),
+            lhs,
+        )
     else:
         # set None to non-chosen non-array values
         return lhs if where else None
