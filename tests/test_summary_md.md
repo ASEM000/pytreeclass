@@ -6,9 +6,11 @@
 <td align = 'center'> Config </td>
 <td align = 'center'> Output </td>
 </tr>
-<tr><td align = 'center'> level0 </td><td align = 'center'> 0
+<tr><td align = 'center'> level1 </td><td align = 'center'> 0
 (1) </td><td align = 'center'> 28.00B
-(0.00B) </td><td align = 'center'> a=10 </td><td align = 'center'>  </td></tr><tr><td align = 'center'> level0 </td><td align = 'center'> 0
+(0.00B) </td><td align = 'center'> d=level0(
+  a=10,
+  b=20) </td><td align = 'center'>  </td></tr><tr><td align = 'center'> level0 </td><td align = 'center'> 0
 (1) </td><td align = 'center'> 28.00B
 (0.00B) </td><td align = 'center'> a=100 </td><td align = 'center'>  </td></tr></table>
 

@@ -75,6 +75,11 @@ def test_register_op():
     assert A.reduce_product() == 6000
     assert (A * A).reduce_mean() == 1400
 
+    with pytest.raises(NotImplementedError):
+        A + "s"
+
+    assert (A["a"] + 10 | A) == Test(20, 20, 30, "A")
+
 
 def test_op_false():
     @treeclass(op=False)
