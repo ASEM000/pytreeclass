@@ -39,13 +39,13 @@ def test_getter_by_slice():
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
 
     B = A.at[0:1].get()
-    assert is_treeclass_equal(B, Test(10, None, None, None, "A"))
+    assert is_treeclass_equal(B, Test(10, None, None, jnp.array([]), "A"))
 
     B = A.at[0:2].get()
-    assert is_treeclass_equal(B, Test(10, 20, None, None, "A"))
+    assert is_treeclass_equal(B, Test(10, 20, None, jnp.array([]), "A"))
 
     B = A.at[:-1].get()
-    assert is_treeclass_equal(B, Test(10, 20, 30, None, "A"))
+    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
     B = A.at[:].get()
     assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))

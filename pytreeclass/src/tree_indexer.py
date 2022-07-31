@@ -183,7 +183,14 @@ class treeIndexer:
             @__getitem__.register(range)
             def _(inner_self, *args):
                 """Non-boolean indexing"""
-                flatten_args = tree_leaves(args)
+
+                # Normalize indices
+                flatten_args = [
+                    (arg + len(self.__dataclass_fields__) if arg < 0 else arg)
+                    if isinstance(arg, int)
+                    else arg
+                    for arg in tree_leaves(args)
+                ]
 
                 class _getterSetterIndexer(_treeIndexerMethods):
                     def get(getter_setter_self):
