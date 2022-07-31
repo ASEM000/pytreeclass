@@ -1,3 +1,5 @@
+import pytest
+
 from pytreeclass.src.decorator_util import cached_property, dispatch
 
 
@@ -90,3 +92,27 @@ def test_singledispatchmethod():
     assert A.plus(1) == 2
     assert A.plus(1.0) == 101.0
     assert A.plus(complex(1.0)) == complex(101.0)
+
+    with pytest.raises(ValueError):
+
+        class test:
+            @dispatch(argnum=1.0)
+            def plus(self, x):
+                ...
+
+            @plus.register(int)
+            def _(self, x):
+                return x + 1
+
+        t = test()
+        t.plus(1)
+
+    @dispatch
+    def fn(x):
+        ...
+
+    @fn.register(int)
+    def _(x):
+        return 1
+
+    assert fn(3) == 1

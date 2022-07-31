@@ -290,7 +290,11 @@ def _summary_str(model, array=None, render: str = "string") -> str:
     if array is not None:
         params_shape = sequential_model_shape_eval(model, array)[1:]
 
-    for index, leaf in enumerate(model.treeclass_leaves):
+    # all dynamic/static leaves
+    all_leaves = (*model.tree_fields[0].values(), *model.tree_fields[1].values())
+    treeclass_leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
+
+    for index, leaf in enumerate(treeclass_leaves):
         name, count, size = _summary_line(leaf)
 
         shape = _node_format(params_shape[index]) if array is not None else ""
@@ -361,7 +365,11 @@ def _summary_md(model, array=None) -> str:
     if array is not None:
         params_shape = sequential_model_shape_eval(model, array)[1:]
 
-    for index, leaf in enumerate(model.treeclass_leaves):
+    # all dynamic/static leaves
+    all_leaves = (*model.tree_fields[0].values(), *model.tree_fields[1].values())
+    treeclass_leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
+
+    for index, leaf in enumerate(treeclass_leaves):
         name, count, size = _summary_line(leaf)
 
         shape = _node_format(params_shape[index]) if array is not None else ""

@@ -67,15 +67,6 @@ class StackedLinear:
         self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
         self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
 
-    def __call__(self, x):
-        x = self.l1(x)
-        x = jax.nn.tanh(x)
-        x = self.l2(x)
-        x = jax.nn.tanh(x)
-        x = self.l3(x)
-
-        return x
-
 
 x = jnp.linspace(0, 1, 100)[:, None]
 y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
@@ -225,3 +216,27 @@ def test_summary_md():
     fmt = "<table>\n<tr>\n<td align = 'center'> Type </td>\n<td align = 'center'> Param #</td>\n<td align = 'center'> Size </td>\n<td align = 'center'> Config </td>\n<td align = 'center'> Output </td>\n</tr>\n<tr><td align = 'center'> Linear </td><td align = 'center'> 20\n(0) </td><td align = 'center'> 80.00B\n(0.00B) </td><td align = 'center'> weight=f32[1,10]<br>bias=f32[1,10] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> Linear </td><td align = 'center'> 110\n(0) </td><td align = 'center'> 440.00B\n(0.00B) </td><td align = 'center'> weight=f32[10,10]<br>bias=f32[1,10] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> Linear </td><td align = 'center'> 11\n(0) </td><td align = 'center'> 44.00B\n(0.00B) </td><td align = 'center'> weight=f32[10,1]<br>bias=f32[1,1] </td><td align = 'center'>  </td></tr></table>\n\n#### Summary\n<table><tr><td>Total #</td><td>141(0)</td></tr><tr><td>Dynamic #</td><td>141(0)</td></tr><tr><td>Static/Frozen #</td><td>0(0)</td></tr><tr><td>Total size</td><td>564.00B(0.00B)</td></tr><tr><td>Dynamic size</td><td>564.00B(0.00B)</td></tr><tr><td>Static/Frozen size</td><td>0.00B(0.00B)</td></tr></table>"
     pred = tree_viz.summary(model, render="md")
     assert pred == fmt
+
+    @pytc.treeclass
+    class StackedLinear:
+        l1: Linear
+        l2: Linear
+        l3: Linear
+
+        def __init__(self, key, in_dim, out_dim):
+
+            keys = jax.random.split(key, 3)
+
+            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=128)
+            self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
+            self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
+
+    model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
+
+    model = model.freeze()
+
+    assert (
+        model.summary()
+        # trunk-ignore(flake8/E501)
+        == "┌────────┬───────┬────────┬───────────────────┐\n│Type    │Param #│Size    │Config             │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │256    │1.03KB  │weight=f32[1,128]  │\n│(frozen)│(1)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │16,512 │64.53KB │weight=f32[128,128]│\n│(frozen)│(1)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │129    │544.00B │weight=f32[128,1]  │\n│(frozen)│(1)    │(55.00B)│bias=f32[1,1]      │\n│        │       │        │notes='string'     │\n└────────┴───────┴────────┴───────────────────┘\nTotal # :\t\t16,897(3)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t16,897(3)\n-----------------------------------------------\nTotal size :\t\t66.09KB(165.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t66.09KB(165.00B)\n==============================================="
+    )

@@ -41,9 +41,6 @@ def test_nn():
 
             return self.layers[-1](x)
 
-        def apply(self, x):
-            return x
-
     x = jnp.linspace(0, 1, 100)[:, None]
     y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
 
