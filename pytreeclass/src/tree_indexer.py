@@ -58,10 +58,6 @@ def _node_applier(lhs: Any, where: bool, func: Callable[[Any], Any]):
 
 
 def _non_boolean_indexing_getter(model, *where: tuple[str | int, ...]):
-
-    if model.frozen:
-        return model
-
     modelCopy = copy.copy(model)
 
     for i, field in enumerate(model.__dataclass_fields__.values()):
@@ -77,10 +73,6 @@ def _non_boolean_indexing_getter(model, *where: tuple[str | int, ...]):
 
 
 def _non_boolean_indexing_setter(model, set_value, *where: tuple[str | int, ...]):
-
-    if model.frozen:
-        return model
-
     modelCopy = copy.copy(model)
 
     for i, field in enumerate(model.__dataclass_fields__.values()):
@@ -96,10 +88,6 @@ def _non_boolean_indexing_setter(model, set_value, *where: tuple[str | int, ...]
 
 
 def _non_boolean_indexing_applier(model, set_value, *where: tuple[str | int, ...]):
-
-    if model.frozen:
-        return model
-
     modelCopy = copy.copy(model)
 
     for i, field in enumerate(model.__dataclass_fields__.values()):

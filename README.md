@@ -70,7 +70,8 @@ class StackedLinear:
 
         # Declaring l1,l2,l3 as dataclass_fields is optional
         # as l1,l2,l3 are Linear class that is wrapped with @pytc.treeclass
-        # To strictly include nodes defined in dataclass fields use `@pytc.treeclass(field_only=True)`
+        # To strictly include nodes defined in dataclass fields 
+        # use `@pytc.treeclass(field_only=True)`
         self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
         self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
         self.l3 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
@@ -199,7 +200,7 @@ StackedLinear
 
 ```mermaid
 
-flowchart TD
+flowchart LR
     id15696277213149321320[StackedLinear]
     id15696277213149321320 --> id159132120600507116(l1\nLinear)
     id159132120600507116 --- id7500441386962467209["weight\nf32[1,10]"]
@@ -256,7 +257,34 @@ StackedLinear
 
 Under jax.jit jax requires states to be explicit, this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
 
+Using the following pattern,Updating state can be achieved under `jax.jit`
+
+```python
+@pytc.treeclass
+class Counter:
+    calls : int = 0
+    
+    def increment(self):
+        self.calls += 1 
+        
+
+>> c = Counter()
+
+@jax.jit
+def update(c):
+    c.increment()
+    return c 
+
+for i in range(10):
+    c = update(c)
+
+>>> print(c.calls)
+10
+```
+
+
 The following code snippets compares between the two concepts by comparing MLP's implementation.
+<details>
 <div align="center">
 <table>
 <tr>
@@ -400,6 +428,7 @@ for _ in range(1,epochs+1):
 
 </table>
 </div>
+</details>
 
 ## 🔢 More<a id="More"></a>
 
