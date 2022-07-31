@@ -6,7 +6,7 @@ from dataclasses import field
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax.tree_util import tree_leaves, tree_reduce
+from jax.tree_util import tree_all, tree_leaves, tree_reduce
 
 
 def static_field(**kwargs):
@@ -45,6 +45,8 @@ def is_treeclass_equal(lhs, rhs):
     def assert_node(lhs_node, rhs_node):
         if isinstance(lhs_node, jnp.ndarray):
             return jnp.all(lhs_node == rhs_node)
+        elif is_treeclass(lhs_node):
+            return tree_all(lhs_node, rhs_node)
         else:
             return lhs_node == rhs_node
 

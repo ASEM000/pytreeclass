@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import math
+from typing import Sequence
 
 import jax
 import jax.numpy as jnp
@@ -95,21 +96,21 @@ def _hstack(boxes):
     return fmt
 
 
-def _vbox(*text):
-    """
-    === Explanation
-        create vertically stacked text boxes
+def _vbox(*text: tuple[str, ...]) -> str:
+    """Create vertically stacked text boxes
 
-    === Examples
+    Returns:
+        str: stacked boxes string
 
-        >> _vbox("a","b")
+    Examples:
+    >>> _vbox("a","b")
         ┌───┐
         │a  │
         ├───┤
         │b  │
         └───┘
 
-        >> _vbox("a","","a")
+    >>> _vbox("a","","a")
         ┌───┐
         │a  │
         ├───┤
@@ -147,12 +148,16 @@ def _vbox(*text):
     return formatted
 
 
-def _resolve_line(cols):
-    """
-    === Explanation
-        combine columns of single line by merging their borders
+def _resolve_line(cols: Sequence[str, ...]) -> str:
+    """combine columns of single line by merging their borders
 
-    === Examples
+    Args:
+        cols (Sequence[str,...]): Sequence of single line column string
+
+    Returns:
+        str: resolved column string
+
+    Example:
         >>> _resolve_line(['ab','b│','│c'])
         'abb│c'
 
@@ -625,58 +630,56 @@ def tree_str(model):
     return fmt.expandtabs(2)
 
 
+def _tree_mermaid(model):
+    def node_id(input):
+        """hash a node by its location in a tree"""
+        return ctypes.c_size_t(hash(input)).value
+
+    def recurse(model, cur_depth, prev_id):
+
+        nonlocal fmt
+
+        if is_treeclass(model):
+            is_frozen = model.frozen
+
+            for i, field in enumerate(model.__dataclass_fields__.values()):
+                cur_node = model.__dict__[field.name]
+                cur_order = i
+                fmt += "\n"
+
+                if is_treeclass(cur_node):
+                    layer_class_name = cur_node.__class__.__name__
+                    cur = (cur_depth, cur_order)
+                    cur_id = node_id((*cur, prev_id))
+                    fmt += f"\tid{prev_id} --> id{cur_id}({field.name}\\n{layer_class_name})"
+                    recurse(cur_node, cur_depth + 1, cur_id)
+
+                else:
+                    cur = (cur_depth, cur_order)
+                    cur_id = node_id((*cur, prev_id))
+                    is_static = "static" in field.metadata and field.metadata["static"]
+                    connector = "--x" if is_static else ("-.-" if is_frozen else "---")
+                    fmt += f'\tid{prev_id} {connector} id{cur_id}["{field.name}\\n{_node_format(cur_node)}"]'
+                    recurse(cur_node, cur_depth + 1, cur_id)
+
+    cur_id = node_id((0, 0, -1, 0))
+    fmt = f"flowchart LR\n\tid{cur_id}[{model.__class__.__name__}]"
+    recurse(model, 1, cur_id)
+    return fmt.expandtabs(4)
+
+
+def _generate_mermaid_link(mermaid_string: str) -> str:
+    """generate a one-time link mermaid diagram"""
+    url_val = "https://pytreeclass.herokuapp.com/generateTemp"
+    request = requests.post(url_val, json={"description": mermaid_string})
+    generated_id = request.json()["id"]
+    generated_html = f"https://pytreeclass.herokuapp.com/temp/?id={generated_id}"
+    return f"Open URL in browser: {generated_html}"
+
+
 def tree_mermaid(model, link=False):
-    def _tree_mermaid(model):
-        def node_id(input):
-            """hash a node by its location in a tree"""
-            return ctypes.c_size_t(hash(input)).value
-
-        def recurse(model, cur_depth, prev_id):
-
-            nonlocal fmt
-
-            if is_treeclass(model):
-                is_frozen = model.frozen
-
-                for i, field in enumerate(model.__dataclass_fields__.values()):
-                    cur_node = model.__dict__[field.name]
-                    cur_order = i
-                    fmt += "\n"
-
-                    if is_treeclass(cur_node):
-                        layer_class_name = cur_node.__class__.__name__
-                        cur = (cur_depth, cur_order)
-                        cur_id = node_id((*cur, prev_id))
-                        fmt += f"\tid{prev_id} --> id{cur_id}({field.name}\\n{layer_class_name})"
-                        recurse(cur_node, cur_depth + 1, cur_id)
-
-                    else:
-                        cur = (cur_depth, cur_order)
-                        cur_id = node_id((*cur, prev_id))
-                        is_static = (
-                            "static" in field.metadata and field.metadata["static"]
-                        )
-                        connector = (
-                            "--x" if is_static else ("-.-" if is_frozen else "---")
-                        )
-                        fmt += f'\tid{prev_id} {connector} id{cur_id}["{field.name}\\n{_node_format(cur_node)}"]'
-                        recurse(cur_node, cur_depth + 1, cur_id)
-
-        cur_id = node_id((0, 0, -1, 0))
-        fmt = f"flowchart TD\n\tid{cur_id}[{model.__class__.__name__}]"
-        recurse(model, 1, cur_id)
-        return fmt.expandtabs(4)
-
-    def generate_link(model) -> str:
-        """generate a one-time link mermaid diagram"""
-        url_val = "https://pytreeclass.herokuapp.com/generateTemp"
-        mermaid_string = _tree_mermaid(model)
-        request = requests.post(url_val, json={"description": mermaid_string})
-        generated_id = request.json()["id"]
-        generated_html = f"https://pytreeclass.herokuapp.com/temp/?id={generated_id}"
-        return f"Open URL in browser: {generated_html}"
-
-    return generate_link(model) if link else _tree_mermaid(model)
+    mermaid_string = _tree_mermaid(model)
+    return _generate_mermaid_link(mermaid_string) if link else mermaid_string
 
 
 def save_viz(model, filename, method="tree_mermaid_md"):

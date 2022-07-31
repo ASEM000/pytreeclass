@@ -5,10 +5,10 @@ from collections.abc import Callable
 from typing import Any
 
 import jax.numpy as jnp
-from jax.tree_util import tree_flatten, tree_leaves, tree_unflatten
+from jax.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import is_treeclass_leaf_bool
+from pytreeclass.src.tree_util import is_treeclass, is_treeclass_leaf_bool
 
 
 def _node_setter(lhs: Any, where: bool, set_value):
@@ -24,6 +24,8 @@ def _node_setter(lhs: Any, where: bool, set_value):
     """
     if isinstance(lhs, jnp.ndarray):
         return jnp.where(where, set_value, lhs)
+    elif is_treeclass(lhs):
+        return tree_map(lambda x: set_value if where else x, lhs)
     else:
         return set_value if where else lhs
 
@@ -33,7 +35,9 @@ def _node_getter(lhs, where):
     # does not change pytreestructure ,
 
     if isinstance(lhs, jnp.ndarray):
-        return lhs[where]
+        return lhs[jnp.where(where)]
+    elif is_treeclass(lhs):
+        return tree_map(lambda x: x if where else None, lhs)
     else:
         # set None to non-chosen non-array values
         return lhs if where else None
@@ -42,6 +46,8 @@ def _node_getter(lhs, where):
 def _node_applier(lhs: Any, where: bool, func: Callable[[Any], Any]):
     if isinstance(lhs, jnp.ndarray):
         return jnp.where(where, func(lhs), lhs)
+    elif is_treeclass(lhs):
+        return tree_map(lambda x: func(x) if where else x, lhs)
     else:
         return func(lhs) if where else lhs
 
@@ -60,7 +66,7 @@ def _non_boolean_indexing_getter(model, *where: tuple[str | int, ...]):
         excluded = excluded_by_type or excluded_by_meta
 
         if not excluded and not (i in where or field.name in where):
-            modelCopy.__dict__[field.name] = None
+            modelCopy.__dict__[field.name] = _node_getter(value, False)
 
     return modelCopy
 
