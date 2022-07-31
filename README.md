@@ -40,6 +40,8 @@ PyTreeClass offers a JAX compatible `dataclass` like datastructure with the foll
 
 ### 🏗️ Create simple MLP <a id="Pytorch">
 
+_For Autoencoder example from scratch see_ [here](#AE)
+
 ```python
 import jax
 from jax import numpy as jnp
@@ -577,6 +579,346 @@ class Test :
 ## 📝 Applications<a id="Applications"></a>
 - [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
 
+
+<details id="AE" ><summary>Simple AutoEncoder from scratch</summary>
+
+While `jax.lax` can be used to construct Convolution, Upsample, Maxpooling functions, in this example [kernex](https://github.com/ASEM000/kernex) is used for its clear syntax.
+
+**AE Construction**
+
+```python
+
+from typing import Sequence
+
+import jax
+import jax.numpy as jnp
+import jax.random as jr
+import pytreeclass as pytc  # dataclass-like decorator for JAX
+
+import kernex as kex # for stencil computations
+
+
+@pytc.treeclass
+class Conv2D:
+
+    weight: jnp.ndarray
+    bias: jnp.ndarray
+
+    # define these variabels here
+    # to be used in __call__
+    in_channels: int = pytc.static_field()
+    out_channels: int = pytc.static_field()
+    kernel_size: Sequence[int] = pytc.static_field()
+    padding: Sequence[str] = pytc.static_field()
+    strides: Sequence[int] = pytc.static_field()
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        strides=1,
+        padding=("same", "same"),
+        key=jax.random.PRNGKey(0),
+        kernel_initializer=jax.nn.initializers.kaiming_uniform(),
+    ):
+
+        self.weight = kernel_initializer(key, (out_channels, in_channels, *kernel_size))
+        self.bias = jnp.zeros((out_channels, *((1,) * len(kernel_size))))
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.strides = strides
+        self.padding = ("valid",) + padding
+
+    def __call__(self, x):
+        @kex.kmap(
+            kernel_size=(self.in_channels, *self.kernel_size),
+            strides=self.strides,
+            padding=self.padding,
+        )
+        def _conv2d(x, w):
+            return jnp.sum(x * w)
+
+        @jax.vmap  # vectorize on batch dimension
+        def fwd_image(image):
+            # filters shape is OIHW
+            # vectorize on filters output dimension
+            return jax.vmap(lambda w: _conv2d(image, w))(self.weight)[:, 0] + (
+                self.bias if self.bias is not None else 0
+            )
+
+        return fwd_image(x)
+
+
+@pytc.treeclass
+class Upsample2D:
+    scale_factor: int = pytc.static_field()
+
+    def __call__(self, x):
+
+        batch, channel, row, col = x.shape
+
+        @kex.kmap(
+            kernel_size=(channel, row, col),
+            strides=(1, 1, 1),
+            padding="valid",
+            relative=False,
+        )
+        def __upsample2D(x):
+            return x.repeat(self.scale_factor, axis=2).repeat(self.scale_factor, axis=1)
+
+        def _upsample2D(batch):
+            return jnp.squeeze(
+                jax.vmap(__upsample2D, in_axes=(0,))(batch), axis=tuple(range(1, 4))
+            )
+
+        return _upsample2D(x)
+
+
+@pytc.treeclass
+class MaxPool2D:
+
+    kernel_size: tuple[int, int] = pytc.static_field(default=(2, 2))
+    strides: int = pytc.static_field(default=2)
+    padding: str | int = pytc.static_field(default="valid")
+
+    def __call__(self, x):
+        @jax.vmap  # apply on batch dimension
+        @jax.vmap  # apply on channels dimension
+        @kex.kmap(
+            kernel_size=self.kernel_size, strides=self.strides, padding=self.padding
+        )
+        def _maxpool2d(x):
+            return jnp.max(x)
+
+        return _maxpool2d(x)
+
+
+@pytc.treeclass
+class AutoEncoder:
+    def __init__(self, in_channels, out_channels, key):
+        keys = jr.split(key, 6)
+
+        self.l1 = Conv2D(in_channels, 16, (3, 3), key=keys[0])
+        self.l2 = MaxPool2D()
+        self.l3 = Conv2D(16, 32, (3, 3), key=keys[1])
+        self.l4 = Conv2D(32, 64, (3, 3), key=keys[2])
+        self.l5 = MaxPool2D()
+
+        self.l6 = Upsample2D(scale_factor=2)
+        self.l7 = Conv2D(64, 32, (3, 3), key=keys[3])
+        self.l8 = Upsample2D(scale_factor=2)
+        self.l9 = Conv2D(32, 16, (3, 3), key=keys[4])
+
+        self.l10 = Conv2D(16, out_channels, (1, 1), key=keys[5])
+
+    def __call__(self, x):
+        x = self.l1(x)
+        x = self.l2(x)
+        x = self.l3(x)
+        x = self.l4(x)
+        x = self.l5(x)
+        x = self.l6(x)
+        x = self.l7(x)
+        x = self.l8(x)
+        x = self.l9(x)
+        x = self.l10(x)
+        return x
+
+
+ae = AutoEncoder(1, 1, jax.random.PRNGKey(0))
+```
+
+<details><summary>
+Model summary
+</summary>
+
+
+```python
+┌──────────┬───────┬───────┬─────────────────────┐
+│Type      │Param #│Size   │Config               │
+├──────────┼───────┼───────┼─────────────────────┤
+│Conv2D    │160    │640.00B│weight=f32[16,1,3,3] │
+│          │(0)    │(0.00B)│bias=f32[16,1,1]     │
+├──────────┼───────┼───────┼─────────────────────┤
+│MaxPool2D │0      │0.00B  │                     │
+│          │(0)    │(0.00B)│                     │
+├──────────┼───────┼───────┼─────────────────────┤
+│Conv2D    │4,640  │18.12KB│weight=f32[32,16,3,3]│
+│          │(0)    │(0.00B)│bias=f32[32,1,1]     │
+├──────────┼───────┼───────┼─────────────────────┤
+│Conv2D    │18,496 │72.25KB│weight=f32[64,32,3,3]│
+│          │(0)    │(0.00B)│bias=f32[64,1,1]     │
+├──────────┼───────┼───────┼─────────────────────┤
+│MaxPool2D │0      │0.00B  │                     │
+│          │(0)    │(0.00B)│                     │
+├──────────┼───────┼───────┼─────────────────────┤
+│Upsample2D│0      │0.00B  │                     │
+│          │(0)    │(0.00B)│                     │
+├──────────┼───────┼───────┼─────────────────────┤
+│Conv2D    │18,464 │72.12KB│weight=f32[32,64,3,3]│
+│          │(0)    │(0.00B)│bias=f32[32,1,1]     │
+├──────────┼───────┼───────┼─────────────────────┤
+│Upsample2D│0      │0.00B  │                     │
+│          │(0)    │(0.00B)│                     │
+├──────────┼───────┼───────┼─────────────────────┤
+│Conv2D    │4,624  │18.06KB│weight=f32[16,32,3,3]│
+│          │(0)    │(0.00B)│bias=f32[16,1,1]     │
+├──────────┼───────┼───────┼─────────────────────┤
+│Conv2D    │17     │68.00B │weight=f32[1,16,1,1] │
+│          │(0)    │(0.00B)│bias=f32[1,1,1]      │
+└──────────┴───────┴───────┴─────────────────────┘
+Total # :		46,401(0)
+Dynamic #:		46,401(0)
+Static/Frozen #:	0(0)
+--------------------------------------------------
+Total size :		181.25KB(0.00B)
+Dynamic size:		181.25KB(0.00B)
+Static/Frozen size:	0.00B(0.00B)
+==================================================
+```
+</details>
+
+<details>
+
+<summary>Model diagram</summary>
+
+**Note** : static_field(untrainable) is marked with `x`
+```python
+AutoEncoder
+    ├── l1=Conv2D
+    │   ├── weight=f32[16,1,3,3]
+    │   ├── bias=f32[16,1,1]
+    │   ├x─ in_channels=1
+    │   ├x─ out_channels=16
+    │   ├x─ kernel_size=(3, 3)
+    │   ├x─ padding=('valid', 'same', 'same')
+    │   └x─ strides=1   
+    ├── l2=MaxPool2D
+    │   ├x─ kernel_size=(2, 2)
+    │   ├x─ strides=2
+    │   └x─ padding='valid' 
+    ├── l3=Conv2D
+    │   ├── weight=f32[32,16,3,3]
+    │   ├── bias=f32[32,1,1]
+    │   ├x─ in_channels=16
+    │   ├x─ out_channels=32
+    │   ├x─ kernel_size=(3, 3)
+    │   ├x─ padding=('valid', 'same', 'same')
+    │   └x─ strides=1   
+    ├── l4=Conv2D
+    │   ├── weight=f32[64,32,3,3]
+    │   ├── bias=f32[64,1,1]
+    │   ├x─ in_channels=32
+    │   ├x─ out_channels=64
+    │   ├x─ kernel_size=(3, 3)
+    │   ├x─ padding=('valid', 'same', 'same')
+    │   └x─ strides=1   
+    ├── l5=MaxPool2D
+    │   ├x─ kernel_size=(2, 2)
+    │   ├x─ strides=2
+    │   └x─ padding='valid' 
+    ├── l6=Upsample2D
+    │   └x─ scale_factor=2  
+    ├── l7=Conv2D
+    │   ├── weight=f32[32,64,3,3]
+    │   ├── bias=f32[32,1,1]
+    │   ├x─ in_channels=64
+    │   ├x─ out_channels=32
+    │   ├x─ kernel_size=(3, 3)
+    │   ├x─ padding=('valid', 'same', 'same')
+    │   └x─ strides=1   
+    ├── l8=Upsample2D
+    │   └x─ scale_factor=2  
+    ├── l9=Conv2D
+    │   ├── weight=f32[16,32,3,3]
+    │   ├── bias=f32[16,1,1]
+    │   ├x─ in_channels=32
+    │   ├x─ out_channels=16
+    │   ├x─ kernel_size=(3, 3)
+    │   ├x─ padding=('valid', 'same', 'same')
+    │   └x─ strides=1   
+    └── l10=Conv2D
+        ├── weight=f32[1,16,1,1]
+        ├── bias=f32[1,1,1]
+        ├x─ in_channels=16
+        ├x─ out_channels=1
+        ├x─ kernel_size=(1, 1)
+        ├x─ padding=('valid', 'same', 'same')
+        └x─ strides=1       
+```
+</details>
+
+<details><summary>Mermaid diagram</summary>
+
+```mermaid
+flowchart LR
+    id15696277213149321320[AutoEncoder]
+    id15696277213149321320 --> id159132120600507116(l1\nConv2D)
+    id159132120600507116 --- id7500441386962467209["weight\nf32[16,1,3,3]"]
+    id159132120600507116 --- id10793958738030044218["bias\nf32[16,1,1]"]
+    id159132120600507116 --x id16245750007010064142["in_channels\n1"]
+    id159132120600507116 --x id18207049543254186577["out_channels\n16"]
+    id159132120600507116 --x id5212096738524654885["kernel_size\n(3, 3)"]
+    id159132120600507116 --x id7173396274768777320["padding\n('valid', 'same', 'same')"]
+    id159132120600507116 --x id10466913625836354329["strides\n1"]
+    id15696277213149321320 --> id10009280772564895168(l2\nMaxPool2D)
+    id10009280772564895168 --x id11951215191344350637["kernel_size\n(2, 2)"]
+    id10009280772564895168 --x id1196345851686744158["strides\n2"]
+    id10009280772564895168 --x id6648137120666764082["padding\n'valid'"]
+    id15696277213149321320 --> id7572222925824649475(l3\nConv2D)
+    id7572222925824649475 --- id4749243995442935477["weight\nf32[32,16,3,3]"]
+    id7572222925824649475 --- id8042761346510512486["bias\nf32[32,1,1]"]
+    id7572222925824649475 --x id17892909998474900538["in_channels\n16"]
+    id7572222925824649475 --x id15455852151734654845["out_channels\n32"]
+    id7572222925824649475 --x id6859256729989491281["kernel_size\n(3, 3)"]
+    id7572222925824649475 --x id4422198883249245588["padding\n('valid', 'same', 'same')"]
+    id7572222925824649475 --x id7715716234316822597["strides\n1"]
+    id15696277213149321320 --> id10865740276892226484(l4\nConv2D)
+    id10865740276892226484 --- id7858522665561710831["weight\nf32[64,32,3,3]"]
+    id10865740276892226484 --- id11152040016629287840["bias\nf32[64,1,1]"]
+    id10865740276892226484 --x id2555444594884124276["in_channels\n32"]
+    id10865740276892226484 --x id118386748143878583["out_channels\n64"]
+    id10865740276892226484 --x id9968535400108266635["kernel_size\n(3, 3)"]
+    id10865740276892226484 --x id7531477553368020942["padding\n('valid', 'same', 'same')"]
+    id10865740276892226484 --x id10824994904435597951["strides\n1"]
+    id15696277213149321320 --> id2269144855147062920(l5\nMaxPool2D)
+    id2269144855147062920 --x id599357636669938791["kernel_size\n(2, 2)"]
+    id2269144855147062920 --x id3892874987737515800["strides\n2"]
+    id2269144855147062920 --x id13743023639701903852["padding\n'valid'"]
+    id15696277213149321320 --> id18278831082116368843(l6\nUpsample2D)
+    id18278831082116368843 --x id5107325274042179099["scale_factor\n2"]
+    id15696277213149321320 --> id9682235660371205279(l7\nConv2D)
+    id9682235660371205279 --- id13157878626227910245["weight\nf32[32,64,3,3]"]
+    id9682235660371205279 --- id16451395977295487254["bias\nf32[32,1,1]"]
+    id9682235660371205279 --x id7854800555550323690["in_channels\n64"]
+    id9682235660371205279 --x id5417742708810077997["out_channels\n32"]
+    id9682235660371205279 --x id15267891360774466049["kernel_size\n(3, 3)"]
+    id9682235660371205279 --x id12830833514034220356["padding\n('valid', 'same', 'same')"]
+    id9682235660371205279 --x id16124350865101797365["strides\n1"]
+    id15696277213149321320 --> id12975753011438782288(l8\nUpsample2D)
+    id12975753011438782288 --x id16267157296346685599["scale_factor\n2"]
+    id15696277213149321320 --> id10538695164698536595(l9\nConv2D)
+    id10538695164698536595 --- id9065186100445270439["weight\nf32[16,32,3,3]"]
+    id10538695164698536595 --- id12358703451512847448["bias\nf32[16,1,1]"]
+    id10538695164698536595 --x id3762108029767683884["in_channels\n32"]
+    id10538695164698536595 --x id1325050183027438191["out_channels\n16"]
+    id10538695164698536595 --x id11175198834991826243["kernel_size\n(3, 3)"]
+    id10538695164698536595 --x id8738140988251580550["padding\n('valid', 'same', 'same')"]
+    id10538695164698536595 --x id12031658339319157559["strides\n1"]
+    id15696277213149321320 --> id1942099742953373031(l10\nConv2D)
+    id1942099742953373031 --- id15854407762278681887["weight\nf32[1,16,1,1]"]
+    id1942099742953373031 --- id5099538422621075408["bias\nf32[1,1,1]"]
+    id1942099742953373031 --x id10551329691601095332["in_channels\n16"]
+    id1942099742953373031 --x id12512629227845217767["out_channels\n1"]
+    id1942099742953373031 --x id17964420496825237691["kernel_size\n(1, 1)"]
+    id1942099742953373031 --x id1478975959359808510["padding\n('valid', 'same', 'same')"]
+    id1942099742953373031 --x id4772493310427385519["strides\n1"]
+```
+</details>
+</details>
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 
