@@ -3,13 +3,14 @@ from dataclasses import field
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
-from pytreeclass import tree_viz, treeclass
+import pytreeclass as pytc
 from pytreeclass.src.tree_util import _freeze_nodes, _unfreeze_nodes
 
 
 def test_freezing_unfreezing():
-    @treeclass
+    @pytc.treeclass
     class A:
         a: int
         b: int
@@ -22,12 +23,12 @@ def test_freezing_unfreezing():
     assert jax.tree_util.tree_leaves(b) == []
     assert jax.tree_util.tree_leaves(c) == [1, 2]
 
-    @treeclass
+    @pytc.treeclass
     class A:
         a: int
         b: int
 
-    @treeclass
+    @pytc.treeclass
     class B:
         c: int = 3
         d: A = A(1, 2)
@@ -36,10 +37,10 @@ def test_freezing_unfreezing():
     a.d = a.d.freeze()
     assert a.d.frozen is True
     assert (
-        tree_viz.tree_diagram(a)
+        pytc.tree_viz.tree_diagram(a)
     ) == "B\n    ├── c=3\n    └── d=A\n        ├#─ a=1\n        └#─ b=2     "
 
-    @treeclass(field_only=True)
+    @pytc.treeclass(field_only=True)
     class A:
         a: int
         b: int
@@ -52,12 +53,12 @@ def test_freezing_unfreezing():
     assert jax.tree_util.tree_leaves(b) == []
     assert jax.tree_util.tree_leaves(c) == [1, 2]
 
-    @treeclass
+    @pytc.treeclass
     class A:
         a: int
         b: int
 
-    @treeclass
+    @pytc.treeclass
     class B:
         c: int = 3
         d: A = A(1, 2)
@@ -66,13 +67,13 @@ def test_freezing_unfreezing():
     a.d = a.d.freeze()
     assert a.d.frozen is True
     assert (
-        tree_viz.tree_diagram(a)
+        pytc.tree_viz.tree_diagram(a)
     ) == "B\n    ├── c=3\n    └── d=A\n        ├#─ a=1\n        └#─ b=2     "
     assert (
         a.tree_diagram()
     ) == "B\n    ├── c=3\n    └── d=A\n        ├#─ a=1\n        └#─ b=2     "
 
-    @treeclass
+    @pytc.treeclass
     class Linear:
 
         weight: jnp.ndarray
@@ -88,7 +89,7 @@ def test_freezing_unfreezing():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @treeclass
+    @pytc.treeclass
     class StackedLinear:
         def __init__(self, key, in_dim, out_dim, hidden_dim):
 
@@ -126,7 +127,7 @@ def test_freezing_unfreezing():
 
     np.testing.assert_allclose(value, jnp.array(3.9368), atol=1e-3)
 
-    @treeclass
+    @pytc.treeclass
     class Stacked:
         def __init__(self):
             self.mdl1 = StackedLinear(
@@ -138,17 +139,17 @@ def test_freezing_unfreezing():
 
     mdl = Stacked()
 
-    frozen_diagram = tree_viz.tree_diagram((_freeze_nodes(mdl)))
+    frozen_diagram = pytc.tree_viz.tree_diagram((_freeze_nodes(mdl)))
     # trunk-ignore(flake8/E501)
     fmt = "Stacked\n    ├#─ mdl1=StackedLinear\n    │   ├#─ l1=Linear\n    │   │   ├#─ weight=f32[1,10]\n    │   │   ├#─ bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   ├#─ l2=Linear\n    │   │   ├#─ weight=f32[10,10]\n    │   │   ├#─ bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   └#─ l3=Linear\n    │       ├#─ weight=f32[10,1]\n    │       ├#─ bias=f32[1,1]\n    │       └x─ notes='string'      \n    └#─ mdl2=StackedLinear\n        ├#─ l1=Linear\n        │   ├#─ weight=f32[1,10]\n        │   ├#─ bias=f32[1,10]\n        │   └x─ notes='string'  \n        ├#─ l2=Linear\n        │   ├#─ weight=f32[10,10]\n        │   ├#─ bias=f32[1,10]\n        │   └x─ notes='string'  \n        └#─ l3=Linear\n            ├#─ weight=f32[10,1]\n            ├#─ bias=f32[1,1]\n            └x─ notes='string'          "
     assert fmt == frozen_diagram
 
-    unfrozen_diagram = tree_viz.tree_diagram(_unfreeze_nodes(_freeze_nodes(mdl)))
+    unfrozen_diagram = pytc.tree_viz.tree_diagram(_unfreeze_nodes(_freeze_nodes(mdl)))
     # trunk-ignore(flake8/E501)
     fmt = "Stacked\n    ├── mdl1=StackedLinear\n    │   ├── l1=Linear\n    │   │   ├── weight=f32[1,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   ├── l2=Linear\n    │   │   ├── weight=f32[10,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   └── l3=Linear\n    │       ├── weight=f32[10,1]\n    │       ├── bias=f32[1,1]\n    │       └x─ notes='string'      \n    └── mdl2=StackedLinear\n        ├── l1=Linear\n        │   ├── weight=f32[1,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        ├── l2=Linear\n        │   ├── weight=f32[10,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        └── l3=Linear\n            ├── weight=f32[10,1]\n            ├── bias=f32[1,1]\n            └x─ notes='string'          "
     assert fmt == unfrozen_diagram
 
-    @treeclass(field_only=True)
+    @pytc.treeclass(field_only=True)
     class StackedLinear:
         l1: Linear
         l2: Linear
@@ -187,7 +188,7 @@ def test_freezing_unfreezing():
 
     np.testing.assert_allclose(value, jnp.array(3.9368), atol=1e-3)
 
-    @treeclass(field_only=True)
+    @pytc.treeclass(field_only=True)
     class Stacked:
         mdl1: StackedLinear
         mdl2: StackedLinear
@@ -202,12 +203,35 @@ def test_freezing_unfreezing():
 
     mdl = Stacked()
 
-    frozen_diagram = tree_viz.tree_diagram((_freeze_nodes(mdl)))
+    frozen_diagram = pytc.tree_viz.tree_diagram((_freeze_nodes(mdl)))
     # trunk-ignore(flake8/E501)
     fmt = "Stacked\n    ├#─ mdl1=StackedLinear\n    │   ├#─ l1=Linear\n    │   │   ├#─ weight=f32[1,10]\n    │   │   ├#─ bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   ├#─ l2=Linear\n    │   │   ├#─ weight=f32[10,10]\n    │   │   ├#─ bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   └#─ l3=Linear\n    │       ├#─ weight=f32[10,1]\n    │       ├#─ bias=f32[1,1]\n    │       └x─ notes='string'      \n    └#─ mdl2=StackedLinear\n        ├#─ l1=Linear\n        │   ├#─ weight=f32[1,10]\n        │   ├#─ bias=f32[1,10]\n        │   └x─ notes='string'  \n        ├#─ l2=Linear\n        │   ├#─ weight=f32[10,10]\n        │   ├#─ bias=f32[1,10]\n        │   └x─ notes='string'  \n        └#─ l3=Linear\n            ├#─ weight=f32[10,1]\n            ├#─ bias=f32[1,1]\n            └x─ notes='string'          "
     assert fmt == frozen_diagram
 
-    unfrozen_diagram = tree_viz.tree_diagram(_unfreeze_nodes(_freeze_nodes(mdl)))
+    unfrozen_diagram = pytc.tree_viz.tree_diagram(_unfreeze_nodes(_freeze_nodes(mdl)))
     # trunk-ignore(flake8/E501)
     fmt = "Stacked\n    ├── mdl1=StackedLinear\n    │   ├── l1=Linear\n    │   │   ├── weight=f32[1,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   ├── l2=Linear\n    │   │   ├── weight=f32[10,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   └── l3=Linear\n    │       ├── weight=f32[10,1]\n    │       ├── bias=f32[1,1]\n    │       └x─ notes='string'      \n    └── mdl2=StackedLinear\n        ├── l1=Linear\n        │   ├── weight=f32[1,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        ├── l2=Linear\n        │   ├── weight=f32[10,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        └── l3=Linear\n            ├── weight=f32[10,1]\n            ├── bias=f32[1,1]\n            └x─ notes='string'          "
     assert fmt == unfrozen_diagram
+
+    @pytc.treeclass(field_only=False)
+    class Test:
+        a: int = 1
+        b: float = pytc.static_field(default=1.0)
+        c: str = "test"
+
+    t = Test()
+
+    with pytest.raises(ValueError):
+        t.freeze().a = 1
+
+    @pytc.treeclass(field_only=True)
+    class Test:
+        a: int = 1
+        b: float = pytc.static_field(default=1.0)
+        c: str = "test"
+
+    t = Test()
+    assert jax.tree_util.tree_leaves(t) == [1]
+
+    with pytest.raises(ValueError):
+        t.freeze().a = 1
