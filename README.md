@@ -68,6 +68,7 @@ class StackedLinear:
 
         # Declaring l1,l2,l3 as dataclass_fields is optional
         # as l1,l2,l3 are Linear class that is wrapped with @pytc.treeclass
+        # To strictly include nodes defined in dataclass fields use `@pytc.treeclass(field_only=True)`
         self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
         self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
         self.l3 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
