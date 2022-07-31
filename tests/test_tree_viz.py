@@ -4,7 +4,8 @@ from dataclasses import field
 import jax
 from jax import numpy as jnp
 
-from pytreeclass import static_field, tree_viz, treeclass
+import pytreeclass as pytc
+from pytreeclass import tree_viz
 
 
 def test__vbox():
@@ -17,7 +18,7 @@ def test__hbox():
 
 
 def test_tree_box():
-    @treeclass
+    @pytc.treeclass
     class test:
         a: int = 1
 
@@ -26,7 +27,7 @@ def test_tree_box():
 
 
 def test_tree_diagram():
-    @treeclass
+    @pytc.treeclass
     class test:
         a: int = 1
 
@@ -34,7 +35,7 @@ def test_tree_diagram():
     assert tree_viz.tree_diagram(test()) == correct
 
 
-@treeclass
+@pytc.treeclass
 class Linear:
 
     weight: jnp.ndarray
@@ -50,7 +51,7 @@ class Linear:
         return x @ self.weight + self.bias
 
 
-@treeclass
+@pytc.treeclass
 class StackedLinear:
     l1: Linear
     l2: Linear
@@ -99,7 +100,7 @@ def test_model():
 
 
 def test_repr_str():
-    @treeclass
+    @pytc.treeclass
     class Test:
         a: float
         b: float
@@ -118,16 +119,16 @@ def test_repr_str():
 
 
 def test_save_viz():
-    @treeclass
+    @pytc.treeclass
     class level0:
         a: int
-        b: int = static_field()
+        b: int = pytc.static_field()
 
-    @treeclass
+    @pytc.treeclass
     class level1:
         d: level0 = level0(10, 20)
 
-    @treeclass
+    @pytc.treeclass
     class level2:
         e: level1 = level1()
         f: level0 = level0(100, 200)
@@ -173,7 +174,7 @@ def test_save_viz():
 
 
 def test_summary_md():
-    @treeclass
+    @pytc.treeclass
     class Linear:
 
         weight: jnp.ndarray
@@ -186,7 +187,7 @@ def test_summary_md():
             )
             self.bias = jnp.ones((1, out_dim))
 
-    @treeclass
+    @pytc.treeclass
     class StackedLinear:
         def __init__(self, key, in_dim, out_dim, hidden_dim):
 

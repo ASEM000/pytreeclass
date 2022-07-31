@@ -56,82 +56,6 @@ class treeBase:
             raise ValueError("Cannot set a value to a frozen treeclass.")
         object.__setattr__(self, name, value)
 
-    @property
-    def tree_fields(self):
-        """Computes the dynamic and static fields.
-
-        Returns:
-            Pair of dynamic and static dictionaries.
-        """
-
-        static, dynamic = dict(), dict()
-        # register other variables defined in other context
-        # if their value is an instance of treeclass
-        # to avoid redefining them as dataclass fields.
-
-        static["__frozen_treeclass__"] = self.frozen
-
-        for var_name, var_value in self.__dict__.items():
-            # check if a variable in self.__dict__ is treeclass
-            # that is not defined in fields
-            if (
-                isinstance(var_name, str)
-                and is_treeclass(var_value)
-                and var_name not in self.__dataclass_fields__.keys()
-            ):
-
-                # create field
-                field_value = field()
-                setattr(field_value, "name", var_name)
-                setattr(field_value, "type", type(var_value))
-
-                # register it to class
-                self.__dataclass_fields__.update({var_name: field_value})
-
-        # register all dataclass fields
-        for fi in self.__dataclass_fields__.values():
-            # field value is defined in class dict
-            if fi.name in self.__dict__:
-                value = self.__dict__[fi.name]
-
-            # field value is defined in field default
-            elif fi.default is not MISSING:
-                self.__dict__[fi.name] = fi.default
-                value = fi.default
-
-            else:
-                # the user did not declare a variable defined in field
-                raise ValueError(f"field={fi.name} is not declared.")
-
-            # if the parent is frozen, freeze all dataclass fields children
-            if self.frozen:
-                static[fi.name] = value
-
-            else:
-                # exclude any string
-                # and mutate the class field static metadata for this variable for future instances
-                excluded_by_type = isinstance(value, str)
-                excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
-
-                if excluded_by_type:
-                    # add static type to metadata to class and its instance
-                    static[fi.name] = value
-                    updated_field = self.__dataclass_fields__[fi.name]
-                    object.__setattr__(
-                        updated_field,
-                        "metadata",
-                        {**updated_field.metadata, **{"static": True}},
-                    )
-                    self.__dataclass_fields__[fi.name] = updated_field
-
-                elif excluded_by_meta:
-                    static[fi.name] = value
-
-                else:
-                    dynamic[fi.name] = value
-
-        return (dynamic, static)
-
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
 
@@ -218,6 +142,158 @@ class treeBase:
         return tree_box(self, array)
 
     def __setitem__(self, key, value):
+        """Set item in treeclass
+
+        Args:
+            key (_type_): _description_
+            value (_type_): _description_
+
+        Raises:
+            ValueError: If treeclass is frozen raises error
+        """
         if self.frozen:
             raise ValueError("Cannot set a value to a frozen treeclass.")
         self.__dict__[key] = value
+
+
+class explicitTreeBase:
+    """ "Nodes = dataclassfields"""
+
+    @property
+    def tree_fields(self):
+        """Computes the dynamic and static fields.
+
+        Returns:
+            Pair of dynamic and static dictionaries.
+        """
+
+        static, dynamic = dict(), dict()
+        # register other variables defined in other context
+        # if their value is an instance of treeclass
+        # to avoid redefining them as dataclass fields.
+
+        static["__frozen_treeclass__"] = self.frozen
+
+        # register all dataclass fields
+        for fi in self.__dataclass_fields__.values():
+            # field value is defined in class dict
+            if fi.name in self.__dict__:
+                value = self.__dict__[fi.name]
+
+            # field value is defined in field default
+            elif fi.default is not MISSING:
+                self.__dict__[fi.name] = fi.default
+                value = fi.default
+
+            else:
+                # the user did not declare a variable defined in field
+                raise ValueError(f"field={fi.name} is not declared.")
+
+            # if the parent is frozen, freeze all dataclass fields children
+            if self.frozen:
+                static[fi.name] = value
+
+            else:
+                # exclude any string
+                # and mutate the class field static metadata for this variable for future instances
+                excluded_by_type = isinstance(value, str)
+                excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
+
+                if excluded_by_type:
+                    # add static type to metadata to class and its instance
+                    static[fi.name] = value
+                    updated_field = self.__dataclass_fields__[fi.name]
+                    object.__setattr__(
+                        updated_field,
+                        "metadata",
+                        {**updated_field.metadata, **{"static": True}},
+                    )
+                    self.__dataclass_fields__[fi.name] = updated_field
+
+                elif excluded_by_meta:
+                    static[fi.name] = value
+
+                else:
+                    dynamic[fi.name] = value
+
+        return (dynamic, static)
+
+
+class implicitTreeBase:
+    """ "Nodes = dataclassfields + treeclass instance variables"""
+
+    @property
+    def tree_fields(self):
+        """Computes the dynamic and static fields.
+
+        Returns:
+            Pair of dynamic and static dictionaries.
+        """
+
+        static, dynamic = dict(), dict()
+        # register other variables defined in other context
+        # if their value is an instance of treeclass
+        # to avoid redefining them as dataclass fields.
+
+        static["__frozen_treeclass__"] = self.frozen
+
+        for var_name, var_value in self.__dict__.items():
+            # check if a variable in self.__dict__ is treeclass
+            # that is not defined in fields
+            if (
+                isinstance(var_name, str)
+                and is_treeclass(var_value)
+                and var_name not in self.__dataclass_fields__.keys()
+            ):
+
+                # create field
+                field_value = field()
+                setattr(field_value, "name", var_name)
+                setattr(field_value, "type", type(var_value))
+
+                # register it to class
+                self.__dataclass_fields__.update({var_name: field_value})
+
+        # register all dataclass fields
+        for fi in self.__dataclass_fields__.values():
+            # field value is defined in class dict
+            if fi.name in self.__dict__:
+                value = self.__dict__[fi.name]
+
+            # field value is defined in field default
+            elif fi.default is not MISSING:
+                self.__dict__[fi.name] = fi.default
+                value = fi.default
+
+            else:
+                # the user did not declare a variable defined in field
+                raise ValueError(f"field={fi.name} is not declared.")
+
+            # if the parent is frozen, freeze all dataclass fields children
+            if self.frozen:
+                static[fi.name] = value
+
+            else:
+                # exclude any string
+                # and mutate the class field static metadata for this variable for future instances
+                excluded_by_type = isinstance(value, str)
+                excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
+
+                if excluded_by_type:
+                    # add static type to metadata to class and its instance
+                    static[fi.name] = value
+                    updated_field = self.__dataclass_fields__[fi.name]
+                    object.__setattr__(
+                        updated_field,
+                        "metadata",
+                        {**updated_field.metadata, **{"static": True}},
+                    )
+                    self.__dataclass_fields__[fi.name] = updated_field
+
+                elif excluded_by_meta:
+                    static[fi.name] = value
+
+                else:
+                    dynamic[fi.name] = value
+
+        return (dynamic, static)

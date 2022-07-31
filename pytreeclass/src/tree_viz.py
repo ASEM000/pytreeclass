@@ -9,9 +9,9 @@ import requests
 from jax import tree_flatten
 
 from .tree_util import (
+    _reduce_count_and_size,
     is_treeclass,
     is_treeclass_leaf,
-    _reduce_count_and_size,
     sequential_model_shape_eval,
 )
 
@@ -313,7 +313,9 @@ def _summary_str(model, array=None, render: str = "string") -> str:
                 [f"{k}={_node_format(v)}" for k, v in leaf.tree_fields[0].items()]
             )
 
-        ROW += [[name, _format_count(count, True), _format_size(size, True), fmt, shape]]
+        ROW += [
+            [name, _format_count(count, True), _format_size(size, True), fmt, shape]
+        ]
 
     COL = [list(c) for c in zip(*ROW)]
     if array is None:
@@ -626,6 +628,7 @@ def tree_mermaid(model, link=False):
             nonlocal fmt
 
             if is_treeclass(model):
+                is_frozen = model.frozen
 
                 for i, field in enumerate(model.__dataclass_fields__.values()):
                     cur_node = model.__dict__[field.name]
@@ -645,7 +648,9 @@ def tree_mermaid(model, link=False):
                         is_static = (
                             "static" in field.metadata and field.metadata["static"]
                         )
-                        connector = "-.-" if is_static else "---"
+                        connector = (
+                            "--x" if is_static else ("-.-" if is_frozen else "---")
+                        )
                         fmt += f'\tid{prev_id} {connector} id{cur_id}["{field.name}\\n{_node_format(cur_node)}"]'
                         recurse(cur_node, cur_depth + 1, cur_id)
 
