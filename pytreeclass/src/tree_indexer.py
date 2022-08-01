@@ -7,10 +7,12 @@ from typing import Any
 import jax.numpy as jnp
 from jax.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
 
+import pytreeclass
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import is_treeclass, is_treeclass_leaf_bool
 
 
+@dispatch(argnum=0)
 def _node_setter(lhs: Any, where: bool, set_value):
     """Set pytree node value.
 
@@ -22,28 +24,90 @@ def _node_setter(lhs: Any, where: bool, set_value):
     Returns:
         Modified node value.
     """
-    if isinstance(lhs, jnp.ndarray):
-        return jnp.where(where, set_value, lhs)
-    else:
-        return set_value if where else lhs
+    raise NotImplementedError("lhs type is unknown.")
 
 
-def _node_getter(lhs, where):
+@_node_setter.register(jnp.ndarray)
+def _(lhs, where, set_value):
+    return jnp.where(where, set_value, lhs)
+
+
+@_node_setter.register(pytreeclass.src.tree_base.treeBase)
+def _(lhs, where, set_value):
+    return tree_map(lambda x: _node_setter(x, where, set_value), lhs)
+
+
+@_node_setter.register(int)
+@_node_setter.register(float)
+@_node_setter.register(complex)
+def _(lhs, where, set_value):
+    return set_value if where else lhs
+
+
+@dispatch(argnum=0)
+def _node_getter(lhs: Any, where: Any):
+    """Get pytree node  value
+
+    Args:
+        lhs (Any): Node value.
+        where (Any): Conditional
+
+    Raises:
+        NotImplementedError:
+    """
     # not jittable as size can changes
     # does not change pytreestructure ,
-
-    if isinstance(lhs, jnp.ndarray):
-        return lhs[jnp.where(where)]
-    else:
-        # set None to non-chosen non-array values
-        return lhs if where else None
+    raise NotImplementedError("lhs type is unknown.")
 
 
+@_node_getter.register(jnp.ndarray)
+def _(lhs, where):
+    return lhs[jnp.where(where)]
+
+
+@_node_getter.register(pytreeclass.src.tree_base.treeBase)
+def _(lhs, where):
+    return tree_map(lambda x: _node_getter(x, where), lhs)
+
+
+@_node_getter.register(int)
+@_node_getter.register(float)
+@_node_getter.register(complex)
+def _(lhs, where):
+    # set None to non-chosen non-array values
+    return lhs if where else None
+
+
+@dispatch(argnum=0)
 def _node_applier(lhs: Any, where: bool, func: Callable[[Any], Any]):
-    if isinstance(lhs, jnp.ndarray):
-        return jnp.where(where, func(lhs), lhs)
-    else:
-        return func(lhs) if where else lhs
+    """Set pytree node
+
+    Args:
+        lhs (Any): Node value.
+        where (bool): Conditional
+        func (Callable[[Any], Any]): Callable
+
+    Raises:
+        NotImplementedError:
+    """
+    raise NotImplementedError("lhs type is unknown.")
+
+
+@_node_applier.register(jnp.ndarray)
+def _(lhs, where, func):
+    return jnp.where(where, func(lhs), lhs)
+
+
+@_node_applier.register(pytreeclass.src.tree_base.treeBase)
+def _(lhs, where, func):
+    return tree_map(lambda x: _node_applier(x, where, func), lhs)
+
+
+@_node_applier.register(int)
+@_node_applier.register(float)
+@_node_applier.register(complex)
+def _(lhs, where, func):
+    return func(lhs) if where else lhs
 
 
 def _non_boolean_indexing_getter(model, *where: tuple[str | int, ...]):
