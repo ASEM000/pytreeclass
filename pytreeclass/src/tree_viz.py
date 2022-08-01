@@ -7,7 +7,7 @@ from typing import Sequence
 import jax
 import jax.numpy as jnp
 import requests
-from jax import tree_flatten
+from jax.tree_util import tree_flatten
 
 from .tree_util import (
     _reduce_count_and_size,
