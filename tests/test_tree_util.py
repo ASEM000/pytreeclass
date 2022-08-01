@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import pytest
 
 from pytreeclass import treeclass
 from pytreeclass.src.tree_util import (
@@ -50,3 +51,20 @@ def test__node_count_and_size():
         complex(0, 20),
     )
     assert _node_count_and_size(3.0) == (complex(1), complex(24))
+
+    @treeclass
+    class x:
+        a: int = 1
+        b: int = 2
+
+    assert x().treeclass_leaves == [x()]
+
+    assert hash(x()) == -3550055125485641917
+
+    xx = x()
+    xx.cc = 1
+    assert xx.cc == 1
+    xx = xx.freeze()
+
+    with pytest.raises(ValueError):
+        xx.test = 1
