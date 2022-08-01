@@ -128,7 +128,7 @@ def test_repr_str():
         str_string
         == "Test(\n  a=\n    10,\n  b=\n    20,\n  c=\n    [1 2 3 4 5],\n  name=\n    A)"
     )
-    assert repr_string == "Test(\n  a=10,\n  b=20,\n  c=i32[5,],\n  name='A')"
+    assert repr_string == "Test(a=10,b=20,c=i32[5,],name='A')"
 
 
 def test_save_viz():
