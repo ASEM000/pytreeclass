@@ -27,7 +27,7 @@ def test_cached_property():
 def test_dispatch():
     @dispatch(argnum=0)
     def func(x):
-        ...
+        raise ValueError("unknown")
 
     @func.register(int)
     def _(x):
@@ -40,9 +40,13 @@ def test_dispatch():
     assert func(1) == 2
     assert func(1.0) == 101.0
 
+    with pytest.raises(ValueError):
+        func("s")
+
     @dispatch(argnum=1)
     def func(x, y):
-        ...
+        raise ValueError("unknown")
+    
 
     @func.register(int)
     def _(x, y):
@@ -55,10 +59,13 @@ def test_dispatch():
     assert func("a", 1) == 2
     assert func(None, 1.0) == 101.0
 
+    with pytest.raises(ValueError):
+        func(None,"s")
+
     # dispatch by keyword argument
     @dispatch(argnum="name")
     def func(x, y, *, name):
-        ...
+        raise ValueError("unknown")
 
     @func.register(int)
     def _(x, y, *, name):
@@ -71,12 +78,15 @@ def test_dispatch():
     assert func(1, 2, name=1) == "int"
     assert func(1, 1, name="s") == "str"
 
+    with pytest.raises(ValueError):
+        func(1,1,name=1.)
+
 
 def test_singledispatchmethod():
     class test:
         @dispatch(argnum=1)
         def plus(self, x):
-            ...
+            raise ValueError("unknown")
 
         @plus.register(int)
         def _(self, x):
@@ -94,25 +104,28 @@ def test_singledispatchmethod():
     assert A.plus(complex(1.0)) == complex(101.0)
 
     with pytest.raises(ValueError):
+        A.plus("s")
+
+    with pytest.raises(ValueError):
 
         class test:
             @dispatch(argnum=1.0)
             def plus(self, x):
-                ...
-
-            @plus.register(int)
-            def _(self, x):
-                return x + 1
+                raise ValueError("a")
 
         t = test()
+        t.plus("s")
         t.plus(1)
 
     @dispatch
     def fn(x):
-        ...
+        raise ValueError("unknown")
 
     @fn.register(int)
     def _(x):
         return 1
 
     assert fn(3) == 1
+
+    with pytest.raises(ValueError):
+        fn(3.)
