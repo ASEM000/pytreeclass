@@ -24,8 +24,6 @@ def _node_setter(lhs: Any, where: bool, set_value):
     """
     if isinstance(lhs, jnp.ndarray):
         return jnp.where(where, set_value, lhs)
-    elif is_treeclass(lhs):
-        return tree_map(lambda x: set_value if where else x, lhs)
     else:
         return set_value if where else lhs
 
@@ -36,13 +34,6 @@ def _node_getter(lhs, where):
 
     if isinstance(lhs, jnp.ndarray):
         return lhs[jnp.where(where)]
-    elif is_treeclass(lhs):
-        return tree_map(
-            lambda x: x
-            if where
-            else (jnp.array([]) if isinstance(x, jnp.ndarray) else None),
-            lhs,
-        )
     else:
         # set None to non-chosen non-array values
         return lhs if where else None
@@ -51,8 +42,6 @@ def _node_getter(lhs, where):
 def _node_applier(lhs: Any, where: bool, func: Callable[[Any], Any]):
     if isinstance(lhs, jnp.ndarray):
         return jnp.where(where, func(lhs), lhs)
-    elif is_treeclass(lhs):
-        return tree_map(lambda x: func(x) if where else x, lhs)
     else:
         return func(lhs) if where else lhs
 

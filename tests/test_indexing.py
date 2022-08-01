@@ -239,6 +239,10 @@ def test_apply_and_its_derivatives():
     rhs = init.at[init > 0].add(1)
     assert is_treeclass_equal(lhs, rhs)
 
+    lhs = A(1, 4, jnp.array([1, 4, 3, 4, 5]))
+    rhs = init.at[init==2].multiply(2)
+    assert is_treeclass_equal(lhs, rhs)
+
     # by param
 
     lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
@@ -273,12 +277,19 @@ def test_apply_and_its_derivatives():
     rhs = init.at["a"].power(2)
     assert is_treeclass_equal(lhs, rhs)
 
+    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].multiply(2)
+    assert is_treeclass_equal(lhs, rhs)
+
     # by param
     with pytest.raises(ValueError):
         init.freeze().at["a"].apply(lambda x: x**2)
 
     with pytest.raises(ValueError):
         init.freeze().at["a", "b"].apply(lambda x: x**2)
+
+    with pytest.raises(ValueError):
+        init.freeze().at["a", "b"].set(0)
 
     # by slice
     with pytest.raises(ValueError):
@@ -293,3 +304,12 @@ def test_apply_and_its_derivatives():
 
     with pytest.raises(ValueError):
         init.freeze().at[init == 1].apply(lambda x: x**2)
+    
+    with pytest.raises(NotImplementedError):
+        init.at[1.0].get()
+
+    with pytest.raises(NotImplementedError):
+        init.at[1.0].set(0)
+
+    with pytest.raises(NotImplementedError):
+        init.at[1.0].apply(lambda x:x)
