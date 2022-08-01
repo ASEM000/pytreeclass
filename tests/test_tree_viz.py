@@ -240,3 +240,48 @@ def test_summary_md():
         # trunk-ignore(flake8/E501)
         == "┌────────┬───────┬────────┬───────────────────┐\n│Type    │Param #│Size    │Config             │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │256    │1.03KB  │weight=f32[1,128]  │\n│(frozen)│(1)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │16,512 │64.53KB │weight=f32[128,128]│\n│(frozen)│(1)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │129    │544.00B │weight=f32[128,1]  │\n│(frozen)│(1)    │(55.00B)│bias=f32[1,1]      │\n│        │       │        │notes='string'     │\n└────────┴───────┴────────┴───────────────────┘\nTotal # :\t\t16,897(3)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t16,897(3)\n-----------------------------------------------\nTotal size :\t\t66.09KB(165.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t66.09KB(165.00B)\n==============================================="
     )
+
+
+def test_tree_indent():
+    @pytc.treeclass
+    class level1:
+        a: int
+        b: int
+        c: int
+
+    @pytc.treeclass
+    class level2:
+        d: level1
+        e: level1
+        name: str = "A"
+
+    A = (
+        level2(
+            d=level1(a=1, b=10, c=jnp.array([1, 2, 3, 4, 5])),
+            e=level1(
+                a="SomethingWrittenHereSomethingWrittenHere",
+                b=20,
+                c=jnp.array([-1, -2, -3, -4, -5]),
+            ),
+            name="SomethingWrittenHere",
+        ),
+    )
+
+    B = (
+        level2(
+            d=level1(a=1, b=10, c=jnp.array([1, 2, 3, 4, 5])),
+            e=level1(a=1, b=20, c=jnp.array([-1, -2, -3, -4, -5])),
+            name="SomethingWrittenHere",
+        ),
+    )
+
+    assert (
+        f"{A!r}"
+        # trunk-ignore(flake8/E501)
+        == "(level2(\n  d=level1(a=1,b=10,c=i32[5,]),\n  e=level1(\n    a='SomethingWrittenHereSomethingWrittenHere',\n    b=20,\n    c=i32[5,]),\n  name='SomethingWrittenHere'),)"
+    )
+    assert (
+        f"{B!r}"
+        # trunk-ignore(flake8/E501)
+        == "(level2(\n  d=level1(a=1,b=10,c=i32[5,]),\n  e=level1(a=1,b=20,c=i32[5,]),\n  name='SomethingWrittenHere'),)"
+    )

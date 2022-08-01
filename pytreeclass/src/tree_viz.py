@@ -535,58 +535,68 @@ def tree_diagram(model):
     return fmt.expandtabs(4)
 
 
-def tree_indent(model):
-    """
-    === Explanation
-        pretty print treeclass model with indentation
+def tree_indent(model) -> str:
+    """Prertty print `treeclass_leaves`
 
-    === Args
-        tree : boolean to create tree-structure
+    Returns:
+        str: indented formatted model leaves.
     """
 
-    def recurse(model, parent_level_count):
+    def recurse(model, depth):
 
         nonlocal fmt
 
         if is_treeclass(model):
             cur_children_count = len(model.__dataclass_fields__)
 
-            newline = cur_children_count > 1
+            newline = cur_children_count > 2
 
             for i, field in enumerate(model.__dataclass_fields__.values()):
                 cur_node = model.__dict__[field.name]
-                fmt += "\n" + "\t" * len(parent_level_count) if newline else ""
+                fmt += "\n" + "\t" * depth if newline else ""
 
                 if is_treeclass(cur_node):
-
                     layer_class_name = f"{cur_node.__class__.__name__}"
                     fmt += f"{field.name}={layer_class_name}" + "("
-                    recurse(cur_node, parent_level_count + [cur_children_count - i])
-                    fmt += ")"
+                    start_cursor = len(fmt)
+                    recurse(cur_node, depth + 1)
+                    fmt += ")" + "," if i < (cur_children_count - 1) else ""
+
+                    end_cursor = len(fmt)
+
+                    children_length = len(
+                        fmt[start_cursor + 1 : end_cursor]
+                        .replace("\n", "")
+                        .replace("\t", "")
+                    )
+                    fmt = (
+                        fmt[:start_cursor]
+                        + fmt[start_cursor:end_cursor]
+                        .replace("\n", "")
+                        .replace("\t", "")
+                        if children_length < 50
+                        else fmt
+                    )
 
                 else:
                     fmt += f"{field.name}={_node_format(cur_node)}" + (
                         "," if i < (cur_children_count - 1) else ("")
                     )
 
-                    recurse(cur_node, parent_level_count + [1])
+                    recurse(cur_node, [1])
 
-    fmt = ""
-    # fmt = f"{(model.__class__.__name__)}("
-    recurse(model, [1])
-
-    fmt = f"{(model.__class__.__name__)}({fmt})"
+    fmt = f"{(model.__class__.__name__)}("
+    recurse(model, 1)
+    fmt += ")"
 
     return fmt.expandtabs(2)
 
 
 def tree_str(model):
-    """
-    === Explanation
-        pretty print treeclass model with indentation
+    """Prertty print `treeclass_leaves`
 
-    === Args
-        tree : boolean to create tree-structure
+    Returns:
+        str: indented model leaves.
     """
 
     def recurse(model, parent_level_count):

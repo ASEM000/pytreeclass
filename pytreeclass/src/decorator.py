@@ -22,14 +22,16 @@ def treeclass(*args, **kwargs):
         )(cls)
 
         base_classes = (dCls, treeBase)
-        base_classes += (treeOpBase, treeIndexer) if op else ()
-        base_classes += (explicitTreeBase,) if field_only else (implicitTreeBase,)
+
+        if op:
+            base_classes += (treeOpBase, treeIndexer)
+            base_classes += (explicitTreeBase,) if field_only else (implicitTreeBase,)
 
         newCls = type(cls.__name__, base_classes, {})
 
         return jax.tree_util.register_pytree_node_class(newCls)
 
-    if len(args) > 0 and inspect.isclass(args[0]):
+    if len(args) == 1 and inspect.isclass(args[0]):
         return wrapper(args[0], True, False)
 
     elif len(args) == 0 and len(kwargs) > 0:

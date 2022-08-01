@@ -2,9 +2,9 @@ import jax.numpy as jnp
 
 from pytreeclass import treeclass
 from pytreeclass.src.tree_util import (
+    _node_count_and_size,
     is_treeclass,
     is_treeclass_leaf,
-    _node_count_and_size,
 )
 
 
@@ -44,3 +44,9 @@ def test__node_count_and_size():
     t = Test()
     assert _node_count_and_size(t.b) == (complex(0, 1), complex(28, 0))
     assert _node_count_and_size(t.a) == (complex(3, 0), complex(12, 0))
+
+    assert _node_count_and_size(jnp.array([1, 2, 3, 4, 5])) == (
+        complex(0, 5),
+        complex(0, 20),
+    )
+    assert _node_count_and_size(3.0) == (complex(1), complex(24))
