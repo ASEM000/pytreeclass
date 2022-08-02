@@ -135,7 +135,7 @@ def _(model, *where):
 
 @_at_getter.register(pytreeclass.src.tree_base.treeBase)
 def _(model, where):
-    lhs_leaves, lhs_treedef = model.flatten_leaves
+    lhs_leaves, lhs_treedef = tree_flatten(model)
     where_leaves, where_treedef = tree_flatten(where)
     lhs_leaves = [
         _node_at_getter(lhs_leaf, where_leaf)

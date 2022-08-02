@@ -266,7 +266,7 @@ def _layer_box(name, indim=None, outdim=None):
 
 def _summary_line(leaf):
 
-    dynamic, static = leaf.tree_fields
+    dynamic, static = leaf.__tree_fields__
     is_dynamic = not leaf.frozen
     class_name = leaf.__class__.__name__
 
@@ -296,7 +296,10 @@ def _summary_str(model, array=None, render: str = "string") -> str:
         params_shape = sequential_model_shape_eval(model, array)[1:]
 
     # all dynamic/static leaves
-    all_leaves = (*model.tree_fields[0].values(), *model.tree_fields[1].values())
+    all_leaves = (
+        *model.__tree_fields__[0].values(),
+        *model.__tree_fields__[1].values(),
+    )
     treeclass_leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
 
     for index, leaf in enumerate(treeclass_leaves):
@@ -310,7 +313,7 @@ def _summary_str(model, array=None, render: str = "string") -> str:
             fmt = "\n".join(
                 [
                     f"{k}={_format_node(v)}"
-                    for k, v in leaf.tree_fields[1].items()
+                    for k, v in leaf.__tree_fields__[1].items()
                     if k != "__frozen_treeclass__"
                 ]
             )
@@ -319,7 +322,7 @@ def _summary_str(model, array=None, render: str = "string") -> str:
             dynamic_count += count
             dynamic_size += size
             fmt = "\n".join(
-                [f"{k}={_format_node(v)}" for k, v in leaf.tree_fields[0].items()]
+                [f"{k}={_format_node(v)}" for k, v in leaf.__tree_fields__[0].items()]
             )
 
         ROW += [
@@ -371,7 +374,10 @@ def _summary_md(model, array=None) -> str:
         params_shape = sequential_model_shape_eval(model, array)[1:]
 
     # all dynamic/static leaves
-    all_leaves = (*model.tree_fields[0].values(), *model.tree_fields[1].values())
+    all_leaves = (
+        *model.__tree_fields__[0].values(),
+        *model.__tree_fields__[1].values(),
+    )
     treeclass_leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
 
     for index, leaf in enumerate(treeclass_leaves):
@@ -385,7 +391,7 @@ def _summary_md(model, array=None) -> str:
             config = "<br>".join(
                 [
                     f"{k}={_format_node(v)}"
-                    for k, v in leaf.tree_fields[1].items()
+                    for k, v in leaf.__tree_fields__[1].items()
                     if k != "__frozen_treeclass__"
                 ]
             )
@@ -394,7 +400,7 @@ def _summary_md(model, array=None) -> str:
             dynamic_count += count
             dynamic_size += size
             config = "<br>".join(
-                [f"{k}={_format_node(v)}" for k, v in leaf.tree_fields[0].items()]
+                [f"{k}={_format_node(v)}" for k, v in leaf.__tree_fields__[0].items()]
             )
 
         fmt += (

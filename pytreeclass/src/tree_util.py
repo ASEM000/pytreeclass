@@ -16,7 +16,7 @@ def static_field(**kwargs):
 
 def is_treeclass(model):
     """check if a class is treeclass"""
-    return hasattr(model, "tree_fields")
+    return hasattr(model, "__tree_fields__")
 
 
 def is_treeclass_leaf_bool(node):
