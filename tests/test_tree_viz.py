@@ -124,11 +124,8 @@ def test_repr_str():
     str_string = f"{A!s}"
     repr_string = f"{A!r}"
 
-    assert (
-        str_string
-        == "Test(\n  a=\n    10,\n  b=\n    20,\n  c=\n    [1 2 3 4 5],\n  name=\n    A)"
-    )
-    assert repr_string == "Test(a=10,b=20,c=i32[5,],name='A')"
+    assert str_string == "Test(a=10,b=20,c=[1 2 3 4 5],name=A)"
+    assert repr_string == "Test(a=10,b=20,c=i32[5],name='A')"
 
 
 def test_save_viz():
@@ -238,7 +235,7 @@ def test_summary_md():
     assert (
         model.summary()
         # trunk-ignore(flake8/E501)
-        == "┌────────┬───────┬────────┬───────────────────┐\n│Type    │Param #│Size    │Config             │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │256    │1.03KB  │weight=f32[1,128]  │\n│(frozen)│(1)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │16,512 │64.53KB │weight=f32[128,128]│\n│(frozen)│(1)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │129    │544.00B │weight=f32[128,1]  │\n│(frozen)│(1)    │(55.00B)│bias=f32[1,1]      │\n│        │       │        │notes='string'     │\n└────────┴───────┴────────┴───────────────────┘\nTotal # :\t\t16,897(3)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t16,897(3)\n-----------------------------------------------\nTotal size :\t\t66.09KB(165.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t66.09KB(165.00B)\n==============================================="
+        == "┌────────┬───────┬────────┬───────────────────┐\n│Type    │Param #│Size    │Config             │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │256    │1.00KB  │weight=f32[1,128]  │\n│(frozen)│(0)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │16,512 │64.50KB │weight=f32[128,128]│\n│(frozen)│(0)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │129    │516.00B │weight=f32[128,1]  │\n│(frozen)│(0)    │(55.00B)│bias=f32[1,1]      │\n│        │       │        │notes='string'     │\n└────────┴───────┴────────┴───────────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t16,897(0)\n-----------------------------------------------\nTotal size :\t\t66.00KB(165.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t66.00KB(165.00B)\n==============================================="
     )
 
 
@@ -278,10 +275,83 @@ def test_tree_indent():
     assert (
         f"{A!r}"
         # trunk-ignore(flake8/E501)
-        == "(level2(\n  d=level1(a=1,b=10,c=i32[5,]),\n  e=level1(\n    a='SomethingWrittenHereSomethingWrittenHere',\n    b=20,\n    c=i32[5,]),\n  name='SomethingWrittenHere'),)"
+        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(\n    a='SomethingWrittenHereSomethingWrittenHere',\n    b=20,\n    c=i32[5]),\n  name='SomethingWrittenHere'),)"
     )
     assert (
         f"{B!r}"
-        # trunk-ignore(flake8/E501)
-        == "(level2(\n  d=level1(a=1,b=10,c=i32[5,]),\n  e=level1(a=1,b=20,c=i32[5,]),\n  name='SomethingWrittenHere'),)"
+        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(a=1,b=20,c=i32[5]),\n  name='SomethingWrittenHere'),)"
+    )
+
+
+def test_repr_true_false():
+    @pytc.treeclass
+    class Test:
+        a: float = field(repr=False)
+        b: float = field(repr=False)
+        c: float = field(repr=False)
+        name: str = field(repr=False)
+
+    A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), "A")
+
+    assert f"{A!r}" == "Test()"
+
+    @pytc.treeclass
+    class Test:
+        a: float = field(repr=False)
+        b: float
+        c: float
+        name: str
+
+    A = Test(10, 20, jnp.ones([10]), "Test")
+
+    assert A.__repr__() == "Test(b=20,c=f32[10],name='Test')"
+    assert (
+        A.__str__()
+        == "Test(\n  b=20,\n  c=[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.],\n  name=Test)"
+    )
+
+    @pytc.treeclass
+    class Test:
+        a: float = field(repr=False)
+        b: float
+        c: float
+        name: str = field(repr=False)
+
+    A = Test(10, 20, jnp.ones([10]), "Test")
+
+    assert A.__str__() == "Test(b=20,c=[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.],)"
+    assert A.__repr__() == "Test(b=20,c=f32[10],)"
+
+    @pytc.treeclass
+    class Linear:
+
+        weight: jnp.ndarray
+        bias: jnp.ndarray
+        notes: str = field(default="string")
+
+        def __init__(self, key, in_dim, out_dim):
+            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
+                2 / in_dim
+            )
+            self.bias = jnp.ones((1, out_dim))
+
+    @pytc.treeclass
+    class StackedLinear:
+        l1: Linear = field(repr=False)
+        l2: Linear
+        l3: Linear
+
+        def __init__(self, key, in_dim, out_dim):
+
+            keys = jax.random.split(key, 3)
+
+            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=128)
+            self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
+            self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
+
+    model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
+
+    assert (
+        model.tree_diagram()
+        == "StackedLinear\n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   ├── bias=f32[1,128]\n    │   └x─ notes='string'  \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        ├── bias=f32[1,1]\n        └x─ notes='string'      "
     )

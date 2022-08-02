@@ -6,29 +6,25 @@ from typing import Any
 
 from jax.tree_util import tree_leaves
 
-from .decorator_util import cached_property
 from .tree_util import _freeze_nodes, _unfreeze_nodes, is_treeclass, is_treeclass_leaf
 from .tree_viz import summary, tree_box, tree_diagram, tree_indent, tree_str
 
 
-def tree_fields(cls):
-
+def tree_fields(self):
     static, dynamic = dict(), dict()
     # register other variables defined in other context
     # if their value is an instance of treeclass
     # to avoid redefining them as dataclass fields.
 
-    static["__frozen_treeclass__"] = cls.frozen
-
     # register all dataclass fields
-    for fi in cls.__dataclass_fields__.values():
+    for fi in self.__dataclass_fields__.values():
         # field value is defined in class dict
-        if fi.name in cls.__dict__:
-            value = cls.__dict__[fi.name]
+        if fi.name in self.__dict__:
+            value = self.__dict__[fi.name]
 
         # field value is defined in field default
         elif fi.default is not MISSING:
-            cls.__dict__[fi.name] = fi.default
+            self.__dict__[fi.name] = fi.default
             value = fi.default
 
         else:
@@ -36,7 +32,7 @@ def tree_fields(cls):
             raise ValueError(f"field={fi.name} is not declared.")
 
         # if the parent is frozen, freeze all dataclass fields children
-        if cls.frozen:
+        if self.frozen:
             static[fi.name] = value
 
         else:
@@ -48,13 +44,13 @@ def tree_fields(cls):
             if excluded_by_type:
                 # add static type to metadata to class and its instance
                 static[fi.name] = value
-                updated_field = cls.__dataclass_fields__[fi.name]
+                updated_field = self.__dataclass_fields__[fi.name]
                 object.__setattr__(
                     updated_field,
                     "metadata",
                     {**updated_field.metadata, **{"static": True}},
                 )
-                cls.__dataclass_fields__[fi.name] = updated_field
+                self.__dataclass_fields__[fi.name] = updated_field
 
             elif excluded_by_meta:
                 static[fi.name] = value
@@ -65,14 +61,14 @@ def tree_fields(cls):
     return (dynamic, static)
 
 
-def register_treeclass_instance_vars(cls):
-    for var_name, var_value in cls.__dict__.items():
+def register_treeclass_instance_variables(self):
+    for var_name, var_value in self.__dict__.items():
         # check if a variable in self.__dict__ is treeclass
         # that is not defined in fields
         if (
             isinstance(var_name, str)
             and is_treeclass(var_value)
-            and var_name not in cls.__dataclass_fields__
+            and var_name not in self.__dataclass_fields__
         ):
 
             # create field
@@ -81,7 +77,7 @@ def register_treeclass_instance_vars(cls):
             setattr(field_value, "type", type(var_value))
 
             # register it to class
-            cls.__dataclass_fields__.update({var_name: field_value})
+            self.__dataclass_fields__.update({var_name: field_value})
 
 
 class treeBase:
@@ -131,19 +127,26 @@ class treeBase:
         """Flatten rule for `jax.tree_flatten`
 
         Returns:
-            Tuple of dynamic values and (dynamic keys,aux dict)
+            Tuple of dynamic values and (dynamic keys,static dict)
         """
-        dynamic, static = (
-            self.__cached_tree_fields__ if self.frozen else self.__tree_fields__
-        )
-        return (dynamic.values(), (dynamic.keys(), static))
+        # we need to transfer the state for the next instance through static
+        # we also need to retrieve it for the current instance
+
+        dynamic, static = self.__tree_fields__
+
+        cache = {"__frozen_treeclass__": self.frozen}
+
+        if hasattr(self, "__frozen_tree_fields__"):
+            cache = {**cache, **{"__frozen_tree_fields__": self.__frozen_tree_fields__}}
+
+        return (dynamic.values(), (dynamic.keys(), static, cache))
 
     @classmethod
-    def tree_unflatten(cls, aux, children):
+    def tree_unflatten(cls, treedef, children):
         """Unflatten rule for `jax.tree_unflatten`
 
         Args:
-            aux:
+            treedef:
                 Pytree definition
                 includes Dynamic nodes keys , static dictionary and frozen state
             children:
@@ -152,10 +155,16 @@ class treeBase:
         Returns:
             New class instance
         """
-        dynamic_vals, dynamic_keys = children, aux[0]
+        dynamic_vals, dynamic_keys = children, treedef[0]
+        static_keys, static_vals = treedef[1].keys(), treedef[1].values()
+        cache_keys, cache_vals = treedef[2].keys(), treedef[2].values()
 
-        static_keys, static_vals = aux[1].keys(), aux[1].values()
-        attrs = dict(zip((*dynamic_keys, *static_keys), (*dynamic_vals, *static_vals)))
+        attrs = dict(
+            zip(
+                (*dynamic_keys, *static_keys, *cache_keys),
+                (*dynamic_vals, *static_vals, *cache_vals),
+            )
+        )
 
         new_cls = cls.__new__(cls)
         for k, v in attrs.items():
@@ -173,7 +182,6 @@ class treeBase:
     def asdict(self):
         """Dictionary representation of dataclass_fields"""
         dynamic, static = self.__tree_fields__
-        static.pop("__frozen_treeclass__", None)
         return {**dynamic, **static}
 
     def register_node(
@@ -225,7 +233,7 @@ class treeBase:
 
 
 class explicitTreeBase:
-    """ "Nodes = dataclassfields"""
+    """ "Register  dataclass fields only"""
 
     @property
     def __tree_fields__(self):
@@ -234,15 +242,17 @@ class explicitTreeBase:
         Returns:
             Pair of dynamic and static dictionaries.
         """
-        return tree_fields(self)
+        if self.frozen:
+            if not hasattr(self, "__frozen_tree_fields__"):
+                object.__setattr__(self, "__frozen_tree_fields__", tree_fields(self))
 
-    @cached_property
-    def __cached_tree_fields__(self):
-        return self.__tree_fields__
+            return self.__frozen_tree_fields__
+
+        return tree_fields(self)
 
 
 class implicitTreeBase:
-    """Nodes = dataclassfields + treeclass instance variables"""
+    """Register dataclass fields and treeclass instance variables"""
 
     @property
     def __tree_fields__(self):
@@ -251,9 +261,13 @@ class implicitTreeBase:
         Returns:
             Pair of dynamic and static dictionaries.
         """
-        register_treeclass_instance_vars(self)
-        return tree_fields(self)
+        if self.frozen:
+            if not hasattr(self, "__frozen_tree_fields__"):
+                register_treeclass_instance_variables(self)
+                object.__setattr__(self, "__frozen_tree_fields__", tree_fields(self))
 
-    @cached_property
-    def __cached_tree_fields__(self):
-        return self.__tree_fields__
+            return self.__frozen_tree_fields__
+
+        else:
+            register_treeclass_instance_variables(self)
+            return tree_fields(self)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import math
+from dataclasses import field
 from typing import Sequence
 
 import jax
@@ -46,6 +47,7 @@ def _format_node(node):
             ("int", "i"),
             ("float", "f"),
             ("complex", "c"),
+            (",)", ")"),
             ("(", "["),
             (")", "]"),
             (" ", ""),
@@ -53,7 +55,6 @@ def _format_node(node):
 
         formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
 
-        # trunk-ignore
         for lhs, rhs in replace_tuple:
             formatted_string = formatted_string.replace(lhs, rhs)
         return formatted_string
@@ -289,6 +290,8 @@ def _summary_str(model, array=None, render: str = "string") -> str:
 
     ROW = [["Type ", "Param #", "Size ", "Config", "Output"]]
 
+    excluded_kw = ["__frozen_treeclass__", "__frozen_tree_fields__"]
+
     dynamic_count, static_count = 0, 0
     dynamic_size, static_size = 0, 0
 
@@ -314,7 +317,7 @@ def _summary_str(model, array=None, render: str = "string") -> str:
                 [
                     f"{k}={_format_node(v)}"
                     for k, v in leaf.__tree_fields__[1].items()
-                    if k != "__frozen_treeclass__"
+                    if k not in excluded_kw
                 ]
             )
 
@@ -367,6 +370,8 @@ def _summary_md(model, array=None) -> str:
         "</tr>\n"
     )
 
+    excluded_kw = ["__frozen_treeclass__", "__frozen_tree_fields__"]
+
     dynamic_count, static_count = 0, 0
     dynamic_size, static_size = 0, 0
 
@@ -392,7 +397,7 @@ def _summary_md(model, array=None) -> str:
                 [
                     f"{k}={_format_node(v)}"
                     for k, v in leaf.__tree_fields__[1].items()
-                    if k != "__frozen_treeclass__"
+                    if k not in excluded_kw
                 ]
             )
 
@@ -472,14 +477,14 @@ def tree_box(model, array=None):
         else:
             level_nodes = []
 
-            for field in model.__dataclass_fields__.values():
-                cur_node = model.__dict__[field.name]
+            for fi in model.__dataclass_fields__.values():
+                cur_node = model.__dict__[fi.name]
 
                 if is_treeclass(cur_node):
-                    level_nodes += [f"{recurse(cur_node,field.name)}"]
+                    level_nodes += [f"{recurse(cur_node,fi.name)}"]
 
                 else:
-                    level_nodes += [_vbox(f"{field.name}={_format_node(cur_node)}")]
+                    level_nodes += [_vbox(f"{fi.name}={_format_node(cur_node)}")]
 
             return _vbox(
                 f"{model.__class__.__name__}({parent_name})", "\n".join(level_nodes)
@@ -507,29 +512,41 @@ def tree_diagram(model):
             cur_children_count = len(model.__dataclass_fields__)
 
             for i, fi in enumerate(model.__dataclass_fields__.values()):
-                cur_node = model.__dict__[fi.name]
 
-                fmt += "\n" + "".join(
-                    [(("│" if lvl > 1 else "") + "\t") for lvl in parent_level_count]
-                )
+                if fi.repr:
+                    cur_node = model.__dict__[fi.name]
 
-                is_static = "static" in fi.metadata and fi.metadata["static"]
-                mark = "x" if is_static else ("#" if model.frozen else "─")
-
-                if is_treeclass(cur_node):
-
-                    layer_class_name = cur_node.__class__.__name__
-
-                    fmt += (
-                        f"├{mark}─ " if i < (cur_children_count - 1) else f"└{mark}─ "
-                    ) + f"{fi.name}={layer_class_name}"
-                    recurse(cur_node, parent_level_count + [cur_children_count - i])
-
-                else:
-                    fmt += (
-                        f"├{mark}─ " if i < (cur_children_count - 1) else f"└{mark}─ "
+                    fmt += "\n" + "".join(
+                        [
+                            (("│" if lvl > 1 else "") + "\t")
+                            for lvl in parent_level_count
+                        ]
                     )
-                    fmt += f"{fi.name}={_format_node(cur_node)}"
+
+                    is_static = "static" in fi.metadata and fi.metadata["static"]
+                    mark = "x" if is_static else ("#" if model.frozen else "─")
+
+                    if is_treeclass(cur_node):
+
+                        layer_class_name = cur_node.__class__.__name__
+
+                        fmt += (
+                            f"├{mark}─ "
+                            if i < (cur_children_count - 1)
+                            else f"└{mark}─ "
+                        ) + f"{fi.name}={layer_class_name}"
+                        recurse(cur_node, parent_level_count + [cur_children_count - i])
+
+                    else:
+                        fmt += (
+                            f"├{mark}─ "
+                            if i < (cur_children_count - 1)
+                            else f"└{mark}─ "
+                        )
+                        fmt += f"{fi.name}={_format_node(cur_node)}"
+                        recurse(cur_node, parent_level_count + [1])
+
+                elif not is_treeclass(model):
                     recurse(cur_node, parent_level_count + [1])
 
             fmt += "\t"
@@ -561,31 +578,36 @@ def tree_indent(model, width: int = 40) -> str:
         if is_treeclass(model):
             cur_children_count = len(model.__dataclass_fields__)
 
-            for i, field in enumerate(model.__dataclass_fields__.values()):
-                cur_node = model.__dict__[field.name]
-                # add newline by default
-                fmt += "\n" + "\t" * depth
+            for i, fi in enumerate(model.__dataclass_fields__.values()):
 
-                if is_treeclass(cur_node):
+                if fi.repr:
+                    cur_node = model.__dict__[fi.name]
 
-                    layer_class_name = f"{cur_node.__class__.__name__}"
-                    fmt += f"{field.name}={layer_class_name}" + "("
+                    # add newline by default
+                    fmt += ("\n" + "\t" * depth) if fi.repr else ""
 
-                    # capture children repr
-                    start_cursor = len(fmt)
-                    recurse(cur_node, depth + 1)
+                    if is_treeclass(cur_node):
+                        layer_class_name = f"{cur_node.__class__.__name__}"
+                        fmt += f"{fi.name}={layer_class_name}" + "("
 
-                    # format children repr width
-                    fmt = fmt[:start_cursor] + format_width(fmt[start_cursor:])
+                        # capture children repr
+                        start_cursor = len(fmt)
 
-                    fmt += ")" + ("," if i < (cur_children_count - 1) else "")
+                        recurse(cur_node, depth + 1)
 
-                else:
-                    fmt += f"{field.name}={_format_node(cur_node)}" + (
-                        "," if i < (cur_children_count - 1) else ("")
-                    )
+                        # format children repr width
+                        fmt = fmt[:start_cursor] + format_width(fmt[start_cursor:])
 
-                    recurse(cur_node, [1])
+                        fmt += ")" + ("," if i < (cur_children_count - 1) else "")
+
+                    else:
+                        fmt += f"{fi.name}={_format_node(cur_node)}" + (
+                            "," if i < (cur_children_count - 1) else ("")
+                        )
+                        recurse(cur_node, depth)
+
+                elif not is_treeclass(model):
+                    recurse(cur_node, depth)
 
     fmt = ""
     recurse(model, 1)
@@ -594,50 +616,64 @@ def tree_indent(model, width: int = 40) -> str:
     return fmt.expandtabs(2)
 
 
-def tree_str(model):
+def tree_str(model, width: int = 40) -> str:
     """Prertty print `treeclass_leaves`
 
     Returns:
         str: indented model leaves.
     """
 
-    def recurse(model, parent_level_count):
+    def format_width(string, width=width):
+        """strip newline/tab characters if less than max width"""
+        stripped_string = string.replace("\n", "").replace("\t", "")
+        children_length = len(stripped_string)
+        return string if children_length > width else stripped_string
+
+    def recurse(model, depth):
 
         nonlocal fmt
 
         if is_treeclass(model):
             cur_children_count = len(model.__dataclass_fields__)
 
-            newline = cur_children_count > 1
+            for i, fi in enumerate(model.__dataclass_fields__.values()):
 
-            for i, field in enumerate(model.__dataclass_fields__.values()):
-                cur_node = model.__dict__[field.name]
-                fmt += "\n" + "\t" * len(parent_level_count) if newline else ""
+                if fi.repr:
+                    cur_node = model.__dict__[fi.name]
 
-                if is_treeclass(cur_node):
-                    layer_class_name = f"{cur_node.__class__.__name__}"
-                    fmt += f"{field.name}={layer_class_name}" + "("
-                    recurse(cur_node, parent_level_count + [cur_children_count - i])
-                    fmt += ")"
+                    # add newline by default
+                    fmt += ("\n" + "\t" * depth) if fi.repr else ""
 
-                else:
-                    formatted_str = (
-                        "\t" * (len(parent_level_count) + 1) + f"{cur_node!s}"
-                    )
-                    formatted_str = ("\n" + "\t" * (len(parent_level_count) + 1)).join(
-                        formatted_str.split("\n")
-                    )
-                    fmt += (
-                        f"{field.name}=\n"
-                        + formatted_str
-                        + ("," if i < (cur_children_count - 1) else "")
-                    )
+                    if is_treeclass(cur_node):
+                        layer_class_name = f"{cur_node.__class__.__name__}"
+                        fmt += f"{fi.name}={layer_class_name}" + "("
 
-                    recurse(cur_node, parent_level_count + [1])
+                        # capture children repr
+                        start_cursor = len(fmt)
+
+                        recurse(cur_node, depth + 1)
+
+                        # format children repr width
+                        fmt = fmt[:start_cursor] + format_width(fmt[start_cursor:])
+
+                        fmt += ")" + ("," if i < (cur_children_count - 1) else "")
+
+                    else:
+                        cur_node_fmt = ("\n" + "\t" * (depth + 1)).join(
+                            f"{cur_node!s}".split("\n")
+                        )
+
+                        fmt += f"{fi.name}={cur_node_fmt}" + (
+                            "," if i < (cur_children_count - 1) else ("")
+                        )
+                        recurse(cur_node, depth)
+
+                elif not is_treeclass(model):
+                    recurse(cur_node, depth)
 
     fmt = ""
-    recurse(model, [1])
-    fmt = f"{(model.__class__.__name__)}({fmt})"
+    recurse(model, 1)
+    fmt = f"{(model.__class__.__name__)}({format_width(fmt,width)})"
 
     return fmt.expandtabs(2)
 
@@ -654,24 +690,30 @@ def _tree_mermaid(model):
         if is_treeclass(model):
             is_frozen = model.frozen
 
-            for i, field in enumerate(model.__dataclass_fields__.values()):
-                cur_node = model.__dict__[field.name]
-                cur_order = i
-                fmt += "\n"
+            for i, fi in enumerate(model.__dataclass_fields__.values()):
+                if fi.repr:
+                    cur_node = model.__dict__[fi.name]
+                    cur_order = i
+                    fmt += "\n"
 
-                if is_treeclass(cur_node):
-                    layer_class_name = cur_node.__class__.__name__
-                    cur = (cur_depth, cur_order)
-                    cur_id = node_id((*cur, prev_id))
-                    fmt += f"\tid{prev_id} --> id{cur_id}({field.name}\\n{layer_class_name})"
-                    recurse(cur_node, cur_depth + 1, cur_id)
+                    if is_treeclass(cur_node):
+                        layer_class_name = cur_node.__class__.__name__
+                        cur = (cur_depth, cur_order)
+                        cur_id = node_id((*cur, prev_id))
+                        fmt += f"\tid{prev_id} --> id{cur_id}({fi.name}\\n{layer_class_name})"
+                        recurse(cur_node, cur_depth + 1, cur_id)
 
-                else:
-                    cur = (cur_depth, cur_order)
-                    cur_id = node_id((*cur, prev_id))
-                    is_static = "static" in field.metadata and field.metadata["static"]
-                    connector = "--x" if is_static else ("-.-" if is_frozen else "---")
-                    fmt += f'\tid{prev_id} {connector} id{cur_id}["{field.name}\\n{_format_node(cur_node)}"]'
+                    else:
+                        cur = (cur_depth, cur_order)
+                        cur_id = node_id((*cur, prev_id))
+                        is_static = "static" in fi.metadata and fi.metadata["static"]
+                        connector = (
+                            "--x" if is_static else ("-.-" if is_frozen else "---")
+                        )
+                        fmt += f'\tid{prev_id} {connector} id{cur_id}["{fi.name}\\n{_format_node(cur_node)}"]'
+                        recurse(cur_node, cur_depth + 1, cur_id)
+
+                elif not is_treeclass(model):
                     recurse(cur_node, cur_depth + 1, cur_id)
 
     cur_id = node_id((0, 0, -1, 0))
