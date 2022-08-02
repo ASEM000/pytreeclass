@@ -9,7 +9,7 @@ from jax.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
 
 import pytreeclass
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import is_treeclass, is_treeclass_leaf_bool
+from pytreeclass.src.tree_util import is_treeclass_leaf_bool
 
 
 @dispatch(argnum=0)
@@ -45,7 +45,7 @@ def _(lhs, where, set_value):
 
 
 @dispatch(argnum=0)
-def _node_getter(lhs: Any, where: Any):
+def _node_at_getter(lhs: Any, where: Any):
     """Get pytree node  value
 
     Args:
@@ -57,22 +57,22 @@ def _node_getter(lhs: Any, where: Any):
     """
     # not jittable as size can changes
     # does not change pytreestructure ,
-    raise NotImplementedError("lhs type is unknown.")
+    raise NotImplementedError(f"lhs type ={type(lhs)} is not implemented.")
 
 
-@_node_getter.register(jnp.ndarray)
+@_node_at_getter.register(jnp.ndarray)
 def _(lhs, where):
     return lhs[jnp.where(where)]
 
 
-@_node_getter.register(pytreeclass.src.tree_base.treeBase)
+@_node_at_getter.register(pytreeclass.src.tree_base.treeBase)
 def _(lhs, where):
-    return tree_map(lambda x: _node_getter(x, where), lhs)
+    return tree_map(lambda x: _node_at_getter(x, where), lhs)
 
 
-@_node_getter.register(int)
-@_node_getter.register(float)
-@_node_getter.register(complex)
+@_node_at_getter.register(int)
+@_node_at_getter.register(float)
+@_node_at_getter.register(complex)
 def _(lhs, where):
     # set None to non-chosen non-array values
     return lhs if where else None
@@ -90,7 +90,7 @@ def _node_applier(lhs: Any, where: bool, func: Callable[[Any], Any]):
     Raises:
         NotImplementedError:
     """
-    raise NotImplementedError("lhs type is unknown.")
+    raise NotImplementedError(f"lhs type= {type(lhs)} is not implemented.")
 
 
 @_node_applier.register(jnp.ndarray)
@@ -110,7 +110,15 @@ def _(lhs, where, func):
     return func(lhs) if where else lhs
 
 
-def _non_boolean_indexing_getter(model, *where: tuple[str | int, ...]):
+@dispatch(argnum=1)
+def _at_getter(model, where):
+    raise NotImplementedError(f"Where type = {type(where)} is not implemented.")
+
+
+@_at_getter.register(int)
+@_at_getter.register(str)
+@_at_getter.register(tuple)
+def _(model, *where):
     modelCopy = copy.copy(model)
 
     for i, field in enumerate(model.__dataclass_fields__.values()):
@@ -120,12 +128,32 @@ def _non_boolean_indexing_getter(model, *where: tuple[str | int, ...]):
         excluded = excluded_by_type or excluded_by_meta
 
         if not excluded and not (i in where or field.name in where):
-            modelCopy.__dict__[field.name] = _node_getter(value, False)
+            modelCopy.__dict__[field.name] = _node_at_getter(value, False)
 
     return modelCopy
 
 
-def _non_boolean_indexing_setter(model, set_value, *where: tuple[str | int, ...]):
+@_at_getter.register(pytreeclass.src.tree_base.treeBase)
+def _(model, where):
+    lhs_leaves, lhs_treedef = model.flatten_leaves
+    where_leaves, where_treedef = tree_flatten(where)
+    lhs_leaves = [
+        _node_at_getter(lhs_leaf, where_leaf)
+        for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
+    ]
+
+    return tree_unflatten(lhs_treedef, lhs_leaves)
+
+
+@dispatch(argnum=2)
+def _at_setter(model, set_value, where):
+    raise NotImplementedError(f"Where type = {type(where)} is not implemented.")
+
+
+@_at_setter.register(int)
+@_at_setter.register(str)
+@_at_setter.register(tuple)
+def _(model, set_value, *where: tuple[str | int, ...]):
     modelCopy = copy.copy(model)
 
     for i, field in enumerate(model.__dataclass_fields__.values()):
@@ -140,7 +168,27 @@ def _non_boolean_indexing_setter(model, set_value, *where: tuple[str | int, ...]
     return modelCopy
 
 
-def _non_boolean_indexing_applier(model, set_value, *where: tuple[str | int, ...]):
+@_at_setter.register(pytreeclass.src.tree_base.treeBase)
+def _(model, set_value, where):
+    lhs_leaves, lhs_treedef = tree_flatten(model)
+    where_leaves, rhs_treedef = tree_flatten(where)
+    lhs_leaves = [
+        _node_setter(lhs_leaf, where_leaf, set_value,)
+        for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)  # fmt: skip
+    ]
+
+    return tree_unflatten(lhs_treedef, lhs_leaves)
+
+
+@dispatch(argnum=2)
+def _at_applier(model, set_value, where):
+    raise NotImplementedError(f"Where type = {type(where)} is not implemented.")
+
+
+@_at_applier.register(int)
+@_at_applier.register(str)
+@_at_applier.register(tuple)
+def _(model, set_value, *where):
     modelCopy = copy.copy(model)
 
     for i, field in enumerate(model.__dataclass_fields__.values()):
@@ -155,29 +203,8 @@ def _non_boolean_indexing_applier(model, set_value, *where: tuple[str | int, ...
     return modelCopy
 
 
-def _boolean_indexing_getter(model, where):
-    lhs_leaves, lhs_treedef = model.flatten_leaves
-    where_leaves, where_treedef = tree_flatten(where)
-    lhs_leaves = [
-        _node_getter(lhs_leaf, where_leaf)
-        for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
-    ]
-
-    return tree_unflatten(lhs_treedef, lhs_leaves)
-
-
-def _boolean_indexing_setter(model, set_value, where):
-    lhs_leaves, lhs_treedef = tree_flatten(model)
-    where_leaves, rhs_treedef = tree_flatten(where)
-    lhs_leaves = [
-        _node_setter(lhs_leaf, where_leaf, set_value=set_value,)
-        for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)  # fmt: skip
-    ]
-
-    return tree_unflatten(lhs_treedef, lhs_leaves)
-
-
-def _boolean_indexing_applier(model, func, where):
+@_at_applier.register(pytreeclass.src.tree_base.treeBase)
+def _(model, func, where):
     lhs_leaves, lhs_treedef = tree_flatten(model)
     where_leaves, rhs_treedef = tree_flatten(where)
     lhs_leaves = [
@@ -188,7 +215,7 @@ def _boolean_indexing_applier(model, func, where):
     return tree_unflatten(lhs_treedef, lhs_leaves)
 
 
-class _treeIndexerMethods:
+class treeIndexerMethods:
     def add(getter_setter_self, set_value):
         return getter_setter_self.apply(lambda x: x + set_value)
 
@@ -233,23 +260,21 @@ class treeIndexer:
                     for arg in tree_leaves(args)
                 ]
 
-                class _getterSetterIndexer(_treeIndexerMethods):
+                class getterSetterIndexer(treeIndexerMethods):
                     def get(getter_setter_self):
-                        return _non_boolean_indexing_getter(self, *flatten_args)
+                        return _at_getter(self, *flatten_args)
 
                     def set(getter_setter_self, set_value):
                         if self.frozen:
                             raise ValueError("Cannot set to a frozen treeclass.")
-                        return _non_boolean_indexing_setter(
-                            self, set_value, *flatten_args
-                        )
+                        return _at_setter(self, set_value, *flatten_args)
 
                     def apply(getter_setter_self, func):
                         if self.frozen:
                             raise ValueError("Cannot apply to a frozen treeclass.")
-                        return _non_boolean_indexing_applier(self, func, *flatten_args)
+                        return _at_applier(self, func, *flatten_args)
 
-                return _getterSetterIndexer()
+                return getterSetterIndexer()
 
             @__getitem__.register(type(self))
             def _(inner_self, arg):
@@ -258,21 +283,21 @@ class treeIndexer:
                 if not all(is_treeclass_leaf_bool(leaf) for leaf in tree_leaves(arg)):
                     raise ValueError("All model leaves must be boolean.")
 
-                class _getterSetterIndexer(_treeIndexerMethods):
+                class getterSetterIndexer(treeIndexerMethods):
                     def get(getter_setter_self):
-                        return _boolean_indexing_getter(self, arg)
+                        return _at_getter(self, arg)
 
                     def set(getter_setter_self, set_value):
                         if self.frozen:
                             raise ValueError("Cannot set to a frozen treeclass.")
-                        return _boolean_indexing_setter(self, set_value, arg)
+                        return _at_setter(self, set_value, arg)
 
                     def apply(getter_setter_self, func):
                         if self.frozen:
                             raise ValueError("Cannot apply to a frozen treeclass.")
-                        return _boolean_indexing_applier(self, func, arg)
+                        return _at_applier(self, func, arg)
 
-                return _getterSetterIndexer()
+                return getterSetterIndexer()
 
             @__getitem__.register(slice)
             def _(inner_self, arg):
