@@ -16,59 +16,6 @@ class Test:
     name: str
 
 
-def test_getter_by_param():
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
-
-    B = A.at["a"].get()
-    assert is_treeclass_equal(B, Test(10, None, None, None, "A"))
-
-    B = A.at["a", "b"].get()
-    assert is_treeclass_equal(B, Test(10, 20, None, None, "A"))
-
-    B = A.at[""].get()
-    assert is_treeclass_equal(B, Test(None, None, None, None, "A"))
-
-    B = A.at["a", "b", "c"].get()
-    assert is_treeclass_equal(B, Test(10, 20, 30, None, "A"))
-
-    B = A.at["a", "b", "c", "d"].get()
-    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-
-def test_getter_by_slice():
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
-
-    B = A.at[0:1].get()
-    assert is_treeclass_equal(B, Test(10, None, None, jnp.array([]), "A"))
-
-    B = A.at[0:2].get()
-    assert is_treeclass_equal(B, Test(10, 20, None, jnp.array([]), "A"))
-
-    B = A.at[:-1].get()
-    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-    B = A.at[:].get()
-    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-
-def test_getter_by_int():
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
-
-    B = A.at[0].get()
-    assert is_treeclass_equal(B, Test(10, None, None, None, "A"))
-
-    B = A.at[1].get()
-    assert is_treeclass_equal(B, Test(None, 20, None, None, "A"))
-
-    B = A.at[2].get()
-    assert is_treeclass_equal(B, Test(None, None, 30, None, "A"))
-
-    B = A.at[3].get()
-    assert is_treeclass_equal(
-        B, Test(None, None, None, jnp.array([1, 2, 3, 4, 5]), "A")
-    )
-
-
 def test_getter_by_pytree():
     @treeclass
     class level1:
@@ -106,46 +53,7 @@ def test_getter_by_pytree():
         B = A.at[A].get()
 
     # with pytest.raises(NotImplementedError):
-    B = A.at[0].get()
-
-
-def test_setter_by_param():
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
-
-    B = A.at["a"].set(0)
-    assert is_treeclass_equal(B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-    B = A.at["a", "b"].set(0)
-    assert is_treeclass_equal(B, Test(0, 0, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-    B = A.at["a", "b", "c"].set(0)
-    assert is_treeclass_equal(B, Test(0, 0, 0, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-
-def test_setter_by_slice():
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
-
-    B = A.at[0:1].set(0)
-    assert is_treeclass_equal(B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-    B = A.at[0:2].set(0)
-    assert is_treeclass_equal(B, Test(0, 0, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-    B = A.at[0:3].set(0)
-    assert is_treeclass_equal(B, Test(0, 0, 0, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-
-def test_setter_by_int():
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
-
-    B = A.at[0].set(0)
-    assert is_treeclass_equal(B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-    B = A.at[1].set(0)
-    assert is_treeclass_equal(B, Test(10, 0, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
-
-    B = A.at[2].set(0)
-    assert is_treeclass_equal(B, Test(10, 20, 0, jnp.array([1, 2, 3, 4, 5]), "A"))
+    # B = A.at[0].get()
 
 
 def test_setter_by_pytree():
@@ -179,7 +87,7 @@ def test_setter_by_pytree():
         B = A.at[A].set(0)
 
     # with pytest.raises(NotImplementedError):
-    B = A.at[0].set(0)
+    # B = A.at[0].set(0)
 
 
 def test_apply_and_its_derivatives():
@@ -240,76 +148,5 @@ def test_apply_and_its_derivatives():
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 4, jnp.array([1, 4, 3, 4, 5]))
-    rhs = init.at[init==2].multiply(2)
+    rhs = init.at[init == 2].multiply(2)
     assert is_treeclass_equal(lhs, rhs)
-
-    # by param
-
-    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].apply(lambda x: x**2)
-    assert is_treeclass_equal(lhs, rhs)
-
-    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].apply(lambda x: x + 1)
-    assert is_treeclass_equal(lhs, rhs)
-
-    lhs = A(20, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].apply(lambda x: (x + 1) * 10)
-    assert is_treeclass_equal(lhs, rhs)
-
-    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].add(1)
-    assert is_treeclass_equal(lhs, rhs)
-
-    lhs = A(0.5, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].divide(2.0)
-    assert is_treeclass_equal(lhs, rhs)
-
-    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].min(1)
-    assert is_treeclass_equal(lhs, rhs)
-
-    lhs = A(4, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].max(4)
-    assert is_treeclass_equal(lhs, rhs)
-
-    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].power(2)
-    assert is_treeclass_equal(lhs, rhs)
-
-    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at["a"].multiply(2)
-    assert is_treeclass_equal(lhs, rhs)
-
-    # by param
-    with pytest.raises(ValueError):
-        init.freeze().at["a"].apply(lambda x: x**2)
-
-    with pytest.raises(ValueError):
-        init.freeze().at["a", "b"].apply(lambda x: x**2)
-
-    with pytest.raises(ValueError):
-        init.freeze().at["a", "b"].set(0)
-
-    # by slice
-    with pytest.raises(ValueError):
-        init.freeze().at[:].apply(lambda x: x**2)
-
-    with pytest.raises(ValueError):
-        init.freeze().at[0].apply(lambda x: x**2)
-
-    # by pytree
-    with pytest.raises(ValueError):
-        init.freeze().at[init > 1].apply(lambda x: x**2)
-
-    with pytest.raises(ValueError):
-        init.freeze().at[init == 1].apply(lambda x: x**2)
-    
-    with pytest.raises(NotImplementedError):
-        init.at[1.0].get()
-
-    with pytest.raises(NotImplementedError):
-        init.at[1.0].set(0)
-
-    with pytest.raises(NotImplementedError):
-        init.at[1.0].apply(lambda x:x)
