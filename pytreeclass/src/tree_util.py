@@ -42,23 +42,19 @@ def is_treeclass_leaf(model):
 
 
 def is_treeclass_equal(lhs, rhs):
-    """assert all leaves are same . use jnp.all on jnp.arrays"""
+    """Assert if two treeclasses are equal"""
+    lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+    rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
 
-    def assert_node(lhs_node, rhs_node):
-        if isinstance(lhs_node, jnp.ndarray):
-            return jnp.all(lhs_node == rhs_node)
-        elif is_treeclass(lhs_node):
-            return jtu.tree_all(lhs_node, rhs_node)
+    def is_node_equal(lhs_node, rhs_node):
+        if isinstance(lhs_node, jnp.ndarray) and isinstance(rhs_node, jnp.ndarray):
+            return jnp.array_equal(lhs_node, rhs_node)
         else:
             return lhs_node == rhs_node
 
-    lhs_leaves = jtu.tree_leaves(lhs)
-    rhs_leaves = jtu.tree_leaves(rhs)
-
-    for lhs_node, rhs_node in zip(lhs_leaves, rhs_leaves):
-        if not assert_node(lhs_node, rhs_node):
-            return False
-    return True
+    return (lhs_treedef == rhs_treedef) and all(
+        [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
+    )
 
 
 def is_excluded(fld: dataclasses.field, instance: Any) -> bool:

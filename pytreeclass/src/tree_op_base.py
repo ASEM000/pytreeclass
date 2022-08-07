@@ -1,35 +1,142 @@
 from __future__ import annotations
 
+import copy
 import functools
 import operator as op
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
+import pytreeclass.src.tree_util as ptu
+from pytreeclass.src.decorator_util import dispatch
+
 
 def _append_math_op(func):
     """binary and unary magic operations"""
 
     @functools.wraps(func)
-    def call(self, rhs=None):
+    def wrapper(self, rhs=None):
+        @dispatch(argnum=1)
+        def inner_wrapper(self, rhs):
+            raise NotImplementedError((f"rhs of type {type(rhs)} is not implemented."))
 
-        if rhs is None:  # unary operation
+        @inner_wrapper.register(type(None))
+        def _(self, rhs):
             return jtu.tree_map(lambda x: func(x), self)
 
-        elif isinstance(rhs, (int, float, complex, bool)):  # binary operation
+        @inner_wrapper.register(int)
+        @inner_wrapper.register(float)
+        @inner_wrapper.register(complex)
+        @inner_wrapper.register(bool)
+        def _(self, rhs):
             return (
                 jtu.tree_map(lambda x: func(x, rhs), self) if rhs is not None else self
             )
 
-        elif isinstance(rhs, type(self)):  # class instance
+        @inner_wrapper.register(type(self))
+        def _(self, rhs):
             return jtu.tree_map(
                 lambda x, y: func(x, y) if y is not None else x, self, rhs
             )
 
-        else:
-            raise NotImplementedError(f"Found type(rhs) = {type(rhs)}")
+        return inner_wrapper(self, rhs)
 
-    return call
+    return wrapper
+
+
+def _append_math_aux(func):
+    """Append math operation with auxillary operations"""
+
+    def set_true(node, array_as_leaves: bool = True):
+        if isinstance(node, jnp.ndarray):
+            return jnp.ones_like(node).astype(jnp.bool_) if array_as_leaves else True
+        else:
+            return True
+
+    def set_false(node, array_as_leaves: bool = True):
+        if isinstance(node, jnp.ndarray):
+            return jnp.zeros_like(node).astype(jnp.bool_) if array_as_leaves else False
+        else:
+            return False
+
+    @functools.wraps(func)
+    def wrapper(self, rhs):
+        @dispatch(argnum=1)
+        def inner_wrapper(tree, where, **kwargs):
+            raise NotImplementedError(
+                f"where of type {type(where)} is not implemented."
+            )
+
+        @inner_wrapper.register(type(None))
+        def _(self, rhs):
+            return jtu.tree_map(lambda x: func(x), self)
+
+        @inner_wrapper.register(int)
+        @inner_wrapper.register(float)
+        @inner_wrapper.register(complex)
+        @inner_wrapper.register(bool)
+        def _(self, rhs):
+            return (
+                jtu.tree_map(lambda x: func(x, rhs), self) if rhs is not None else self
+            )
+
+        @inner_wrapper.register(type(self))
+        def _(self, rhs):
+            return jtu.tree_map(
+                lambda x, y: func(x, y) if y is not None else x, self, rhs
+            )
+
+        @inner_wrapper.register(str)
+        def _(tree, where, **kwargs):
+            tree_copy = copy.deepcopy(tree)
+
+            def recurse(tree, where, **kwargs):
+                for i, fld in enumerate(tree.__dataclass_fields__.values()):
+                    cur_node = tree.__dict__[fld.name]
+                    if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
+                        if fld.name in where:
+                            # whole branch is true
+                            tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
+                        else:
+                            recurse(cur_node, where, **kwargs)
+                    else:
+                        tree.__dict__[fld.name] = (
+                            set_true(cur_node)
+                            if (fld.name in where)
+                            else set_false(cur_node)
+                        )
+
+                return tree
+
+            return recurse(tree_copy, where, **kwargs)
+
+        @inner_wrapper.register(type)
+        def _(tree, where, **kwargs):
+            tree_copy = copy.deepcopy(tree)
+
+            def recurse(tree, where, **kwargs):
+                for i, fld in enumerate(tree.__dataclass_fields__.values()):
+                    cur_node = tree.__dict__[fld.name]
+
+                    if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
+                        if isinstance(cur_node, where):
+                            tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
+                        else:
+                            recurse(cur_node, where, **kwargs)
+                    else:
+                        tree.__dict__[fld.name] = (
+                            set_true(cur_node)
+                            if (isinstance(cur_node, where))
+                            else set_false(cur_node)
+                        )
+
+                return tree
+
+            return recurse(tree_copy, where, **kwargs)
+
+        return inner_wrapper(self, rhs)
+
+    return wrapper
 
 
 class treeOpBase:
@@ -37,7 +144,7 @@ class treeOpBase:
     __abs__ = _append_math_op(op.abs)
     __add__ = _append_math_op(op.add)
     __radd__ = _append_math_op(op.add)
-    __eq__ = _append_math_op(op.eq)
+    __eq__ = _append_math_aux(op.eq)
     __floordiv__ = _append_math_op(op.floordiv)
     __ge__ = _append_math_op(op.ge)
     __gt__ = _append_math_op(op.gt)
@@ -63,6 +170,12 @@ class treeOpBase:
 
     def __or__(self, rhs):
         def node_or(x, y):
-            return x if isinstance(x, jnp.ndarray) else (x or y)
+            if isinstance(x, jnp.ndarray):
+                # Treat jnp.array([]) as None
+                return (
+                    jnp.logical_or(x, y) if not jnp.array_equal(x, jnp.array([])) else y
+                )
+            else:
+                return x or y
 
         return jtu.tree_map(node_or, self, rhs, is_leaf=lambda x: x is None)
