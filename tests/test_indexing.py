@@ -52,8 +52,27 @@ def test_getter_by_pytree():
     with pytest.raises(ValueError):
         B = A.at[A].get()
 
-    # with pytest.raises(NotImplementedError):
-    # B = A.at[0].get()
+    with pytest.raises(NotImplementedError):
+        B = A.at[0].get()
+
+
+def test_getter_by_param():
+    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
+
+    B = A.at["a"].get()
+    assert is_treeclass_equal(B, Test(10, None, None, None, "A"))
+
+    B = A.at["a", "b"].get()
+    assert is_treeclass_equal(B, Test(10, 20, None, None, "A"))
+
+    B = A.at[""].get()
+    assert is_treeclass_equal(B, Test(None, None, None, None, "A"))
+
+    B = A.at["a", "b", "c"].get()
+    assert is_treeclass_equal(B, Test(10, 20, 30, None, "A"))
+
+    B = A.at["a", "b", "c", "d"].get()
+    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
 
 def test_setter_by_pytree():
@@ -86,8 +105,21 @@ def test_setter_by_pytree():
     with pytest.raises(ValueError):
         B = A.at[A].set(0)
 
-    # with pytest.raises(NotImplementedError):
-    # B = A.at[0].set(0)
+    with pytest.raises(NotImplementedError):
+        B = A.at[0].set(0)
+
+
+def test_setter_by_param():
+    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
+
+    B = A.at["a"].set(0)
+    assert is_treeclass_equal(B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+    B = A.at["a", "b"].set(0)
+    assert is_treeclass_equal(B, Test(0, 0, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+    B = A.at["a", "b", "c"].set(0)
+    assert is_treeclass_equal(B, Test(0, 0, 0, jnp.array([1, 2, 3, 4, 5]), "A"))
 
 
 def test_apply_and_its_derivatives():
@@ -150,3 +182,89 @@ def test_apply_and_its_derivatives():
     lhs = A(1, 4, jnp.array([1, 4, 3, 4, 5]))
     rhs = init.at[init == 2].multiply(2)
     assert is_treeclass_equal(lhs, rhs)
+
+    # by param
+
+    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].apply(lambda x: x**2)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].apply(lambda x: x + 1)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(20, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].apply(lambda x: (x + 1) * 10)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].add(1)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(0.5, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].divide(2.0)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].min(1)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(4, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].max(4)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].power(2)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
+    rhs = init.at["a"].multiply(2)
+    assert is_treeclass_equal(lhs, rhs)
+
+    # by param
+    with pytest.raises(ValueError):
+        init.freeze().at["a"].apply(lambda x: x**2)
+
+    with pytest.raises(ValueError):
+        init.freeze().at["a", "b"].apply(lambda x: x**2)
+
+    with pytest.raises(ValueError):
+        init.freeze().at["a", "b"].set(0)
+
+
+def test_reduce():
+    @treeclass
+    class A:
+        a: int
+        b: int
+        c: jnp.ndarray
+
+    init = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
+
+    lhs = 2 + 2 + 3 + 4 + 5
+    rhs = init.at[init > 1].reduce(lambda x, y: x + jnp.sum(y))
+    assert lhs == rhs
+
+    lhs = 3 + 4 + 5
+    rhs = init.at[init > 2].reduce(lambda x, y: x + jnp.sum(y))
+    assert lhs == rhs
+
+    lhs = 0
+    rhs = init.at[init > 100].reduce(lambda x, y: x + jnp.sum(y))
+    assert lhs == rhs
+
+    @treeclass
+    class B:
+        a: int
+        b: int
+        c: jnp.ndarray
+        d: tuple
+
+    init = B(1, 2, jnp.array([1, 2, 3, 4, 5]), (10, 20, 30))
+
+    lhs = 2 + 2 + 3 + 4 + 5 + 10 + 20 + 30
+    rhs = init.at[init > 1].reduce(lambda x, y: x + jnp.sum(y))
+    assert lhs == rhs
+
+    # with pytest.raises(TypeError):
+    print(init.at[init > 1].reduce(lambda x, y: x + jnp.sum(y)))
