@@ -14,7 +14,7 @@ from .tree_op_base import treeOpBase
 def treeclass(*args, **kwargs):
     """Class JAX  compaitable decorator for `dataclass`"""
 
-    def wrapper(cls, op: bool, field_only: bool):
+    def wrapper(cls, field_only: bool):
         user_defined_init = "__init__" in cls.__dict__
 
         dCls = dataclass(
@@ -31,7 +31,7 @@ def treeclass(*args, **kwargs):
         return jax.tree_util.register_pytree_node_class(new_cls)
 
     if len(args) == 1 and inspect.isclass(args[0]):
-        return wrapper(args[0], True, False)
+        return wrapper(args[0], False)
 
     elif len(args) == 0 and len(kwargs) > 0:
         field_only = kwargs["field_only"] if "field_only" in kwargs else False

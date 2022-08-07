@@ -74,18 +74,21 @@ def _(tree, where, **kwargs):
 @_at_get.register(str)
 @_at_get.register(tuple)
 def _(tree, *where, **kwargs):
-    tree_copy = copy.copy(tree)
+    tree_copy = copy.deepcopy(tree)
 
-    for i, fld in enumerate(tree.__dataclass_fields__.values()):
+    def recursive_get(tree, *where, **kwargs):
 
-        if not ptu.is_excluded(fld, tree_copy) and not (
-            i in where or fld.name in where
-        ):
-            tree_copy.__dict__[fld.name] = _node_get(
-                tree_copy.__dict__[fld.name], False, **kwargs
-            )
+        for i, fld in enumerate(tree.__dataclass_fields__.values()):
+            cur_node = tree.__dict__[fld.name]
+            if ptu.is_treeclass(cur_node):
+                recursive_get(cur_node, *where, **kwargs)
 
-    return tree_copy
+            if not ptu.is_excluded(fld, tree) and not (fld.name in where):
+                tree.__dict__[fld.name] = _node_get(cur_node, False, **kwargs)
+
+        return tree
+
+    return recursive_get(tree_copy, *where, **kwargs)
 
 
 """ Setter """
@@ -149,16 +152,21 @@ def _(tree, set_value, where, **kwargs):
 @_at_set.register(str)
 @_at_set.register(tuple)
 def _(tree, set_value, *where, **kwargs):
-    tree_copy = copy.copy(tree)
+    tree_copy = copy.deepcopy(tree)
 
-    for i, fld in enumerate(tree.__dataclass_fields__.values()):
+    def recursive_set(tree, *where, **kwargs):
 
-        if not ptu.is_excluded(fld, tree_copy) and (i in where or fld.name in where):
-            tree_copy.__dict__[fld.name] = _node_set(
-                tree_copy.__dict__[fld.name], True, set_value, **kwargs
-            )
+        for i, fld in enumerate(tree.__dataclass_fields__.values()):
+            cur_node = tree.__dict__[fld.name]
+            if ptu.is_treeclass(cur_node):
+                recursive_set(cur_node, *where, **kwargs)
 
-    return tree_copy
+            if not ptu.is_excluded(fld, tree) and (fld.name in where):
+                tree.__dict__[fld.name] = _node_set(cur_node, True, set_value, **kwargs)
+
+        return tree
+
+    return recursive_set(tree_copy, *where, **kwargs)
 
 
 """ Apply """
@@ -222,16 +230,21 @@ def _(tree, func, where, **kwargs):
 @_at_apply.register(str)
 @_at_apply.register(tuple)
 def _(tree, func, *where, **kwargs):
-    tree_copy = copy.copy(tree)
+    tree_copy = copy.deepcopy(tree)
 
-    for i, fld in enumerate(tree.__dataclass_fields__.values()):
+    def recursive_apply(tree, *where, **kwargs):
 
-        if not ptu.is_excluded(fld, tree_copy) and (i in where or fld.name in where):
-            tree_copy.__dict__[fld.name] = _node_apply(
-                tree_copy.__dict__[fld.name], True, func, **kwargs
-            )
+        for i, fld in enumerate(tree.__dataclass_fields__.values()):
+            cur_node = tree.__dict__[fld.name]
+            if ptu.is_treeclass(cur_node):
+                recursive_apply(cur_node, *where, **kwargs)
 
-    return tree_copy
+            if not ptu.is_excluded(fld, tree) and (fld.name in where):
+                tree.__dict__[fld.name] = _node_apply(cur_node, True, func, **kwargs)
+
+        return tree
+
+    return recursive_apply(tree_copy, *where, **kwargs)
 
 
 """ Reduce """

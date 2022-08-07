@@ -1,5 +1,4 @@
 import jax.numpy as jnp
-import pytest
 
 from pytreeclass import static_field, treeclass
 
@@ -81,10 +80,10 @@ def test_asdict():
 #     assert (A["a"] + 10 | A) == Test(20, 20, 30, "A")
 
 
-def test_op_false():
-    @treeclass(op=False)
-    class Test:
-        a: int
+# def test_op_false():
+#     @treeclass(op=False)
+#     class Test:
+#         a: int
 
-    with pytest.raises(TypeError):
-        Test(1) + Test(2)
+#     with pytest.raises(TypeError):
+#         Test(1) + Test(2)

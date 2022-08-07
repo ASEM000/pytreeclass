@@ -74,6 +74,31 @@ def test_getter_by_param():
     B = A.at["a", "b", "c", "d"].get()
     assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
+    @treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @treeclass
+    class L1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @treeclass
+    class L2:
+        a: int = 10
+        b: int = 20
+        c: int = 30
+        d: L1 = L1()
+
+    t = L2()
+    lhs = t.at["a"].get()
+    rhs = L2(10, None, None, L1(1, None, None, L0(1, None, None)))
+    assert is_treeclass_equal(lhs, rhs)
+
 
 def test_setter_by_pytree():
     @treeclass
@@ -107,6 +132,31 @@ def test_setter_by_pytree():
 
     with pytest.raises(NotImplementedError):
         B = A.at[0].set(0)
+
+    @treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @treeclass
+    class L1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @treeclass
+    class L2:
+        a: int = 10
+        b: int = 20
+        c: int = 30
+        d: L1 = L1()
+
+    t = L2()
+    lhs = t.at["a"].set(100)
+    rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
+    assert is_treeclass_equal(lhs, rhs)
 
 
 def test_setter_by_param():
@@ -142,6 +192,31 @@ def test_apply_and_its_derivatives():
 
     lhs = A(20, 30, jnp.array([20, 30, 40, 50, 60]))
     rhs = init.at[init == init].apply(lambda x: (x + 1) * 10)
+    assert is_treeclass_equal(lhs, rhs)
+
+    @treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @treeclass
+    class L1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @treeclass
+    class L2:
+        a: int = 10
+        b: int = 20
+        c: int = 30
+        d: L1 = L1()
+
+    t = L2()
+    lhs = t.at["a"].apply(lambda _: 100)
+    rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
