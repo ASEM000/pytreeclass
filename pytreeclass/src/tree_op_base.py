@@ -93,22 +93,21 @@ def _append_math_op_aux(func):
 
             def recurse(tree, where, **kwargs):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
+                    
                     cur_node = tree.__dict__[fld.name]
                     if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
-                        if fld.name in where:
-                            # whole branch is true
+                        if fld.name ==  where:                            
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
                             recurse(cur_node, where, **kwargs)
                     else:
                         tree.__dict__[fld.name] = (
                             set_true(cur_node)
-                            if (fld.name in where)
+                            if (fld.name == where)
                             else set_false(cur_node)
                         )
-
                 return tree
-
+                
             return recurse(tree_copy, where, **kwargs)
 
         @inner_wrapper.register(type)
