@@ -659,7 +659,9 @@ def tree_str(model, width: int = 40) -> str:
                         fmt += ")" + ("," if i < (cur_children_count - 1) else "")
 
                     else:
-                        cur_node_fmt = ("\n" + "\t" * (depth + 1)).join(
+                        multiline =  "\n" in f"{cur_node!s}" 
+                        cur_node_fmt =("\n" + "\t" * (depth + 1)) if multiline else ""
+                        cur_node_fmt += ("\n" + "\t" * (depth + 1)).join(
                             f"{cur_node!s}".split("\n")
                         )
 
