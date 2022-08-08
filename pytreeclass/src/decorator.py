@@ -14,7 +14,7 @@ from .tree_op_base import treeOpBase
 def treeclass(*args, **kwargs):
     """Class JAX  compaitable decorator for `dataclass`"""
 
-    def wrapper(cls, op: bool, field_only: bool):
+    def wrapper(cls, field_only: bool):
         user_defined_init = "__init__" in cls.__dict__
 
         dCls = dataclass(
@@ -23,18 +23,16 @@ def treeclass(*args, **kwargs):
 
         base_classes = (dCls, treeBase)
 
-        if op:
-            base_classes += (treeOpBase, treeIndexer)
-            base_classes += (explicitTreeBase,) if field_only else (implicitTreeBase,)
+        base_classes += (treeOpBase, treeIndexer)
+        base_classes += (explicitTreeBase,) if field_only else (implicitTreeBase,)
 
-        newCls = type(cls.__name__, base_classes, {})
+        new_cls = type(cls.__name__, base_classes, {})
 
-        return jax.tree_util.register_pytree_node_class(newCls)
+        return jax.tree_util.register_pytree_node_class(new_cls)
 
     if len(args) == 1 and inspect.isclass(args[0]):
-        return wrapper(args[0], True, False)
+        return wrapper(args[0], False)
 
     elif len(args) == 0 and len(kwargs) > 0:
-        op = kwargs["op"] if "op" in kwargs else True
         field_only = kwargs["field_only"] if "field_only" in kwargs else False
-        return functools.partial(wrapper, op=op, field_only=field_only)
+        return functools.partial(wrapper, field_only=field_only)

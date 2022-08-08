@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import dataclasses
 import sys
 from dataclasses import field
+from typing import Any
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 import numpy as np
-from jax.tree_util import tree_all, tree_leaves, tree_reduce
 
 
 def static_field(**kwargs):
@@ -40,28 +42,37 @@ def is_treeclass_leaf(model):
 
 
 def is_treeclass_equal(lhs, rhs):
-    """assert all leaves are same . use jnp.all on jnp.arrays"""
+    """Assert if two treeclasses are equal"""
+    lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+    rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
 
-    def assert_node(lhs_node, rhs_node):
-        if isinstance(lhs_node, jnp.ndarray):
-            return jnp.all(lhs_node == rhs_node)
-        elif is_treeclass(lhs_node):
-            return tree_all(lhs_node, rhs_node)
+    def is_node_equal(lhs_node, rhs_node):
+        if isinstance(lhs_node, jnp.ndarray) and isinstance(rhs_node, jnp.ndarray):
+            return jnp.array_equal(lhs_node, rhs_node)
         else:
             return lhs_node == rhs_node
 
-    lhs_leaves = tree_leaves(lhs)
-    rhs_leaves = tree_leaves(rhs)
+    return (lhs_treedef == rhs_treedef) and all(
+        [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
+    )
 
-    for lhs_node, rhs_node in zip(lhs_leaves, rhs_leaves):
-        if not assert_node(lhs_node, rhs_node):
-            return False
-    return True
+
+def is_excluded(fld: dataclasses.field, instance: Any) -> bool:
+    """Check if a field is excluded
+
+    Returns:
+        bool: boolean if the field should be excluded or not.
+    """
+    val = instance.__dict__[fld.name]
+    excluded_types = (str,)  # automatically excluded str from jax computations
+    excluded_by_type = isinstance(val, excluded_types)
+    excluded_by_meta = ("static" in fld.metadata) and fld.metadata["static"] is True  # fmt: skip
+    return excluded_by_type or excluded_by_meta
 
 
 def sequential_model_shape_eval(model, array):
     """Evaluate shape propagation of assumed sequential modules"""
-    leaves = tree_leaves(model, is_treeclass_leaf)
+    leaves = jtu.tree_leaves(model, is_treeclass_leaf)
     shape = [jax.eval_shape(lambda x: x, array)]
     for leave in leaves:
         shape += [jax.eval_shape(leave, shape[-1])]
@@ -108,7 +119,7 @@ def _reduce_count_and_size(leaf):
         rhs_count, rhs_size = _node_count_and_size(node)
         return (lhs_count + rhs_count, lhs_size + rhs_size)
 
-    return tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
+    return jtu.tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
 
 
 def _freeze_nodes(model):
