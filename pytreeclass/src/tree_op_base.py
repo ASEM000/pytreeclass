@@ -44,7 +44,7 @@ def _append_math_op(func):
     return wrapper
 
 
-def _append_math_aux(func):
+def _append_math_op_aux(func):
     """Append math operation with auxillary operations"""
 
     def set_true(node, array_as_leaves: bool = True):
@@ -88,6 +88,7 @@ def _append_math_aux(func):
 
         @inner_wrapper.register(str)
         def _(tree, where, **kwargs):
+            """Filter by field name"""
             tree_copy = copy.deepcopy(tree)
 
             def recurse(tree, where, **kwargs):
@@ -112,6 +113,7 @@ def _append_math_aux(func):
 
         @inner_wrapper.register(type)
         def _(tree, where, **kwargs):
+            """Filter by type"""
             tree_copy = copy.deepcopy(tree)
 
             def recurse(tree, where, **kwargs):
@@ -134,6 +136,34 @@ def _append_math_aux(func):
 
             return recurse(tree_copy, where, **kwargs)
 
+        @inner_wrapper.register(dict)
+        def _(tree, where, **kwargs):
+            """Filter by metadata"""
+            tree_copy = copy.deepcopy(tree)
+            kws, vals = zip(*where.items())
+
+            in_meta = lambda fld: all(kw in fld.metadata for kw in kws) and all(
+                fld.metadata[kw] == val for kw, val in zip(kws, vals)
+            )
+
+            def recurse(tree, where, **kwargs):
+                for i, fld in enumerate(tree.__dataclass_fields__.values()):
+                    cur_node = tree.__dict__[fld.name]
+
+                    if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
+                        if in_meta(fld):
+                            tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
+                        else:
+                            recurse(cur_node, where, **kwargs)
+                    else:
+                        tree.__dict__[fld.name] = (
+                            set_true(cur_node) if in_meta(fld) else set_false(cur_node)
+                        )
+
+                return tree
+
+            return recurse(tree_copy, where, **kwargs)
+
         return inner_wrapper(self, rhs)
 
     return wrapper
@@ -144,7 +174,7 @@ class treeOpBase:
     __abs__ = _append_math_op(op.abs)
     __add__ = _append_math_op(op.add)
     __radd__ = _append_math_op(op.add)
-    __eq__ = _append_math_aux(op.eq)
+    __eq__ = _append_math_op_aux(op.eq)
     __floordiv__ = _append_math_op(op.floordiv)
     __ge__ = _append_math_op(op.ge)
     __gt__ = _append_math_op(op.gt)

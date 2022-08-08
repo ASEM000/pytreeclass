@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import field
+
 import jax.numpy as jnp
 import pytest
 
@@ -16,7 +18,7 @@ class Test:
     name: str
 
 
-def test_getter_by_pytree():
+def test_getter_by_val():
     @treeclass
     class level1:
         a: int
@@ -102,7 +104,66 @@ def test_getter_by_param():
     assert is_treeclass_equal(lhs, rhs)
 
 
-def test_setter_by_pytree():
+def test_getter_by_metadata():
+    @treeclass
+    class Test:
+        a: float = field(metadata={"name": "a", "unit": "m"})
+        b: float = field(metadata={"name": "b", "unit": "m"})
+        c: float = field(metadata={"name": "c", "unit": "m"})
+        d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
+        name: str
+
+    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
+
+    B = A.at[A == {"name": "a"}].get(array_as_leaves=False)
+    assert is_treeclass_equal(B, Test(10, None, None, None, "A"))
+
+    B = A.at[(A == {"name": "a"}) | (A == {"name": "b"})].get(array_as_leaves=False)
+    assert is_treeclass_equal(B, Test(10, 20, None, None, "A"))
+
+    B = A.at[A == {"": ""}].get(array_as_leaves=False)
+    assert is_treeclass_equal(B, Test(None, None, None, None, "A"))
+
+    B = A.at[(A == {"name": "a"}) | (A == {"name": "b"}) | (A == {"name": "c"})].get(
+        array_as_leaves=False
+    )
+    assert is_treeclass_equal(B, Test(10, 20, 30, None, "A"))
+
+    B = A.at[
+        (A == {"name": "a"})
+        | (A == {"name": "b"})
+        | (A == {"name": "c"})
+        | (A == {"name": "d"})
+    ].get(array_as_leaves=False)
+    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
+
+    @treeclass
+    class L0:
+        a: int = field(default=1, metadata={"name": "a", "unit": "m"})
+        b: int = 2
+        c: int = 3
+
+    @treeclass
+    class L1:
+        a: int = field(default=1, metadata={"name": "a", "unit": "m"})
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @treeclass
+    class L2:
+        a: int = field(default=10, metadata={"name": "a", "unit": "m"})
+        b: int = 20
+        c: int = 30
+        d: L1 = L1()
+
+    t = L2()
+    lhs = t.at[t == {"name": "a"}].get()
+    rhs = L2(10, None, None, L1(1, None, None, L0(1, None, None)))
+    assert is_treeclass_equal(lhs, rhs)
+
+
+def test_setter_by_val():
     @treeclass
     class level1:
         a: int
