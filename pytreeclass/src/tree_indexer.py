@@ -37,10 +37,6 @@ def _at_get(tree, where, **kwargs):
             else (lhs if jnp.all(where) else None)
         )
 
-    @_node_get.register(pytreeclass.src.tree_base.treeBase)
-    def _(lhs, where, **kwargs):
-        return jtu.tree_map(lambda x: _node_get(x, where), lhs, **kwargs)
-
     @_node_get.register(int)
     @_node_get.register(float)
     @_node_get.register(complex)
@@ -99,10 +95,6 @@ def _at_set(tree, set_value, where, **kwargs):
             else (set_value if jnp.all(where) else lhs)  # Not JITable
         )
 
-    @_node_set.register(pytreeclass.src.tree_base.treeBase)
-    def _(lhs, where, set_value, **kwargs):
-        return jtu.tree_map(lambda x: _node_set(x, where, set_value, **kwargs), lhs)
-
     @_node_set.register(int)
     @_node_set.register(float)
     @_node_set.register(complex)
@@ -159,10 +151,6 @@ def _at_apply(tree, func, where, **kwargs):
             if array_as_leaves
             else (func(lhs) if jnp.all(where) else lhs)
         )
-
-    @_node_apply.register(pytreeclass.src.tree_base.treeBase)
-    def _(lhs, where, func, **kwargs):
-        return jtu.tree_map(lambda x: _node_apply(x, where, func, **kwargs), lhs)
 
     @_node_apply.register(int)
     @_node_apply.register(float)
@@ -233,7 +221,7 @@ class treeIndexerMethods:
         return getter_setter_self.reduce(lambda x, y: x + jnp.sum(y))
 
     def reduce_product(getter_setter_self):
-        return getter_setter_self.reduce(lambda x, y: x * jnp.prod(y), 1)
+        return getter_setter_self.reduce(lambda x, y: x * jnp.prod(y), initializer=1)
 
     def reduce_max(getter_setter_self):
         return getter_setter_self.reduce(
@@ -282,7 +270,3 @@ class treeIndexer:
                 return getterSetterIndexer()
 
         return indexer()
-
-    def __getitem__(self, *args):
-        """alias for .at[].get()"""
-        return self.at.__getitem__(*args).get()

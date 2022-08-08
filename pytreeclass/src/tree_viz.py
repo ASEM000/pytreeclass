@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ctypes
 import math
-from dataclasses import field
 from typing import Sequence
 
 import jax
@@ -659,8 +658,8 @@ def tree_str(model, width: int = 40) -> str:
                         fmt += ")" + ("," if i < (cur_children_count - 1) else "")
 
                     else:
-                        multiline =  "\n" in f"{cur_node!s}" 
-                        cur_node_fmt =("\n" + "\t" * (depth + 1)) if multiline else ""
+                        multiline = "\n" in f"{cur_node!s}"
+                        cur_node_fmt = ("\n" + "\t" * (depth + 1)) if multiline else ""
                         cur_node_fmt += ("\n" + "\t" * (depth + 1)).join(
                             f"{cur_node!s}".split("\n")
                         )
