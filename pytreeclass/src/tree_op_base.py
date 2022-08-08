@@ -44,8 +44,9 @@ def _append_math_op(func):
     return wrapper
 
 
-def _append_math_op_aux(func):
-    """Append math operation with auxillary operations"""
+def _append_math_eq_ne(func):
+    """Append eq/ne operations"""
+    assert func in [op.eq, op.ne], f"func={func} is not implemented."
 
     def set_true(node, array_as_leaves: bool = True):
         if isinstance(node, jnp.ndarray):
@@ -66,10 +67,6 @@ def _append_math_op_aux(func):
             raise NotImplementedError(
                 f"where of type {type(where)} is not implemented."
             )
-
-        @inner_wrapper.register(type(None))
-        def _(self, rhs):
-            return jtu.tree_map(lambda x: func(x), self)
 
         @inner_wrapper.register(int)
         @inner_wrapper.register(float)
@@ -96,14 +93,14 @@ def _append_math_op_aux(func):
 
                     cur_node = tree.__dict__[fld.name]
                     if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
-                        if fld.name == where:
+                        if func(fld.name, where):
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
                             recurse(cur_node, where, **kwargs)
                     else:
                         tree.__dict__[fld.name] = (
                             set_true(cur_node)
-                            if (fld.name == where)
+                            if (func(fld.name, where))
                             else set_false(cur_node)
                         )
                 return tree
@@ -115,19 +112,25 @@ def _append_math_op_aux(func):
             """Filter by type"""
             tree_copy = copy.deepcopy(tree)
 
+            def instance_func(lhs, rhs):
+                if func == op.eq:
+                    return isinstance(lhs, rhs)
+                elif func == op.ne:
+                    return not isinstance(lhs, rhs)
+
             def recurse(tree, where, **kwargs):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
                     cur_node = tree.__dict__[fld.name]
 
                     if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
-                        if isinstance(cur_node, where):
+                        if instance_func(cur_node, where):
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
                             recurse(cur_node, where, **kwargs)
                     else:
                         tree.__dict__[fld.name] = (
                             set_true(cur_node)
-                            if (isinstance(cur_node, where))
+                            if (instance_func(cur_node, where))
                             else set_false(cur_node)
                         )
 
@@ -142,7 +145,7 @@ def _append_math_op_aux(func):
             kws, vals = zip(*where.items())
 
             in_meta = lambda fld: all(kw in fld.metadata for kw in kws) and all(
-                fld.metadata[kw] == val for kw, val in zip(kws, vals)
+                func(fld.metadata[kw], val) for kw, val in zip(kws, vals)
             )
 
             def recurse(tree, where, **kwargs):
@@ -173,7 +176,7 @@ class treeOpBase:
     __abs__ = _append_math_op(op.abs)
     __add__ = _append_math_op(op.add)
     __radd__ = _append_math_op(op.add)
-    __eq__ = _append_math_op_aux(op.eq)
+    __eq__ = _append_math_eq_ne(op.eq)
     __floordiv__ = _append_math_op(op.floordiv)
     __ge__ = _append_math_op(op.ge)
     __gt__ = _append_math_op(op.gt)
@@ -186,7 +189,7 @@ class treeOpBase:
     __mod__ = _append_math_op(op.mod)
     __mul__ = _append_math_op(op.mul)
     __rmul__ = _append_math_op(op.mul)
-    __ne__ = _append_math_op(op.ne)
+    __ne__ = _append_math_eq_ne(op.ne)
     __neg__ = _append_math_op(op.neg)
     __not__ = _append_math_op(op.not_)
     __pos__ = _append_math_op(op.pos)

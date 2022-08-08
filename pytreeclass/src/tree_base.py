@@ -177,7 +177,7 @@ class treeBase:
         return jtu.tree_leaves(self, is_treeclass_leaf)
 
     def __hash__(self):
-        return hash(tuple(*self.flatten_leaves))
+        return hash(tuple(*jtu.tree_flatten(self)))
 
     def asdict(self):
         """Dictionary representation of dataclass_fields"""
