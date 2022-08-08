@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import field
 
+import jax
 import jax.numpy as jnp
 import pytest
 
@@ -102,6 +103,15 @@ def test_getter_by_param():
     lhs = t.at[t == "a"].get()
     rhs = L2(10, None, None, L1(1, None, None, L0(1, None, None)))
     assert is_treeclass_equal(lhs, rhs)
+
+    with pytest.raises(NotImplementedError):
+        t.at["s"].get()
+
+    with pytest.raises(NotImplementedError):
+        t.at["s"].set(100)
+
+    with pytest.raises(NotImplementedError):
+        t.at["s"].apply(lambda _: 100)
 
 
 def test_getter_by_metadata():
@@ -430,7 +440,6 @@ def test_apply_and_its_derivatives():
     with pytest.raises(ValueError):
         init.freeze().at[(init == "a") | (A == "b")].set(0)
 
-
     @treeclass
     class Test:
         a: float = field(metadata={"name": "a", "unit": "m"})
@@ -441,7 +450,7 @@ def test_apply_and_its_derivatives():
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
 
-    B = A.at[A == {"name": "a"}].apply(lambda _:100, array_as_leaves=False)
+    B = A.at[A == {"name": "a"}].apply(lambda _: 100, array_as_leaves=False)
     assert is_treeclass_equal(B, Test(100, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
     B = A.at[(A == {"name": "a"}) | (A == {"name": "b"})].set(
@@ -449,7 +458,7 @@ def test_apply_and_its_derivatives():
     )
     assert is_treeclass_equal(B, Test(100, 100, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
-    B = A.at[A == {"": ""}].apply(lambda _:100, array_as_leaves=False)
+    B = A.at[A == {"": ""}].apply(lambda _: 100, array_as_leaves=False)
     assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
     B = A.at[(A == {"name": "a"}) | (A == {"name": "b"}) | (A == {"name": "c"})].set(
@@ -462,7 +471,7 @@ def test_apply_and_its_derivatives():
         | (A == {"name": "b"})
         | (A == {"name": "c"})
         | (A == {"name": "d"})
-    ].apply(lambda _:100, array_as_leaves=False)
+    ].apply(lambda _: 100, array_as_leaves=False)
     assert is_treeclass_equal(B, Test(100, 100, 100, 100, "A"))
 
     @treeclass
@@ -486,7 +495,7 @@ def test_apply_and_its_derivatives():
         d: L1 = L1()
 
     t = L2()
-    lhs = t.at[t == {"name": "a"}].apply(lambda _:100)
+    lhs = t.at[t == {"name": "a"}].apply(lambda _: 100)
     rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
     assert is_treeclass_equal(lhs, rhs)
 
@@ -525,5 +534,59 @@ def test_reduce():
     rhs = init.at[init > 1].reduce(lambda x, y: x + jnp.sum(y))
     assert lhs == rhs
 
-    # with pytest.raises(TypeError):
-    print(init.at[init > 1].reduce(lambda x, y: x + jnp.sum(y)))
+    with pytest.raises(AssertionError):
+        init.at[init].reduce(lambda x, y: x + jnp.sum(y))
+
+
+def test_reduce_and_its_derivatives():
+    @treeclass
+    class Linear:
+        weight: jnp.ndarray
+        bias: jnp.ndarray
+
+        def __init__(self, key, in_dim, out_dim):
+            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
+                2 / in_dim
+            )
+            self.bias = jnp.ones((1, out_dim))
+
+        def __call__(self, x):
+            return x @ self.weight + self.bias
+
+    @treeclass
+    class StackedLinear:
+        l1: Linear = field(metadata={"description": "First layer"})
+        l2: Linear = field(metadata={"description": "Second layer"})
+
+        def __init__(self, key, in_dim, out_dim, hidden_dim):
+            keys = jax.random.split(key, 3)
+
+            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
+            self.l2 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
+
+        def __call__(self, x):
+            x = self.l1(x)
+            x = jax.nn.tanh(x)
+            x = self.l2(x)
+
+            return x
+
+    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=5, key=jax.random.PRNGKey(0))
+
+    assert (model.at[model > 0].reduce_min()) == 0.98507565
+    assert (model.at[model > 0].reduce_max()) == 1.3969219
+    assert (model.at[model > 0].reduce_sum()) == 10.6970625
+    assert (model.at[model > 0].reduce_product()) == 1.8088213
+
+    assert (model.at[model == "l1"].reduce_sum()) == 2.8428133
+    assert (model.at[model == "l1"].reduce_product()) == -3.4602268
+
+    assert (model.at[model == Linear].reduce_min()) == -2.8383057
+    assert (model.at[model == Linear].reduce_max()) == 1.3969219
+    assert (model.at[model == Linear].reduce_sum()) == 3.3538322
+    assert (model.at[model == Linear].reduce_product()) == 0.84782064
+
+    assert (model.at[model == jnp.ndarray].reduce_min()) == -2.8383057
+    assert (model.at[model == jnp.ndarray].reduce_max()) == 1.3969219
+    assert (model.at[model == jnp.ndarray].reduce_sum()) == 3.3538322
+    assert (model.at[model == jnp.ndarray].reduce_product()) == 0.84782064
