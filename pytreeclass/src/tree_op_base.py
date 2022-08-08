@@ -199,11 +199,15 @@ class treeOpBase:
 
     def __or__(self, rhs):
         def node_or(x, y):
-            if isinstance(x, jnp.ndarray):
-                # Treat jnp.array([]) as None
-                return (
-                    jnp.logical_or(x, y) if not jnp.array_equal(x, jnp.array([])) else y
-                )
+            if isinstance(x, jnp.ndarray) and isinstance(y, jnp.ndarray):
+                if x.shape == y.shape:
+                    return jnp.logical_or(x, y)
+                elif jnp.array_equal(x, jnp.array([])):
+                    return y
+                elif jnp.array_equal(y, jnp.array([])):
+                    return x
+                else:
+                    raise ValueError("Cannot or arrays of different shapes")
             else:
                 return x or y
 
