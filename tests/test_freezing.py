@@ -235,3 +235,7 @@ def test_freezing_unfreezing():
 
     with pytest.raises(ValueError):
         t.freeze().a = 1
+
+    t.unfreeze().a = 1
+
+    hash(t)
