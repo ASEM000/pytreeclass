@@ -48,6 +48,12 @@ def _append_math_eq_ne(func):
     """Append eq/ne operations"""
     assert func in [op.eq, op.ne], f"func={func} is not implemented."
 
+    def node_not(node):
+        if isinstance(node, jnp.ndarray):
+            return jnp.logical_not(node)
+        else:
+            return not node
+
     def set_true(node, array_as_leaves: bool = True):
         if isinstance(node, jnp.ndarray):
             return jnp.ones_like(node).astype(jnp.bool_) if array_as_leaves else True
@@ -93,14 +99,14 @@ def _append_math_eq_ne(func):
 
                     cur_node = tree.__dict__[fld.name]
                     if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
-                        if func(fld.name, where):
+                        if fld.name == where:
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
                             recurse(cur_node, where, **kwargs)
                     else:
                         tree.__dict__[fld.name] = (
                             set_true(cur_node)
-                            if (func(fld.name, where))
+                            if ((fld.name == where))
                             else set_false(cur_node)
                         )
                 return tree
@@ -112,25 +118,19 @@ def _append_math_eq_ne(func):
             """Filter by type"""
             tree_copy = copy.deepcopy(tree)
 
-            def instance_func(lhs, rhs):
-                if func == op.eq:
-                    return isinstance(lhs, rhs)
-                elif func == op.ne:
-                    return not isinstance(lhs, rhs)
-
             def recurse(tree, where, **kwargs):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
                     cur_node = tree.__dict__[fld.name]
 
                     if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
-                        if instance_func(cur_node, where):
+                        if isinstance(cur_node, where):
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
                             recurse(cur_node, where, **kwargs)
                     else:
                         tree.__dict__[fld.name] = (
                             set_true(cur_node)
-                            if (instance_func(cur_node, where))
+                            if (isinstance(cur_node, where))
                             else set_false(cur_node)
                         )
 
@@ -142,31 +142,37 @@ def _append_math_eq_ne(func):
         def _(tree, where, **kwargs):
             """Filter by metadata"""
             tree_copy = copy.deepcopy(tree)
-            kws, vals = zip(*where.items())
 
-            in_meta = lambda fld: all(kw in fld.metadata for kw in kws) and all(
-                func(fld.metadata[kw], val) for kw, val in zip(kws, vals)
-            )
+            def in_metadata(fld):
+                kws, vals = zip(*where.items())
+                return all(
+                    fld.metadata.get(kw, False) and (fld.metadata[kw] == val)
+                    for kw, val in zip(kws, vals)
+                )
 
             def recurse(tree, where, **kwargs):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
                     cur_node = tree.__dict__[fld.name]
 
                     if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
-                        if in_meta(fld):
+                        if in_metadata(fld):
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
                             recurse(cur_node, where, **kwargs)
                     else:
                         tree.__dict__[fld.name] = (
-                            set_true(cur_node) if in_meta(fld) else set_false(cur_node)
+                            set_true(cur_node)
+                            if in_metadata(fld)
+                            else set_false(cur_node)
                         )
 
                 return tree
 
             return recurse(tree_copy, where, **kwargs)
 
-        return inner_wrapper(self, rhs)
+        res = inner_wrapper(self, rhs)
+
+        return res if func == op.eq else res.at[res == res].apply(node_not)
 
     return wrapper
 

@@ -430,6 +430,27 @@ def test_apply_and_its_derivatives():
     rhs = init.at[init == "a"].multiply(2)
     assert is_treeclass_equal(lhs, rhs)
 
+    #
+    lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
+    rhs = init.at[init != "a"].apply(lambda x: x**2)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(1, 3, jnp.array([2, 3, 4, 5, 6]))
+    rhs = init.at[init != "a"].apply(lambda x: x + 1)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(1, 30, jnp.array([20, 30, 40, 50, 60]))
+    rhs = init.at[init != "a"].apply(lambda x: (x + 1) * 10)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(1, 3, jnp.array([2, 3, 4, 5, 6]))
+    rhs = init.at[init != "a"].add(1)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(1, 1, jnp.array([0.5, 1, 1.5, 2, 2.5]))
+    rhs = init.at[init != "a"].divide(2.0)
+    assert is_treeclass_equal(lhs, rhs)
+
     # by param
     with pytest.raises(ValueError):
         init.freeze().at[init == "a"].apply(lambda x: x**2)
@@ -474,6 +495,11 @@ def test_apply_and_its_derivatives():
     ].apply(lambda _: 100, array_as_leaves=False)
     assert is_treeclass_equal(B, Test(100, 100, 100, 100, "A"))
 
+    B = A.at[A != {"name": "a"}].apply(lambda _: 100)
+    assert is_treeclass_equal(
+        B, Test(10, 100, 100, jnp.array([100, 100, 100, 100, 100]), "A")
+    )
+
     @treeclass
     class L0:
         a: int = field(default=1, metadata={"name": "a", "unit": "m"})
@@ -497,6 +523,12 @@ def test_apply_and_its_derivatives():
     t = L2()
     lhs = t.at[t == {"name": "a"}].apply(lambda _: 100)
     rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
+    assert is_treeclass_equal(lhs, rhs)
+
+    t = L2()
+    lhs = t.at[t != {"name": "a"}].apply(lambda _: 100)
+    rhs = L2(10, 100, 100, L1(1, 100, 100, L0(1, 100, 100)))
+
     assert is_treeclass_equal(lhs, rhs)
 
 
