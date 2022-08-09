@@ -537,6 +537,31 @@ def test_apply_and_its_derivatives():
 
     assert is_treeclass_equal(lhs, rhs)
 
+    @treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @treeclass
+    class L1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @treeclass
+    class L2:
+        a: int = 10
+        b: int = 20
+        c: int = 30
+        d: L1 = field(default=L1(), metadata={"name": "d", "unit": "m"})
+
+    t = L2()
+    lhs = t.at[t == {"name": "d"}].apply(lambda _: 100)
+    rhs = L2(10, 20, 30, L1(100, 100, 100, L0(100, 100, 100)))
+    assert is_treeclass_equal(lhs, rhs)
+
 
 def test_reduce():
     @treeclass

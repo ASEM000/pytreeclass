@@ -16,9 +16,9 @@ def static_field(**kwargs):
     return field(**{**kwargs, **{"metadata": {"static": True}}})
 
 
-def is_treeclass(model):
+def is_treeclass(tree):
     """check if a class is treeclass"""
-    return hasattr(model, "__tree_fields__")
+    return hasattr(tree, "__tree_fields__")
 
 
 def is_treeclass_leaf_bool(node):
@@ -29,13 +29,13 @@ def is_treeclass_leaf_bool(node):
         return isinstance(node, bool)
 
 
-def is_treeclass_leaf(model):
+def is_treeclass_leaf(tree):
     """assert if a node is treeclass leaf"""
-    if is_treeclass(model):
-        fields = model.__dataclass_fields__.values()
+    if is_treeclass(tree):
+        fields = tree.__dataclass_fields__.values()
 
-        return is_treeclass(model) and not any(
-            [is_treeclass(model.__dict__[field.name]) for field in fields]
+        return is_treeclass(tree) and not any(
+            [is_treeclass(tree.__dict__[field.name]) for field in fields]
         )
     else:
         return False
@@ -70,7 +70,7 @@ def is_excluded(fld: dataclasses.field, instance: Any) -> bool:
     return excluded_by_type or excluded_by_meta
 
 
-def sequential_model_shape_eval(tree, array):
+def sequential_tree_shape_eval(tree, array):
     """Evaluate shape propagation of assumed sequential modules"""
 
     # all dynamic/static leaves
@@ -129,19 +129,19 @@ def _reduce_count_and_size(leaf):
     return jtu.tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
 
 
-def _freeze_nodes(model):
+def _freeze_nodes(tree):
     """inplace freezing"""
-    if is_treeclass(model):
-        object.__setattr__(model, "__frozen_treeclass__", True)
-        for kw, leaf in model.__dataclass_fields__.items():
-            _freeze_nodes(model.__dict__[kw])
-    return model
+    if is_treeclass(tree):
+        object.__setattr__(tree, "__frozen_treeclass__", True)
+        for kw, leaf in tree.__dataclass_fields__.items():
+            _freeze_nodes(tree.__dict__[kw])
+    return tree
 
 
-def _unfreeze_nodes(model):
+def _unfreeze_nodes(tree):
     """inplace unfreezing"""
-    if is_treeclass(model):
-        object.__setattr__(model, "__frozen_treeclass__", False)
-        for kw, leaf in model.__dataclass_fields__.items():
-            _unfreeze_nodes(model.__dict__[kw])
-    return model
+    if is_treeclass(tree):
+        object.__setattr__(tree, "__frozen_treeclass__", False)
+        for kw, leaf in tree.__dataclass_fields__.items():
+            _unfreeze_nodes(tree.__dict__[kw])
+    return tree

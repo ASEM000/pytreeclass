@@ -208,18 +208,18 @@ class treeOpBase:
     __truediv__ = _append_math_op(op.truediv)
     __xor__ = _append_math_op(op.xor)
 
-    def __or__(self, rhs):
-        def node_or(x, y):
-            if isinstance(x, jnp.ndarray) and isinstance(y, jnp.ndarray):
-                if x.shape == y.shape:
-                    return jnp.logical_or(x, y)
-                elif jnp.array_equal(x, jnp.array([])):
-                    return y
-                elif jnp.array_equal(y, jnp.array([])):
-                    return x
-                else:
-                    raise ValueError("Cannot or arrays of different shapes")
-            else:
-                return x or y
+    def __or__(lhs,rhs):
+        def _or(x,y):
+            if isinstance(x,jnp.ndarray):
+                if jnp.array_equal(x, jnp.array([])):
+                    # array([]) > None
+                    return y if y is not None else x
+                elif isinstance(y, jnp.ndarray) :
+                    if jnp.array_equal(y, jnp.array([])):
+                        return x if x is not None else y
+                    else:
+                        return jnp.logical_or(x,y)
+            else :
+                return x or y 
 
-        return jtu.tree_map(node_or, self, rhs, is_leaf=lambda x: x is None)
+        return jtu.tree_map(_or, lhs, rhs, is_leaf= lambda x:x is None )

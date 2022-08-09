@@ -13,7 +13,7 @@ from .tree_util import (
     _reduce_count_and_size,
     is_treeclass,
     is_treeclass_leaf,
-    sequential_model_shape_eval,
+    sequential_tree_shape_eval,
 )
 
 # Node formatting
@@ -285,7 +285,7 @@ def _cell(text):
     return f"<td align = 'center'> {text} </td>"
 
 
-def _summary_str(model, array=None, render: str = "string") -> str:
+def _summary_str(tree, array=None, render: str = "string") -> str:
 
     ROW = [["Type ", "Param #", "Size ", "Config", "Output"]]
 
@@ -295,12 +295,12 @@ def _summary_str(model, array=None, render: str = "string") -> str:
     dynamic_size, static_size = 0, 0
 
     if array is not None:
-        params_shape = sequential_model_shape_eval(model, array)[1:]
+        params_shape = sequential_tree_shape_eval(tree, array)[1:]
 
     # all dynamic/static leaves
     all_leaves = (
-        *model.__tree_fields__[0].values(),
-        *model.__tree_fields__[1].values(),
+        *tree.__tree_fields__[0].values(),
+        *tree.__tree_fields__[1].values(),
     )
     treeclass_leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
 
@@ -356,7 +356,7 @@ def _summary_str(model, array=None, render: str = "string") -> str:
     return layer__table + "\n" + param_summary
 
 
-def _summary_md(model, array=None) -> str:
+def _summary_md(tree, array=None) -> str:
 
     fmt = (
         "<table>\n"
@@ -375,12 +375,12 @@ def _summary_md(model, array=None) -> str:
     dynamic_size, static_size = 0, 0
 
     if array is not None:
-        params_shape = sequential_model_shape_eval(model, array)[1:]
+        params_shape = sequential_tree_shape_eval(tree, array)[1:]
 
     # all dynamic/static leaves
     all_leaves = (
-        *model.__tree_fields__[0].values(),
-        *model.__tree_fields__[1].values(),
+        *tree.__tree_fields__[0].values(),
+        *tree.__tree_fields__[1].values(),
     )
     treeclass_leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
 
@@ -437,12 +437,12 @@ def _summary_md(model, array=None) -> str:
     return fmt + "\n\n#### Summary\n" + param_summary
 
 
-def summary(model, array=None, render: str = "string") -> str:
+def summary(tree, array=None, render: str = "string") -> str:
     if render in ["string", "str"]:
-        return _summary_str(model, array=array)
+        return _summary_str(tree, array=array)
 
     elif render in ["markdown", "md"]:
-        return _summary_md(model, array=array)
+        return _summary_md(tree, array=array)
 
     else:
         raise ValueError(
@@ -453,19 +453,19 @@ def summary(model, array=None, render: str = "string") -> str:
 # tree_**
 
 
-def tree_box(model, array=None):
+def tree_box(tree, array=None):
     """
     === plot tree classes
     """
 
-    def recurse(model, parent_name):
+    def recurse(tree, parent_name):
 
         nonlocal shapes
 
-        if is_treeclass_leaf(model):
-            frozen_stmt = "(Frozen)" if model.frozen else ""
+        if is_treeclass_leaf(tree):
+            frozen_stmt = "(Frozen)" if tree.frozen else ""
             box = _layer_box(
-                f"{model.__class__.__name__}[{parent_name}]{frozen_stmt}",
+                f"{tree.__class__.__name__}[{parent_name}]{frozen_stmt}",
                 _format_node(shapes[0]) if array is not None else None,
                 _format_node(shapes[1]) if array is not None else None,
             )
@@ -477,8 +477,8 @@ def tree_box(model, array=None):
         else:
             level_nodes = []
 
-            for fi in model.__dataclass_fields__.values():
-                cur_node = model.__dict__[fi.name]
+            for fi in tree.__dataclass_fields__.values():
+                cur_node = tree.__dict__[fi.name]
 
                 if is_treeclass(cur_node):
                     level_nodes += [f"{recurse(cur_node,fi.name)}"]
@@ -487,34 +487,34 @@ def tree_box(model, array=None):
                     level_nodes += [_vbox(f"{fi.name}={_format_node(cur_node)}")]
 
             return _vbox(
-                f"{model.__class__.__name__}[{parent_name}]", "\n".join(level_nodes)
+                f"{tree.__class__.__name__}[{parent_name}]", "\n".join(level_nodes)
             )
 
-    shapes = sequential_model_shape_eval(model, array) if array is not None else None
-    return recurse(model, "Parent")
+    shapes = sequential_tree_shape_eval(tree, array) if array is not None else None
+    return recurse(tree, "Parent")
 
 
-def tree_diagram(model):
+def tree_diagram(tree):
     """
     === Explanation
-        pretty print treeclass model with tree structure diagram
+        pretty print treeclass tree with tree structure diagram
 
     === Args
         tree : boolean to create tree-structure
     """
 
-    def recurse(model, parent_level_count):
+    def recurse(tree, parent_level_count):
 
         nonlocal fmt
 
-        if is_treeclass(model):
+        if is_treeclass(tree):
 
-            cur_children_count = len(model.__dataclass_fields__)
+            cur_children_count = len(tree.__dataclass_fields__)
 
-            for i, fi in enumerate(model.__dataclass_fields__.values()):
+            for i, fi in enumerate(tree.__dataclass_fields__.values()):
 
                 if fi.repr:
-                    cur_node = model.__dict__[fi.name]
+                    cur_node = tree.__dict__[fi.name]
 
                     fmt += "\n" + "".join(
                         [
@@ -524,7 +524,7 @@ def tree_diagram(model):
                     )
 
                     is_static = "static" in fi.metadata and fi.metadata["static"]
-                    mark = "x" if is_static else ("#" if model.frozen else "─")
+                    mark = "x" if is_static else ("#" if tree.frozen else "─")
 
                     if is_treeclass(cur_node):
 
@@ -546,23 +546,23 @@ def tree_diagram(model):
                         fmt += f"{fi.name}={_format_node(cur_node)}"
                         recurse(cur_node, parent_level_count + [1])
 
-                elif not is_treeclass(model):
+                elif not is_treeclass(tree):
                     recurse(cur_node, parent_level_count + [1])
 
             fmt += "\t"
 
-    fmt = f"{(model.__class__.__name__)}"
+    fmt = f"{(tree.__class__.__name__)}"
 
-    recurse(model, [1])
+    recurse(tree, [1])
 
     return fmt.expandtabs(4)
 
 
-def tree_indent(model, width: int = 40) -> str:
+def tree_indent(tree, width: int = 40) -> str:
     """Prertty print `treeclass_leaves`
 
     Returns:
-        str: indented model leaves.
+        str: indented tree leaves.
     """
 
     def format_width(string, width=width):
@@ -571,17 +571,17 @@ def tree_indent(model, width: int = 40) -> str:
         children_length = len(stripped_string)
         return string if children_length > width else stripped_string
 
-    def recurse(model, depth):
+    def recurse(tree, depth):
 
         nonlocal fmt
 
-        if is_treeclass(model):
-            cur_children_count = len(model.__dataclass_fields__)
+        if is_treeclass(tree):
+            cur_children_count = len(tree.__dataclass_fields__)
 
-            for i, fi in enumerate(model.__dataclass_fields__.values()):
+            for i, fi in enumerate(tree.__dataclass_fields__.values()):
 
                 if fi.repr:
-                    cur_node = model.__dict__[fi.name]
+                    cur_node = tree.__dict__[fi.name]
 
                     # add newline by default
                     fmt += ("\n" + "\t" * depth) if fi.repr else ""
@@ -606,21 +606,21 @@ def tree_indent(model, width: int = 40) -> str:
                         )
                         recurse(cur_node, depth)
 
-                elif not is_treeclass(model):
+                elif not is_treeclass(tree):
                     recurse(cur_node, depth)
 
     fmt = ""
-    recurse(model, 1)
-    fmt = f"{(model.__class__.__name__)}({format_width(fmt,width)})"
+    recurse(tree, 1)
+    fmt = f"{(tree.__class__.__name__)}({format_width(fmt,width)})"
 
     return fmt.expandtabs(2)
 
 
-def tree_str(model, width: int = 40) -> str:
+def tree_str(tree, width: int = 40) -> str:
     """Prertty print `treeclass_leaves`
 
     Returns:
-        str: indented model leaves.
+        str: indented tree leaves.
     """
 
     def format_width(string, width=width):
@@ -629,17 +629,17 @@ def tree_str(model, width: int = 40) -> str:
         children_length = len(stripped_string)
         return string if children_length > width else stripped_string
 
-    def recurse(model, depth):
+    def recurse(tree, depth):
 
         nonlocal fmt
 
-        if is_treeclass(model):
-            cur_children_count = len(model.__dataclass_fields__)
+        if is_treeclass(tree):
+            cur_children_count = len(tree.__dataclass_fields__)
 
-            for i, fi in enumerate(model.__dataclass_fields__.values()):
+            for i, fi in enumerate(tree.__dataclass_fields__.values()):
 
                 if fi.repr:
-                    cur_node = model.__dict__[fi.name]
+                    cur_node = tree.__dict__[fi.name]
 
                     # add newline by default
                     fmt += ("\n" + "\t" * depth) if fi.repr else ""
@@ -670,31 +670,31 @@ def tree_str(model, width: int = 40) -> str:
                         )
                         recurse(cur_node, depth)
 
-                elif not is_treeclass(model):
+                elif not is_treeclass(tree):
                     recurse(cur_node, depth)
 
     fmt = ""
-    recurse(model, 1)
-    fmt = f"{(model.__class__.__name__)}({format_width(fmt,width)})"
+    recurse(tree, 1)
+    fmt = f"{(tree.__class__.__name__)}({format_width(fmt,width)})"
 
     return fmt.expandtabs(2)
 
 
-def _tree_mermaid(model):
+def _tree_mermaid(tree):
     def node_id(input):
         """hash a node by its location in a tree"""
         return ctypes.c_size_t(hash(input)).value
 
-    def recurse(model, cur_depth, prev_id):
+    def recurse(tree, cur_depth, prev_id):
 
         nonlocal fmt
 
-        if is_treeclass(model):
-            is_frozen = model.frozen
+        if is_treeclass(tree):
+            is_frozen = tree.frozen
 
-            for i, fi in enumerate(model.__dataclass_fields__.values()):
+            for i, fi in enumerate(tree.__dataclass_fields__.values()):
                 if fi.repr:
-                    cur_node = model.__dict__[fi.name]
+                    cur_node = tree.__dict__[fi.name]
                     cur_order = i
                     fmt += "\n"
 
@@ -715,12 +715,12 @@ def _tree_mermaid(model):
                         fmt += f'\tid{prev_id} {connector} id{cur_id}["{fi.name}\\n{_format_node(cur_node)}"]'
                         recurse(cur_node, cur_depth + 1, cur_id)
 
-                elif not is_treeclass(model):
+                elif not is_treeclass(tree):
                     recurse(cur_node, cur_depth + 1, cur_id)
 
     cur_id = node_id((0, 0, -1, 0))
-    fmt = f"flowchart LR\n\tid{cur_id}[{model.__class__.__name__}]"
-    recurse(model, 1, cur_id)
+    fmt = f"flowchart LR\n\tid{cur_id}[{tree.__class__.__name__}]"
+    recurse(tree, 1, cur_id)
     return fmt.expandtabs(4)
 
 
@@ -733,15 +733,15 @@ def _generate_mermaid_link(mermaid_string: str) -> str:
     return f"Open URL in browser: {generated_html}"
 
 
-def tree_mermaid(model, link=False):
-    mermaid_string = _tree_mermaid(model)
+def tree_mermaid(tree, link=False):
+    mermaid_string = _tree_mermaid(tree)
     return _generate_mermaid_link(mermaid_string) if link else mermaid_string
 
 
-def save_viz(model, filename, method="tree_mermaid_md"):
+def save_viz(tree, filename, method="tree_mermaid_md"):
 
     if method == "tree_mermaid_md":
-        fmt = "```mermaid\n" + tree_mermaid(model) + "\n```"
+        fmt = "```mermaid\n" + tree_mermaid(tree) + "\n```"
 
         with open(f"{filename}.md", "w") as f:
             f.write(fmt)
@@ -749,7 +749,7 @@ def save_viz(model, filename, method="tree_mermaid_md"):
     elif method == "tree_mermaid_html":
         fmt = "<html><body><script src='https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js'></script>"
         fmt += "<script>mermaid.initialize({ startOnLoad: true });</script><div class='mermaid'>"
-        fmt += tree_mermaid(model)
+        fmt += tree_mermaid(tree)
         fmt += "</div></body></html>"
 
         with open(f"{filename}.html", "w") as f:
@@ -757,16 +757,16 @@ def save_viz(model, filename, method="tree_mermaid_md"):
 
     elif method == "tree_diagram":
         with open(f"{filename}.txt", "w") as f:
-            f.write(tree_diagram(model))
+            f.write(tree_diagram(tree))
 
     elif method == "tree_box":
         with open(f"{filename}.txt", "w") as f:
-            f.write(tree_box(model))
+            f.write(tree_box(tree))
 
     elif method == "summary":
         with open(f"{filename}.txt", "w") as f:
-            f.write(summary(model))
+            f.write(summary(tree))
 
     elif method == "summary_md":
         with open(f"{filename}.md", "w") as f:
-            f.write(summary(model, render="md"))
+            f.write(summary(tree, render="md"))
