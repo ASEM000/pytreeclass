@@ -170,9 +170,11 @@ def _append_math_eq_ne(func):
 
             return recurse(tree_copy, where, **kwargs)
 
-        res = inner_wrapper(self, rhs)
-
-        return res if func == op.eq else res.at[res == res].apply(node_not)
+        return (
+            jtu.tree_map(node_not, inner_wrapper(self, rhs))
+            if func == op.ne
+            else inner_wrapper(self, rhs)
+        )
 
     return wrapper
 

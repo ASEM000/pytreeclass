@@ -70,9 +70,16 @@ def is_excluded(fld: dataclasses.field, instance: Any) -> bool:
     return excluded_by_type or excluded_by_meta
 
 
-def sequential_model_shape_eval(model, array):
+def sequential_model_shape_eval(tree, array):
     """Evaluate shape propagation of assumed sequential modules"""
-    leaves = jtu.tree_leaves(model, is_treeclass_leaf)
+
+    # all dynamic/static leaves
+    all_leaves = (
+        *tree.__tree_fields__[0].values(),
+        *tree.__tree_fields__[1].values(),
+    )
+    leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
+
     shape = [jax.eval_shape(lambda x: x, array)]
     for leave in leaves:
         shape += [jax.eval_shape(leave, shape[-1])]

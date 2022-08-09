@@ -239,3 +239,8 @@ def test_freezing_unfreezing():
     t.unfreeze().a = 1
 
     hash(t)
+
+    t = Test()
+    t.unfreeze()
+    t.freeze()
+    assert t.frozen is False

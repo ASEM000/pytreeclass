@@ -92,7 +92,7 @@ class treeBase:
         >>> model = model.freeze()
         >>> assert model.frozen == True
         """
-        return _freeze_nodes(copy.copy(self))
+        return _freeze_nodes(copy.deepcopy(self))
 
     def unfreeze(self):
         """Unfreeze treeclass.
@@ -105,7 +105,7 @@ class treeBase:
         >>> model = model.unfreeze()
         >>> assert model.frozen == False
         """
-        return _unfreeze_nodes(copy.copy(self))
+        return _unfreeze_nodes(copy.deepcopy(self))
 
     @property
     def frozen(self) -> bool:

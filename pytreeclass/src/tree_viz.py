@@ -463,8 +463,9 @@ def tree_box(model, array=None):
         nonlocal shapes
 
         if is_treeclass_leaf(model):
+            frozen_stmt = "(Frozen)" if model.frozen else ""
             box = _layer_box(
-                f"{model.__class__.__name__}({parent_name})",
+                f"{model.__class__.__name__}[{parent_name}]{frozen_stmt}",
                 _format_node(shapes[0]) if array is not None else None,
                 _format_node(shapes[1]) if array is not None else None,
             )
@@ -486,7 +487,7 @@ def tree_box(model, array=None):
                     level_nodes += [_vbox(f"{fi.name}={_format_node(cur_node)}")]
 
             return _vbox(
-                f"{model.__class__.__name__}({parent_name})", "\n".join(level_nodes)
+                f"{model.__class__.__name__}[{parent_name}]", "\n".join(level_nodes)
             )
 
     shapes = sequential_model_shape_eval(model, array) if array is not None else None

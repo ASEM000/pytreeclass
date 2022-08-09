@@ -22,7 +22,7 @@ def test_tree_box():
     class test:
         a: int = 1
 
-    correct = "┌──────────────┬────────┬──────┐\n│              │ Input  │ None │\n│ test(Parent) │────────┼──────┤\n│              │ Output │ None │\n└──────────────┴────────┴──────┘"  # noqa
+    correct = "┌──────────────┬────────┬──────┐\n│              │ Input  │ None │\n│ test[Parent] │────────┼──────┤\n│              │ Output │ None │\n└──────────────┴────────┴──────┘"  # noqa
     assert tree_viz.tree_box(test()) == correct
     assert test().tree_box() == correct
 
@@ -37,44 +37,41 @@ def test_tree_diagram():
     assert test().tree_diagram() == correct
 
 
-@pytc.treeclass
-class Linear:
-
-    weight: jnp.ndarray
-    bias: jnp.ndarray
-
-    def __init__(self, key, in_dim, out_dim):
-        self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
-            2 / in_dim
-        )
-        self.bias = jnp.ones((1, out_dim))
-
-    def __call__(self, x):
-        return x @ self.weight + self.bias
-
-
-@pytc.treeclass
-class StackedLinear:
-    l1: Linear
-    l2: Linear
-    l3: Linear
-
-    def __init__(self, key, in_dim, out_dim):
-
-        keys = jax.random.split(key, 3)
-
-        self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=128)
-        self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
-        self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
-
-
-x = jnp.linspace(0, 1, 100)[:, None]
-y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
-
-model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
-
-
 def test_model():
+    @pytc.treeclass
+    class Linear:
+
+        weight: jnp.ndarray
+        bias: jnp.ndarray
+
+        def __init__(self, key, in_dim, out_dim):
+            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
+                2 / in_dim
+            )
+            self.bias = jnp.ones((1, out_dim))
+
+        def __call__(self, x):
+            return x @ self.weight + self.bias
+
+    @pytc.treeclass
+    class StackedLinear:
+        l1: Linear
+        l2: Linear
+        l3: Linear
+
+        def __init__(self, key, in_dim, out_dim):
+
+            keys = jax.random.split(key, 3)
+
+            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=128)
+            self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
+            self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
+
+    x = jnp.linspace(0, 1, 100)[:, None]
+    # y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
+
+    model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
+
     assert (
         tree_viz.summary(model)
         # trunk-ignore(flake8/E501)
@@ -90,13 +87,13 @@ def test_model():
     assert (
         tree_viz.tree_box(model, array=x)
         # trunk-ignore(flake8/E501)
-        == "┌──────────────────────────────────────┐\n│StackedLinear(Parent)                 │\n├──────────────────────────────────────┤\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,1]   ││\n││ Linear(l1) │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear(l2) │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear(l3) │────────┼──────────────┤│\n││            │ Output │ f32[100,1]   ││\n│└────────────┴────────┴──────────────┘│\n└──────────────────────────────────────┘"
+        == "┌──────────────────────────────────────┐\n│StackedLinear[Parent]                 │\n├──────────────────────────────────────┤\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,1]   ││\n││ Linear[l1] │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear[l2] │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear[l3] │────────┼──────────────┤│\n││            │ Output │ f32[100,1]   ││\n│└────────────┴────────┴──────────────┘│\n└──────────────────────────────────────┘"
     )
 
     assert (
         model.tree_box(array=x)
         # trunk-ignore(flake8/E501)
-        == "┌──────────────────────────────────────┐\n│StackedLinear(Parent)                 │\n├──────────────────────────────────────┤\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,1]   ││\n││ Linear(l1) │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear(l2) │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear(l3) │────────┼──────────────┤│\n││            │ Output │ f32[100,1]   ││\n│└────────────┴────────┴──────────────┘│\n└──────────────────────────────────────┘"
+        == "┌──────────────────────────────────────┐\n│StackedLinear[Parent]                 │\n├──────────────────────────────────────┤\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,1]   ││\n││ Linear[l1] │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear[l2] │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear[l3] │────────┼──────────────┤│\n││            │ Output │ f32[100,1]   ││\n│└────────────┴────────┴──────────────┘│\n└──────────────────────────────────────┘"
     )
 
     assert (
@@ -109,6 +106,13 @@ def test_model():
         model.tree_diagram()
         # trunk-ignore(flake8/E501)
         == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   └── bias=f32[1,128] \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   └── bias=f32[1,128] \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        └── bias=f32[1,1]       "
+    )
+
+    model = model.freeze()
+    assert (
+        model.tree_box(array=x)
+        # trunk-ignore(flake8/E501)
+        == "┌──────────────────────────────────────────────┐\n│StackedLinear[Parent]                         │\n├──────────────────────────────────────────────┤\n│┌────────────────────┬────────┬──────────────┐│\n││                    │ Input  │ f32[100,1]   ││\n││ Linear[l1](Frozen) │────────┼──────────────┤│\n││                    │ Output │ f32[100,128] ││\n│└────────────────────┴────────┴──────────────┘│\n│┌────────────────────┬────────┬──────────────┐│\n││                    │ Input  │ f32[100,128] ││\n││ Linear[l2](Frozen) │────────┼──────────────┤│\n││                    │ Output │ f32[100,128] ││\n│└────────────────────┴────────┴──────────────┘│\n│┌────────────────────┬────────┬──────────────┐│\n││                    │ Input  │ f32[100,128] ││\n││ Linear[l3](Frozen) │────────┼──────────────┤│\n││                    │ Output │ f32[100,1]   ││\n│└────────────────────┴────────┴──────────────┘│\n└──────────────────────────────────────────────┘"
     )
 
 
@@ -236,6 +240,63 @@ def test_summary_md():
         model.summary()
         # trunk-ignore(flake8/E501)
         == "┌────────┬───────┬────────┬───────────────────┐\n│Type    │Param #│Size    │Config             │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │256    │1.00KB  │weight=f32[1,128]  │\n│(frozen)│(0)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │16,512 │64.50KB │weight=f32[128,128]│\n│(frozen)│(0)    │(55.00B)│bias=f32[1,128]    │\n│        │       │        │notes='string'     │\n├────────┼───────┼────────┼───────────────────┤\n│Linear  │129    │516.00B │weight=f32[128,1]  │\n│(frozen)│(0)    │(55.00B)│bias=f32[1,1]      │\n│        │       │        │notes='string'     │\n└────────┴───────┴────────┴───────────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t16,897(0)\n-----------------------------------------------\nTotal size :\t\t66.00KB(165.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t66.00KB(165.00B)\n==============================================="
+    )
+
+    @pytc.treeclass
+    class Linear:
+        # Any variable not wrapped with @pytc.treeclass
+        # should be declared as a dataclass field here
+        weight: jnp.ndarray
+        bias: jnp.ndarray
+
+        def __init__(self, key, in_dim, out_dim):
+            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
+                2 / in_dim
+            )
+            self.bias = jnp.ones((1, out_dim))
+
+        def __call__(self, x):
+            return x @ self.weight + self.bias
+
+    @pytc.treeclass
+    class StackedLinear:
+        def __init__(self, key, in_dim, out_dim, hidden_dim):
+            keys = jax.random.split(key, 3)
+
+            # Declaring l1,l2,l3 as dataclass_fields is optional
+            # as l1,l2,l3 are Linear class that is wrapped with @pytc.treeclass
+            # To strictly include nodes defined in dataclass fields
+            # use `@pytc.treeclass(field_only=True)`
+            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
+            self.l2 = Linear(key=keys[1], in_dim=hidden_dim, out_dim=hidden_dim)
+            self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
+
+        def __call__(self, x):
+            x = self.l1(x)
+            x = jax.nn.tanh(x)
+            x = self.l2(x)
+            x = jax.nn.tanh(x)
+            x = self.l3(x)
+
+            return x
+
+    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
+
+    # x = jnp.linspace(0, 1, 100)[:, None]
+    # y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
+
+    model = model.freeze()
+
+    assert (
+        model.summary()
+        # trunk-ignore(flake8/E501)
+        == "┌────────┬───────┬───────┬─────────────────┐\n│Type    │Param #│Size   │Config           │\n├────────┼───────┼───────┼─────────────────┤\n│Linear  │20     │80.00B │weight=f32[1,10] │\n│(frozen)│(0)    │(0.00B)│bias=f32[1,10]   │\n├────────┼───────┼───────┼─────────────────┤\n│Linear  │110    │440.00B│weight=f32[10,10]│\n│(frozen)│(0)    │(0.00B)│bias=f32[1,10]   │\n├────────┼───────┼───────┼─────────────────┤\n│Linear  │11     │44.00B │weight=f32[10,1] │\n│(frozen)│(0)    │(0.00B)│bias=f32[1,1]    │\n└────────┴───────┴───────┴─────────────────┘\nTotal # :\t\t141(0)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t141(0)\n--------------------------------------------\nTotal size :\t\t564.00B(0.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t564.00B(0.00B)\n============================================"
+    )
+
+    assert (
+        model.tree_diagram()
+        # trunk-ignore(flake8/E501)
+        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,10]\n    │   └#─ bias=f32[1,10]  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[10,10]\n    │   └#─ bias=f32[1,10]  \n    └#─ l3=Linear\n        ├#─ weight=f32[10,1]\n        └#─ bias=f32[1,1]       "
     )
 
 
