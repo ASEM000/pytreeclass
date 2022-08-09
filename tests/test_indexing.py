@@ -613,8 +613,8 @@ def test_reduce_and_its_derivatives():
             )
             self.bias = jnp.ones((1, out_dim))
 
-        def __call__(self, x):
-            return x @ self.weight + self.bias
+        # def __call__(self, x):
+        #     return x @ self.weight + self.bias
 
     @treeclass
     class StackedLinear:
@@ -627,12 +627,12 @@ def test_reduce_and_its_derivatives():
             self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
             self.l2 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
 
-        def __call__(self, x):
-            x = self.l1(x)
-            x = jax.nn.tanh(x)
-            x = self.l2(x)
+        # def __call__(self, x):
+        #     x = self.l1(x)
+        #     x = jax.nn.tanh(x)
+        #     x = self.l2(x)
 
-            return x
+        #     return x
 
     model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=5, key=jax.random.PRNGKey(0))
 

@@ -46,7 +46,6 @@ def test_dispatch():
     @dispatch(argnum=1)
     def func(x, y):
         raise ValueError("unknown")
-    
 
     @func.register(int)
     def _(x, y):
@@ -60,7 +59,7 @@ def test_dispatch():
     assert func(None, 1.0) == 101.0
 
     with pytest.raises(ValueError):
-        func(None,"s")
+        func(None, "s")
 
     # dispatch by keyword argument
     @dispatch(argnum="name")
@@ -79,7 +78,7 @@ def test_dispatch():
     assert func(1, 1, name="s") == "str"
 
     with pytest.raises(ValueError):
-        func(1,1,name=1.)
+        func(1, 1, name=1.0)
 
 
 def test_singledispatchmethod():
@@ -110,8 +109,7 @@ def test_singledispatchmethod():
 
         class test:
             @dispatch(argnum=1.0)
-            def plus(self, x):
-                raise ValueError("a")
+            def plus(self, x): ...
 
         t = test()
         t.plus("s")
@@ -128,4 +126,4 @@ def test_singledispatchmethod():
     assert fn(3) == 1
 
     with pytest.raises(ValueError):
-        fn(3.)
+        fn(3.0)
