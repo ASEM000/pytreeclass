@@ -43,7 +43,7 @@ def test__node_count_and_size():
         b: int = 1
 
     t = Test()
-    assert _node_count_and_size(t.b) == (complex(0, 1), complex(28, 0))
+    assert _node_count_and_size(t.b) == (complex(0, 1), complex(0, 28))
     assert _node_count_and_size(t.a) == (complex(3, 0), complex(12, 0))
 
     assert _node_count_and_size(jnp.array([1, 2, 3, 4, 5])) == (

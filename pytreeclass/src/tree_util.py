@@ -86,8 +86,15 @@ def sequential_tree_shape_eval(tree, array):
     return shape
 
 
-def _node_count_and_size(node):
-    """calculate number and size of `trainable` and `non-trainable` parameters"""
+def _node_count_and_size(node : Any) -> tuple[complex,complex] :
+    """Calculate number and size of `trainable` and `non-trainable` parameters
+
+    Args:
+        node (Any): treeclass node
+
+    Returns:
+        complex: Complex number of (inexact, non-exact) parameters for count/size
+    """    
 
     if isinstance(node, (jnp.ndarray, np.ndarray)):
         # inexact(trainable) array
@@ -100,7 +107,7 @@ def _node_count_and_size(node):
             count = complex(0, int(jnp.array(node.shape).prod()))
             size = complex(0, int(node.nbytes))
 
-    # inexact non-array
+    # inexact non-array (array_like)
     elif isinstance(node, (float, complex)):
         count = complex(1, 0)
         size = complex(sys.getsizeof(node), 0)
@@ -108,12 +115,12 @@ def _node_count_and_size(node):
     # exact non-array
     elif isinstance(node, int):
         count = complex(0, 1)
-        size = complex(sys.getsizeof(node), 0)
+        size = complex(0, sys.getsizeof(node))
 
-    # others
+    # exclude others
     else:
         count = complex(0, 0)
-        size = complex(0, sys.getsizeof(node))
+        size = complex(0, 0)
 
     return (count, size)
 
