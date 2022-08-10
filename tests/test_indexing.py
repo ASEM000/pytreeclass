@@ -4,9 +4,11 @@ from dataclasses import field
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from pytreeclass import treeclass
+from pytreeclass.src.tree_indexer import _at_apply, _at_get, _at_reduce, _at_set
 from pytreeclass.src.tree_util import is_treeclass_equal
 
 
@@ -689,3 +691,35 @@ def test_reduce_and_its_derivatives():
     assert (model.at[model == jnp.ndarray].reduce_max()) == 1.3969219
     assert (model.at[model == jnp.ndarray].reduce_sum()) == 3.3538322
     assert (model.at[model == jnp.ndarray].reduce_product()) == 0.84782064
+
+
+def test_not_implemented():
+    @treeclass
+    class Test:
+        a: int = 1
+
+    t = Test()
+
+    with pytest.raises(NotImplementedError):
+        _at_get(t == t, 3)
+
+    with pytest.raises(NotImplementedError):
+        _at_set(t == t, 3, 3)
+
+    with pytest.raises(NotImplementedError):
+        _at_reduce(t == t, lambda x: x, 3)
+
+    with pytest.raises(NotImplementedError):
+        _at_apply(t == t, lambda x: x, 3)
+
+    with pytest.raises(NotImplementedError):
+        _at_get(t == t, np.array([1, 2, 3]))
+
+    with pytest.raises(NotImplementedError):
+        _at_set(t == t, 3, np.array([1, 2, 3]))
+
+    with pytest.raises(NotImplementedError):
+        _at_reduce(t == t, lambda x: x, np.array([1, 2, 3]))
+
+    with pytest.raises(NotImplementedError):
+        _at_apply(t == t, lambda x: x, np.array([1, 2, 3]))

@@ -273,5 +273,5 @@ class treeIndexer:
             def _(inner_self, arg):
                 """Ellipsis as an alias for all elements"""
                 return self.at.__getitem__(self == self)
-                
+
         return indexer()
