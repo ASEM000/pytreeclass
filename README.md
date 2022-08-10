@@ -235,7 +235,7 @@ flowchart LR
 >>> model.l2 = model.l2.at[model.l2<0].set(0)
 
 # apply sin(x) to all values in l3
->>> model.l3 = model.l3.at[model.l3==model.l3].apply(jnp.sin)
+>>> model.l3 = model.l3.at[...].apply(jnp.sin)
 
 # frozen nodes are marked with #
 >>> print(model.tree_diagram())
@@ -267,7 +267,7 @@ class Counter:
         self.calls += 1 
         
 
->> c = Counter()
+>>> c = Counter()
 
 @jax.jit
 def update(c):
