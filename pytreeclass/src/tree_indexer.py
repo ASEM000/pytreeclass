@@ -27,7 +27,7 @@ def _at_get(tree, where, **kwargs):
         """
         # not jittable as size can changes
         # does not change pytreestructure ,
-        raise NotImplementedError(f"Get node type ={type(lhs)} is not implemented.")
+        ... 
 
     @_node_get.register(jnp.ndarray)
     def _(lhs, where, array_as_leaves: bool = True):
@@ -48,7 +48,7 @@ def _at_get(tree, where, **kwargs):
 
     @dispatch(argnum=1)
     def __at_get(tree, where, **kwargs):
-        raise NotImplementedError(f"Get where type = {type(where)} is not implemented.")
+        ...
 
     @__at_get.register(type(tree))
     def _(tree, where, **kwargs):
@@ -85,7 +85,7 @@ def _at_set(tree, set_value, where, **kwargs):
         Returns:
             Modified node value.
         """
-        raise NotImplementedError(f"Set node type = {type(lhs)} is unknown.")
+        ...
 
     @_node_set.register(jnp.ndarray)
     def _(lhs, where, set_value, array_as_leaves: bool = True):
@@ -142,7 +142,7 @@ def _at_apply(tree, func, where, **kwargs):
         Raises:
             NotImplementedError:
         """
-        raise NotImplementedError(f"Apply node type= {type(lhs)} is not implemented.")
+        ... 
 
     @_node_apply.register(jnp.ndarray)
     def _(lhs, where, func, array_as_leaves: bool = True):
@@ -162,9 +162,7 @@ def _at_apply(tree, func, where, **kwargs):
 
     @dispatch(argnum=2)
     def __at_apply(tree, func, where, **kwargs):
-        raise NotImplementedError(
-            f"Apply where type = {type(where)} is not implemented."
-        )
+        ...
 
     @__at_apply.register(type(tree))
     def _(tree, func, where, **kwargs):
@@ -190,7 +188,7 @@ def _at_apply(tree, func, where, **kwargs):
 
 @dispatch(argnum=2)
 def _at_reduce(tree, set_value, where, **kwargs):
-    raise NotImplementedError(f"Reduce where type = {type(where)} is not implemented.")
+    ...
 
 
 @_at_reduce.register(pytreeclass.src.tree_base.treeBase)
