@@ -269,4 +269,9 @@ class treeIndexer:
 
                 return getterSetterIndexer()
 
+            @__getitem__.register(type(Ellipsis))
+            def _(inner_self, arg):
+                """Ellipsis as an alias for all elements"""
+                return self.at.__getitem__(self == self)
+                
         return indexer()

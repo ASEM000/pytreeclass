@@ -320,12 +320,24 @@ def test_apply_and_its_derivatives():
     rhs = init.at[init == init].apply(lambda x: x**2)
     assert is_treeclass_equal(lhs, rhs)
 
+    lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
+    rhs = init.at[...].apply(lambda x: x**2)
+    assert is_treeclass_equal(lhs, rhs)
+
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
     rhs = init.at[init == init].apply(lambda x: x + 1)
     assert is_treeclass_equal(lhs, rhs)
 
+    lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
+    rhs = init.at[...].apply(lambda x: x + 1)
+    assert is_treeclass_equal(lhs, rhs)
+
     lhs = A(20, 30, jnp.array([20, 30, 40, 50, 60]))
     rhs = init.at[init == init].apply(lambda x: (x + 1) * 10)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(20, 30, jnp.array([20, 30, 40, 50, 60]))
+    rhs = init.at[...].apply(lambda x: (x + 1) * 10)
     assert is_treeclass_equal(lhs, rhs)
 
     @treeclass
@@ -357,8 +369,16 @@ def test_apply_and_its_derivatives():
     rhs = init.at[init == init].add(1)
     assert is_treeclass_equal(lhs, rhs)
 
+    lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
+    rhs = init.at[...].add(1)
+    assert is_treeclass_equal(lhs, rhs)
+
     lhs = A(0.5, 1.0, jnp.array([0.5, 1.0, 1.5, 2.0, 2.5]))
     rhs = init.at[init == init].divide(2.0)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(0.5, 1.0, jnp.array([0.5, 1.0, 1.5, 2.0, 2.5]))
+    rhs = init.at[...].divide(2.0)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 1, jnp.array([1, 1, 1, 1, 1]))
@@ -369,8 +389,16 @@ def test_apply_and_its_derivatives():
     rhs = init.at[init == init].max(4)
     assert is_treeclass_equal(lhs, rhs)
 
+    lhs = A(4, 4, jnp.array([4, 4, 4, 4, 5]))
+    rhs = init.at[...].max(4)
+    assert is_treeclass_equal(lhs, rhs)
+
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
     rhs = init.at[init == init].power(2)
+    assert is_treeclass_equal(lhs, rhs)
+
+    lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
+    rhs = init.at[...].power(2)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 2, jnp.array([1, 2, 3, 16, 25]))
