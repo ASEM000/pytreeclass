@@ -6,8 +6,8 @@ from typing import Sequence
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 import requests
-from jax.tree_util import tree_flatten
 
 from .tree_util import (
     _reduce_count_and_size,
@@ -121,7 +121,8 @@ def _vbox(*text: tuple[str, ...]) -> str:
     """
 
     max_width = (
-        max(tree_flatten([[len(t) for t in item.split("\n")] for item in text])[0]) + 0
+        max(jtu.tree_flatten([[len(t) for t in item.split("\n")] for item in text])[0])
+        + 0
     )
 
     top = f"┌{'─'*max_width}┐"
@@ -302,7 +303,12 @@ def _summary_str(tree, array=None, render: str = "string") -> str:
         *tree.__tree_fields__[0].values(),
         *tree.__tree_fields__[1].values(),
     )
-    treeclass_leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
+
+    treeclass_leaves = (
+        [tree]
+        if is_treeclass_leaf(tree)
+        else [leaf for leaf in all_leaves if is_treeclass(leaf)]
+    )
 
     for index, leaf in enumerate(treeclass_leaves):
         name, count, size = _summary_line(leaf)
@@ -346,11 +352,11 @@ def _summary_str(tree, array=None, render: str = "string") -> str:
         f"Total # :\t\t{_format_count(total_count)}\n"
         f"Dynamic #:\t\t{_format_count(dynamic_count)}\n"
         f"Static/Frozen #:\t{_format_count(static_count)}\n"
-        f"{'-'*_table_width}\n"
+        f"{'-'*max([_table_width,40])}\n"
         f"Total size :\t\t{_format_size(total_size)}\n"
         f"Dynamic size:\t\t{_format_size(dynamic_size)}\n"
         f"Static/Frozen size:\t{_format_size(static_size)}\n"
-        f"{'='*_table_width}"
+        f"{'='*max([_table_width,40])}"
     )
 
     return layer__table + "\n" + param_summary
@@ -382,7 +388,12 @@ def _summary_md(tree, array=None) -> str:
         *tree.__tree_fields__[0].values(),
         *tree.__tree_fields__[1].values(),
     )
-    treeclass_leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
+
+    treeclass_leaves = (
+        [tree]
+        if is_treeclass_leaf(tree)
+        else [leaf for leaf in all_leaves if is_treeclass(leaf)]
+    )
 
     for index, leaf in enumerate(treeclass_leaves):
         name, count, size = _summary_line(leaf)
