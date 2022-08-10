@@ -44,6 +44,14 @@ def test_getter_by_val():
 
     assert is_treeclass_equal(B, C)
 
+    B = A.at[(A > 0) & (A < 5)].get()
+    C = level2(
+        d=level1(a=1, b=None, c=jnp.array([1, 2, 3, 4])),
+        e=level1(a=2, b=None, c=jnp.array([])),
+    )
+
+    assert is_treeclass_equal(B, C)
+
     B = A.at[A == 0].get()
     C = level2(
         d=level1(a=None, b=None, c=jnp.array([])),

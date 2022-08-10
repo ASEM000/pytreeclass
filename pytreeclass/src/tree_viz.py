@@ -558,7 +558,7 @@ def tree_diagram(tree):
     return fmt.expandtabs(4)
 
 
-def tree_indent(tree, width: int = 40) -> str:
+def tree_repr(tree, width: int = 40) -> str:
     """Prertty print `treeclass_leaves`
 
     Returns:

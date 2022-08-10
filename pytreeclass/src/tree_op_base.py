@@ -184,6 +184,8 @@ class treeOpBase:
     __abs__ = _append_math_op(op.abs)
     __add__ = _append_math_op(op.add)
     __radd__ = _append_math_op(op.add)
+    __and__ = _append_math_op(op.and_)
+    __rand__ = _append_math_op(op.and_)
     __eq__ = _append_math_eq_ne(op.eq)
     __floordiv__ = _append_math_op(op.floordiv)
     __ge__ = _append_math_op(op.ge)
@@ -208,18 +210,18 @@ class treeOpBase:
     __truediv__ = _append_math_op(op.truediv)
     __xor__ = _append_math_op(op.xor)
 
-    def __or__(lhs,rhs):
-        def _or(x,y):
-            if isinstance(x,jnp.ndarray):
+    def __or__(lhs, rhs):
+        def _or(x, y):
+            if isinstance(x, jnp.ndarray):
                 if jnp.array_equal(x, jnp.array([])):
                     # array([]) > None
                     return y if y is not None else x
-                elif isinstance(y, jnp.ndarray) :
+                elif isinstance(y, jnp.ndarray):
                     if jnp.array_equal(y, jnp.array([])):
                         return x if x is not None else y
                     else:
-                        return jnp.logical_or(x,y)
-            else :
-                return x or y 
+                        return jnp.logical_or(x, y)
+            else:
+                return x or y
 
-        return jtu.tree_map(_or, lhs, rhs, is_leaf= lambda x:x is None )
+        return jtu.tree_map(_or, lhs, rhs, is_leaf=lambda x: x is None)

@@ -7,7 +7,7 @@ from typing import Any
 import jax.tree_util as jtu
 
 from .tree_util import _freeze_nodes, _unfreeze_nodes, is_treeclass, is_treeclass_leaf
-from .tree_viz import summary, tree_box, tree_diagram, tree_indent, tree_str
+from .tree_viz import summary, tree_box, tree_diagram, tree_repr, tree_str
 
 
 def tree_fields(self):
@@ -203,7 +203,7 @@ class treeBase:
         return self.__dict__[name]
 
     def __repr__(self):
-        return tree_indent(self)
+        return tree_repr(self)
 
     def __str__(self):
         return tree_str(self)
