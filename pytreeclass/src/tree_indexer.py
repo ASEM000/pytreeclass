@@ -6,7 +6,6 @@ from typing import Any
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-import pytreeclass
 import pytreeclass.src.tree_util as ptu
 from pytreeclass.src.decorator_util import dispatch
 
@@ -188,14 +187,18 @@ def _at_apply(tree, func, where, **kwargs):
 """ Reduce """
 
 
-@dispatch(argnum=2)
 def _at_reduce(tree, set_value, where, **kwargs):
-    raise NotImplementedError(f"Reduce where type = {type(where)} is not implemented.")
+    @dispatch(argnum=2)
+    def __at_reduce(tree, set_value, where, **kwargs):
+        raise NotImplementedError(
+            f"Reduce where type = {type(where)} is not implemented."
+        )
 
+    @__at_reduce.register(type(tree))
+    def _(tree, func, where, initializer=0, **kwargs):
+        return jtu.tree_reduce(func, tree.at[where].get(), initializer)
 
-@_at_reduce.register(pytreeclass.src.tree_base.treeBase)
-def _(tree, func, where, initializer=0, **kwargs):
-    return jtu.tree_reduce(func, tree.at[where].get(), initializer)
+    return __at_reduce(tree, set_value, where, **kwargs)
 
 
 class treeIndexerMethods:
