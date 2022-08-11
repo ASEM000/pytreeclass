@@ -114,9 +114,7 @@ class treeBase:
         Returns:
             Frozen state boolean.
         """
-        if hasattr(self, "__frozen_treeclass__"):
-            return self.__frozen_treeclass__
-        return False
+        return True if hasattr(self, "__frozen_tree_fields__") else False 
 
     def __setattr__(self, name, value):
         if self.frozen:
@@ -134,10 +132,10 @@ class treeBase:
 
         dynamic, static = self.__tree_fields__
 
-        cache = {"__frozen_treeclass__": self.frozen}
+        cache = dict()
 
         if hasattr(self, "__frozen_tree_fields__"):
-            cache = {**cache, **{"__frozen_tree_fields__": self.__frozen_tree_fields__}}
+            cache["__frozen_tree_fields__"] = self.__frozen_tree_fields__
 
         return (dynamic.values(), (dynamic.keys(), static, cache))
 
@@ -229,7 +227,7 @@ class explicitTreeBase:
             Pair of dynamic and static dictionaries.
         """
         if self.frozen:
-            if not hasattr(self, "__frozen_tree_fields__"):
+            if self.__frozen_tree_fields__ is None :
                 object.__setattr__(self, "__frozen_tree_fields__", tree_fields(self))
 
             return self.__frozen_tree_fields__
@@ -248,7 +246,7 @@ class implicitTreeBase:
             Pair of dynamic and static dictionaries.
         """
         if self.frozen:
-            if not hasattr(self, "__frozen_tree_fields__"):
+            if self.__frozen_tree_fields__ is None :
                 register_treeclass_instance_variables(self)
                 object.__setattr__(self, "__frozen_tree_fields__", tree_fields(self))
 
