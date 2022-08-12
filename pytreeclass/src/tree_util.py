@@ -86,7 +86,7 @@ def sequential_tree_shape_eval(tree, array):
     return shape
 
 
-def _node_count_and_size(node : Any) -> tuple[complex,complex] :
+def _node_count_and_size(node: Any) -> tuple[complex, complex]:
     """Calculate number and size of `trainable` and `non-trainable` parameters
 
     Args:
@@ -94,7 +94,7 @@ def _node_count_and_size(node : Any) -> tuple[complex,complex] :
 
     Returns:
         complex: Complex number of (inexact, non-exact) parameters for count/size
-    """    
+    """
 
     if isinstance(node, (jnp.ndarray, np.ndarray)):
         # inexact(trainable) array

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from dataclasses import MISSING, field
 from typing import Any
 
@@ -92,7 +91,7 @@ class treeBase:
         >>> model = model.freeze()
         >>> assert model.frozen == True
         """
-        return _freeze_nodes(copy.deepcopy(self))
+        return _freeze_nodes(jtu.tree_unflatten(*jtu.tree_flatten(self)[::-1]))
 
     def unfreeze(self):
         """Unfreeze treeclass.
@@ -105,7 +104,7 @@ class treeBase:
         >>> model = model.unfreeze()
         >>> assert model.frozen == False
         """
-        return _unfreeze_nodes(copy.deepcopy(self))
+        return _unfreeze_nodes(jtu.tree_unflatten(*jtu.tree_flatten(self)[::-1]))
 
     @property
     def frozen(self) -> bool:
@@ -114,7 +113,7 @@ class treeBase:
         Returns:
             Frozen state boolean.
         """
-        return True if hasattr(self, "__frozen_tree_fields__") else False 
+        return True if hasattr(self, "__frozen_tree_fields__") else False
 
     def __setattr__(self, name, value):
         if self.frozen:
@@ -227,7 +226,7 @@ class explicitTreeBase:
             Pair of dynamic and static dictionaries.
         """
         if self.frozen:
-            if self.__frozen_tree_fields__ is None :
+            if self.__frozen_tree_fields__ is None:
                 object.__setattr__(self, "__frozen_tree_fields__", tree_fields(self))
 
             return self.__frozen_tree_fields__
@@ -246,7 +245,7 @@ class implicitTreeBase:
             Pair of dynamic and static dictionaries.
         """
         if self.frozen:
-            if self.__frozen_tree_fields__ is None :
+            if self.__frozen_tree_fields__ is None:
                 register_treeclass_instance_variables(self)
                 object.__setattr__(self, "__frozen_tree_fields__", tree_fields(self))
 
