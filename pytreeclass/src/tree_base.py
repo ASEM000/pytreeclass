@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import MISSING, field
-from typing import Any
+from typing import Any, Sequence
 
+import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from .tree_util import _freeze_nodes, _unfreeze_nodes, is_treeclass, is_treeclass_leaf
 from .tree_viz import summary, tree_box, tree_diagram, tree_repr, tree_str
 
+PyTree = Any
 
-def tree_fields(self):
+
+def tree_fields(self) -> tuple[dict[str, Any], dict[str, Any]]:
     static, dynamic = dict(), dict()
     # register other variables defined in other context
     # if their value is an instance of treeclass
@@ -31,36 +34,32 @@ def tree_fields(self):
             raise ValueError(f"field={fi.name} is not declared.")
 
         # if the parent is frozen, freeze all dataclass fields children
-        if self.frozen:
+        # exclude any string
+        # and mutate the class field static metadata for this variable for future instances
+        excluded_by_type = isinstance(value, str)
+        excluded_by_meta = fi.metadata.get("static", False)
+
+        if excluded_by_type:
+            # add static type to metadata to class and its instance
+            static[fi.name] = value
+            updated_field = self.__dataclass_fields__[fi.name]
+            object.__setattr__(
+                updated_field,
+                "metadata",
+                {**updated_field.metadata, **{"static": True}},
+            )
+            self.__dataclass_fields__[fi.name] = updated_field
+
+        elif excluded_by_meta:
             static[fi.name] = value
 
         else:
-            # exclude any string
-            # and mutate the class field static metadata for this variable for future instances
-            excluded_by_type = isinstance(value, str)
-            excluded_by_meta = ("static" in fi.metadata) and fi.metadata["static"] is True  # fmt: skip
-
-            if excluded_by_type:
-                # add static type to metadata to class and its instance
-                static[fi.name] = value
-                updated_field = self.__dataclass_fields__[fi.name]
-                object.__setattr__(
-                    updated_field,
-                    "metadata",
-                    {**updated_field.metadata, **{"static": True}},
-                )
-                self.__dataclass_fields__[fi.name] = updated_field
-
-            elif excluded_by_meta:
-                static[fi.name] = value
-
-            else:
-                dynamic[fi.name] = value
+            dynamic[fi.name] = value
 
     return (dynamic, static)
 
 
-def register_treeclass_instance_variables(self):
+def register_treeclass_instance_variables(self) -> None:
     for var_name, var_value in self.__dict__.items():
         # check if a variable in self.__dict__ is treeclass
         # that is not defined in fields
@@ -80,7 +79,7 @@ def register_treeclass_instance_variables(self):
 
 
 class treeBase:
-    def freeze(self):
+    def freeze(self) -> PyTree:
         """Freeze treeclass.
 
         Returns:
@@ -93,7 +92,7 @@ class treeBase:
         """
         return _freeze_nodes(jtu.tree_unflatten(*jtu.tree_flatten(self)[::-1]))
 
-    def unfreeze(self):
+    def unfreeze(self) -> PyTree:
         """Unfreeze treeclass.
 
         Returns:
@@ -115,7 +114,7 @@ class treeBase:
         """
         return True if hasattr(self, "__frozen_tree_fields__") else False
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any) -> None:
         if self.frozen:
             raise ValueError("Cannot set a value to a frozen treeclass.")
         object.__setattr__(self, name, value)
@@ -131,12 +130,11 @@ class treeBase:
 
         dynamic, static = self.__tree_fields__
 
-        cache = dict()
+        if self.frozen:
+            return (), ((), {"__frozen_tree_fields__": (dynamic, static)})
 
-        if hasattr(self, "__frozen_tree_fields__"):
-            cache["__frozen_tree_fields__"] = self.__frozen_tree_fields__
-
-        return (dynamic.values(), (dynamic.keys(), static, cache))
+        else:
+            return dynamic.values(), (dynamic.keys(), static)
 
     @classmethod
     def tree_unflatten(cls, treedef, children):
@@ -152,31 +150,77 @@ class treeBase:
         Returns:
             New class instance
         """
-        dynamic_vals, dynamic_keys = children, treedef[0]
-        static_keys, static_vals = treedef[1].keys(), treedef[1].values()
-        cache_keys, cache_vals = treedef[2].keys(), treedef[2].values()
-
-        attrs = dict(
-            zip(
-                (*dynamic_keys, *static_keys, *cache_keys),
-                (*dynamic_vals, *static_vals, *cache_vals),
-            )
-        )
-
         new_cls = cls.__new__(cls)
+
+        tree_fields = treedef[1].get("__frozen_tree_fields__", None)
+
+        if tree_fields is not None:
+            object.__setattr__(new_cls, "__frozen_tree_fields__", tree_fields)
+            dynamic, static = tree_fields
+            attrs = {**dynamic, **static}
+
+        else:
+
+            dynamic_vals, dynamic_keys = children, treedef[0]
+            static_keys, static_vals = treedef[1].keys(), treedef[1].values()
+
+            attrs = dict(
+                zip(
+                    (*dynamic_keys, *static_keys),
+                    (*dynamic_vals, *static_vals),
+                )
+            )
+
         for k, v in attrs.items():
             object.__setattr__(new_cls, k, v)
         return new_cls
 
     @property
-    def treeclass_leaves(self):
-        """Tree leaves of treeclass"""
+    def treeclass_leaves(self) -> Sequence[PyTree | Any, ...]:
+        """Tree leaves of treeclass
+
+        Example:
+
+            @pytc.treeclass
+            class T0:
+                a : int = 1
+                b : int = 2
+
+            @pytc.treeclass
+            class T1:
+                c : T0 = T0()
+                d : int = 3
+
+
+            @pytc.treeclass
+            class T2 :
+                e : T1 = T1()
+                f : T0 = T0()
+                g : int = 4
+
+            >>> t = T2()
+
+            >>> print(t.tree_diagram())
+            T2
+                ├── e=T1
+                │   ├── c=T0
+                │   │   ├── a=1
+                │   │   └── b=2
+                │   └── d=3
+                ├── f=T0
+                │   ├── a=1
+                │   └── b=2
+                └── g=4
+
+            >>> print(t.treeclass_leaves)
+            [T0(a=1,b=2), 3, T0(a=1,b=2), 4]
+        """
         return jtu.tree_leaves(self, is_treeclass_leaf)
 
     def __hash__(self):
         return hash(tuple(*jtu.tree_flatten(self)))
 
-    def asdict(self):
+    def asdict(self) -> dict[str, Any]:
         """Dictionary representation of dataclass_fields"""
         dynamic, static = self.__tree_fields__
         return {**dynamic, **static}
@@ -205,13 +249,13 @@ class treeBase:
     def __str__(self):
         return tree_str(self)
 
-    def summary(self, array=None):
+    def summary(self, array: jnp.ndarray = None) -> str:
         return summary(self, array)
 
-    def tree_diagram(self):
+    def tree_diagram(self) -> str:
         return tree_diagram(self)
 
-    def tree_box(self, array=None):
+    def tree_box(self, array: jnp.ndarray = None) -> str:
         return tree_box(self, array)
 
 
@@ -225,13 +269,10 @@ class explicitTreeBase:
         Returns:
             Pair of dynamic and static dictionaries.
         """
-        if self.frozen:
-            if self.__frozen_tree_fields__ is None:
-                object.__setattr__(self, "__frozen_tree_fields__", tree_fields(self))
-
+        if self.__dict__.get("__frozen_tree_fields__", None) is not None:
             return self.__frozen_tree_fields__
-
-        return tree_fields(self)
+        else:
+            return tree_fields(self)
 
 
 class implicitTreeBase:
@@ -244,11 +285,7 @@ class implicitTreeBase:
         Returns:
             Pair of dynamic and static dictionaries.
         """
-        if self.frozen:
-            if self.__frozen_tree_fields__ is None:
-                register_treeclass_instance_variables(self)
-                object.__setattr__(self, "__frozen_tree_fields__", tree_fields(self))
-
+        if self.__dict__.get("__frozen_tree_fields__", None) is not None:
             return self.__frozen_tree_fields__
 
         else:

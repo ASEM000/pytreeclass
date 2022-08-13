@@ -10,6 +10,8 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
+from pytreeclass.src.decorator_util import dispatch
+
 
 def static_field(**kwargs):
     """ignore from pytree computations"""
@@ -66,7 +68,7 @@ def is_excluded(fld: dataclasses.field, instance: Any) -> bool:
     val = instance.__dict__[fld.name]
     excluded_types = (str,)  # automatically excluded str from jax computations
     excluded_by_type = isinstance(val, excluded_types)
-    excluded_by_meta = ("static" in fld.metadata) and fld.metadata["static"] is True  # fmt: skip
+    excluded_by_meta = fld.metadata.get("static", False)
     return excluded_by_type or excluded_by_meta
 
 
@@ -123,6 +125,45 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
         size = complex(0, 0)
 
     return (count, size)
+
+
+def _dispatched_tree_map(func, lhs, rhs=None):
+    """Slightly different implementation to jtu.tree_map for unary/binary operators broadcasting"""
+
+    @dispatch(argnum=1)
+    def _tree_map(lhs, rhs):
+        raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
+
+    @_tree_map.register(type(lhs))
+    def _(lhs, rhs):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+        rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
+
+        lhs_leaves = [
+            func(lhs_leaf, rhs_leaf) if rhs_leaf is not None else lhs_leaf
+            for (lhs_leaf, rhs_leaf) in zip(lhs_leaves, rhs_leaves)
+        ]
+
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    @_tree_map.register(int)
+    @_tree_map.register(float)
+    @_tree_map.register(complex)
+    @_tree_map.register(bool)
+    def _(lhs, rhs):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+
+        lhs_leaves = [func(leaf, rhs) for leaf in lhs_leaves]
+
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    @_tree_map.register(type(None))
+    def _(lhs, rhs=None):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+        lhs_leaves = [func(lhs_node) for lhs_node in lhs_leaves]
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    return _tree_map(lhs, rhs)
 
 
 def _reduce_count_and_size(leaf):

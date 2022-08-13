@@ -2,7 +2,6 @@ from dataclasses import field
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy as np
 import pytest
 
@@ -282,9 +281,9 @@ def test_jit_freeze():
             x = self.l3(x)
             return x
 
-    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
-    x = jnp.linspace(0, 1, 100)[:, None]
-    y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
+    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=5, key=jax.random.PRNGKey(0))
+    x = jnp.linspace(0, 1, 10)[:, None]
+    y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (10, 1)) * 0.01
 
     @jax.value_and_grad
     def loss_func(model, x, y):
@@ -293,11 +292,14 @@ def test_jit_freeze():
 
     @jax.jit
     def update(model, x, y):
-        value, grads = loss_func(model, x, y)
-        return value, jtu.tree_map(lambda x, y: x - 1e-3 * y, model, grads)
+        return _, model
+        # value, grads = loss_func(model, x, y)
+        # return value, jtu.tree_map(lambda x, y: x - 1e-3 * y, model, grads)
 
-    # for __ in range(2):
-    #     model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
-    #     model.l2 = model.l2.freeze()
-    #     for _ in range(1,101):
-    #         value, model = update(model,x,y)
+    for __ in range(2):
+        model = StackedLinear(
+            in_dim=1, out_dim=1, hidden_dim=5, key=jax.random.PRNGKey(0)
+        )
+        model = model.freeze()
+        for _ in range(1, 101):
+            val, model = update(model, x, y)
