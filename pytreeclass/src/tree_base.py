@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from .tree_util import _freeze_nodes, _unfreeze_nodes, is_treeclass, is_treeclass_leaf
-from .tree_viz import summary, tree_box, tree_diagram, tree_repr, tree_str
+from .tree_viz import tree_box, tree_diagram, tree_repr, tree_str, tree_summary
 
 PyTree = Any
 
@@ -250,7 +250,7 @@ class treeBase:
         return tree_str(self)
 
     def summary(self, array: jnp.ndarray = None) -> str:
-        return summary(self, array)
+        return tree_summary(self, array)
 
     def tree_diagram(self) -> str:
         return tree_diagram(self)
