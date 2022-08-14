@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import functools
 import operator as op
 
@@ -16,30 +15,7 @@ def _append_math_op(func):
 
     @functools.wraps(func)
     def wrapper(self, rhs=None):
-        @dispatch(argnum=1)
-        def inner_wrapper(self, rhs):
-            raise NotImplementedError((f"rhs of type {type(rhs)} is not implemented."))
-
-        @inner_wrapper.register(type(None))
-        def _(self, rhs):
-            return jtu.tree_map(lambda x: func(x), self)
-
-        @inner_wrapper.register(int)
-        @inner_wrapper.register(float)
-        @inner_wrapper.register(complex)
-        @inner_wrapper.register(bool)
-        def _(self, rhs):
-            return (
-                jtu.tree_map(lambda x: func(x, rhs), self) if rhs is not None else self
-            )
-
-        @inner_wrapper.register(type(self))
-        def _(self, rhs):
-            return jtu.tree_map(
-                lambda x, y: func(x, y) if y is not None else x, self, rhs
-            )
-
-        return inner_wrapper(self, rhs)
+        return ptu._dispatched_tree_map(func, self, rhs)
 
     return wrapper
 
@@ -70,29 +46,20 @@ def _append_math_eq_ne(func):
     def wrapper(self, rhs):
         @dispatch(argnum=1)
         def inner_wrapper(tree, where, **kwargs):
-            raise NotImplementedError(
-                f"where of type {type(where)} is not implemented."
-            )
+            raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
 
         @inner_wrapper.register(int)
         @inner_wrapper.register(float)
         @inner_wrapper.register(complex)
         @inner_wrapper.register(bool)
-        def _(self, rhs):
-            return (
-                jtu.tree_map(lambda x: func(x, rhs), self) if rhs is not None else self
-            )
-
         @inner_wrapper.register(type(self))
         def _(self, rhs):
-            return jtu.tree_map(
-                lambda x, y: func(x, y) if y is not None else x, self, rhs
-            )
+            return ptu._dispatched_tree_map(func, self, rhs)
 
         @inner_wrapper.register(str)
         def _(tree, where, **kwargs):
             """Filter by field name"""
-            tree_copy = copy.deepcopy(tree)
+            tree_copy = jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
             def recurse(tree, where, **kwargs):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
@@ -116,7 +83,7 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(type)
         def _(tree, where, **kwargs):
             """Filter by type"""
-            tree_copy = copy.deepcopy(tree)
+            tree_copy = jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
             def recurse(tree, where, **kwargs):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
@@ -141,7 +108,7 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(dict)
         def _(tree, where, **kwargs):
             """Filter by metadata"""
-            tree_copy = copy.deepcopy(tree)
+            tree_copy = jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
             def in_metadata(fld):
                 kws, vals = zip(*where.items())

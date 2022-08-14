@@ -43,6 +43,7 @@ def test_model():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
+        notes: str = field(default="string")
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -67,52 +68,74 @@ def test_model():
             self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
             self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
 
-    x = jnp.linspace(0, 1, 100)[:, None]
-    # y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
+        def __call__(self, x):
+            x = self.l1(x)
+            x = jax.nn.tanh(x)
+            x = self.l2(x)
+            x = jax.nn.tanh(x)
+            x = self.l3(x)
+
+            return x
 
     model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
+    x = jnp.linspace(0, 1, 100)[:, None]
 
     assert (
-        tree_viz.summary(model)
+        (model.freeze().summary())
         # trunk-ignore(flake8/E501)
-        == "┌──────┬───────┬───────┬───────────────────┐\n│Type  │Param #│Size   │Config             │\n├──────┼───────┼───────┼───────────────────┤\n│Linear│256    │1.00KB │weight=f32[1,128]  │\n│      │(0)    │(0.00B)│bias=f32[1,128]    │\n├──────┼───────┼───────┼───────────────────┤\n│Linear│16,512 │64.50KB│weight=f32[128,128]│\n│      │(0)    │(0.00B)│bias=f32[1,128]    │\n├──────┼───────┼───────┼───────────────────┤\n│Linear│129    │516.00B│weight=f32[128,1]  │\n│      │(0)    │(0.00B)│bias=f32[1,1]      │\n└──────┴───────┴───────┴───────────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t16,897(0)\nStatic/Frozen #:\t0(0)\n--------------------------------------------\nTotal size :\t\t66.00KB(0.00B)\nDynamic size:\t\t66.00KB(0.00B)\nStatic/Frozen size:\t0.00B(0.00B)\n============================================"
+        == "┌────────┬──────┬───────┬───────┬───────────────────┐\n│Name    │Type  │Param #│Size   │Config             │\n├────────┼──────┼───────┼───────┼───────────────────┤\n│l1      │Linear│256    │1.00KB │weight=f32[1,128]  │\n│(frozen)│      │(0)    │(0.00B)│bias=f32[1,128]    │\n├────────┼──────┼───────┼───────┼───────────────────┤\n│l2      │Linear│16,512 │64.50KB│weight=f32[128,128]│\n│(frozen)│      │(0)    │(0.00B)│bias=f32[1,128]    │\n├────────┼──────┼───────┼───────┼───────────────────┤\n│l3      │Linear│129    │516.00B│weight=f32[128,1]  │\n│(frozen)│      │(0)    │(0.00B)│bias=f32[1,1]      │\n└────────┴──────┴───────┴───────┴───────────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t16,897(0)\n-----------------------------------------------------\nTotal size :\t\t66.00KB(0.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t66.00KB(0.00B)\n====================================================="
+    )
+    assert (
+        (model.summary())
+        # trunk-ignore(flake8/E501)
+        == "┌────┬──────┬───────┬───────┬───────────────────┐\n│Name│Type  │Param #│Size   │Config             │\n├────┼──────┼───────┼───────┼───────────────────┤\n│l1  │Linear│256    │1.00KB │weight=f32[1,128]  │\n│    │      │(0)    │(0.00B)│bias=f32[1,128]    │\n├────┼──────┼───────┼───────┼───────────────────┤\n│l2  │Linear│16,512 │64.50KB│weight=f32[128,128]│\n│    │      │(0)    │(0.00B)│bias=f32[1,128]    │\n├────┼──────┼───────┼───────┼───────────────────┤\n│l3  │Linear│129    │516.00B│weight=f32[128,1]  │\n│    │      │(0)    │(0.00B)│bias=f32[1,1]      │\n└────┴──────┴───────┴───────┴───────────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t16,897(0)\nStatic/Frozen #:\t0(0)\n-------------------------------------------------\nTotal size :\t\t66.00KB(0.00B)\nDynamic size:\t\t66.00KB(0.00B)\nStatic/Frozen size:\t0.00B(0.00B)\n================================================="
+    )
+    assert (
+        (model.summary(array=x))
+        # trunk-ignore(flake8/E501)
+        == "┌────┬──────┬───────┬───────┬───────────────────┬────────────┐\n│Name│Type  │Param #│Size   │Config             │Input/Output│\n├────┼──────┼───────┼───────┼───────────────────┼────────────┤\n│l1  │Linear│256    │1.00KB │weight=f32[1,128]  │f32[100,1]  │\n│    │      │(0)    │(0.00B)│bias=f32[1,128]    │f32[100,128]│\n├────┼──────┼───────┼───────┼───────────────────┼────────────┤\n│l2  │Linear│16,512 │64.50KB│weight=f32[128,128]│f32[100,128]│\n│    │      │(0)    │(0.00B)│bias=f32[1,128]    │f32[100,128]│\n├────┼──────┼───────┼───────┼───────────────────┼────────────┤\n│l3  │Linear│129    │516.00B│weight=f32[128,1]  │f32[100,128]│\n│    │      │(0)    │(0.00B)│bias=f32[1,1]      │f32[100,1]  │\n└────┴──────┴───────┴───────┴───────────────────┴────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t16,897(0)\nStatic/Frozen #:\t0(0)\n--------------------------------------------------------------\nTotal size :\t\t66.00KB(0.00B)\nDynamic size:\t\t66.00KB(0.00B)\nStatic/Frozen size:\t0.00B(0.00B)\n=============================================================="
+    )
+    assert (
+        (model.freeze().summary(array=x))
+        # trunk-ignore(flake8/E501)
+        == "┌────────┬──────┬───────┬───────┬───────────────────┬────────────┐\n│Name    │Type  │Param #│Size   │Config             │Input/Output│\n├────────┼──────┼───────┼───────┼───────────────────┼────────────┤\n│l1      │Linear│256    │1.00KB │weight=f32[1,128]  │f32[100,1]  │\n│(frozen)│      │(0)    │(0.00B)│bias=f32[1,128]    │f32[100,128]│\n├────────┼──────┼───────┼───────┼───────────────────┼────────────┤\n│l2      │Linear│16,512 │64.50KB│weight=f32[128,128]│f32[100,128]│\n│(frozen)│      │(0)    │(0.00B)│bias=f32[1,128]    │f32[100,128]│\n├────────┼──────┼───────┼───────┼───────────────────┼────────────┤\n│l3      │Linear│129    │516.00B│weight=f32[128,1]  │f32[100,128]│\n│(frozen)│      │(0)    │(0.00B)│bias=f32[1,1]      │f32[100,1]  │\n└────────┴──────┴───────┴───────┴───────────────────┴────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t16,897(0)\n------------------------------------------------------------------\nTotal size :\t\t66.00KB(0.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t66.00KB(0.00B)\n=================================================================="
     )
 
     assert (
-        model.summary()
+        (model.freeze().tree_diagram())
         # trunk-ignore(flake8/E501)
-        == "┌──────┬───────┬───────┬───────────────────┐\n│Type  │Param #│Size   │Config             │\n├──────┼───────┼───────┼───────────────────┤\n│Linear│256    │1.00KB │weight=f32[1,128]  │\n│      │(0)    │(0.00B)│bias=f32[1,128]    │\n├──────┼───────┼───────┼───────────────────┤\n│Linear│16,512 │64.50KB│weight=f32[128,128]│\n│      │(0)    │(0.00B)│bias=f32[1,128]    │\n├──────┼───────┼───────┼───────────────────┤\n│Linear│129    │516.00B│weight=f32[128,1]  │\n│      │(0)    │(0.00B)│bias=f32[1,1]      │\n└──────┴───────┴───────┴───────────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t16,897(0)\nStatic/Frozen #:\t0(0)\n--------------------------------------------\nTotal size :\t\t66.00KB(0.00B)\nDynamic size:\t\t66.00KB(0.00B)\nStatic/Frozen size:\t0.00B(0.00B)\n============================================"
+        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └x─ notes='string'  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └x─ notes='string'  \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └x─ notes='string'      "
+    )
+    assert (
+        (model.tree_diagram())
+        # trunk-ignore(flake8/E501)
+        == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   ├── bias=f32[1,128]\n    │   └x─ notes='string'  \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   ├── bias=f32[1,128]\n    │   └x─ notes='string'  \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        ├── bias=f32[1,1]\n        └x─ notes='string'      "
+    )
+    assert (
+        (model.freeze().tree_diagram())
+        # trunk-ignore(flake8/E501)
+        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └x─ notes='string'  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └x─ notes='string'  \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └x─ notes='string'      "
     )
 
     assert (
-        tree_viz.tree_box(model, array=x)
+        tree_viz.tree_summary_md(model)
         # trunk-ignore(flake8/E501)
-        == "┌──────────────────────────────────────┐\n│StackedLinear[Parent]                 │\n├──────────────────────────────────────┤\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,1]   ││\n││ Linear[l1] │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear[l2] │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear[l3] │────────┼──────────────┤│\n││            │ Output │ f32[100,1]   ││\n│└────────────┴────────┴──────────────┘│\n└──────────────────────────────────────┘"
+        == "<table>\n<tr>\n<td align = 'center'> Name </td>\n<td align = 'center'> Type </td>\n<td align = 'center'> Param #</td>\n<td align = 'center'> Size </td>\n<td align = 'center'> Config </td>\n<td align = 'center'> Input/Output </td>\n</tr>\n<tr><td align = 'center'> l1 </td><td align = 'center'> Linear </td><td align = 'center'> 256\n(0) </td><td align = 'center'> 1.00KB\n(0.00B) </td><td align = 'center'> weight=f32[1,128]<br>bias=f32[1,128] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> l2 </td><td align = 'center'> Linear </td><td align = 'center'> 16,512\n(0) </td><td align = 'center'> 64.50KB\n(0.00B) </td><td align = 'center'> weight=f32[128,128]<br>bias=f32[1,128] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> l3 </td><td align = 'center'> Linear </td><td align = 'center'> 129\n(0) </td><td align = 'center'> 516.00B\n(0.00B) </td><td align = 'center'> weight=f32[128,1]<br>bias=f32[1,1] </td><td align = 'center'>  </td></tr></table>\n\n#### Summary\n<table><tr><td>Total #</td><td>16,897(0)</td></tr><tr><td>Dynamic #</td><td>16,897(0)</td></tr><tr><td>Static/Frozen #</td><td>0(0)</td></tr><tr><td>Total size</td><td>66.00KB(0.00B)</td></tr><tr><td>Dynamic size</td><td>66.00KB(0.00B)</td></tr><tr><td>Static/Frozen size</td><td>0.00B(0.00B)</td></tr></table>"
     )
-
     assert (
-        model.tree_box(array=x)
+        tree_viz.tree_summary_md(model, array=x)
         # trunk-ignore(flake8/E501)
-        == "┌──────────────────────────────────────┐\n│StackedLinear[Parent]                 │\n├──────────────────────────────────────┤\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,1]   ││\n││ Linear[l1] │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear[l2] │────────┼──────────────┤│\n││            │ Output │ f32[100,128] ││\n│└────────────┴────────┴──────────────┘│\n│┌────────────┬────────┬──────────────┐│\n││            │ Input  │ f32[100,128] ││\n││ Linear[l3] │────────┼──────────────┤│\n││            │ Output │ f32[100,1]   ││\n│└────────────┴────────┴──────────────┘│\n└──────────────────────────────────────┘"
+        == "<table>\n<tr>\n<td align = 'center'> Name </td>\n<td align = 'center'> Type </td>\n<td align = 'center'> Param #</td>\n<td align = 'center'> Size </td>\n<td align = 'center'> Config </td>\n<td align = 'center'> Input/Output </td>\n</tr>\n<tr><td align = 'center'> l1 </td><td align = 'center'> Linear </td><td align = 'center'> 256\n(0) </td><td align = 'center'> 1.00KB\n(0.00B) </td><td align = 'center'> weight=f32[1,128]<br>bias=f32[1,128] </td><td align = 'center'> f32[100,1]\nf32[100,128] </td></tr><tr><td align = 'center'> l2 </td><td align = 'center'> Linear </td><td align = 'center'> 16,512\n(0) </td><td align = 'center'> 64.50KB\n(0.00B) </td><td align = 'center'> weight=f32[128,128]<br>bias=f32[1,128] </td><td align = 'center'> f32[100,128]\nf32[100,128] </td></tr><tr><td align = 'center'> l3 </td><td align = 'center'> Linear </td><td align = 'center'> 129\n(0) </td><td align = 'center'> 516.00B\n(0.00B) </td><td align = 'center'> weight=f32[128,1]<br>bias=f32[1,1] </td><td align = 'center'> f32[100,128]\nf32[100,1] </td></tr></table>\n\n#### Summary\n<table><tr><td>Total #</td><td>16,897(0)</td></tr><tr><td>Dynamic #</td><td>16,897(0)</td></tr><tr><td>Static/Frozen #</td><td>0(0)</td></tr><tr><td>Total size</td><td>66.00KB(0.00B)</td></tr><tr><td>Dynamic size</td><td>66.00KB(0.00B)</td></tr><tr><td>Static/Frozen size</td><td>0.00B(0.00B)</td></tr></table>"
     )
-
     assert (
-        tree_viz.tree_diagram(model)
+        tree_viz.tree_summary_md(model.freeze())
         # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   └── bias=f32[1,128] \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   └── bias=f32[1,128] \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        └── bias=f32[1,1]       "
+        == "<table>\n<tr>\n<td align = 'center'> Name </td>\n<td align = 'center'> Type </td>\n<td align = 'center'> Param #</td>\n<td align = 'center'> Size </td>\n<td align = 'center'> Config </td>\n<td align = 'center'> Input/Output </td>\n</tr>\n<tr><td align = 'center'> l1<br>(frozen) </td><td align = 'center'> Linear </td><td align = 'center'> 256\n(0) </td><td align = 'center'> 1.00KB\n(0.00B) </td><td align = 'center'> weight=f32[1,128]<br>bias=f32[1,128] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> l2<br>(frozen) </td><td align = 'center'> Linear </td><td align = 'center'> 16,512\n(0) </td><td align = 'center'> 64.50KB\n(0.00B) </td><td align = 'center'> weight=f32[128,128]<br>bias=f32[1,128] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> l3<br>(frozen) </td><td align = 'center'> Linear </td><td align = 'center'> 129\n(0) </td><td align = 'center'> 516.00B\n(0.00B) </td><td align = 'center'> weight=f32[128,1]<br>bias=f32[1,1] </td><td align = 'center'>  </td></tr></table>\n\n#### Summary\n<table><tr><td>Total #</td><td>16,897(0)</td></tr><tr><td>Dynamic #</td><td>0(0)</td></tr><tr><td>Static/Frozen #</td><td>16,897(0)</td></tr><tr><td>Total size</td><td>66.00KB(0.00B)</td></tr><tr><td>Dynamic size</td><td>0.00B(0.00B)</td></tr><tr><td>Static/Frozen size</td><td>66.00KB(0.00B)</td></tr></table>"
     )
-
     assert (
-        model.tree_diagram()
+        tree_viz.tree_summary_md(model.freeze(), array=x)
         # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   └── bias=f32[1,128] \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   └── bias=f32[1,128] \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        └── bias=f32[1,1]       "
-    )
-
-    model = model.freeze()
-    assert (
-        model.tree_box(array=x)
-        # trunk-ignore(flake8/E501)
-        == "┌──────────────────────────────────────────────┐\n│StackedLinear[Parent]                         │\n├──────────────────────────────────────────────┤\n│┌────────────────────┬────────┬──────────────┐│\n││                    │ Input  │ f32[100,1]   ││\n││ Linear[l1](Frozen) │────────┼──────────────┤│\n││                    │ Output │ f32[100,128] ││\n│└────────────────────┴────────┴──────────────┘│\n│┌────────────────────┬────────┬──────────────┐│\n││                    │ Input  │ f32[100,128] ││\n││ Linear[l2](Frozen) │────────┼──────────────┤│\n││                    │ Output │ f32[100,128] ││\n│└────────────────────┴────────┴──────────────┘│\n│┌────────────────────┬────────┬──────────────┐│\n││                    │ Input  │ f32[100,128] ││\n││ Linear[l3](Frozen) │────────┼──────────────┤│\n││                    │ Output │ f32[100,1]   ││\n│└────────────────────┴────────┴──────────────┘│\n└──────────────────────────────────────────────┘"
+        == "<table>\n<tr>\n<td align = 'center'> Name </td>\n<td align = 'center'> Type </td>\n<td align = 'center'> Param #</td>\n<td align = 'center'> Size </td>\n<td align = 'center'> Config </td>\n<td align = 'center'> Input/Output </td>\n</tr>\n<tr><td align = 'center'> l1<br>(frozen) </td><td align = 'center'> Linear </td><td align = 'center'> 256\n(0) </td><td align = 'center'> 1.00KB\n(0.00B) </td><td align = 'center'> weight=f32[1,128]<br>bias=f32[1,128] </td><td align = 'center'> f32[100,1]\nf32[100,128] </td></tr><tr><td align = 'center'> l2<br>(frozen) </td><td align = 'center'> Linear </td><td align = 'center'> 16,512\n(0) </td><td align = 'center'> 64.50KB\n(0.00B) </td><td align = 'center'> weight=f32[128,128]<br>bias=f32[1,128] </td><td align = 'center'> f32[100,128]\nf32[100,128] </td></tr><tr><td align = 'center'> l3<br>(frozen) </td><td align = 'center'> Linear </td><td align = 'center'> 129\n(0) </td><td align = 'center'> 516.00B\n(0.00B) </td><td align = 'center'> weight=f32[128,1]<br>bias=f32[1,1] </td><td align = 'center'> f32[100,128]\nf32[100,1] </td></tr></table>\n\n#### Summary\n<table><tr><td>Total #</td><td>16,897(0)</td></tr><tr><td>Dynamic #</td><td>0(0)</td></tr><tr><td>Static/Frozen #</td><td>16,897(0)</td></tr><tr><td>Total size</td><td>66.00KB(0.00B)</td></tr><tr><td>Dynamic size</td><td>0.00B(0.00B)</td></tr><tr><td>Static/Frozen size</td><td>66.00KB(0.00B)</td></tr></table>"
     )
 
 
@@ -184,119 +207,6 @@ def test_save_viz():
             model, os.path.join("tests", "test_summary_md"), method="summary_md"
         )
         is None
-    )
-
-
-def test_summary_md():
-    @pytc.treeclass
-    class Linear:
-
-        weight: jnp.ndarray
-        bias: jnp.ndarray
-        notes: str = field(default="string")
-
-        def __init__(self, key, in_dim, out_dim):
-            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
-                2 / in_dim
-            )
-            self.bias = jnp.ones((1, out_dim))
-
-    @pytc.treeclass
-    class StackedLinear:
-        def __init__(self, key, in_dim, out_dim, hidden_dim):
-
-            keys = jax.random.split(key, 3)
-
-            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
-            self.l2 = Linear(key=keys[1], in_dim=hidden_dim, out_dim=hidden_dim)
-            self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
-
-    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
-
-    # trunk-ignore(flake8/E501)
-    fmt = "<table>\n<tr>\n<td align = 'center'> Type </td>\n<td align = 'center'> Param #</td>\n<td align = 'center'> Size </td>\n<td align = 'center'> Config </td>\n<td align = 'center'> Output </td>\n</tr>\n<tr><td align = 'center'> Linear </td><td align = 'center'> 20\n(0) </td><td align = 'center'> 80.00B\n(0.00B) </td><td align = 'center'> weight=f32[1,10]<br>bias=f32[1,10] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> Linear </td><td align = 'center'> 110\n(0) </td><td align = 'center'> 440.00B\n(0.00B) </td><td align = 'center'> weight=f32[10,10]<br>bias=f32[1,10] </td><td align = 'center'>  </td></tr><tr><td align = 'center'> Linear </td><td align = 'center'> 11\n(0) </td><td align = 'center'> 44.00B\n(0.00B) </td><td align = 'center'> weight=f32[10,1]<br>bias=f32[1,1] </td><td align = 'center'>  </td></tr></table>\n\n#### Summary\n<table><tr><td>Total #</td><td>141(0)</td></tr><tr><td>Dynamic #</td><td>141(0)</td></tr><tr><td>Static/Frozen #</td><td>0(0)</td></tr><tr><td>Total size</td><td>564.00B(0.00B)</td></tr><tr><td>Dynamic size</td><td>564.00B(0.00B)</td></tr><tr><td>Static/Frozen size</td><td>0.00B(0.00B)</td></tr></table>"
-    pred = tree_viz.summary(model, render="md")
-    assert pred == fmt
-
-    @pytc.treeclass
-    class StackedLinear:
-        l1: Linear
-        l2: Linear
-        l3: Linear
-
-        def __init__(self, key, in_dim, out_dim):
-
-            keys = jax.random.split(key, 3)
-
-            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=128)
-            self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
-            self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
-
-    model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
-
-    model = model.freeze()
-
-    assert (
-        model.summary()
-        # trunk-ignore(flake8/E501)
-        == "┌────────┬───────┬───────┬───────────────────┐\n│Type    │Param #│Size   │Config             │\n├────────┼───────┼───────┼───────────────────┤\n│Linear  │256    │1.00KB │weight=f32[1,128]  │\n│(frozen)│(0)    │(0.00B)│bias=f32[1,128]    │\n│        │       │       │notes='string'     │\n├────────┼───────┼───────┼───────────────────┤\n│Linear  │16,512 │64.50KB│weight=f32[128,128]│\n│(frozen)│(0)    │(0.00B)│bias=f32[1,128]    │\n│        │       │       │notes='string'     │\n├────────┼───────┼───────┼───────────────────┤\n│Linear  │129    │516.00B│weight=f32[128,1]  │\n│(frozen)│(0)    │(0.00B)│bias=f32[1,1]      │\n│        │       │       │notes='string'     │\n└────────┴───────┴───────┴───────────────────┘\nTotal # :\t\t16,897(0)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t16,897(0)\n----------------------------------------------\nTotal size :\t\t66.00KB(0.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t66.00KB(0.00B)\n=============================================="
-    )
-
-    @pytc.treeclass
-    class Linear:
-        # Any variable not wrapped with @pytc.treeclass
-        # should be declared as a dataclass field here
-        weight: jnp.ndarray
-        bias: jnp.ndarray
-
-        def __init__(self, key, in_dim, out_dim):
-            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
-                2 / in_dim
-            )
-            self.bias = jnp.ones((1, out_dim))
-
-        # def __call__(self, x):
-        #     return x @ self.weight + self.bias
-
-    @pytc.treeclass
-    class StackedLinear:
-        def __init__(self, key, in_dim, out_dim, hidden_dim):
-            keys = jax.random.split(key, 3)
-
-            # Declaring l1,l2,l3 as dataclass_fields is optional
-            # as l1,l2,l3 are Linear class that is wrapped with @pytc.treeclass
-            # To strictly include nodes defined in dataclass fields
-            # use `@pytc.treeclass(field_only=True)`
-            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
-            self.l2 = Linear(key=keys[1], in_dim=hidden_dim, out_dim=hidden_dim)
-            self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
-
-        # def __call__(self, x):
-        #     x = self.l1(x)
-        #     x = jax.nn.tanh(x)
-        #     x = self.l2(x)
-        #     x = jax.nn.tanh(x)
-        #     x = self.l3(x)
-
-        #     return x
-
-    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
-
-    # x = jnp.linspace(0, 1, 100)[:, None]
-    # y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
-
-    model = model.freeze()
-
-    assert (
-        model.summary()
-        # trunk-ignore(flake8/E501)
-        == "┌────────┬───────┬───────┬─────────────────┐\n│Type    │Param #│Size   │Config           │\n├────────┼───────┼───────┼─────────────────┤\n│Linear  │20     │80.00B │weight=f32[1,10] │\n│(frozen)│(0)    │(0.00B)│bias=f32[1,10]   │\n├────────┼───────┼───────┼─────────────────┤\n│Linear  │110    │440.00B│weight=f32[10,10]│\n│(frozen)│(0)    │(0.00B)│bias=f32[1,10]   │\n├────────┼───────┼───────┼─────────────────┤\n│Linear  │11     │44.00B │weight=f32[10,1] │\n│(frozen)│(0)    │(0.00B)│bias=f32[1,1]    │\n└────────┴───────┴───────┴─────────────────┘\nTotal # :\t\t141(0)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t141(0)\n--------------------------------------------\nTotal size :\t\t564.00B(0.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t564.00B(0.00B)\n============================================"
-    )
-
-    assert (
-        model.tree_diagram()
-        # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,10]\n    │   └#─ bias=f32[1,10]  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[10,10]\n    │   └#─ bias=f32[1,10]  \n    └#─ l3=Linear\n        ├#─ weight=f32[10,1]\n        └#─ bias=f32[1,1]       "
     )
 
 
@@ -414,6 +324,7 @@ def test_repr_true_false():
 
     assert (
         model.tree_diagram()
+        # trunk-ignore(flake8/E501)
         == "StackedLinear\n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   ├── bias=f32[1,128]\n    │   └x─ notes='string'  \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        ├── bias=f32[1,1]\n        └x─ notes='string'      "
     )
 

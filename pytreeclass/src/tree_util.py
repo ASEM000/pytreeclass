@@ -10,6 +10,8 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
+from pytreeclass.src.decorator_util import dispatch
+
 
 def static_field(**kwargs):
     """ignore from pytree computations"""
@@ -66,7 +68,7 @@ def is_excluded(fld: dataclasses.field, instance: Any) -> bool:
     val = instance.__dict__[fld.name]
     excluded_types = (str,)  # automatically excluded str from jax computations
     excluded_by_type = isinstance(val, excluded_types)
-    excluded_by_meta = ("static" in fld.metadata) and fld.metadata["static"] is True  # fmt: skip
+    excluded_by_meta = fld.metadata.get("static", False)
     return excluded_by_type or excluded_by_meta
 
 
@@ -86,7 +88,7 @@ def sequential_tree_shape_eval(tree, array):
     return shape
 
 
-def _node_count_and_size(node : Any) -> tuple[complex,complex] :
+def _node_count_and_size(node: Any) -> tuple[complex, complex]:
     """Calculate number and size of `trainable` and `non-trainable` parameters
 
     Args:
@@ -94,7 +96,7 @@ def _node_count_and_size(node : Any) -> tuple[complex,complex] :
 
     Returns:
         complex: Complex number of (inexact, non-exact) parameters for count/size
-    """    
+    """
 
     if isinstance(node, (jnp.ndarray, np.ndarray)):
         # inexact(trainable) array
@@ -125,6 +127,45 @@ def _node_count_and_size(node : Any) -> tuple[complex,complex] :
     return (count, size)
 
 
+def _dispatched_tree_map(func, lhs, rhs=None):
+    """Slightly different implementation to jtu.tree_map for unary/binary operators broadcasting"""
+
+    @dispatch(argnum=1)
+    def _tree_map(lhs, rhs):
+        raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
+
+    @_tree_map.register(type(lhs))
+    def _(lhs, rhs):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+        rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
+
+        lhs_leaves = [
+            func(lhs_leaf, rhs_leaf) if rhs_leaf is not None else lhs_leaf
+            for (lhs_leaf, rhs_leaf) in zip(lhs_leaves, rhs_leaves)
+        ]
+
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    @_tree_map.register(int)
+    @_tree_map.register(float)
+    @_tree_map.register(complex)
+    @_tree_map.register(bool)
+    def _(lhs, rhs):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+
+        lhs_leaves = [func(leaf, rhs) for leaf in lhs_leaves]
+
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    @_tree_map.register(type(None))
+    def _(lhs, rhs=None):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+        lhs_leaves = [func(lhs_node) for lhs_node in lhs_leaves]
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    return _tree_map(lhs, rhs)
+
+
 def _reduce_count_and_size(leaf):
     """reduce params count and params size of a tree of leaves"""
 
@@ -139,7 +180,7 @@ def _reduce_count_and_size(leaf):
 def _freeze_nodes(tree):
     """inplace freezing"""
     if is_treeclass(tree):
-        object.__setattr__(tree, "__frozen_treeclass__", True)
+        object.__setattr__(tree, "__frozen_tree_fields__", None)
         for kw, leaf in tree.__dataclass_fields__.items():
             _freeze_nodes(tree.__dict__[kw])
     return tree
@@ -148,7 +189,8 @@ def _freeze_nodes(tree):
 def _unfreeze_nodes(tree):
     """inplace unfreezing"""
     if is_treeclass(tree):
-        object.__setattr__(tree, "__frozen_treeclass__", False)
+        if hasattr(tree, "__frozen_tree_fields__"):
+            object.__delattr__(tree, "__frozen_tree_fields__")
         for kw, leaf in tree.__dataclass_fields__.items():
             _unfreeze_nodes(tree.__dict__[kw])
     return tree
