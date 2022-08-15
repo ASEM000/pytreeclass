@@ -146,6 +146,7 @@ def _dispatched_tree_map(func, lhs, rhs=None):
 
         return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
 
+    @_tree_map.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
     @_tree_map.register(int)
     @_tree_map.register(float)
     @_tree_map.register(complex)

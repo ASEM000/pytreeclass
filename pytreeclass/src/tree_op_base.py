@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import operator as op
 
+import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
@@ -53,6 +54,7 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(complex)
         @inner_wrapper.register(bool)
         @inner_wrapper.register(type(self))
+        @inner_wrapper.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
         def _(self, rhs):
             return ptu._dispatched_tree_map(func, self, rhs)
 

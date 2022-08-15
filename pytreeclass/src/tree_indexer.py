@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
@@ -28,6 +29,7 @@ def _at_get(tree, where, **kwargs):
         # does not change pytreestructure ,
         raise NotImplementedError(f"Get node type ={type(lhs)} is not implemented.")
 
+    @_node_get.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
     @_node_get.register(jnp.ndarray)
     def _(lhs, where, array_as_leaves: bool = True):
         return (
@@ -86,6 +88,7 @@ def _at_set(tree, set_value, where, **kwargs):
         """
         raise NotImplementedError(f"Set node type = {type(lhs)} is unknown.")
 
+    @_node_set.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
     @_node_set.register(jnp.ndarray)
     def _(lhs, where, set_value, array_as_leaves: bool = True):
         return (
@@ -143,6 +146,7 @@ def _at_apply(tree, func, where, **kwargs):
         """
         raise NotImplementedError(f"Apply node type= {type(lhs)} is not implemented.")
 
+    @_node_apply.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
     @_node_apply.register(jnp.ndarray)
     def _(lhs, where, func, array_as_leaves: bool = True):
         return (

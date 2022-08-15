@@ -1,11 +1,11 @@
 import jax
 import jax.tree_util as jtu
+import numpy.testing as npt
+import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
 
-
-import numpy.testing as npt
 
 def test_jit_freeze():
     @pytc.treeclass
@@ -100,3 +100,48 @@ def test_jit_freeze():
 
     for _ in range(2):
         value, model = train_step(x, y, epochs=20_000)
+
+
+def test_ops_with_jit():
+    @pytc.treeclass
+    class T0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @pytc.treeclass
+    class T1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: jnp.ndarray = jnp.array([1, 2, 3])
+
+    @jax.jit
+    def getter(tree):
+        return tree.at[...].get()
+
+    @jax.jit
+    def setter(tree):
+        return tree.at[...].set(0)
+
+    @jax.jit
+    def applier(tree):
+        return tree.at[...].apply(lambda _: 0)
+
+    with pytest.raises(jax.errors.ConcretizationTypeError):
+        getter(T0())
+
+    assert pytc.src.tree_util.is_treeclass_equal(T0(0, 0, 0), setter(T0()))
+
+    assert pytc.src.tree_util.is_treeclass_equal(T0(0, 0, 0), applier(T0()))
+
+    with pytest.raises(jax.errors.ConcretizationTypeError):
+        getter(T1())
+
+    assert pytc.src.tree_util.is_treeclass_equal(
+        T1(0, 0, 0, jnp.array([0, 0, 0])), setter(T1())
+    )
+
+    assert pytc.src.tree_util.is_treeclass_equal(
+        T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1())
+    )
