@@ -603,7 +603,7 @@ def tree_repr(tree, width: int = 40) -> str:
         children_length = len(stripped_string)
         return string if children_length > width else stripped_string
 
-    def recurse(tree, depth):
+    def recurse(tree, depth, frozen_state=None):
 
         nonlocal fmt
 
@@ -614,18 +614,21 @@ def tree_repr(tree, width: int = 40) -> str:
 
                 if fi.repr:
                     cur_node = tree.__dict__[fi.name]
-
+                    frozen_state = (
+                        cur_node.frozen if is_treeclass(cur_node) else frozen_state
+                    )
+                    frozen_str = "(Frozen)" if frozen_state else ""
                     # add newline by default
                     fmt += ("\n" + "\t" * depth) if fi.repr else ""
 
                     if is_treeclass(cur_node):
                         layer_class_name = f"{cur_node.__class__.__name__}"
-                        fmt += f"{fi.name}={layer_class_name}" + "("
+                        fmt += f"{fi.name}{frozen_str}={layer_class_name}" + "("
 
                         # capture children repr
                         start_cursor = len(fmt)
 
-                        recurse(cur_node, depth + 1)
+                        recurse(cur_node, depth + 1, cur_node.frozen)
 
                         # format children repr width
                         fmt = fmt[:start_cursor] + format_width(fmt[start_cursor:])
@@ -636,13 +639,13 @@ def tree_repr(tree, width: int = 40) -> str:
                         fmt += f"{fi.name}={_format_node(cur_node)}" + (
                             "," if i < (cur_children_count - 1) else ("")
                         )
-                        recurse(cur_node, depth)
+                        recurse(cur_node, depth, frozen_state)
 
                 elif not is_treeclass(tree):
-                    recurse(cur_node, depth)
+                    recurse(cur_node, depth, frozen_state)
 
     fmt = ""
-    recurse(tree, 1)
+    recurse(tree, 1, tree.frozen)
     fmt = f"{(tree.__class__.__name__)}({format_width(fmt,width)})"
 
     return fmt.expandtabs(2)
@@ -661,7 +664,7 @@ def tree_str(tree, width: int = 40) -> str:
         children_length = len(stripped_string)
         return string if children_length > width else stripped_string
 
-    def recurse(tree, depth):
+    def recurse(tree, depth, frozen_state):
 
         nonlocal fmt
 
@@ -672,18 +675,21 @@ def tree_str(tree, width: int = 40) -> str:
 
                 if fi.repr:
                     cur_node = tree.__dict__[fi.name]
-
+                    frozen_state = (
+                        cur_node.frozen if is_treeclass(cur_node) else frozen_state
+                    )
+                    frozen_str = "(Frozen)" if frozen_state else ""
                     # add newline by default
                     fmt += ("\n" + "\t" * depth) if fi.repr else ""
 
                     if is_treeclass(cur_node):
                         layer_class_name = f"{cur_node.__class__.__name__}"
-                        fmt += f"{fi.name}={layer_class_name}" + "("
+                        fmt += f"{fi.name}{frozen_str}={layer_class_name}" + "("
 
                         # capture children repr
                         start_cursor = len(fmt)
 
-                        recurse(cur_node, depth + 1)
+                        recurse(cur_node, depth + 1, frozen_state)
 
                         # format children repr width
                         fmt = fmt[:start_cursor] + format_width(fmt[start_cursor:])
@@ -700,13 +706,13 @@ def tree_str(tree, width: int = 40) -> str:
                         fmt += f"{fi.name}={cur_node_fmt}" + (
                             "," if i < (cur_children_count - 1) else ("")
                         )
-                        recurse(cur_node, depth)
+                        recurse(cur_node, depth, frozen_state)
 
                 elif not is_treeclass(tree):
                     recurse(cur_node, depth)
 
     fmt = ""
-    recurse(tree, 1)
+    recurse(tree, 1, tree.frozen)
     fmt = f"{(tree.__class__.__name__)}({format_width(fmt,width)})"
 
     return fmt.expandtabs(2)

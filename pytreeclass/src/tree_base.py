@@ -12,8 +12,17 @@ from .tree_viz import tree_box, tree_diagram, tree_repr, tree_str, tree_summary
 PyTree = Any
 
 
+class fieldDict(dict):
+    # dict will throw
+    # `ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()``
+    # while this implementation will not.
+    # relevant issue : https://github.com/google/jax/issues/11089
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+
 def tree_fields(self) -> tuple[dict[str, Any], dict[str, Any]]:
-    static, dynamic = dict(), dict()
+    static, dynamic = fieldDict(), fieldDict()
     # register other variables defined in other context
     # if their value is an instance of treeclass
     # to avoid redefining them as dataclass fields.
