@@ -65,7 +65,7 @@ def test_jit_freeze():
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
-        npt.assert_allclose(value, jnp.array(0.0012702086))
+        npt.assert_allclose(value, jnp.array(0.0012702086), atol=1e-4)
         return value, model
 
     for _ in range(2):
@@ -80,7 +80,7 @@ def test_jit_freeze():
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
-        npt.assert_allclose(value, jnp.array(0.00619382))
+        npt.assert_allclose(value, jnp.array(0.00619382), atol=1e-4)
         return value, model
 
     for _ in range(2):
@@ -95,7 +95,7 @@ def test_jit_freeze():
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
-        npt.assert_allclose(value, jnp.array(3.9368904))
+        npt.assert_allclose(value, jnp.array(3.9368904), atol=1e-4)
         return value, model
 
     for _ in range(2):
