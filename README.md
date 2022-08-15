@@ -1034,7 +1034,7 @@ flowchart LR
 </details>
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
-
+- [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
 - [Equinox](https://github.com/patrick-kidger/equinox)
 - [Treex](https://github.com/cgarciae/treex)
 - [tree-math](https://github.com/google/tree-math)
