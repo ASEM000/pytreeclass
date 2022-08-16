@@ -283,7 +283,7 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
 
         @dispatch(argnum=0)
         def _info(leaf):
-            """Any object"""
+            """Any non-treeclass object"""
             count, size = _reduce_count_and_size(leaf)
             return (count, size)
 
@@ -617,13 +617,13 @@ def tree_repr(tree, width: int = 40) -> str:
                     frozen_state = (
                         cur_node.frozen if is_treeclass(cur_node) else frozen_state
                     )
-                    frozen_str = "(Frozen)" if frozen_state else ""
+                    frozen_str = "#" if frozen_state else ""
                     # add newline by default
                     fmt += ("\n" + "\t" * depth) if fi.repr else ""
 
                     if is_treeclass(cur_node):
                         layer_class_name = f"{cur_node.__class__.__name__}"
-                        fmt += f"{fi.name}{frozen_str}={layer_class_name}" + "("
+                        fmt += f"{frozen_str}{fi.name}={layer_class_name}" + "("
 
                         # capture children repr
                         start_cursor = len(fmt)
@@ -678,13 +678,13 @@ def tree_str(tree, width: int = 40) -> str:
                     frozen_state = (
                         cur_node.frozen if is_treeclass(cur_node) else frozen_state
                     )
-                    frozen_str = "(Frozen)" if frozen_state else ""
+                    frozen_str = "#" if frozen_state else ""
                     # add newline by default
                     fmt += ("\n" + "\t" * depth) if fi.repr else ""
 
                     if is_treeclass(cur_node):
                         layer_class_name = f"{cur_node.__class__.__name__}"
-                        fmt += f"{fi.name}{frozen_str}={layer_class_name}" + "("
+                        fmt += f"{frozen_str}{fi.name}={layer_class_name}" + "("
 
                         # capture children repr
                         start_cursor = len(fmt)
@@ -728,7 +728,6 @@ def _tree_mermaid(tree):
         nonlocal fmt
 
         if is_treeclass(tree):
-            is_frozen = tree.frozen
 
             for i, fi in enumerate(tree.__dataclass_fields__.values()):
                 if fi.repr:
@@ -748,7 +747,7 @@ def _tree_mermaid(tree):
                         cur_id = node_id((*cur, prev_id))
                         is_static = "static" in fi.metadata and fi.metadata["static"]
                         connector = (
-                            "--x" if is_static else ("-.-" if is_frozen else "---")
+                            "--x" if is_static else ("-.-" if tree.frozen else "---")
                         )
                         fmt += f'\tid{prev_id} {connector} id{cur_id}["{fi.name}\\n{_format_node(cur_node)}"]'
                         recurse(cur_node, cur_depth + 1, cur_id)

@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 import jax
 
-from .tree_base import explicitTreeBase, implicitTreeBase, treeBase
-from .tree_indexer import treeIndexer
-from .tree_op_base import treeOpBase
+from pytreeclass.src.tree_base import explicitTreeBase, implicitTreeBase, treeBase
+from pytreeclass.src.tree_indexer import treeIndexer
+from pytreeclass.src.tree_op_base import treeOpBase
 
 
 def treeclass(*args, **kwargs):

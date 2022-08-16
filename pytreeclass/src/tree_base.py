@@ -6,8 +6,19 @@ from typing import Any, Sequence
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from .tree_util import _freeze_nodes, _unfreeze_nodes, is_treeclass, is_treeclass_leaf
-from .tree_viz import tree_box, tree_diagram, tree_repr, tree_str, tree_summary
+from pytreeclass.src.tree_util import (
+    _freeze_nodes,
+    _unfreeze_nodes,
+    is_treeclass,
+    is_treeclass_leaf,
+)
+from pytreeclass.src.tree_viz import (
+    tree_box,
+    tree_diagram,
+    tree_repr,
+    tree_str,
+    tree_summary,
+)
 
 PyTree = Any
 

@@ -91,10 +91,16 @@ def _at_set(tree, set_value, where, **kwargs):
     @_node_set.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
     @_node_set.register(jnp.ndarray)
     def _(lhs, where, set_value, array_as_leaves: bool = True):
+
+        # valid set_values
+        assert isinstance(
+            set_value, (int, float, complex, jnp.ndarray, bool,type(None))
+        ), f"Set value of type {type(set_value)} is not of valid type."
+
         return (
-            jnp.where(where, set_value, lhs)  # JITable
+            jnp.where(where, set_value, lhs)
             if array_as_leaves
-            else (set_value if jnp.all(where) else lhs)  # Not JITable
+            else (set_value if jnp.all(where) else lhs)
         )
 
     @_node_set.register(int)

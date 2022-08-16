@@ -69,6 +69,7 @@ def _append_math_eq_ne(func):
                     cur_node = tree.__dict__[fld.name]
                     if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
                         if fld.name == where:
+                            # broadcast True to all subtrees
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
                             recurse(cur_node, where, **kwargs)
