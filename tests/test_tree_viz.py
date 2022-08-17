@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from dataclasses import field
 from typing import Any, Callable, Sequence
@@ -346,6 +348,20 @@ def test_repr_true_false():
         "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="
     )
 
+
+def test_tree_with_containers():
+    @pytc.treeclass
+    class Linear:
+
+        weight: jnp.ndarray
+        bias: jnp.ndarray
+
+        def __init__(self, in_dim, out_dim, key):
+            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
+                2 / in_dim
+            )
+            self.bias = jnp.ones((out_dim,))
+
     @pytc.treeclass
     class MLP:
         layers: Any
@@ -368,13 +384,6 @@ def test_repr_true_false():
                 for ki, in_dim, out_dim in zip(keys, layers[:-1], layers[1:])
             ]
 
-        def __call__(self, x):
-            for layer in self.layers[:-1]:
-                x = layer(x)
-                x = self.act_func(x)
-
-            return self.layers[-1](x)
-
     model = MLP((1, 2, 1))
 
     assert (
@@ -385,5 +394,22 @@ def test_repr_true_false():
     assert (
         f"{model!s}"
         # trunk-ignore(flake8/E501)
-        == "MLP(\n  layers=[\n      Linear(\n        weight=[[ 2.7783015 -1.6938814]],\n        bias=[1. 1.]),\n      Linear(\n        weight=[[ 0.68648785] [-0.5842739 ]],\n        bias=[1.])],)"
+        == "MLP(\n  layers=[\n      Linear(\n        weight=[[-0.13426289 -0.12849723]],\n        bias=[1. 1.]),\n      Linear(\n        weight=[[ 1.2636864] [-0.0423024]],\n        bias=[1.])],)"
     )
+
+    @pytc.treeclass
+    class test:
+        a: Any
+
+    assert f"{test({'a':1,'b':'s'*20})}" == "test(a={a:1,b:ssssssssssssssssssss})"
+    assert f"{test({'a':1,'b':'s'*20})!r}" == "test(a={a:1,b:'ssssssssssssssssssss'})"
+
+    assert f"{test((1,2,3))!s}" == "test(a=(1,2,3))"
+    assert f"{test([1,2,3])!r}" == "test(a=[1,2,3])"
+    assert (
+        (f"{test([jnp.ones([4,4]),2,3])}")
+        # trunk-ignore(flake8/E501)
+        == "test(\n  a=[\n      [[1. 1. 1. 1.]\n       [1. 1. 1. 1.]\n       [1. 1. 1. 1.]\n       [1. 1. 1. 1.]],\n      2,\n      3])"
+    )
+    assert (f"{test([jnp.ones([4,4]),2,3])!r}") == "test(a=[f32[4,4],2,3])"
+    assert f"{test({'a':1,'b':jnp.array([1,2,3])})!r}" == "test(a={a:1,b:i32[3]})"

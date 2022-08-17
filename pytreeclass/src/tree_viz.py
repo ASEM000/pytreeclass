@@ -71,7 +71,7 @@ def _format_node_repr(node, *args, **kwargs):
     def _(node, depth=0):
         return (
             "[\n"
-            + ",\n".join(["\t" * (depth + 1) + f"{layer!r}" for layer in node])
+            + ",\n".join(["\t" * (depth + 1) + __format_node_repr(k) for k in node])
             + "]"
         )
 
@@ -79,7 +79,7 @@ def _format_node_repr(node, *args, **kwargs):
     def _(node, depth=0):
         return (
             "(\n"
-            + ",\n".join(["\t" * (depth + 1) + f"{layer!r}" for layer in node])
+            + ",\n".join(["\t" * (depth + 1) + __format_node_repr(k) for k in node])
             + ")"
         )
 
@@ -87,7 +87,12 @@ def _format_node_repr(node, *args, **kwargs):
     def _(node, depth=0):
         return (
             "{\n"
-            + ",\n".join(["\t" * (depth + 1) + f"{k}:{v!r}" for k, v in node.items()])
+            + ",\n".join(
+                [
+                    "\t" * (depth + 1) + f"{k}:{__format_node_repr(v)}"
+                    for k, v in node.items()
+                ]
+            )
             + "}"
         )
 
