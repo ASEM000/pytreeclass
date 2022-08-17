@@ -38,7 +38,7 @@ def test_freezing_unfreezing():
     assert a.d.frozen is True
     assert (
         pytc.tree_viz.tree_diagram(a)
-    ) == "B\n    ├── c=3\n    └── d=A\n        ├#─ a=1\n        └#─ b=2     "
+    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
 
     @pytc.treeclass(field_only=True)
     class A:
@@ -68,10 +68,10 @@ def test_freezing_unfreezing():
     assert a.d.frozen is True
     assert (
         pytc.tree_viz.tree_diagram(a)
-    ) == "B\n    ├── c=3\n    └── d=A\n        ├#─ a=1\n        └#─ b=2     "
+    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
     assert (
         a.tree_diagram()
-    ) == "B\n    ├── c=3\n    └── d=A\n        ├#─ a=1\n        └#─ b=2     "
+    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
 
     @pytc.treeclass
     class Linear:

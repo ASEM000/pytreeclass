@@ -94,7 +94,7 @@ def _at_set(tree, set_value, where, **kwargs):
 
         # valid set_values
         assert isinstance(
-            set_value, (int, float, complex, jnp.ndarray, bool,type(None))
+            set_value, (int, float, complex, jnp.ndarray, bool, type(None))
         ), f"Set value of type {type(set_value)} is not of valid type."
 
         return (
