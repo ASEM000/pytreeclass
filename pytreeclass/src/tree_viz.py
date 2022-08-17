@@ -43,10 +43,14 @@ def _format_count(node_count, newline=False):
     return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
 
 
-def _format_node(node):
-    """format shape and dtype of jnp.array"""
+def _format_node_repr(node, *args, **kwargs):
+    @dispatch(argnum=0)
+    def __format_node_repr(node, *args, **kwargs):
+        return f"{node!r}"
 
-    if isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
+    @__format_node_repr.register(jnp.ndarray)
+    @__format_node_repr.register(jax.ShapeDtypeStruct)
+    def _(node, *args, **kwargs):
         replace_tuple = (
             ("int", "i"),
             ("float", "f"),
@@ -63,8 +67,93 @@ def _format_node(node):
             formatted_string = formatted_string.replace(lhs, rhs)
         return formatted_string
 
-    else:
+    @__format_node_repr.register(list)
+    def _(node, depth=0):
+        return (
+            "[\n"
+            + ",\n".join(["\t" * (depth + 1) + f"{layer!r}" for layer in node])
+            + "]"
+        )
+
+    @__format_node_repr.register(tuple)
+    def _(node, depth=0):
+        return (
+            "(\n"
+            + ",\n".join(["\t" * (depth + 1) + f"{layer!r}" for layer in node])
+            + ")"
+        )
+
+    @__format_node_repr.register(dict)
+    def _(node, depth=0):
+        return (
+            "{\n"
+            + ",\n".join(["\t" * (depth + 1) + f"{k}:{v!r}" for k, v in node.items()])
+            + "}"
+        )
+
+    return __format_node_repr(node, *args, **kwargs)
+
+
+def _format_node_str(node, *args, **kwargs):
+    @dispatch(argnum=0)
+    def __format_node_str(node, depth=0):
+        multiline = "\n" in f"{node!s}"
+        string = ("\n" + "\t" * (depth + 3)) if multiline else ""
+        string += ("\n" + "\t" * (depth + 3)).join(f"{node!s}".split("\n"))
+        return string
+
+    @__format_node_str.register(list)
+    def _(node, depth=0):
+        string = ",\n".join(f"{layer!s}" for layer in node)
+        shifted = "\t" * (depth + 3) + ("\n" + "\t" * (depth + 3)).join(
+            string.split("\n")
+        )
+        return "[\n" + shifted + "]"
+
+    @__format_node_str.register(tuple)
+    def _(node, depth=0):
+        string = ",\n".join(f"{layer!s}" for layer in node)
+        shifted = "\t" * (depth + 3) + ("\n" + "\t" * (depth + 3)).join(
+            string.split("\n")
+        )
+        return "(\n" + shifted + ")"
+
+    @__format_node_str.register(dict)
+    def _(node, depth=0):
+        string = ",\n".join(f"{k}:{v!s}" for k, v in node.items())
+        shifted = "\t" * (depth + 3) + ("\n" + "\t" * (depth + 3)).join(
+            string.split("\n")
+        )
+        return "{\n" + shifted + "}"
+
+    return __format_node_str(node, depth=0)
+
+
+def _format_node_diagram(node, *args, **kwargs):
+    @dispatch(argnum=0)
+    def __format_node_diagram(node, *args, **kwargs):
         return f"{node!r}"
+
+    @__format_node_diagram.register(jnp.ndarray)
+    @__format_node_diagram.register(jax.ShapeDtypeStruct)
+    def _(node, *args, **kwargs):
+        replace_tuple = (
+            ("int", "i"),
+            ("float", "f"),
+            ("complex", "c"),
+            (",)", ")"),
+            ("(", "["),
+            (")", "]"),
+            (" ", ""),
+        )
+
+        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
+
+        for lhs, rhs in replace_tuple:
+            formatted_string = formatted_string.replace(lhs, rhs)
+        return formatted_string
+
+    return __format_node_diagram(node, *args, **kwargs)
 
 
 # Box drawing
@@ -325,16 +414,16 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
                     config_str = (
                         "<br>".join(
                             [
-                                f"{k}={_format_node(v)}"
+                                f"{k}={_format_node_repr(v)}"
                                 for k, v in cur_node.__tree_fields__[0].items()
                             ]
                         )
                         if is_treeclass(cur_node)
-                        else f"{fi.name}={_format_node(cur_node)}"
+                        else f"{fi.name}={_format_node_repr(cur_node)}"
                     )
 
                     shape_str = (
-                        f"{_format_node(indim_shape[i])}\n{_format_node(outdim_shape[i])}"
+                        f"{_format_node_repr(indim_shape[i])}\n{_format_node_repr(outdim_shape[i])}"
                         if array is not None
                         else ""
                     )
@@ -438,16 +527,16 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
                     config_str = (
                         "\n".join(
                             [
-                                f"{k}={_format_node(v)}"
+                                f"{k}={_format_node_repr(v)}"
                                 for k, v in cur_node.__tree_fields__[0].items()
                             ]
                         )
                         if is_treeclass(cur_node)
-                        else f"{fi.name}={_format_node(cur_node)}"
+                        else f"{fi.name}={_format_node_repr(cur_node)}"
                     )
 
                     shape_str = (
-                        f"{_format_node(indim_shape[i])}\n{_format_node(outdim_shape[i])}"
+                        f"{_format_node_repr(indim_shape[i])}\n{_format_node_repr(outdim_shape[i])}"
                         if array is not None
                         else ""
                     )
@@ -499,8 +588,8 @@ def tree_box(tree, array=None):
             frozen_stmt = "(Frozen)" if tree.frozen else ""
             box = _layer_box(
                 f"{tree.__class__.__name__}[{parent_name}]{frozen_stmt}",
-                _format_node(shapes[0]) if array is not None else None,
-                _format_node(shapes[1]) if array is not None else None,
+                _format_node_repr(shapes[0]) if array is not None else None,
+                _format_node_repr(shapes[1]) if array is not None else None,
             )
 
             if shapes is not None:
@@ -517,7 +606,7 @@ def tree_box(tree, array=None):
                     level_nodes += [f"{recurse(cur_node,fi.name)}"]
 
                 else:
-                    level_nodes += [_vbox(f"{fi.name}={_format_node(cur_node)}")]
+                    level_nodes += [_vbox(f"{fi.name}={_format_node_repr(cur_node)}")]
 
             return _vbox(
                 f"{tree.__class__.__name__}[{parent_name}]", "\n".join(level_nodes)
@@ -555,7 +644,7 @@ def tree_diagram(tree):
             )
 
             FMT += f"└{mark}─ " if is_last_field else f"├{mark}─ "
-            FMT += f"{field_item.name}={_format_node(node_item)}"
+            FMT += f"{field_item.name}={_format_node_diagram(node_item)}"
 
         recurse(node_item, parent_level_count + [1], frozen_state)
 
@@ -632,7 +721,9 @@ def tree_repr(tree, width: int = 40) -> str:
 
         if field_item.repr:
             FMT += "\n" + "\t" * depth
-            FMT += f"{field_item.name}={format_width(_format_node(node_item))}"
+            FMT += (
+                f"{field_item.name}={format_width(_format_node_repr(node_item,depth))}"
+            )
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, frozen_state)
@@ -653,58 +744,6 @@ def tree_repr(tree, width: int = 40) -> str:
 
             FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
             FMT += "" if is_last_field else ","
-
-    @recurse_field.register(list)
-    def _(field_item, node_item, depth, frozen_state, is_last_field):
-        nonlocal FMT
-
-        if field_item.repr:
-            FMT += "\n" + "\t" * depth
-
-            repr_node = (
-                "[\n"
-                + ",\n".join(["\t" * (depth + 1) + f"{layer!r}" for layer in node_item])
-                + "]"
-            )
-
-            FMT += f"{field_item.name}={format_width(repr_node)}"
-            FMT += "" if is_last_field else ","
-
-        recurse(node_item, depth, frozen_state)
-
-    @recurse_field.register(tuple)
-    def _(field_item, node_item, depth, frozen_state, is_last_field):
-        nonlocal FMT
-
-        if field_item.repr:
-            FMT += "\n" + "\t" * depth
-
-            repr_node = (
-                "(\n"
-                + ",\n".join(["\t" * (depth + 1) + f"{layer!r}" for layer in node_item])
-                + ")"
-            )
-
-            FMT += f"{field_item.name}={format_width(repr_node)}"
-            FMT += "" if is_last_field else ","
-        recurse(node_item, depth, frozen_state)
-
-    @recurse_field.register(dict)
-    def _(field_item, node_item, depth, frozen_state, is_last_field):
-        nonlocal FMT
-
-        if field_item.repr:
-            FMT += "\n" + "\t" * depth
-            repr_node = (
-                "{\n"
-                + ",\n".join(
-                    ["\t" * (depth + 1) + f"{k}:{v!r}" for k, v in node_item.items()]
-                )
-                + "}"
-            )
-            FMT += f"{field_item.name}={format_width(repr_node)}"
-            FMT += "" if is_last_field else ","
-        recurse(node_item, depth, frozen_state)
 
     @dispatch(argnum=0)
     def recurse(tree, depth, frozen_state):
@@ -755,13 +794,10 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-
-            multiline = "\n" in f"{node_item!s}"
-            node_FMT = ("\n" + "\t" * (depth + 1)) if multiline else ""
-            node_FMT += ("\n" + "\t" * (depth + 1)).join(f"{node_item!s}".split("\n"))
-
             FMT += "\n" + "\t" * depth
-            FMT += f"{field_item.name}={node_FMT}"
+            FMT += (
+                f"{field_item.name}={format_width(_format_node_str(node_item,depth))}"
+            )
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, frozen_state)
@@ -783,58 +819,6 @@ def tree_str(tree, width: int = 40) -> str:
 
             FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
             FMT += "" if is_last_field else ","
-
-    @recurse_field.register(list)
-    def _(field_item, node_item, depth, frozen_state, is_last_field):
-        nonlocal FMT
-
-        if field_item.repr:
-            FMT += "\n" + "\t" * depth
-
-            repr_node = (
-                "[\n"
-                + ",\n".join(["\t" * (depth + 1) + f"{layer!s}" for layer in node_item])
-                + "]"
-            )
-
-            FMT += f"{field_item.name}={format_width(repr_node)}"
-            FMT += "" if is_last_field else ","
-
-        recurse(node_item, depth, frozen_state)
-
-    @recurse_field.register(tuple)
-    def _(field_item, node_item, depth, frozen_state, is_last_field):
-        nonlocal FMT
-
-        if field_item.repr:
-            FMT += "\n" + "\t" * depth
-
-            repr_node = (
-                "(\n"
-                + ",\n".join(["\t" * (depth + 1) + f"{layer!s}" for layer in node_item])
-                + ")"
-            )
-
-            FMT += f"{field_item.name}={format_width(repr_node)}"
-            FMT += "" if is_last_field else ","
-        recurse(node_item, depth, frozen_state)
-
-    @recurse_field.register(dict)
-    def _(field_item, node_item, depth, frozen_state, is_last_field):
-        nonlocal FMT
-
-        if field_item.repr:
-            FMT += "\n" + "\t" * depth
-            repr_node = (
-                "{\n"
-                + ",\n".join(
-                    ["\t" * (depth + 1) + f"{k}:{v!s}" for k, v in node_item.items()]
-                )
-                + "}"
-            )
-            FMT += f"{field_item.name}={format_width(repr_node)}"
-            FMT += "" if is_last_field else ","
-        recurse(node_item, depth, frozen_state)
 
     @dispatch(argnum=0)
     def recurse(tree, depth, frozen_state):
@@ -897,7 +881,7 @@ def _tree_mermaid(tree):
                         connector = (
                             "--x" if is_static else ("-.-" if tree.frozen else "---")
                         )
-                        FMT += f'\tid{prev_id} {connector} id{cur_id}["{fi.name}\\n{_format_node(cur_node)}"]'
+                        FMT += f'\tid{prev_id} {connector} id{cur_id}["{fi.name}\\n{_format_node_repr(cur_node)}"]'
                         recurse(cur_node, cur_depth + 1, cur_id)
 
                 elif not is_treeclass(tree):

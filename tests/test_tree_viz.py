@@ -1,7 +1,9 @@
 import os
 from dataclasses import field
+from typing import Any, Callable, Sequence
 
 import jax
+import jax.random as jr
 from jax import numpy as jnp
 
 import pytreeclass as pytc
@@ -342,4 +344,46 @@ def test_repr_true_false():
 
     assert pytc.tree_viz.tree_mermaid(model, link=True).startswith(
         "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="
+    )
+
+    @pytc.treeclass
+    class MLP:
+        layers: Any
+        act_func: Callable = pytc.static_field(default=jax.nn.relu, repr=False)
+
+        def __init__(
+            self,
+            layers: Sequence[int],
+            *,
+            act_func: Callable = jax.nn.relu,
+            weight_init_func: Callable = jax.nn.initializers.he_normal(),
+            bias_init_func: Callable | None = lambda key, shape: jnp.ones(shape),
+            key: jr.PRNGKey = jr.PRNGKey(0),
+        ):
+            # self.act_func = jax.nn.relu
+            keys = jr.split(key, len(layers))
+
+            self.layers = [
+                Linear(in_dim, out_dim, key=ki)
+                for ki, in_dim, out_dim in zip(keys, layers[:-1], layers[1:])
+            ]
+
+        def __call__(self, x):
+            for layer in self.layers[:-1]:
+                x = layer(x)
+                x = self.act_func(x)
+
+            return self.layers[-1](x)
+
+    model = MLP((1, 2, 1))
+
+    assert (
+        f"{model!r}"
+        == "MLP(\n  layers=[\n    Linear(weight=f32[1,2],bias=f32[2]),\n    Linear(weight=f32[2,1],bias=f32[1])],)"
+    )
+
+    assert (
+        f"{model!s}"
+        # trunk-ignore(flake8/E501)
+        == "MLP(\n  layers=[\n      Linear(\n        weight=[[ 2.7783015 -1.6938814]],\n        bias=[1. 1.]),\n      Linear(\n        weight=[[ 0.68648785] [-0.5842739 ]],\n        bias=[1.])],)"
     )
