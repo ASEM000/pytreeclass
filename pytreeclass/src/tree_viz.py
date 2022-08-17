@@ -392,60 +392,63 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
 
         return _info(tree_leaf)
 
-    def recurse(tree, path=(), frozen_state=None):
+    @dispatch(argnum=0)
+    def recurse(tree, path=(), frozen_state=None): ...
+
+    @recurse.register(pytreeclass.src.tree_base.treeBase)
+    def _(tree, path=(), frozen_state=None):
+        assert is_treeclass(tree)
 
         nonlocal FMT, COUNT, SIZE
 
-        if is_treeclass(tree):
+        for i, fi in enumerate(tree.__dataclass_fields__.values()):
 
-            for i, fi in enumerate(tree.__dataclass_fields__.values()):
+            cur_node = tree.__dict__[fi.name]
 
-                cur_node = tree.__dict__[fi.name]
+            if is_treeclass(cur_node) and not is_treeclass_leaf(cur_node):
+                # Non leaf treeclass node
+                recurse(
+                    cur_node, path + (cur_node.__class__.__name__,), cur_node.frozen
+                )
 
-                if is_treeclass(cur_node) and not is_treeclass_leaf(cur_node):
-                    # Non leaf treeclass node
-                    recurse(
-                        cur_node, path + (cur_node.__class__.__name__,), cur_node.frozen
+            elif is_treeclass_leaf(cur_node) or not is_treeclass(cur_node):
+                # Leaf node (treeclass or non-treeclass)
+                count, size = _leaf_info(cur_node)
+                frozen_str = "<br>(frozen)" if frozen_state else ""
+                name_str = f"{fi.name}{frozen_str}"
+                type_str = "/".join(path + (cur_node.__class__.__name__,))
+                count_str = _format_count(count, True)
+                size_str = _format_size(size, True)
+                config_str = (
+                    "<br>".join(
+                        [
+                            f"{k}={_format_node_repr(v)}"
+                            for k, v in cur_node.__tree_fields__[0].items()
+                        ]
                     )
+                    if is_treeclass(cur_node)
+                    else f"{fi.name}={_format_node_repr(cur_node)}"
+                )
 
-                elif is_treeclass_leaf(cur_node) or not is_treeclass(cur_node):
-                    # Leaf node (treeclass or non-treeclass)
-                    count, size = _leaf_info(cur_node)
-                    frozen_str = "<br>(frozen)" if frozen_state else ""
-                    name_str = f"{fi.name}{frozen_str}"
-                    type_str = "/".join(path + (cur_node.__class__.__name__,))
-                    count_str = _format_count(count, True)
-                    size_str = _format_size(size, True)
-                    config_str = (
-                        "<br>".join(
-                            [
-                                f"{k}={_format_node_repr(v)}"
-                                for k, v in cur_node.__tree_fields__[0].items()
-                            ]
-                        )
-                        if is_treeclass(cur_node)
-                        else f"{fi.name}={_format_node_repr(cur_node)}"
-                    )
+                shape_str = (
+                    f"{_format_node_repr(indim_shape[i])}\n{_format_node_repr(outdim_shape[i])}"
+                    if array is not None
+                    else ""
+                )
 
-                    shape_str = (
-                        f"{_format_node_repr(indim_shape[i])}\n{_format_node_repr(outdim_shape[i])}"
-                        if array is not None
-                        else ""
-                    )
+                COUNT[1 if frozen_state else 0] += count
+                SIZE[1 if frozen_state else 0] += size
 
-                    COUNT[1 if frozen_state else 0] += count
-                    SIZE[1 if frozen_state else 0] += size
-
-                    FMT += (
-                        "<tr>"
-                        + _cell(name_str)
-                        + _cell(type_str)
-                        + _cell(count_str)
-                        + _cell(size_str)
-                        + _cell(config_str)
-                        + _cell(shape_str)
-                        + "</tr>"
-                    )
+                FMT += (
+                    "<tr>"
+                    + _cell(name_str)
+                    + _cell(type_str)
+                    + _cell(count_str)
+                    + _cell(size_str)
+                    + _cell(config_str)
+                    + _cell(shape_str)
+                    + "</tr>"
+                )
 
     FMT = (
         "<table>\n"
@@ -505,53 +508,57 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
 
         return _info(tree_leaf)
 
+    @dispatch(argnum=0)
     def recurse(tree, path=(), frozen_state=None):
+        ...
+    
+    @recurse.register(pytreeclass.src.tree_base.treeBase)
+    def _(tree, path=(), frozen_state=None):
+        assert is_treeclass(tree)
 
         nonlocal ROWS, COUNT, SIZE
 
-        if is_treeclass(tree):
+        for i, fi in enumerate(tree.__dataclass_fields__.values()):
 
-            for i, fi in enumerate(tree.__dataclass_fields__.values()):
+            cur_node = tree.__dict__[fi.name]
 
-                cur_node = tree.__dict__[fi.name]
+            if is_treeclass(cur_node) and not is_treeclass_leaf(cur_node):
+                # Non leaf treeclass node
+                recurse(
+                    cur_node, path + (cur_node.__class__.__name__,), cur_node.frozen
+                )
 
-                if is_treeclass(cur_node) and not is_treeclass_leaf(cur_node):
-                    # Non leaf treeclass node
-                    recurse(
-                        cur_node, path + (cur_node.__class__.__name__,), cur_node.frozen
+            elif is_treeclass_leaf(cur_node) or not is_treeclass(cur_node):
+                # Leaf node (treeclass or non-treeclass)
+                count, size = _leaf_info(cur_node)
+                frozen_str = "\n(frozen)" if frozen_state else ""
+                name_str = f"{fi.name}{frozen_str}"
+                type_str = "/".join(path + (cur_node.__class__.__name__,))
+                count_str = _format_count(count, True)
+                size_str = _format_size(size, True)
+                config_str = (
+                    "\n".join(
+                        [
+                            f"{k}={_format_node_repr(v)}"
+                            for k, v in cur_node.__tree_fields__[0].items()
+                        ]
                     )
+                    if is_treeclass(cur_node)
+                    else f"{fi.name}={_format_node_repr(cur_node)}"
+                )
 
-                elif is_treeclass_leaf(cur_node) or not is_treeclass(cur_node):
-                    # Leaf node (treeclass or non-treeclass)
-                    count, size = _leaf_info(cur_node)
-                    frozen_str = "\n(frozen)" if frozen_state else ""
-                    name_str = f"{fi.name}{frozen_str}"
-                    type_str = "/".join(path + (cur_node.__class__.__name__,))
-                    count_str = _format_count(count, True)
-                    size_str = _format_size(size, True)
-                    config_str = (
-                        "\n".join(
-                            [
-                                f"{k}={_format_node_repr(v)}"
-                                for k, v in cur_node.__tree_fields__[0].items()
-                            ]
-                        )
-                        if is_treeclass(cur_node)
-                        else f"{fi.name}={_format_node_repr(cur_node)}"
-                    )
+                shape_str = (
+                    f"{_format_node_repr(indim_shape[i])}\n{_format_node_repr(outdim_shape[i])}"
+                    if array is not None
+                    else ""
+                )
 
-                    shape_str = (
-                        f"{_format_node_repr(indim_shape[i])}\n{_format_node_repr(outdim_shape[i])}"
-                        if array is not None
-                        else ""
-                    )
+                COUNT[1 if frozen_state else 0] += count
+                SIZE[1 if frozen_state else 0] += size
 
-                    COUNT[1 if frozen_state else 0] += count
-                    SIZE[1 if frozen_state else 0] += size
-
-                    ROWS.append(
-                        [name_str, type_str, count_str, size_str, config_str, shape_str]
-                    )
+                ROWS.append(
+                    [name_str, type_str, count_str, size_str, config_str, shape_str]
+                )
 
     ROWS = [["Name", "Type ", "Param #", "Size ", "Config", "Input/Output"]]
     COUNT = [0, 0]
