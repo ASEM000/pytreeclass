@@ -181,17 +181,19 @@ class treeOpBase:
     __xor__ = _append_math_op(op.xor)
 
     def __or__(lhs, rhs):
-        def _or(x, y):
-            if isinstance(x, jnp.ndarray):
-                if jnp.array_equal(x, jnp.array([])):
-                    # array([]) > None
-                    return y if y is not None else x
-                elif isinstance(y, jnp.ndarray):
-                    if jnp.array_equal(y, jnp.array([])):
-                        return x if x is not None else y
-                    else:
-                        return jnp.logical_or(x, y)
-            else:
-                return x or y
+        @dispatch(argnum=0)
+        def or_func(x, y):
+            return x or y
 
-        return jtu.tree_map(_or, lhs, rhs, is_leaf=lambda x: x is None)
+        @or_func.register(jnp.ndarray)
+        def lhs_array(x, y):
+            if jnp.array_equal(x, jnp.array([])):
+                return y if y is not None else x
+
+            elif isinstance(y, jnp.ndarray):
+                if jnp.array_equal(y, jnp.array([])):
+                    return x if x is not None else y
+                else:
+                    return jnp.logical_or(x, y)
+
+        return jtu.tree_map(or_func, lhs, rhs, is_leaf=lambda x: x is None)
