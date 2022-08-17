@@ -76,11 +76,11 @@ def _hbox(*text):
     boxes = [(box).split("\n") for box in boxes]
     max_col_height = max([len(b) for b in boxes])
     boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
-    fmt = ""
+    FMT = ""
 
     for _, line in enumerate(zip(*boxes)):
-        fmt += _resolve_line(line) + "\n"
-    return fmt
+        FMT += _resolve_line(line) + "\n"
+    return FMT
 
 
 def _hstack(boxes):
@@ -91,14 +91,14 @@ def _hstack(boxes):
     # expand height of each col before merging
     boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
 
-    fmt = ""
+    FMT = ""
 
     _cells = tuple(zip(*boxes))
 
     for i, line in enumerate(_cells):
-        fmt += _resolve_line(line) + ("\n" if i != (len(_cells) - 1) else "")
+        FMT += _resolve_line(line) + ("\n" if i != (len(_cells) - 1) else "")
 
-    return fmt
+    return FMT
 
 
 def _vbox(*text: tuple[str, ...]) -> str:
@@ -611,8 +611,6 @@ def tree_diagram(tree):
 
     return FMT.expandtabs(4)
 
-    return fmt.expandtabs(4)
-
 
 def tree_repr(tree, width: int = 40) -> str:
     """Prertty print `treeclass_leaves`
@@ -656,6 +654,58 @@ def tree_repr(tree, width: int = 40) -> str:
             FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
             FMT += "" if is_last_field else ","
 
+    @recurse_field.register(list)
+    def _(field_item, node_item, depth, frozen_state, is_last_field):
+        nonlocal FMT
+
+        if field_item.repr:
+            FMT += "\n" + "\t" * depth
+
+            repr_node = (
+                "[\n"
+                + ",\n".join(["\t" * (depth + 1) + f"{layer!r}" for layer in node_item])
+                + "]"
+            )
+
+            FMT += f"{field_item.name}={format_width(repr_node)}"
+            FMT += "" if is_last_field else ","
+
+        recurse(node_item, depth, frozen_state)
+
+    @recurse_field.register(tuple)
+    def _(field_item, node_item, depth, frozen_state, is_last_field):
+        nonlocal FMT
+
+        if field_item.repr:
+            FMT += "\n" + "\t" * depth
+
+            repr_node = (
+                "(\n"
+                + ",\n".join(["\t" * (depth + 1) + f"{layer!r}" for layer in node_item])
+                + ")"
+            )
+
+            FMT += f"{field_item.name}={format_width(repr_node)}"
+            FMT += "" if is_last_field else ","
+        recurse(node_item, depth, frozen_state)
+
+    @recurse_field.register(dict)
+    def _(field_item, node_item, depth, frozen_state, is_last_field):
+        nonlocal FMT
+
+        if field_item.repr:
+            FMT += "\n" + "\t" * depth
+            repr_node = (
+                "{\n"
+                + ",\n".join(
+                    ["\t" * (depth + 1) + f"{k}:{v!r}" for k, v in node_item.items()]
+                )
+                + "}"
+            )
+            FMT += f"{field_item.name}={format_width(repr_node)}"
+            FMT += "" if is_last_field else ","
+        recurse(node_item, depth, frozen_state)
+
     @dispatch(argnum=0)
     def recurse(tree, depth, frozen_state):
         ...
@@ -663,6 +713,7 @@ def tree_repr(tree, width: int = 40) -> str:
     @recurse.register(pytreeclass.src.tree_base.treeBase)
     def _(tree, depth, frozen_state):
         nonlocal FMT
+        is_treeclass(tree)
 
         leaves_count = len(tree.__dataclass_fields__)
         for i, fi in enumerate(tree.__dataclass_fields__.values()):
@@ -706,11 +757,11 @@ def tree_str(tree, width: int = 40) -> str:
         if field_item.repr:
 
             multiline = "\n" in f"{node_item!s}"
-            node_fmt = ("\n" + "\t" * (depth + 1)) if multiline else ""
-            node_fmt += ("\n" + "\t" * (depth + 1)).join(f"{node_item!s}".split("\n"))
+            node_FMT = ("\n" + "\t" * (depth + 1)) if multiline else ""
+            node_FMT += ("\n" + "\t" * (depth + 1)).join(f"{node_item!s}".split("\n"))
 
             FMT += "\n" + "\t" * depth
-            FMT += f"{field_item.name}={node_fmt}"
+            FMT += f"{field_item.name}={node_FMT}"
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, frozen_state)
@@ -732,6 +783,58 @@ def tree_str(tree, width: int = 40) -> str:
 
             FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
             FMT += "" if is_last_field else ","
+
+    @recurse_field.register(list)
+    def _(field_item, node_item, depth, frozen_state, is_last_field):
+        nonlocal FMT
+
+        if field_item.repr:
+            FMT += "\n" + "\t" * depth
+
+            repr_node = (
+                "[\n"
+                + ",\n".join(["\t" * (depth + 1) + f"{layer!s}" for layer in node_item])
+                + "]"
+            )
+
+            FMT += f"{field_item.name}={format_width(repr_node)}"
+            FMT += "" if is_last_field else ","
+
+        recurse(node_item, depth, frozen_state)
+
+    @recurse_field.register(tuple)
+    def _(field_item, node_item, depth, frozen_state, is_last_field):
+        nonlocal FMT
+
+        if field_item.repr:
+            FMT += "\n" + "\t" * depth
+
+            repr_node = (
+                "(\n"
+                + ",\n".join(["\t" * (depth + 1) + f"{layer!s}" for layer in node_item])
+                + ")"
+            )
+
+            FMT += f"{field_item.name}={format_width(repr_node)}"
+            FMT += "" if is_last_field else ","
+        recurse(node_item, depth, frozen_state)
+
+    @recurse_field.register(dict)
+    def _(field_item, node_item, depth, frozen_state, is_last_field):
+        nonlocal FMT
+
+        if field_item.repr:
+            FMT += "\n" + "\t" * depth
+            repr_node = (
+                "{\n"
+                + ",\n".join(
+                    ["\t" * (depth + 1) + f"{k}:{v!s}" for k, v in node_item.items()]
+                )
+                + "}"
+            )
+            FMT += f"{field_item.name}={format_width(repr_node)}"
+            FMT += "" if is_last_field else ","
+        recurse(node_item, depth, frozen_state)
 
     @dispatch(argnum=0)
     def recurse(tree, depth, frozen_state):
@@ -770,7 +873,7 @@ def _tree_mermaid(tree):
 
     def recurse(tree, cur_depth, prev_id):
 
-        nonlocal fmt
+        nonlocal FMT
 
         if is_treeclass(tree):
 
@@ -778,13 +881,13 @@ def _tree_mermaid(tree):
                 if fi.repr:
                     cur_node = tree.__dict__[fi.name]
                     cur_order = i
-                    fmt += "\n"
+                    FMT += "\n"
 
                     if is_treeclass(cur_node):
                         layer_class_name = cur_node.__class__.__name__
                         cur = (cur_depth, cur_order)
                         cur_id = node_id((*cur, prev_id))
-                        fmt += f"\tid{prev_id} --> id{cur_id}({fi.name}\\n{layer_class_name})"
+                        FMT += f"\tid{prev_id} --> id{cur_id}({fi.name}\\n{layer_class_name})"
                         recurse(cur_node, cur_depth + 1, cur_id)
 
                     else:
@@ -794,16 +897,16 @@ def _tree_mermaid(tree):
                         connector = (
                             "--x" if is_static else ("-.-" if tree.frozen else "---")
                         )
-                        fmt += f'\tid{prev_id} {connector} id{cur_id}["{fi.name}\\n{_format_node(cur_node)}"]'
+                        FMT += f'\tid{prev_id} {connector} id{cur_id}["{fi.name}\\n{_format_node(cur_node)}"]'
                         recurse(cur_node, cur_depth + 1, cur_id)
 
                 elif not is_treeclass(tree):
                     recurse(cur_node, cur_depth + 1, cur_id)
 
     cur_id = node_id((0, 0, -1, 0))
-    fmt = f"flowchart LR\n\tid{cur_id}[{tree.__class__.__name__}]"
+    FMT = f"flowchart LR\n\tid{cur_id}[{tree.__class__.__name__}]"
     recurse(tree, 1, cur_id)
-    return fmt.expandtabs(4)
+    return FMT.expandtabs(4)
 
 
 def _generate_mermaid_link(mermaid_string: str) -> str:
@@ -823,19 +926,19 @@ def tree_mermaid(tree, link=False):
 def save_viz(tree, filename, method="tree_mermaid_md"):
 
     if method == "tree_mermaid_md":
-        fmt = "```mermaid\n" + tree_mermaid(tree) + "\n```"
+        FMT = "```mermaid\n" + tree_mermaid(tree) + "\n```"
 
         with open(f"{filename}.md", "w") as f:
-            f.write(fmt)
+            f.write(FMT)
 
     elif method == "tree_mermaid_html":
-        fmt = "<html><body><script src='https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js'></script>"
-        fmt += "<script>mermaid.initialize({ startOnLoad: true });</script><div class='mermaid'>"
-        fmt += tree_mermaid(tree)
-        fmt += "</div></body></html>"
+        FMT = "<html><body><script src='https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js'></script>"
+        FMT += "<script>mermaid.initialize({ startOnLoad: true });</script><div class='mermaid'>"
+        FMT += tree_mermaid(tree)
+        FMT += "</div></body></html>"
 
         with open(f"{filename}.html", "w") as f:
-            f.write(fmt)
+            f.write(FMT)
 
     elif method == "tree_diagram":
         with open(f"{filename}.txt", "w") as f:
