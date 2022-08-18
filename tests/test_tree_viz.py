@@ -403,4 +403,9 @@ def test_tree_with_containers():
         == "test(\n  a=[ \n    [[1. 1. 1. 1.]\n     [1. 1. 1. 1.]\n     [1. 1. 1. 1.]\n     [1. 1. 1. 1.]],2,3])"
     )
     assert (f"{test([jnp.ones([4,4]),2,3])!r}") == "test(a=[f32[4,4],2,3])"
+    assert (f"{test((jnp.ones([4,4]),2,3))!r}") == "test(a=(f32[4,4],2,3))"
     assert f"{test({'a':1,'b':jnp.array([1,2,3])})!r}" == "test(a={a:1,b:i32[3]})"
+    assert f"{test(lambda x:x)!s}" == "test(a=<lambda>(x))"
+    assert f"{test(lambda x:x)!r}" == "test(a=<lambda>(x))"
+    assert f"{test(jax.nn.relu)!s}" == "test(a=relu(*args,**kwargs))"
+    assert f"{test(jax.nn.relu)!r}" == "test(a=relu(*args,**kwargs))"
