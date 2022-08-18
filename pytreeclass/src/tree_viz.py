@@ -393,7 +393,8 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
         return _info(tree_leaf)
 
     @dispatch(argnum=0)
-    def recurse(tree, path=(), frozen_state=None): ...
+    def recurse(tree, path=(), frozen_state=None):
+        ...
 
     @recurse.register(pytreeclass.src.tree_base.treeBase)
     def _(tree, path=(), frozen_state=None):
@@ -511,10 +512,11 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
     @dispatch(argnum=0)
     def recurse(tree, path=(), frozen_state=None):
         ...
-    
+
     @recurse.register(pytreeclass.src.tree_base.treeBase)
     def _(tree, path=(), frozen_state=None):
         assert is_treeclass(tree)
+        _format_node = lambda node: _format_node_repr(node).expandtabs(1)
 
         nonlocal ROWS, COUNT, SIZE
 
@@ -539,16 +541,16 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
                 config_str = (
                     "\n".join(
                         [
-                            f"{k}={_format_node_repr(v)}"
+                            f"{k}={_format_node(v)}"
                             for k, v in cur_node.__tree_fields__[0].items()
                         ]
                     )
                     if is_treeclass(cur_node)
-                    else f"{fi.name}={_format_node_repr(cur_node)}"
+                    else f"{fi.name}={_format_node(cur_node)}"
                 )
 
                 shape_str = (
-                    f"{_format_node_repr(indim_shape[i])}\n{_format_node_repr(outdim_shape[i])}"
+                    f"{_format_node(indim_shape[i])}\n{_format_node(outdim_shape[i])}"
                     if array is not None
                     else ""
                 )
