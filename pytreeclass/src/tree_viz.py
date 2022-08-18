@@ -313,7 +313,7 @@ def tree_diagram(tree):
             is_static = (
                 "static" in field_item.metadata and field_item.metadata["static"]
             )
-            mark = "x" if is_static else ("#" if frozen_state else "─")
+            mark = "*" if is_static else ("#" if frozen_state else "─")
             is_last_field = node_index == 1
 
             FMT += "\n"
@@ -336,7 +336,7 @@ def tree_diagram(tree):
             is_static = (
                 "static" in field_item.metadata and field_item.metadata["static"]
             )
-            mark = "x" if is_static else ("#" if frozen_state else "─")
+            mark = "*" if is_static else ("#" if frozen_state else "─")
             layer_class_name = node_item.__class__.__name__
 
             is_last_field = node_index == 1
@@ -399,9 +399,9 @@ def tree_repr(tree, width: int = 40) -> str:
 
         if field_item.repr:
             mark = (
-                "(x)"
+                "*"
                 if field_item.metadata.get("static", False)
-                else ("(#)" if frozen_state else "")
+                else ("#" if frozen_state else "")
             )
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}={format_width(_format_node_repr(node_item,depth))}"
@@ -416,9 +416,9 @@ def tree_repr(tree, width: int = 40) -> str:
         assert is_treeclass(node_item)
         if field_item.repr:
             mark = (
-                "(x)"
+                "*"
                 if field_item.metadata.get("static", False)
-                else ("(#)" if frozen_state else "")
+                else ("#" if frozen_state else "")
             )
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
@@ -480,9 +480,9 @@ def tree_str(tree, width: int = 40) -> str:
 
         if field_item.repr:
             mark = (
-                "(x)"
+                "*"
                 if field_item.metadata.get("static", False)
-                else ("(#)" if frozen_state else "")
+                else ("#" if frozen_state else "")
             )
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}={format_width(_format_node_str(node_item,depth))}"
@@ -498,9 +498,9 @@ def tree_str(tree, width: int = 40) -> str:
 
         if field_item.repr:
             mark = (
-                "(x)"
+                "*"
                 if field_item.metadata.get("static", False)
-                else ("(#)" if frozen_state else "")
+                else ("#" if frozen_state else "")
             )
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
