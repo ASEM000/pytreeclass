@@ -409,3 +409,4 @@ def test_tree_with_containers():
     assert f"{test(lambda x:x)!r}" == "test(a=<lambda>(x))"
     assert f"{test(jax.nn.relu)!s}" == "test(a=relu(*args,**kwargs))"
     assert f"{test(jax.nn.relu)!r}" == "test(a=relu(*args,**kwargs))"
+    assert test(jax.nn.relu).tree_diagram() == "test\n    └── a=relu(*args,**kwargs)  "

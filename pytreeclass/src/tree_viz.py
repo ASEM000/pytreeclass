@@ -547,42 +547,60 @@ def _tree_mermaid(tree):
         """hash a node by its location in a tree"""
         return ctypes.c_size_t(hash(input)).value
 
-    def recurse(tree, cur_depth, prev_id):
-
+    @dispatch(argnum=1)
+    def recurse_field(field_item, node_item, depth, prev_id, order, frozen_state):
         nonlocal FMT
 
-        if is_treeclass(tree):
+        if field_item.repr:
+            # create node id from depth, order, and previous id
+            cur_id = node_id((depth, order, prev_id))
+            mark = (
+                "--x"
+                if field_item.metadata.get("static", False)
+                else ("-.-" if frozen_state else "---")
+            )
+            FMT += f'\n\tid{prev_id} {mark} id{cur_id}["{field_item.name}\\n{_format_node_diagram(node_item)}"]'
+            prev_id = cur_id
 
-            for i, fi in enumerate(tree.__dataclass_fields__.values()):
-                if fi.repr:
-                    cur_node = tree.__dict__[fi.name]
-                    cur_order = i
-                    FMT += "\n"
+        recurse(node_item, depth, prev_id, frozen_state)
 
-                    if is_treeclass(cur_node):
-                        layer_class_name = cur_node.__class__.__name__
-                        cur = (cur_depth, cur_order)
-                        cur_id = node_id((*cur, prev_id))
-                        FMT += f"\tid{prev_id} --> id{cur_id}({fi.name}\\n{layer_class_name})"
-                        recurse(cur_node, cur_depth + 1, cur_id)
+    @recurse_field.register(pytreeclass.src.tree_base.treeBase)
+    def _(field_item, node_item, depth, prev_id, order, frozen_state):
+        nonlocal FMT
+        assert is_treeclass(node_item)
 
-                    else:
-                        cur = (cur_depth, cur_order)
-                        cur_id = node_id((*cur, prev_id))
-                        is_static = "static" in fi.metadata and fi.metadata["static"]
-                        connector = (
-                            "--x" if is_static else ("-.-" if tree.frozen else "---")
-                        )
-                        # trunk-ignore(flake8/E501)
-                        FMT += f'\tid{prev_id} {connector} id{cur_id}["{fi.name}\\n{_format_node_repr(cur_node,cur_depth)}"]'
-                        recurse(cur_node, cur_depth + 1, cur_id)
+        if field_item.repr:
+            layer_class_name = node_item.__class__.__name__
+            cur_id = node_id((depth, order, prev_id))
+            FMT += f"\n\tid{prev_id} --> id{cur_id}({field_item.name}\\n{layer_class_name})"
+            recurse(node_item, depth + 1, cur_id, node_item.frozen)
 
-                elif not is_treeclass(tree):
-                    recurse(cur_node, cur_depth + 1, cur_id)
+    @dispatch(argnum=0)
+    def recurse(tree, depth, prev_id, frozen_state):
+        ...
+
+    @recurse.register(pytreeclass.src.tree_base.treeBase)
+    def _(tree, depth, prev_id, frozen_state):
+        nonlocal FMT
+        assert is_treeclass(tree)
+
+        for i, fi in enumerate(tree.__dataclass_fields__.values()):
+
+            # retrieve node item
+            cur_node = tree.__dict__[fi.name]
+
+            recurse_field(
+                fi,
+                cur_node,
+                depth,
+                prev_id,
+                i,
+                frozen_state,
+            )
 
     cur_id = node_id((0, 0, -1, 0))
     FMT = f"flowchart LR\n\tid{cur_id}[{tree.__class__.__name__}]"
-    recurse(tree, 1, cur_id)
+    recurse(tree, 1, cur_id, tree.frozen)
     return FMT.expandtabs(4)
 
 
