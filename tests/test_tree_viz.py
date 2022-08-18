@@ -12,15 +12,6 @@ import pytreeclass as pytc
 from pytreeclass import tree_viz
 
 
-def test__vbox():
-
-    assert tree_viz._vbox("a", " a", "a ") == "┌──┐\n│a │\n├──┤\n│ a│\n├──┤\n│a │\n└──┘"
-
-
-def test__hbox():
-    assert tree_viz._hbox("a", "b", "c") == "┌─┬─┬─┐\n│a│b│c│\n└─┴─┴─┘\n"
-
-
 def test_tree_box():
     @pytc.treeclass
     class test:
@@ -413,16 +404,3 @@ def test_tree_with_containers():
     )
     assert (f"{test([jnp.ones([4,4]),2,3])!r}") == "test(a=[f32[4,4],2,3])"
     assert f"{test({'a':1,'b':jnp.array([1,2,3])})!r}" == "test(a={a:1,b:i32[3]})"
-
-
-def test_func_repr():
-    def example(a: int, b=1, *c, d, e=2, **f) -> str:
-        pass
-
-    assert tree_viz._func_repr(example) == "example(a,b,*c,d,e,**f)"
-    assert tree_viz._func_repr(lambda x: x) == "<lambda>(x)"
-    assert tree_viz._func_repr(jax.nn.relu) == "relu(*args,**kwargs)"
-    assert (
-        tree_viz._func_repr(jax.nn.initializers.he_normal)
-        == "he_normal(in_axis,out_axis,batch_axis,dtype)"
-    )
