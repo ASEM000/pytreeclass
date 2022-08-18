@@ -78,7 +78,7 @@ def test_freezing_unfreezing():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
-        notes: str = field(default="string")
+        notes: str = pytc.static_field(default="string")
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -147,6 +147,7 @@ def test_freezing_unfreezing():
     unfrozen_diagram = pytc.tree_viz.tree_diagram(_unfreeze_nodes(_freeze_nodes(mdl)))
     # trunk-ignore(flake8/E501)
     fmt = "Stacked\n    ├── mdl1=StackedLinear\n    │   ├── l1=Linear\n    │   │   ├── weight=f32[1,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   ├── l2=Linear\n    │   │   ├── weight=f32[10,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   └── l3=Linear\n    │       ├── weight=f32[10,1]\n    │       ├── bias=f32[1,1]\n    │       └x─ notes='string'      \n    └── mdl2=StackedLinear\n        ├── l1=Linear\n        │   ├── weight=f32[1,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        ├── l2=Linear\n        │   ├── weight=f32[10,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        └── l3=Linear\n            ├── weight=f32[10,1]\n            ├── bias=f32[1,1]\n            └x─ notes='string'          "
+    
     assert fmt == unfrozen_diagram
 
     @pytc.treeclass(field_only=True)
@@ -228,7 +229,7 @@ def test_freezing_unfreezing():
     class Test:
         a: int = 1
         b: float = pytc.static_field(default=1.0)
-        c: str = "test"
+        c: str = pytc.static_field(default="test")
 
     t = Test()
     assert jax.tree_util.tree_leaves(t) == [1]

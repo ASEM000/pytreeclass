@@ -398,9 +398,10 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
+            mark = "(x)" if field_item.metadata.get("static", False) else ("(#)" if frozen_state else "")
             FMT += "\n" + "\t" * depth
             FMT += (
-                f"{field_item.name}={format_width(_format_node_repr(node_item,depth))}"
+                f"{mark}{field_item.name}={format_width(_format_node_repr(node_item,depth))}"
             )
             FMT += "" if is_last_field else ","
 
@@ -412,10 +413,10 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
         assert is_treeclass(node_item)
         if field_item.repr:
+            mark = "(x)" if field_item.metadata.get("static", False) else ("(#)" if frozen_state else "")
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
-            frozen_str = "#" if node_item.frozen else ""
-            FMT += f"{frozen_str}{field_item.name}={layer_class_name}" + "("
+            FMT += f"{mark}{field_item.name}={layer_class_name}" + "("
             start_cursor = len(FMT)  # capture children repr
 
             recurse(node_item, depth=depth + 1, frozen_state=node_item.frozen)
@@ -472,9 +473,10 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
+            mark = "(x)" if field_item.metadata.get("static", False) else ("(#)" if frozen_state else "")
             FMT += "\n" + "\t" * depth
             FMT += (
-                f"{field_item.name}={format_width(_format_node_str(node_item,depth))}"
+                f"{mark}{field_item.name}={format_width(_format_node_str(node_item,depth))}"
             )
             FMT += "" if is_last_field else ","
 
@@ -487,10 +489,10 @@ def tree_str(tree, width: int = 40) -> str:
         assert is_treeclass(node_item)
 
         if field_item.repr:
+            mark = "(x)" if field_item.metadata.get("static", False) else ("(#)" if frozen_state else "")
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
-            frozen_str = "#" if node_item.frozen else ""
-            FMT += f"{frozen_str}{field_item.name}={layer_class_name}" + "("
+            FMT += f"{mark}{field_item.name}={layer_class_name}" + "("
             start_cursor = len(FMT)  # capture children repr
 
             recurse(node_item, depth=depth + 1, frozen_state=node_item.frozen)

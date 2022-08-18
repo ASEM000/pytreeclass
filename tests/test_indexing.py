@@ -8,27 +8,28 @@ import numpy as np
 import pytest
 
 from pytreeclass import treeclass
+import pytreeclass as pytc 
 from pytreeclass.src.tree_indexer import _at_apply, _at_get, _at_reduce, _at_set
 from pytreeclass.src.tree_util import is_treeclass_equal
 
 
-@treeclass
+@pytc.treeclass
 class Test:
     a: float
     b: float
     c: float
     d: jnp.ndarray
-    name: str
+    name: str = pytc.static_field()
 
 
 def test_getter_by_val():
-    @treeclass
+    @pytc.treeclass
     class level1:
         a: int
         b: int
         c: int
 
-    @treeclass
+    @pytc.treeclass
     class level2:
         d: level1
         e: level1
@@ -70,6 +71,8 @@ def test_getter_by_val():
 
 
 def test_getter_by_param():
+
+
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
 
     B = A.at[A == "a"].get(array_as_leaves=False)
@@ -89,20 +92,20 @@ def test_getter_by_param():
     )
     assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
-    @treeclass
+    @pytc.treeclass
     class L0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @treeclass
+    @pytc.treeclass
     class L1:
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @treeclass
+    @pytc.treeclass
     class L2:
         a: int = 10
         b: int = 20
@@ -125,13 +128,13 @@ def test_getter_by_param():
 
 
 def test_getter_by_metadata():
-    @treeclass
+    @pytc.treeclass
     class Test:
         a: float = field(metadata={"name": "a", "unit": "m"})
         b: float = field(metadata={"name": "b", "unit": "m"})
         c: float = field(metadata={"name": "c", "unit": "m"})
         d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
-        name: str
+        name: str = pytc.static_field()
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
 
@@ -157,20 +160,20 @@ def test_getter_by_metadata():
     ].get(array_as_leaves=False)
     assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A"))
 
-    @treeclass
+    @pytc.treeclass
     class L0:
         a: int = field(default=1, metadata={"name": "a", "unit": "m"})
         b: int = 2
         c: int = 3
 
-    @treeclass
+    @pytc.treeclass
     class L1:
         a: int = field(default=1, metadata={"name": "a", "unit": "m"})
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @treeclass
+    @pytc.treeclass
     class L2:
         a: int = field(default=10, metadata={"name": "a", "unit": "m"})
         b: int = 20
@@ -184,13 +187,13 @@ def test_getter_by_metadata():
 
 
 def test_setter_by_val():
-    @treeclass
+    @pytc.treeclass
     class level1:
         a: int
         b: int
         c: int
 
-    @treeclass
+    @pytc.treeclass
     class level2:
         d: level1
         e: level1
@@ -216,20 +219,20 @@ def test_setter_by_val():
     with pytest.raises(NotImplementedError):
         B = A.at[0].set(0)
 
-    @treeclass
+    @pytc.treeclass
     class L0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @treeclass
+    @pytc.treeclass
     class L1:
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @treeclass
+    @pytc.treeclass
     class L2:
         a: int = 10
         b: int = 20
@@ -256,13 +259,13 @@ def test_setter_by_param():
 
 
 def test_setter_by_metadata():
-    @treeclass
+    @pytc.treeclass
     class Test:
         a: float = field(metadata={"name": "a", "unit": "m"})
         b: float = field(metadata={"name": "b", "unit": "m"})
         c: float = field(metadata={"name": "c", "unit": "m"})
         d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
-        name: str
+        name: str = pytc.static_field()
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
 
@@ -290,20 +293,20 @@ def test_setter_by_metadata():
     ].set(100, array_as_leaves=False)
     assert is_treeclass_equal(B, Test(100, 100, 100, 100, "A"))
 
-    @treeclass
+    @pytc.treeclass
     class L0:
         a: int = field(default=1, metadata={"name": "a", "unit": "m"})
         b: int = 2
         c: int = 3
 
-    @treeclass
+    @pytc.treeclass
     class L1:
         a: int = field(default=1, metadata={"name": "a", "unit": "m"})
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @treeclass
+    @pytc.treeclass
     class L2:
         a: int = field(default=10, metadata={"name": "a", "unit": "m"})
         b: int = 20
@@ -317,7 +320,7 @@ def test_setter_by_metadata():
 
 
 def test_apply_and_its_derivatives():
-    @treeclass
+    @pytc.treeclass
     class A:
         a: int
         b: int
@@ -350,20 +353,20 @@ def test_apply_and_its_derivatives():
     rhs = init.at[...].apply(lambda x: (x + 1) * 10)
     assert is_treeclass_equal(lhs, rhs)
 
-    @treeclass
+    @pytc.treeclass
     class L0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @treeclass
+    @pytc.treeclass
     class L1:
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @treeclass
+    @pytc.treeclass
     class L2:
         a: int = 10
         b: int = 20
@@ -505,13 +508,13 @@ def test_apply_and_its_derivatives():
     with pytest.raises(ValueError):
         init.freeze().at[(init == init) | (A == "b")].reduce_sum()
 
-    @treeclass
+    @pytc.treeclass
     class Test:
         a: float = field(metadata={"name": "a", "unit": "m"})
         b: float = field(metadata={"name": "b", "unit": "m"})
         c: float = field(metadata={"name": "c", "unit": "m"})
         d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
-        name: str
+        name: str = pytc.static_field()
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
 
@@ -544,20 +547,20 @@ def test_apply_and_its_derivatives():
         B, Test(10, 100, 100, jnp.array([100, 100, 100, 100, 100]), "A")
     )
 
-    @treeclass
+    @pytc.treeclass
     class L0:
         a: int = field(default=1, metadata={"name": "a", "unit": "m"})
         b: int = 2
         c: int = 3
 
-    @treeclass
+    @pytc.treeclass
     class L1:
         a: int = field(default=1, metadata={"name": "a", "unit": "m"})
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @treeclass
+    @pytc.treeclass
     class L2:
         a: int = field(default=10, metadata={"name": "a", "unit": "m"})
         b: int = 20
@@ -575,20 +578,20 @@ def test_apply_and_its_derivatives():
 
     assert is_treeclass_equal(lhs, rhs)
 
-    @treeclass
+    @pytc.treeclass
     class L0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @treeclass
+    @pytc.treeclass
     class L1:
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @treeclass
+    @pytc.treeclass
     class L2:
         a: int = 10
         b: int = 20
@@ -602,7 +605,7 @@ def test_apply_and_its_derivatives():
 
 
 def test_reduce():
-    @treeclass
+    @pytc.treeclass
     class A:
         a: int
         b: int
@@ -622,7 +625,7 @@ def test_reduce():
     rhs = init.at[init > 100].reduce(lambda x, y: x + jnp.sum(y))
     assert lhs == rhs
 
-    @treeclass
+    @pytc.treeclass
     class B:
         a: int
         b: int
@@ -640,7 +643,7 @@ def test_reduce():
 
 
 def test_reduce_and_its_derivatives():
-    @treeclass
+    @pytc.treeclass
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
@@ -654,7 +657,7 @@ def test_reduce_and_its_derivatives():
         # def __call__(self, x):
         #     return x @ self.weight + self.bias
 
-    @treeclass
+    @pytc.treeclass
     class StackedLinear:
         l1: Linear = field(metadata={"description": "First layer"})
         l2: Linear = field(metadata={"description": "Second layer"})
@@ -694,7 +697,7 @@ def test_reduce_and_its_derivatives():
 
 
 def test_not_implemented():
-    @treeclass
+    @pytc.treeclass
     class Test:
         a: int = 1
 

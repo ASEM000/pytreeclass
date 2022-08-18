@@ -20,8 +20,11 @@ from pytreeclass.src.tree_viz import (
     tree_summary,
 )
 
-PyTree = Any
 
+import typing as tp
+
+
+PyTree = Any
 
 class fieldDict(dict):
     # dict will throw
@@ -56,21 +59,10 @@ def tree_fields(self) -> tuple[dict[str, Any], dict[str, Any]]:
         # if the parent is frozen, freeze all dataclass fields children
         # exclude any string
         # and mutate the class field static metadata for this variable for future instances
-        excluded_by_type = isinstance(value, str)
+        
         excluded_by_meta = fi.metadata.get("static", False)
 
-        if excluded_by_type:
-            # add static type to metadata to class and its instance
-            static[fi.name] = value
-            updated_field = self.__dataclass_fields__[fi.name]
-            object.__setattr__(
-                updated_field,
-                "metadata",
-                {**updated_field.metadata, **{"static": True}},
-            )
-            self.__dataclass_fields__[fi.name] = updated_field
-
-        elif excluded_by_meta:
+        if excluded_by_meta:
             static[fi.name] = value
 
         else:
