@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import ctypes
+import inspect
 import math
+from types import FunctionType
 from typing import Any, Sequence
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
+import jaxlib
 import requests
 
 import pytreeclass
@@ -22,6 +25,37 @@ PyTree = Any
 
 
 # Node formatting
+
+
+def _func_repr(func):
+    args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(func)
+    ARGS = (",".join(args)) if len(args) > 0 else ""
+    VARARGS = ("*" + varargs) if varargs is not None else ""
+    KWONLYARGS = (",".join(kwonlyargs)) if len(kwonlyargs) > 0 else ""
+    VARKW = ("**" + varkw) if varkw is not None else ""
+    return (
+        f"{func.__name__}("
+        + ",".join(item for item in [ARGS, VARARGS, KWONLYARGS, VARKW] if item != "")
+        + ")"
+    )
+
+
+def jax_numpy_repr(node, *args, **kwargs):
+    replace_tuple = (
+        ("int", "i"),
+        ("float", "f"),
+        ("complex", "c"),
+        (",)", ")"),
+        ("(", "["),
+        (")", "]"),
+        (" ", ""),
+    )
+
+    formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
+
+    for lhs, rhs in replace_tuple:
+        formatted_string = formatted_string.replace(lhs, rhs)
+    return formatted_string
 
 
 def _format_size(node_size, newline=False):
@@ -51,21 +85,13 @@ def _format_node_repr(node, *args, **kwargs):
     @__format_node_repr.register(jnp.ndarray)
     @__format_node_repr.register(jax.ShapeDtypeStruct)
     def _(node, *args, **kwargs):
-        replace_tuple = (
-            ("int", "i"),
-            ("float", "f"),
-            ("complex", "c"),
-            (",)", ")"),
-            ("(", "["),
-            (")", "]"),
-            (" ", ""),
-        )
+        return jax_numpy_repr(node)
 
-        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
-
-        for lhs, rhs in replace_tuple:
-            formatted_string = formatted_string.replace(lhs, rhs)
-        return formatted_string
+    @__format_node_repr.register(jaxlib.xla_extension.CompiledFunction)
+    @__format_node_repr.register(jax._src.custom_derivatives.custom_jvp)
+    @__format_node_repr.register(FunctionType)
+    def _(node, *args, **kwargs):
+        return _func_repr(node)
 
     @__format_node_repr.register(list)
     def _(node, depth=0):
@@ -107,6 +133,12 @@ def _format_node_str(node, *args, **kwargs):
         string += ("\n" + "\t" * (depth + 3)).join(f"{node!s}".split("\n"))
         return string
 
+    @__format_node_str.register(jaxlib.xla_extension.CompiledFunction)
+    @__format_node_str.register(jax._src.custom_derivatives.custom_jvp)
+    @__format_node_str.register(FunctionType)
+    def _(node, *args, **kwargs):
+        return _func_repr(node)
+
     @__format_node_str.register(list)
     def _(node, depth=0):
         string = ",\n".join(f"{layer!s}" for layer in node)
@@ -139,24 +171,16 @@ def _format_node_diagram(node, *args, **kwargs):
     def __format_node_diagram(node, *args, **kwargs):
         return f"{node!r}"
 
+    @__format_node_diagram.register(jaxlib.xla_extension.CompiledFunction)
+    @__format_node_diagram.register(jax._src.custom_derivatives.custom_jvp)
+    @__format_node_diagram.register(FunctionType)
+    def _(node, *args, **kwargs):
+        return _func_repr(node)
+
     @__format_node_diagram.register(jnp.ndarray)
     @__format_node_diagram.register(jax.ShapeDtypeStruct)
     def _(node, *args, **kwargs):
-        replace_tuple = (
-            ("int", "i"),
-            ("float", "f"),
-            ("complex", "c"),
-            (",)", ")"),
-            ("(", "["),
-            (")", "]"),
-            (" ", ""),
-        )
-
-        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
-
-        for lhs, rhs in replace_tuple:
-            formatted_string = formatted_string.replace(lhs, rhs)
-        return formatted_string
+        return jax_numpy_repr(node)
 
     return __format_node_diagram(node, *args, **kwargs)
 
