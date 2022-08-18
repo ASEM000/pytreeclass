@@ -1,5 +1,3 @@
-from dataclasses import field
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -147,7 +145,7 @@ def test_freezing_unfreezing():
     unfrozen_diagram = pytc.tree_viz.tree_diagram(_unfreeze_nodes(_freeze_nodes(mdl)))
     # trunk-ignore(flake8/E501)
     fmt = "Stacked\n    ├── mdl1=StackedLinear\n    │   ├── l1=Linear\n    │   │   ├── weight=f32[1,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   ├── l2=Linear\n    │   │   ├── weight=f32[10,10]\n    │   │   ├── bias=f32[1,10]\n    │   │   └x─ notes='string'  \n    │   └── l3=Linear\n    │       ├── weight=f32[10,1]\n    │       ├── bias=f32[1,1]\n    │       └x─ notes='string'      \n    └── mdl2=StackedLinear\n        ├── l1=Linear\n        │   ├── weight=f32[1,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        ├── l2=Linear\n        │   ├── weight=f32[10,10]\n        │   ├── bias=f32[1,10]\n        │   └x─ notes='string'  \n        └── l3=Linear\n            ├── weight=f32[10,1]\n            ├── bias=f32[1,1]\n            └x─ notes='string'          "
-    
+
     assert fmt == unfrozen_diagram
 
     @pytc.treeclass(field_only=True)

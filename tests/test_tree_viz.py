@@ -140,7 +140,7 @@ def test_repr_str():
         a: float
         b: float
         c: float
-        name: str =pytc.static_field()
+        name: str = pytc.static_field()
 
     A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), "A")
     str_string = f"{A!s}"
@@ -245,6 +245,7 @@ def test_tree_indent():
     )
     assert (
         f"{B!r}"
+        # trunk-ignore(flake8/E501)
         == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(a=1,b=20,c=i32[5]),\n  (x)name='SomethingWrittenHere'),)"
     )
 
@@ -379,13 +380,13 @@ def test_tree_with_containers():
 
     assert (
         f"{model!r}"
-        == "MLP(\n  layers=[\n    Linear(weight=f32[1,2],bias=f32[2]),\n    Linear(weight=f32[2,1],bias=f32[1])],)"
+        == "MLP(\n  layers=[  \n    Linear(weight=f32[1,2],bias=f32[2]),\n    Linear(weight=f32[2,1],bias=f32[1])],)"
     )
 
     assert (
         f"{model!s}"
         # trunk-ignore(flake8/E501)
-        == "MLP(\n  layers=[\n      Linear(\n        weight=[[-0.13426289 -0.12849723]],\n        bias=[1. 1.]),\n      Linear(\n        weight=[[ 1.2636864] [-0.0423024]],\n        bias=[1.])],)"
+        == "MLP(\n  layers=[  \n    Linear(\n      weight=[[-0.13426289 -0.12849723]],\n      bias=[1. 1.]),\n    Linear(\n      weight=[[ 1.2636864] [-0.0423024]],\n      bias=[1.])],)"
     )
 
     @pytc.treeclass
@@ -399,8 +400,7 @@ def test_tree_with_containers():
     assert f"{test([1,2,3])!r}" == "test(a=[1,2,3])"
     assert (
         (f"{test([jnp.ones([4,4]),2,3])}")
-        # trunk-ignore(flake8/E501)
-        == "test(\n  a=[\n      [[1. 1. 1. 1.]\n       [1. 1. 1. 1.]\n       [1. 1. 1. 1.]\n       [1. 1. 1. 1.]],\n      2,\n      3])"
+        == "test(\n  a=[ \n    [[1. 1. 1. 1.]\n     [1. 1. 1. 1.]\n     [1. 1. 1. 1.]\n     [1. 1. 1. 1.]],2,3])"
     )
     assert (f"{test([jnp.ones([4,4]),2,3])!r}") == "test(a=[f32[4,4],2,3])"
     assert f"{test({'a':1,'b':jnp.array([1,2,3])})!r}" == "test(a={a:1,b:i32[3]})"

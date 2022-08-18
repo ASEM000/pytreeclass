@@ -7,8 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from pytreeclass import treeclass
-import pytreeclass as pytc 
+import pytreeclass as pytc
 from pytreeclass.src.tree_indexer import _at_apply, _at_get, _at_reduce, _at_set
 from pytreeclass.src.tree_util import is_treeclass_equal
 
@@ -71,7 +70,6 @@ def test_getter_by_val():
 
 
 def test_getter_by_param():
-
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), "A")
 
