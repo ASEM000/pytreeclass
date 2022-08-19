@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools as ft
 from collections.abc import Callable
 from typing import Any
 
@@ -9,6 +10,7 @@ import jax.tree_util as jtu
 
 import pytreeclass.src.tree_util as ptu
 from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.tree_util import Static
 
 """ Getter """
 
@@ -43,6 +45,7 @@ def _at_get(tree, where, **kwargs):
     @_node_get.register(complex)
     @_node_get.register(tuple)
     @_node_get.register(list)
+    @_node_get.register(str)
     def _(lhs, where, **kwargs):
         # set None to non-chosen non-array values
         return lhs if where else None
@@ -73,7 +76,7 @@ def _at_get(tree, where, **kwargs):
 """ Setter """
 
 
-def _at_set(tree, set_value, where, **kwargs):
+def _at_set(tree, where, set_value, **kwargs):
     @dispatch(argnum=0)
     def _node_set(lhs: Any, where: bool, set_value, **kwargs):
         """Set pytree node value.
@@ -90,13 +93,24 @@ def _at_set(tree, set_value, where, **kwargs):
 
     @_node_set.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
     @_node_set.register(jnp.ndarray)
+    @dispatch(argnum=2)
+    def _array_node(lhs, where, set_value):
+        """Multi dispatched on lhs and where type"""
+        # lhs is numeric node
+        # set_value in not acceptable set_value type for numeric node
+        # thus array_as_leaves is not an optional keyword argument
+        # An example is setting an array to None
+        # then the entire array is set to None if all array elements are
+        # satisfied by the where condition
+        return set_value if jnp.all(where) else lhs
+
+    @_array_node.register(int)
+    @_array_node.register(float)
+    @_array_node.register(complex)
+    @_array_node.register(jnp.ndarray)
     def _(lhs, where, set_value, array_as_leaves: bool = True):
-
-        # valid set_values
-        assert isinstance(
-            set_value, (int, float, complex, jnp.ndarray, bool, type(None))
-        ), f"Set value of type {type(set_value)} is not of valid type."
-
+        # lhs is numeric node
+        # set_value in acceptable set_value type for a numeric node
         return (
             jnp.where(where, set_value, lhs)
             if array_as_leaves
@@ -108,15 +122,16 @@ def _at_set(tree, set_value, where, **kwargs):
     @_node_set.register(complex)
     @_node_set.register(tuple)
     @_node_set.register(list)
+    @_node_set.register(str)
     def _(lhs, where, set_value, **kwargs):
         return set_value if where else lhs
 
-    @dispatch(argnum=2)
-    def __at_set(tree, set_value, where, **kwargs):
+    @dispatch(argnum=1)
+    def __at_set(tree, where, set_value, **kwargs):
         raise NotImplementedError(f"Set where type = {type(where)} is not implemented.")
 
     @__at_set.register(type(tree))
-    def _(tree, set_value, where, **kwargs):
+    def _(tree, where, set_value, **kwargs):
 
         assert all(
             ptu.is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(where)
@@ -131,13 +146,13 @@ def _at_set(tree, set_value, where, **kwargs):
 
         return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
 
-    return __at_set(tree, set_value, where, **kwargs)
+    return __at_set(tree, where, set_value, **kwargs)
 
 
 """ Apply """
 
 
-def _at_apply(tree, func, where, **kwargs):
+def _at_apply(tree, where, func, **kwargs):
     @dispatch(argnum=0)
     def _node_apply(lhs: Any, where: bool, func: Callable[[Any], Any], **kwargs):
         """Set pytree node
@@ -166,17 +181,18 @@ def _at_apply(tree, func, where, **kwargs):
     @_node_apply.register(complex)
     @_node_apply.register(tuple)
     @_node_apply.register(list)
+    @_node_apply.register(str)
     def _(lhs, where, func, **kwargs):
         return func(lhs) if where else lhs
 
-    @dispatch(argnum=2)
-    def __at_apply(tree, func, where, **kwargs):
+    @dispatch(argnum=1)
+    def __at_apply(tree, where, func, **kwargs):
         raise NotImplementedError(
             f"Apply where type = {type(where)} is not implemented."
         )
 
     @__at_apply.register(type(tree))
-    def _(tree, func, where, **kwargs):
+    def _(tree, where, func, **kwargs):
 
         assert all(
             ptu.is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(where)
@@ -191,24 +207,41 @@ def _at_apply(tree, func, where, **kwargs):
 
         return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
 
-    return __at_apply(tree, func, where, **kwargs)
+    return __at_apply(tree, where, func, **kwargs)
 
 
 """ Reduce """
 
 
-def _at_reduce(tree, set_value, where, **kwargs):
-    @dispatch(argnum=2)
-    def __at_reduce(tree, set_value, where, **kwargs):
+def _at_reduce(tree, where, func, **kwargs):
+    @dispatch(argnum=1)
+    def __at_reduce(tree, where, func, **kwargs):
         raise NotImplementedError(
             f"Reduce where type = {type(where)} is not implemented."
         )
 
     @__at_reduce.register(type(tree))
-    def _(tree, func, where, initializer=0, **kwargs):
+    def _(tree, where, func, initializer=0, **kwargs):
         return jtu.tree_reduce(func, tree.at[where].get(), initializer)
 
-    return __at_reduce(tree, set_value, where, **kwargs)
+    return __at_reduce(tree, where, func, **kwargs)
+
+
+""" Static"""
+
+
+def _at_static(tree, where, **kwargs):
+    @dispatch(argnum=1)
+    def __at_static(tree, where, **kwargs):
+        raise NotImplementedError(
+            f"Static where type = {type(where)} is not implemented."
+        )
+
+    @__at_static.register(type(tree))
+    def _(tree, where, **kwargs):
+        return tree.at[where].apply(Static, array_as_leaves=False)
+
+    return __at_static(tree, where, **kwargs)
 
 
 class treeIndexerMethods:
@@ -263,22 +296,35 @@ class treeIndexer:
 
                 class getterSetterIndexer(treeIndexerMethods):
                     def get(getter_setter_self, **kwargs):
-                        return _at_get(self, arg, **kwargs)
+                        return ft.partial(_at_get, where=arg)(tree=self, **kwargs)
 
                     def set(getter_setter_self, set_value, **kwargs):
                         if self.frozen:
                             raise ValueError("Cannot set to a frozen treeclass.")
-                        return _at_set(self, set_value, arg, **kwargs)
+                        return ft.partial(_at_set, where=arg)(
+                            tree=self, set_value=set_value, **kwargs
+                        )
 
                     def apply(getter_setter_self, func, **kwargs):
                         if self.frozen:
                             raise ValueError("Cannot apply to a frozen treeclass.")
-                        return _at_apply(self, func, arg, **kwargs)
+                        return ft.partial(_at_apply, where=arg)(
+                            tree=self, func=func, **kwargs
+                        )
 
                     def reduce(getter_setter_self, func, **kwargs):
                         if self.frozen:
-                            raise ValueError("Cannot apply to a frozen treeclass.")
-                        return _at_reduce(self, func, arg, **kwargs)
+                            raise ValueError("Cannot reduce to a frozen treeclass.")
+                        return ft.partial(_at_reduce, where=arg)(
+                            tree=self, func=func, **kwargs
+                        )
+
+                    def static(getter_setter_self, **kwargs):
+                        if self.frozen:
+                            raise ValueError(
+                                "Cannot apply static to a frozen treeclass."
+                            )
+                        return ft.partial(_at_static, where=arg)(tree=self, **kwargs)
 
                 return getterSetterIndexer()
 

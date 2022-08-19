@@ -3,7 +3,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-
+from dataclasses import field
 
 @pytc.treeclass
 class Linear:
@@ -75,7 +75,7 @@ def test_field_only():
 
     @pytc.treeclass(field_only=True)
     class StackedLinear:
-        l4: Linear = pytc.static_field(default=1)
+        l4: Linear = field(default=pytc.Static(1))
         l5: Linear
 
         def __init__(self, key, in_dim, out_dim, hidden_dim):

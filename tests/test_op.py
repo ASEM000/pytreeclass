@@ -1,16 +1,16 @@
 import jax.numpy as jnp
 import pytest
 
-from pytreeclass import static_field, treeclass
-from pytreeclass.src.tree_util import is_treeclass_equal
-
+from pytreeclass import treeclass
+from pytreeclass.src.tree_util import Static, is_treeclass_equal
+from dataclasses import field
 
 @treeclass
 class Test:
     a: float
     b: float
     c: float
-    name: str = static_field()
+    name: str 
 
 
 def test_ops():
@@ -19,14 +19,14 @@ def test_ops():
         a: float
         b: float
         c: float
-        name: str = static_field(metadata={"static": True})
+        name: str 
 
-    A = Test(10, 20, 30, "A")
+    A = Test(10, 20, 30, Static("A"))
     # binary operations
 
-    assert (A + A) == Test(20, 40, 60, "A")
-    assert (A - A) == Test(0, 0, 0, "A")
-    # assert ((A["a"] + A) | A) == Test(20, 20, 30, "A")
+    assert (A + A) == Test(20, 40, 60, Static("A"))
+    assert (A - A) == Test(0, 0, 0, Static("A"))
+    # assert ((A["a"] + A) | A) == Test(20, 20, 30 ,Static("A"))
     # assert A.reduce_mean() == jnp.array(60)
     assert abs(A) == A
 
@@ -34,38 +34,38 @@ def test_ops():
     class Test:
         a: int
         b: int
-        name: str = static_field()
+        name: str
 
-    A = Test(-10, 20, "A")
+    A = Test(-10, 20, Static("A"))
 
     # magic ops
-    assert abs(A) == Test(10, 20, "A")
-    assert A + A == Test(-20, 40, "A")
+    assert abs(A) == Test(10, 20, Static("A"))
+    assert A + A == Test(-20, 40, Static("A"))
     assert A == A
-    assert A // 2 == Test(-5, 10, "A")
-    assert A / 2 == Test(-5.0, 10.0, "A")
-    assert (A > A) == Test(False, False, "A")
-    assert (A >= A) == Test(True, True, "A")
-    assert (A <= A) == Test(True, True, "A")
-    assert -A == Test(10, -20, "A")
-    assert A * A == Test(100, 400, "A")
-    assert A**A == Test((-10) ** (-10), 20**20, "A")
-    assert A - A == Test(0, 0, "A")
+    assert A // 2 == Test(-5, 10, Static("A"))
+    assert A / 2 == Test(-5.0, 10.0, Static("A"))
+    assert (A > A) == Test(False, False, Static("A"))
+    assert (A >= A) == Test(True, True, Static("A"))
+    assert (A <= A) == Test(True, True, Static("A"))
+    assert -A == Test(10, -20, Static("A"))
+    assert A * A == Test(100, 400, Static("A"))
+    assert A**A == Test((-10) ** (-10), 20**20, Static("A"))
+    assert A - A == Test(0, 0, Static("A"))
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(TypeError):
         A + "s"
 
     with pytest.raises(NotImplementedError):
         A == (1,)
 
-    assert abs(A) == Test(10, 20, "A")
+    assert abs(A) == Test(10, 20, Static("A"))
 
     # numpy ops
     A = Test(a=jnp.array([-10, -10]), b=1, name="A")
 
 
 def test_asdict():
-    A = Test(10, 20, 30, "A")
+    A = Test(10, 20, 30, Static("A"))
     assert A.asdict() == {"a": 10, "b": 20, "c": 30, "name": "A"}
 
 

@@ -1,3 +1,5 @@
+from dataclasses import field
+
 import jax
 import jax.tree_util as jtu
 import numpy.testing as npt
@@ -5,6 +7,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
+from pytreeclass.src.tree_util import Static
 
 
 def test_jit_freeze():
@@ -12,7 +15,7 @@ def test_jit_freeze():
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
-        name: str = pytc.static_field(default="a")
+        name: str = field(default=Static("a"))
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(

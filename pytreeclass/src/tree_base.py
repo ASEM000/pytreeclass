@@ -7,6 +7,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from pytreeclass.src.tree_util import (
+    Static,
     _freeze_nodes,
     _unfreeze_nodes,
     is_treeclass,
@@ -33,7 +34,7 @@ class fieldDict(dict):
 
 
 def tree_fields(self) -> tuple[dict[str, Any], dict[str, Any]]:
-    static, dynamic = fieldDict(), fieldDict()
+    dynamic, static = fieldDict(), fieldDict()
     # register other variables defined in other context
     # if their value is an instance of treeclass
     # to avoid redefining them as dataclass fields.
@@ -57,9 +58,10 @@ def tree_fields(self) -> tuple[dict[str, Any], dict[str, Any]]:
         # exclude any string
         # and mutate the class field static metadata for this variable for future instances
 
-        excluded_by_meta = fi.metadata.get("static", False)
+        # excluded_by_meta = fi.metadata.get("static", False)
+        excluded_by_type = isinstance(value, Static)
 
-        if excluded_by_meta:
+        if excluded_by_type:
             static[fi.name] = value
 
         else:
@@ -232,7 +234,12 @@ class treeBase:
     def asdict(self) -> dict[str, Any]:
         """Dictionary representation of dataclass_fields"""
         dynamic, static = self.__tree_fields__
-        return {**dynamic, **static}
+        return {
+            **dynamic,
+            **jtu.tree_map(
+                lambda x: x.value if isinstance(x, Static) else x, dict(static)
+            ),
+        }
 
     def register_node(
         self, node: Any, *, name: str, static: bool = False, repr: bool = True

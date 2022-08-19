@@ -10,6 +10,9 @@ from jax import numpy as jnp
 
 import pytreeclass as pytc
 from pytreeclass import tree_viz
+from pytreeclass.src.tree_util import Static
+
+from dataclasses import field
 
 
 def test_tree_box():
@@ -38,7 +41,7 @@ def test_model():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
-        notes: str = pytc.static_field(default="string")
+        notes: str = field(default=Static("string"))
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -99,17 +102,17 @@ def test_model():
     assert (
         (model.freeze().tree_diagram())
         # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └*─ notes='string'      "
+        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes=*{'string'}   \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes=*{'string'}   \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └#─ notes=*{'string'}       "
     )
     assert (
         (model.tree_diagram())
         # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   ├── bias=f32[1,128]\n    │   └*─ notes='string'  \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   ├── bias=f32[1,128]\n    │   └*─ notes='string'  \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        ├── bias=f32[1,1]\n        └*─ notes='string'      "
+        == "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   ├── bias=f32[1,128]\n    │   └── notes=*{'string'}   \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   ├── bias=f32[1,128]\n    │   └── notes=*{'string'}   \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        ├── bias=f32[1,1]\n        └── notes=*{'string'}       "
     )
     assert (
         (model.freeze().tree_diagram())
         # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └*─ notes='string'      "
+        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes=*{'string'}   \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes=*{'string'}   \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └#─ notes=*{'string'}       "
     )
 
     assert (
@@ -140,30 +143,30 @@ def test_repr_str():
         a: float
         b: float
         c: float
-        name: str = pytc.static_field()
+        name: str
 
-    A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), "A")
+    A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), Static("A"))
     str_string = f"{A!s}"
     repr_string = f"{A!r}"
 
-    assert str_string == "Test(a=10,b=20,c=[1 2 3 4 5],*name=A)"
-    assert repr_string == "Test(a=10,b=20,c=i32[5],*name='A')"
+    assert str_string == "Test(a=10,b=20,c=[1 2 3 4 5],name=*{A})"
+    assert repr_string == "Test(a=10,b=20,c=i32[5],name=*{'A'})"
 
 
 def test_save_viz():
     @pytc.treeclass
     class level0:
         a: int
-        b: int = pytc.static_field()
+        b: int
 
     @pytc.treeclass
     class level1:
-        d: level0 = level0(10, 20)
+        d: level0 = level0(10, Static(20))
 
     @pytc.treeclass
     class level2:
         e: level1 = level1()
-        f: level0 = level0(100, 200)
+        f: level0 = level0(100, Static(200))
 
     model = level2()
 
@@ -216,7 +219,7 @@ def test_tree_indent():
     class level2:
         d: level1
         e: level1
-        name: str = pytc.static_field(default="A")
+        name: str = field(default=Static("A"))
 
     A = (
         level2(
@@ -226,7 +229,7 @@ def test_tree_indent():
                 b=20,
                 c=jnp.array([-1, -2, -3, -4, -5]),
             ),
-            name="SomethingWrittenHere",
+            name=pytc.Static("SomethingWrittenHere"),
         ),
     )
 
@@ -234,19 +237,18 @@ def test_tree_indent():
         level2(
             d=level1(a=1, b=10, c=jnp.array([1, 2, 3, 4, 5])),
             e=level1(a=1, b=20, c=jnp.array([-1, -2, -3, -4, -5])),
-            name="SomethingWrittenHere",
+            name=pytc.Static("SomethingWrittenHere"),
         ),
     )
 
     assert (
         f"{A!r}"
         # trunk-ignore(flake8/E501)
-        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(\n    a='SomethingWrittenHereSomethingWrittenHere',\n    b=20,\n    c=i32[5]),\n  *name='SomethingWrittenHere'),)"
+        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(\n    a='SomethingWrittenHereSomethingWrittenHere',\n    b=20,\n    c=i32[5]),\n  name=*{'SomethingWrittenHere'}),)"
     )
     assert (
         f"{B!r}"
-        # trunk-ignore(flake8/E501)
-        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(a=1,b=20,c=i32[5]),\n  *name='SomethingWrittenHere'),)"
+        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(a=1,b=20,c=i32[5]),\n  name=*{'SomethingWrittenHere'}),)"
     )
 
 
@@ -256,9 +258,9 @@ def test_repr_true_false():
         a: float = field(repr=False)
         b: float = field(repr=False)
         c: float = field(repr=False)
-        name: str = pytc.static_field(repr=False)
+        name: str = field(repr=False)
 
-    A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), "A")
+    A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), Static("A"))
 
     assert f"{A!r}" == "Test()"
 
@@ -267,14 +269,14 @@ def test_repr_true_false():
         a: float = field(repr=False)
         b: float
         c: float
-        name: str = pytc.static_field()
+        name: str
 
-    A = Test(10, 20, jnp.ones([10]), "Test")
+    A = Test(10, 20, jnp.ones([10]), Static("Test"))
 
-    assert A.__repr__() == "Test(b=20,c=f32[10],*name='Test')"
+    assert A.__repr__() == "Test(b=20,c=f32[10],name=*{'Test'})"
     assert (
         A.__str__()
-        == "Test(\n  b=20,\n  c=[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.],\n  *name=Test)"
+        == "Test(\n  b=20,\n  c=[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.],\n  name=*{Test})"
     )
 
     @pytc.treeclass
@@ -294,7 +296,7 @@ def test_repr_true_false():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
-        notes: str = pytc.static_field(default="string")
+        notes: str = field(default=Static("string"))
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -321,19 +323,19 @@ def test_repr_true_false():
     assert (
         model.tree_diagram()
         # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   ├── bias=f32[1,128]\n    │   └*─ notes='string'  \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        ├── bias=f32[1,1]\n        └*─ notes='string'      "
+        == "StackedLinear\n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   ├── bias=f32[1,128]\n    │   └── notes=*{'string'}   \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        ├── bias=f32[1,1]\n        └── notes=*{'string'}       "
     )
 
     assert (
         f"{model!r}"
         # trunk-ignore(flake8/E501)
-        == "StackedLinear(\n  l2=Linear(\n    weight=f32[128,128],\n    bias=f32[1,128],\n    *notes='string'),\n  l3=Linear(\n    weight=f32[128,1],\n    bias=f32[1,1],\n    *notes='string'))"
+        == "StackedLinear(\n  l2=Linear(\n    weight=f32[128,128],\n    bias=f32[1,128],\n    notes=*{'string'}),\n  l3=Linear(\n    weight=f32[128,1],\n    bias=f32[1,1],\n    notes=*{'string'}))"
     )
 
     assert (
         f"{model!s}"
         # trunk-ignore(flake8/E501)
-        == "StackedLinear(\n  l2=Linear(\n    weight=\n      [[ 0.0144316  -0.02565258  0.1499472  ...  0.008577    0.03262375\n         0.01743125]\n       [-0.0139193   0.19198167  0.258941   ... -0.12346198  0.01294849\n        -0.2187072 ]\n       [-0.07239359 -0.18226019 -0.3028738  ... -0.14551452 -0.15422817\n        -0.10291965]\n       ...\n       [-0.01665265  0.01209195  0.00641495 ... -0.1831385   0.06862506\n        -0.04054948]\n       [ 0.06876494  0.1895817  -0.28528026 ... -0.01250978 -0.0017787\n        -0.00140986]\n       [-0.00827225 -0.01063784  0.07471714 ... -0.09154531  0.10096554\n         0.11608632]],\n    bias=\n      [[1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1.]],\n    *notes=string),\n  l3=Linear(\n    weight=\n      [[-1.27816513e-01]\n       [ 1.32774442e-01]\n       [-6.23992570e-02]\n       [-7.49895275e-02]\n       [-3.26067805e-01]\n       [-6.05660751e-02]\n       [ 9.42161772e-03]\n       [ 2.32644677e-02]\n       [ 2.19230186e-02]\n       [ 5.65892598e-03]\n       [ 1.73938096e-01]\n       [-6.12434782e-02]\n       [ 1.57998070e-01]\n       [-4.63032909e-02]\n       [-2.07810000e-01]\n       [-1.11553043e-01]\n       [ 3.34456592e-04]\n       [ 3.62022198e-04]\n       [ 7.67446086e-02]\n       [ 9.32634622e-02]\n       [ 6.82672486e-02]\n       [ 3.77380736e-02]\n       [-3.92685691e-03]\n       [-2.28517000e-02]\n       [ 3.70539159e-01]\n       [-1.07250832e-01]\n       [ 2.90615618e-01]\n       [-4.94155660e-02]\n       [-1.58073619e-01]\n       [ 1.73059702e-02]\n       [ 1.12092093e-01]\n       [ 2.62781501e-01]\n       [ 1.21488310e-01]\n       [ 2.35134047e-02]\n       [ 1.78431377e-01]\n       [-8.47617313e-02]\n       [-2.28548661e-01]\n       [-1.80765197e-01]\n       [ 1.58395842e-01]\n       [-9.32636857e-02]\n       [ 8.50839838e-02]\n       [-2.39499062e-02]\n       [-1.41875058e-01]\n       [-2.35416722e-02]\n       [ 1.53016120e-01]\n       [-6.64851367e-02]\n       [-6.48237243e-02]\n       [-3.47195677e-02]\n       [-6.45313859e-02]\n       [-9.28561985e-02]\n       [ 8.82501807e-03]\n       [ 8.81578326e-02]\n       [-1.10307902e-01]\n       [ 3.76644917e-03]\n       [ 1.77450284e-01]\n       [-2.46017352e-01]\n       [ 1.82314426e-01]\n       [ 2.05066040e-01]\n       [ 1.51756600e-01]\n       [ 1.10387504e-01]\n       [ 1.24458313e-01]\n       [-2.43619345e-02]\n       [-3.66542675e-02]\n       [ 1.20256767e-02]\n       [ 1.15861200e-01]\n       [-6.81490526e-02]\n       [-6.63509741e-02]\n       [ 2.95970023e-01]\n       [-2.56108880e-01]\n       [ 2.41085105e-02]\n       [ 1.62178770e-01]\n       [-9.90648493e-02]\n       [-1.74334608e-02]\n       [ 2.28304099e-02]\n       [ 4.36865306e-03]\n       [ 5.85013963e-02]\n       [-9.30247605e-02]\n       [ 3.41776609e-02]\n       [-1.65961653e-01]\n       [ 2.18492467e-02]\n       [-8.39286372e-02]\n       [ 5.88469356e-02]\n       [-1.20792515e-03]\n       [-1.87232509e-01]\n       [ 3.28620017e-01]\n       [-2.93127503e-02]\n       [-5.68653969e-03]\n       [ 9.76577960e-03]\n       [ 1.66406319e-01]\n       [ 7.57132843e-02]\n       [ 7.52598047e-02]\n       [ 6.68830201e-02]\n       [-2.54682396e-02]\n       [ 1.07006788e-01]\n       [ 1.66288093e-02]\n       [-3.88930887e-02]\n       [-1.02033049e-01]\n       [-2.88383458e-02]\n       [ 1.38657033e-01]\n       [-2.65064180e-01]\n       [ 3.98033708e-02]\n       [ 1.01474397e-01]\n       [-1.57758023e-03]\n       [-7.05675259e-02]\n       [ 1.61069810e-01]\n       [-1.07353851e-01]\n       [ 2.08973810e-02]\n       [ 2.29642868e-01]\n       [ 4.62677144e-02]\n       [-3.10902178e-01]\n       [-2.61312351e-02]\n       [-2.12754250e-01]\n       [ 4.32350487e-03]\n       [ 2.38580763e-01]\n       [ 3.97011787e-02]\n       [-1.26753747e-01]\n       [-1.85061261e-01]\n       [-1.46927118e-01]\n       [ 7.63780961e-04]\n       [-4.70348075e-02]\n       [-1.28862098e-01]\n       [-2.61529356e-01]\n       [-5.51525690e-02]\n       [-4.07684296e-02]\n       [ 1.20138936e-01]\n       [-6.21847659e-02]\n       [ 5.08390032e-02]\n       [ 3.24640907e-02]],\n    bias=[[1.]],\n    *notes=string))"
+        == 'StackedLinear(\n  l2=Linear(\n    weight=\n      [[ 0.0144316  -0.02565258  0.1499472  ...  0.008577    0.03262375\n         0.01743125]\n       [-0.0139193   0.19198167  0.258941   ... -0.12346198  0.01294849\n        -0.2187072 ]\n       [-0.07239359 -0.18226019 -0.3028738  ... -0.14551452 -0.15422817\n        -0.10291965]\n       ...\n       [-0.01665265  0.01209195  0.00641495 ... -0.1831385   0.06862506\n        -0.04054948]\n       [ 0.06876494  0.1895817  -0.28528026 ... -0.01250978 -0.0017787\n        -0.00140986]\n       [-0.00827225 -0.01063784  0.07471714 ... -0.09154531  0.10096554\n         0.11608632]],\n    bias=\n      [[1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1.]],\n    notes=*{string}),\n  l3=Linear(\n    weight=\n      [[-1.27816513e-01]\n       [ 1.32774442e-01]\n       [-6.23992570e-02]\n       [-7.49895275e-02]\n       [-3.26067805e-01]\n       [-6.05660751e-02]\n       [ 9.42161772e-03]\n       [ 2.32644677e-02]\n       [ 2.19230186e-02]\n       [ 5.65892598e-03]\n       [ 1.73938096e-01]\n       [-6.12434782e-02]\n       [ 1.57998070e-01]\n       [-4.63032909e-02]\n       [-2.07810000e-01]\n       [-1.11553043e-01]\n       [ 3.34456592e-04]\n       [ 3.62022198e-04]\n       [ 7.67446086e-02]\n       [ 9.32634622e-02]\n       [ 6.82672486e-02]\n       [ 3.77380736e-02]\n       [-3.92685691e-03]\n       [-2.28517000e-02]\n       [ 3.70539159e-01]\n       [-1.07250832e-01]\n       [ 2.90615618e-01]\n       [-4.94155660e-02]\n       [-1.58073619e-01]\n       [ 1.73059702e-02]\n       [ 1.12092093e-01]\n       [ 2.62781501e-01]\n       [ 1.21488310e-01]\n       [ 2.35134047e-02]\n       [ 1.78431377e-01]\n       [-8.47617313e-02]\n       [-2.28548661e-01]\n       [-1.80765197e-01]\n       [ 1.58395842e-01]\n       [-9.32636857e-02]\n       [ 8.50839838e-02]\n       [-2.39499062e-02]\n       [-1.41875058e-01]\n       [-2.35416722e-02]\n       [ 1.53016120e-01]\n       [-6.64851367e-02]\n       [-6.48237243e-02]\n       [-3.47195677e-02]\n       [-6.45313859e-02]\n       [-9.28561985e-02]\n       [ 8.82501807e-03]\n       [ 8.81578326e-02]\n       [-1.10307902e-01]\n       [ 3.76644917e-03]\n       [ 1.77450284e-01]\n       [-2.46017352e-01]\n       [ 1.82314426e-01]\n       [ 2.05066040e-01]\n       [ 1.51756600e-01]\n       [ 1.10387504e-01]\n       [ 1.24458313e-01]\n       [-2.43619345e-02]\n       [-3.66542675e-02]\n       [ 1.20256767e-02]\n       [ 1.15861200e-01]\n       [-6.81490526e-02]\n       [-6.63509741e-02]\n       [ 2.95970023e-01]\n       [-2.56108880e-01]\n       [ 2.41085105e-02]\n       [ 1.62178770e-01]\n       [-9.90648493e-02]\n       [-1.74334608e-02]\n       [ 2.28304099e-02]\n       [ 4.36865306e-03]\n       [ 5.85013963e-02]\n       [-9.30247605e-02]\n       [ 3.41776609e-02]\n       [-1.65961653e-01]\n       [ 2.18492467e-02]\n       [-8.39286372e-02]\n       [ 5.88469356e-02]\n       [-1.20792515e-03]\n       [-1.87232509e-01]\n       [ 3.28620017e-01]\n       [-2.93127503e-02]\n       [-5.68653969e-03]\n       [ 9.76577960e-03]\n       [ 1.66406319e-01]\n       [ 7.57132843e-02]\n       [ 7.52598047e-02]\n       [ 6.68830201e-02]\n       [-2.54682396e-02]\n       [ 1.07006788e-01]\n       [ 1.66288093e-02]\n       [-3.88930887e-02]\n       [-1.02033049e-01]\n       [-2.88383458e-02]\n       [ 1.38657033e-01]\n       [-2.65064180e-01]\n       [ 3.98033708e-02]\n       [ 1.01474397e-01]\n       [-1.57758023e-03]\n       [-7.05675259e-02]\n       [ 1.61069810e-01]\n       [-1.07353851e-01]\n       [ 2.08973810e-02]\n       [ 2.29642868e-01]\n       [ 4.62677144e-02]\n       [-3.10902178e-01]\n       [-2.61312351e-02]\n       [-2.12754250e-01]\n       [ 4.32350487e-03]\n       [ 2.38580763e-01]\n       [ 3.97011787e-02]\n       [-1.26753747e-01]\n       [-1.85061261e-01]\n       [-1.46927118e-01]\n       [ 7.63780961e-04]\n       [-4.70348075e-02]\n       [-1.28862098e-01]\n       [-2.61529356e-01]\n       [-5.51525690e-02]\n       [-4.07684296e-02]\n       [ 1.20138936e-01]\n       [-6.21847659e-02]\n       [ 5.08390032e-02]\n       [ 3.24640907e-02]],\n    bias=[[1.]],\n    notes=*{string}))'
     )
 
     assert pytc.tree_viz.tree_mermaid(model, link=True).startswith(
@@ -357,7 +359,7 @@ def test_tree_with_containers():
     @pytc.treeclass
     class MLP:
         layers: Any
-        act_func: Callable = pytc.static_field(default=jax.nn.relu, repr=False)
+        act_func: Callable = field(default=Static(jax.nn.relu), repr=False)
 
         def __init__(
             self,
