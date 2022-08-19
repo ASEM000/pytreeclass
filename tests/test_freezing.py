@@ -7,7 +7,7 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass.src.tree_util import Static, _freeze_nodes, _unfreeze_nodes
-from dataclasses import field
+
 
 def test_freezing_unfreezing():
     @pytc.treeclass

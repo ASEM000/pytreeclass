@@ -18,7 +18,7 @@ class Test:
     b: float
     c: float
     d: jnp.ndarray
-    name: str 
+    name: str
 
 
 def test_getter_by_val():
@@ -134,7 +134,7 @@ def test_getter_by_metadata():
         b: float = field(metadata={"name": "b", "unit": "m"})
         c: float = field(metadata={"name": "c", "unit": "m"})
         d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
-        name: str 
+        name: str
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A"))
 
@@ -251,10 +251,14 @@ def test_setter_by_param():
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A"))
 
     B = A.at[A == "a"].set(0)
-    assert is_treeclass_equal(B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A")))
+    assert is_treeclass_equal(
+        B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A"))
+    )
 
     B = A.at[(A == "a") | (A == "b")].set(0)
-    assert is_treeclass_equal(B, Test(0, 0, 30, jnp.array([1, 2, 3, 4, 5]), Static("A")))
+    assert is_treeclass_equal(
+        B, Test(0, 0, 30, jnp.array([1, 2, 3, 4, 5]), Static("A"))
+    )
 
     B = A.at[(A == "a") | (A == "b") | (A == "c")].set(0)
     assert is_treeclass_equal(B, Test(0, 0, 0, jnp.array([1, 2, 3, 4, 5]), Static("A")))
@@ -267,25 +271,33 @@ def test_setter_by_metadata():
         b: float = field(metadata={"name": "b", "unit": "m"})
         c: float = field(metadata={"name": "c", "unit": "m"})
         d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
-        name: str 
+        name: str
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A"))
 
     B = A.at[A == {"name": "a"}].set(100, array_as_leaves=False)
-    assert is_treeclass_equal(B, Test(100, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A")))
+    assert is_treeclass_equal(
+        B, Test(100, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A"))
+    )
 
     B = A.at[(A == {"name": "a"}) | (A == {"name": "b"})].set(
         100, array_as_leaves=False
     )
-    assert is_treeclass_equal(B, Test(100, 100, 30, jnp.array([1, 2, 3, 4, 5]), Static("A")))
+    assert is_treeclass_equal(
+        B, Test(100, 100, 30, jnp.array([1, 2, 3, 4, 5]), Static("A"))
+    )
 
     B = A.at[A == {"": ""}].set(100, array_as_leaves=False)
-    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A")))
+    assert is_treeclass_equal(
+        B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), Static("A"))
+    )
 
     B = A.at[(A == {"name": "a"}) | (A == {"name": "b"}) | (A == {"name": "c"})].set(
         100, array_as_leaves=False
     )
-    assert is_treeclass_equal(B, Test(100, 100, 100, jnp.array([1, 2, 3, 4, 5]), Static("A")))
+    assert is_treeclass_equal(
+        B, Test(100, 100, 100, jnp.array([1, 2, 3, 4, 5]), Static("A"))
+    )
 
     B = A.at[
         (A == {"name": "a"})

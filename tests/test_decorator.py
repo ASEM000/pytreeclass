@@ -1,9 +1,11 @@
+from dataclasses import field
+
 import jax
 import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from dataclasses import field
+
 
 @pytc.treeclass
 class Linear:

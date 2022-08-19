@@ -3,14 +3,14 @@ import pytest
 
 from pytreeclass import treeclass
 from pytreeclass.src.tree_util import Static, is_treeclass_equal
-from dataclasses import field
+
 
 @treeclass
 class Test:
     a: float
     b: float
     c: float
-    name: str 
+    name: str
 
 
 def test_ops():
@@ -19,7 +19,7 @@ def test_ops():
         a: float
         b: float
         c: float
-        name: str 
+        name: str
 
     A = Test(10, 20, 30, Static("A"))
     # binary operations

@@ -11,6 +11,7 @@ import pytreeclass.src.tree_util as ptu
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import Static
 
+
 def _append_math_op(func):
     """binary and unary magic operations"""
 

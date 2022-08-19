@@ -12,15 +12,16 @@ import numpy as np
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_viz_util import _format_node_repr, _format_node_str
 
+
 class Static:
     def __init__(self, value):
         self.value = value
 
     def __repr__(self):
-        return "<" + f"{_format_node_repr(self.value,0)}" + ">"
+        return f"<{_format_node_repr(self.value,0)}>"
 
     def __str__(self):
-        return "<" + f"{_format_node_str(self.value,0)}" + ">"
+        return f"<{_format_node_str(self.value,0)}>"
 
 
 # Deprecated in favor of Static
