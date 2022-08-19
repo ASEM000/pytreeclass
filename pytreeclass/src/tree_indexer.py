@@ -10,7 +10,7 @@ import jax.tree_util as jtu
 
 import pytreeclass.src.tree_util as ptu
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import Static
+from pytreeclass.src.tree_util import static_value
 
 """ Getter """
 
@@ -239,7 +239,7 @@ def _at_static(tree, where, **kwargs):
 
     @__at_static.register(type(tree))
     def _(tree, where, **kwargs):
-        return tree.at[where].apply(Static, array_as_leaves=False)
+        return tree.at[where].apply(static_value, array_as_leaves=False)
 
     return __at_static(tree, where, **kwargs)
 

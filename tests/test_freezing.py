@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.tree_util import Static, _freeze_nodes, _unfreeze_nodes
+from pytreeclass.src.tree_util import _freeze_nodes, _unfreeze_nodes, static_value
 
 
 def test_freezing_unfreezing():
@@ -84,7 +84,7 @@ def test_freezing_unfreezing():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
-        notes: str = field(default=pytc.Static("string"))
+        notes: str = field(default=pytc.static_value("string"))
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -222,7 +222,7 @@ def test_freezing_unfreezing():
     @pytc.treeclass(field_only=False)
     class Test:
         a: int = 1
-        b: float = field(default=pytc.Static(1.0))
+        b: float = field(default=pytc.static_value(1.0))
         c: str = "test"
 
     t = Test()
@@ -233,8 +233,8 @@ def test_freezing_unfreezing():
     @pytc.treeclass(field_only=True)
     class Test:
         a: int = 1
-        b: float = field(default=Static(1.0))
-        c: str = field(default=Static("test"))
+        b: float = field(default=static_value(1.0))
+        c: str = field(default=static_value("test"))
 
     t = Test()
     assert jax.tree_util.tree_leaves(t) == [1]

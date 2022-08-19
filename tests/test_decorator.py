@@ -77,7 +77,7 @@ def test_field_only():
 
     @pytc.treeclass(field_only=True)
     class StackedLinear:
-        l4: Linear = field(default=pytc.Static(1))
+        l4: Linear = field(default=pytc.static_value(1))
         l5: Linear
 
         def __init__(self, key, in_dim, out_dim, hidden_dim):

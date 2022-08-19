@@ -7,11 +7,11 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from pytreeclass.src.tree_util import (
-    Static,
     _freeze_nodes,
     _unfreeze_nodes,
     is_treeclass,
     is_treeclass_leaf,
+    static_value,
 )
 from pytreeclass.src.tree_viz import (
     tree_box,
@@ -181,7 +181,7 @@ class treeBase:
         return {
             **dynamic,
             **jtu.tree_map(
-                lambda x: x.value if isinstance(x, Static) else x, dict(static)
+                lambda x: x.value if isinstance(x, static_value) else x, dict(static)
             ),
         }
 
@@ -239,14 +239,10 @@ class treeBase:
                 # the user did not declare a variable defined in field
                 raise ValueError(f"field={fi.name} is not declared.")
 
-            # if the parent is frozen, freeze all dataclass fields children
-            # exclude any string
-            # and mutate the class field static metadata for this variable for future instances
+            excluded_by_meta = fi.metadata.get("static", False)
+            excluded_by_type = isinstance(value, static_value)
 
-            # excluded_by_meta = fi.metadata.get("static", False)
-            excluded_by_type = isinstance(value, Static)
-
-            if excluded_by_type:
+            if excluded_by_type or excluded_by_meta:
                 static[fi.name] = value
 
             else:

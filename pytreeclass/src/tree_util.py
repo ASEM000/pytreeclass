@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import sys
+from dataclasses import field
 from typing import Any
 
 import jax
@@ -13,7 +14,7 @@ from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_viz_util import _format_node_repr, _format_node_str
 
 
-class Static:
+class static_value:
     def __init__(self, value):
         self.value = value
 
@@ -24,10 +25,9 @@ class Static:
         return f"<{_format_node_str(self.value,0)}>"
 
 
-# Deprecated in favor of Static
-# def static_field(**kwargs):
-#     """ignore from pytree computations"""
-#     return field(**{**kwargs, **{"metadata": {"static": True}}})
+def static_field(**kwargs):
+    """ignore from pytree computations"""
+    return field(**{**kwargs, **{"metadata": {"static": True}}})
 
 
 def is_treeclass(tree):
@@ -71,14 +71,15 @@ def is_treeclass_equal(lhs, rhs):
     )
 
 
-def is_excluded(fld: dataclasses.field) -> bool:
+def is_excluded(field_item: dataclasses.field, node_item: Any) -> bool:
     """Check if a field is excluded
 
     Returns:
         bool: boolean if the field should be excluded or not.
     """
-    excluded_by_meta = fld.metadata.get("static", False)
-    return excluded_by_meta
+    excluded_by_meta = field_item.metadata.get("static", False)
+    excluded_by_type = isinstance(node_item, static_value)
+    return excluded_by_meta or excluded_by_type
 
 
 def sequential_tree_shape_eval(tree, array):
@@ -107,7 +108,7 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
         complex: Complex number of (inexact, non-exact) parameters for count/size
     """
 
-    node = node.value if isinstance(node, Static) else node
+    node = node.value if isinstance(node, static_value) else node
 
     if isinstance(node, (jnp.ndarray, np.ndarray)):
         # inexact(trainable) array
