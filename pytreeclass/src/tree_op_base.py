@@ -67,7 +67,7 @@ def _append_math_eq_ne(func):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
 
                     cur_node = tree.__dict__[fld.name]
-                    if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
+                    if not ptu.is_excluded(fld) and ptu.is_treeclass(cur_node):
                         if fld.name == where:
                             # broadcast True to all subtrees
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
@@ -92,7 +92,7 @@ def _append_math_eq_ne(func):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
                     cur_node = tree.__dict__[fld.name]
 
-                    if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
+                    if not ptu.is_excluded(fld) and ptu.is_treeclass(cur_node):
                         if isinstance(cur_node, where):
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
@@ -124,7 +124,7 @@ def _append_math_eq_ne(func):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
                     cur_node = tree.__dict__[fld.name]
 
-                    if not ptu.is_excluded(fld, tree) and ptu.is_treeclass(cur_node):
+                    if not ptu.is_excluded(fld) and ptu.is_treeclass(cur_node):
                         if in_metadata(fld):
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:

@@ -59,17 +59,14 @@ def is_treeclass_equal(lhs, rhs):
     )
 
 
-def is_excluded(fld: dataclasses.field, instance: Any) -> bool:
+def is_excluded(fld: dataclasses.field) -> bool:
     """Check if a field is excluded
 
     Returns:
         bool: boolean if the field should be excluded or not.
     """
-    val = instance.__dict__[fld.name]
-    excluded_types = (str,)  # automatically excluded str from jax computations
-    excluded_by_type = isinstance(val, excluded_types)
     excluded_by_meta = fld.metadata.get("static", False)
-    return excluded_by_type or excluded_by_meta
+    return excluded_by_meta
 
 
 def sequential_tree_shape_eval(tree, array):
