@@ -632,6 +632,105 @@ StackedLinear(
   l2=Linear(weight=[],bias=[]))
 ```
 
+### Filterning example applications 
+
+-  Manipulate certain modules attributes values.
+-  Set certain modules (e.g. `Dropout`) to eval mode
+
+<details>
+
+<summary>Model definition</summary>
+
+```python
+import jax
+from jax import numpy as jnp
+import jax.random as jr
+import pytreeclass as pytc
+
+@pytc.treeclass
+class Linear :
+   weight : jnp.ndarray
+   bias   : jnp.ndarray
+
+   def __init__(self,key,in_dim,out_dim):
+       self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
+       self.bias = jnp.ones((1,out_dim))
+
+   def __call__(self,x):
+       return x @ self.weight + self.bias
+
+
+@pytc.treeclass
+class Dropout:
+    p: float
+    eval : bool | None
+
+    def __init__(self, p: float = 0.5, eval: bool | None = None):
+        """p : probability of an element to be zeroed out"""
+        self.p = p
+        self.eval = eval
+
+    def __call__(self, x, *, key=jr.PRNGKey(0)):
+        return ( 
+            x if (self.eval is True) 
+            else 
+            jnp.where(jr.bernoulli(key, (1 - self.p), x.shape), x / (1 - self.p), 0)
+        )
+
+@pytc.treeclass
+class LinearWithDropout:
+    def __init__(self):
+        self.l1 = Linear(key=jr.PRNGKey(0), in_dim=1, out_dim=5)
+        self.d1 = Dropout(p = 1.) # zero out all elements 
+
+    def __call__(self, x):
+        x = self.l1(x)
+        x = self.d1(x)
+        return x
+```
+</details>
+
+```python
+# Linear module with dropout
+>>> model = LinearWithDropout()
+>>> print("Model output with dropout :\n",model(jnp.ones((1,1))))
+```
+```
+Model output with dropout :
+ [[0. 0. 0. 0. 0.]]
+```
+
+```python
+# Linear module without dropout
+>>> mask = (model == "eval")
+>>> model_no_dropout = model.at[mask].set(True, is_leaf = lambda x:x is None)
+>>> print("Module output without dropout :\n",model_no_dropout(jnp.ones((1,1))))
+```
+
+```
+Module output without dropout :
+ [[ 1.2656513  -0.8149204   0.61661845  2.7664368   1.3457328 ]]
+```
+
+```python
+# Linear module bias set to 0
+>>> mask = (model == "bias") & (model == Linear) 
+# combining two masks ( by attribute name and class type)
+>>> model_no_linear_bias = model.at[mask ].set(0)
+>>> print("Model output with zero bias :\n" , model_no_linear_bias)
+```
+```
+Model output with zero bias :
+ LinearWithDropout(
+  l1=Linear(
+    weight=[[ 0.26565132 -1.8149204  -0.38338155  1.7664368   0.34573284]],
+    bias=[[0. 0. 0. 0. 0.]]),
+  d1=Dropout(p=1.0,eval=None))
+```
+
+
+
+
 ## 📝 Applications<a id="Applications"></a>
 - [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
 
