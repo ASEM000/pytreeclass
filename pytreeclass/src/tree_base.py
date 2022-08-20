@@ -69,10 +69,7 @@ class treeBase:
         """
         return True if hasattr(self, "__frozen_tree_fields__") else False
 
-    def __setattr__(self, name: str, value: Any) -> None:
-        if self.frozen:
-            raise ValueError("Cannot set a value to a frozen treeclass.")
-        object.__setattr__(self, name, value)
+
 
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
@@ -266,6 +263,10 @@ class explicitTreeBase:
         else:
             return self.__generate_tree_fields__()
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if self.frozen:
+            raise ValueError("Cannot set a value to a frozen treeclass.")
+        object.__setattr__(self, name, value)
 
 class implicitTreeBase:
     """Register dataclass fields and treeclass instance variables"""
@@ -288,6 +289,12 @@ class implicitTreeBase:
                 # register it to class
                 self.__dataclass_fields__.update({var_name: field_value})
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if self.frozen:
+            raise ValueError("Cannot set a value to a frozen treeclass.")
+        object.__setattr__(self, name, value)
+        self.__register_treeclass_instance_variables__()
+
     @property
     def __tree_fields__(self):
         """Computes the dynamic and static fields.
@@ -299,5 +306,4 @@ class implicitTreeBase:
             return self.__frozen_tree_fields__
 
         else:
-            self.__register_treeclass_instance_variables__()
             return self.__generate_tree_fields__()
