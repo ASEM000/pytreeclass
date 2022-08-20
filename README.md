@@ -6,9 +6,10 @@
 [**Installation**](#Installation)
 |[**Description**](#Description)
 |[**Quick Example**](#QuickExample)
+|[**Filtering**](#Filtering)
 |[**StatefulComputation**](#StatefulComputation)
-|[**More**](#More)
 |[**Applications**](#Applications)
+|[**More**](#More)
 |[**Acknowledgements**](#Acknowledgements)
 
 
@@ -34,7 +35,7 @@ PyTreeClass offers a JAX compatible `dataclass` like datastructure with the foll
 
 - 🏗️ [Create PyTorch like NN classes](#Pytorch)
 - 🎨 [Visualize for pytrees decorated with `@pytc.treeclass`.](#Viz)
-- ☝️ [Filtering/Indexing on Pytrees in functional style similar to `jax.numpy.at` ](#Filtering)
+- ☝️ [Filtering by boolean masking similar to `jax.numpy.at` ](#Filtering)
 
 
 ## ⏩ Quick Example <a id="QuickExample">
@@ -93,6 +94,7 @@ class StackedLinear:
 ```
 
 ### 🎨 Visualize<a id="Viz">
+<details>
 
 <div align="center">
 <table>
@@ -228,7 +230,12 @@ flowchart LR
 
  </div>
 
+</details>
+
 ### ✂️ Model surgery
+
+<details>
+
 ```python
 # freeze l1
 >>> model.l1 = model.l1.freeze()
@@ -253,10 +260,281 @@ StackedLinear
         └── bias=f32[1,1] 
 ```
 
-## 📜 Stateful computations<a id="StatefulComputation"></a>
-[JAX reference](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state)
+</details>
 
+## ☝️ Filtering with `.at[]` <a id="Filtering">
+`PyTreeClass` offers four means of filtering: 
+1. Filter by value
+2. Filter by field name
+3. Filter by field type
+4. Filter by field metadata.
+
+The following example demonstrates the usage the filtering.
+Suppose you have the following (Multilayer perceptron) MLP class  
+- **Note** in `StackedLinear` `l1` and `l2` has a description in `field` metadata.
+
+<details> 
+
+<summary>Model definition</summary>
+
+```python
+import jax
+from jax import numpy as jnp
+import pytreeclass as pytc
+import matplotlib.pyplot as plt
+from dataclasses import  field 
+
+@pytc.treeclass
+class Linear :
+   weight : jnp.ndarray
+   bias   : jnp.ndarray
+
+   def __init__(self,key,in_dim,out_dim):
+       self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
+       self.bias = jnp.ones((1,out_dim))
+
+   def __call__(self,x):
+       return x @ self.weight + self.bias
+
+@pytc.treeclass
+class StackedLinear:
+    l1 : Linear = field(metadata={"description": "First layer"})
+    l2 : Linear = field(metadata={"description": "Second layer"})
+
+    def __init__(self,key,in_dim,out_dim,hidden_dim):
+        keys= jax.random.split(key,3)
+
+        self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
+        self.l2 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
+
+    def __call__(self,x):
+        x = self.l1(x)
+        x = jax.nn.tanh(x)
+        x = self.l2(x)
+
+        return x
+        
+model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=5,key=jax.random.PRNGKey(0))
+```
+</details>
+
+
+* Raw model values before any filtering.
+```python
+>>> print(model)
+
+StackedLinear(
+  l1=Linear(
+    weight=[[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812]],
+    bias=[[1. 1. 1. 1. 1.]]),
+  l2=Linear(
+    weight=
+      [[ 0.98507565]
+       [ 0.99815285]
+       [-1.0687716 ]
+       [-0.19255024]
+       [-1.2108876 ]],
+    bias=[[1.]]))
+```
+
+#### Filter by value
+
+* Get all negative values
+```python
+>>> print(model.at[model<0].get())
+
+StackedLinear(
+  l1=Linear(
+    weight=[-1.6248673  -2.8383057  -0.40784812],
+    bias=[]),
+  l2=Linear(
+    weight=[-1.0687716  -0.19255024 -1.2108876 ],
+    bias=[]))
+```
+
+*  Set negative values to 0
+```python
+>>> print(model.at[model<0].set(0))
+
+StackedLinear(
+  l1=Linear(
+    weight=[[0.        0.        1.3969219 1.3169124 0.       ]],
+    bias=[[1. 1. 1. 1. 1.]]),
+  l2=Linear(
+    weight=
+      [[0.98507565]
+       [0.99815285]
+       [0.        ]
+       [0.        ]
+       [0.        ]],
+    bias=[[1.]]))
+```
+
+* Apply f(x)=x^2 to negative values
+```python
+>>> print(model.at[model<0].apply(lambda x:x**2))
+
+StackedLinear(
+  l1=Linear(
+    weight=[[2.6401937  8.05598    1.3969219  1.3169124  0.16634008]],
+    bias=[[1. 1. 1. 1. 1.]]),
+  l2=Linear(
+    weight=
+      [[0.98507565]
+       [0.99815285]
+       [1.1422727 ]
+       [0.03707559]
+       [1.4662486 ]],
+    bias=[[1.]]))
+```
+* Sum all negative values
+```python
+>>> print(model.at[model<0].reduce_sum())
+-7.3432307
+```
+
+#### Filter by field name
+
+* Get all fields named `l1`
+```python
+>>> print(model.at[model == "l1"].get())
+
+StackedLinear(
+  l1=Linear(
+    weight=[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812],
+    bias=[1. 1. 1. 1. 1.]),
+  l2=Linear(weight=[],bias=[]))
+```
+
+#### Filter by field type
+* Get all fields of `Linear` type
+```python
+>>> print(model.at[model == Linear].get())
+
+StackedLinear(
+  l1=Linear(
+    weight=[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812],
+    bias=[1. 1. 1. 1. 1.]),
+  l2=Linear(
+    weight=[ 0.98507565  0.99815285 -1.0687716  -0.19255024 -1.2108876 ],
+    bias=[1.]))
+```
+
+#### Filter by field metadata
+* Get all fields of with `{"description": "First layer"}` in their metadata
+```python
+>>> print(model.at[model == {"description": "First layer"}].get())
+
+StackedLinear(
+  l1=Linear(
+    weight=[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812],
+    bias=[1. 1. 1. 1. 1.]),
+  l2=Linear(weight=[],bias=[]))
+```
+
+### 🤯 Application : Filtering PyTrees by boolean masking 
+
+-  Manipulate certain modules attributes values.
+-  Set certain modules (e.g. `Dropout`) to *eval* mode
+
+<details>
+
+
+* Model definition
+
+```python
+import jax
+from jax import numpy as jnp
+import jax.random as jr
+import pytreeclass as pytc
+
+@pytc.treeclass
+class Linear :
+   weight : jnp.ndarray
+   bias   : jnp.ndarray
+
+   def __init__(self,key,in_dim,out_dim):
+       self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
+       self.bias = jnp.ones((1,out_dim))
+
+   def __call__(self,x):
+       return x @ self.weight + self.bias
+
+
+@pytc.treeclass
+class Dropout:
+    p: float
+    eval : bool | None
+
+    def __init__(self, p: float = 0.5, eval: bool | None = None):
+        """p : probability of an element to be zeroed out"""
+        self.p = p
+        self.eval = eval
+
+    def __call__(self, x, *, key=jr.PRNGKey(0)):
+        return ( 
+            x if (self.eval is True) 
+            else 
+            jnp.where(jr.bernoulli(key, (1 - self.p), x.shape), x / (1 - self.p), 0)
+        )
+
+@pytc.treeclass
+class LinearWithDropout:
+    def __init__(self):
+        self.l1 = Linear(key=jr.PRNGKey(0), in_dim=1, out_dim=5)
+        self.d1 = Dropout(p = 1.) # zero out all elements 
+
+    def __call__(self, x):
+        x = self.l1(x)
+        x = self.d1(x)
+        return x
+```
+
+
+#### `Linear` module with full dropout
+```python
+>>> model = LinearWithDropout()
+>>> print(model(jnp.ones((1,1))))
+
+[[0. 0. 0. 0. 0.]]
+```
+
+#### Disable `Dropout`
+* using boolean masking with `.at[].set()` to disable `Dropout`
+```python
+>>> mask = (model == "eval")
+>>> model_no_dropout = model.at[mask].set(True, is_leaf = lambda x:x is None)
+>>> print(model_no_dropout(jnp.ones((1,1))))
+
+[[ 1.2656513  -0.8149204   0.61661845  2.7664368   1.3457328 ]]
+```
+
+#### Set `Linear` module bias to 0
+* Combining _attribute name_ mask and _class type_ mask 
+```python
+>>> mask = (model == "bias") & (model == Linear) 
+>>> model_no_linear_bias = model.at[mask ].set(0)
+>>> print(model_no_linear_bias)
+
+LinearWithDropout(
+ l1=Linear(
+   weight=[[ 0.26565132 -1.8149204  -0.38338155  1.7664368   0.34573284]],
+   bias=[[0. 0. 0. 0. 0.]]),
+ d1=Dropout(p=1.0,eval=None))
+```
+
+</details>
+
+
+
+## 📜 Stateful computations<a id="StatefulComputation"></a>
+
+[JAX reference](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state)
 Under jax.jit jax requires states to be explicit, this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
+
+
+<details>
+
 
 Using the following pattern,Updating state can be achieved under `jax.jit`
 
@@ -431,6 +709,24 @@ for _ in range(1,epochs+1):
 </div>
 </details>
 
+
+</details>
+
+
+
+
+
+
+
+
+
+
+## 📝 Applications<a id="Applications"></a>
+- [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
+
+
+
+
 ## 🔢 More<a id="More"></a>
 
 <details><summary><mark>More compact boilerplate</mark></summary>
@@ -471,269 +767,7 @@ class StackedLinear:
         x = self.register_node(Linear(self.keys[2],10,x.shape[-1]),name="l3")(x)
         return x
 ```
-
 </details>
-
-### ☝️ Filtering with `.at[]` <a id="Filtering">
-`PyTreeClass` offers four means of filtering: 
-1. Filter by value
-2. Filter by field name
-3. Filter by field type
-4. Filter by field metadata.
-
-The following example demonstrates the usage the filtering.
-Suppose you have the following (Multilayer perceptron) MLP class  
-- **note in `StackedLinear` we added a description to `l1` and `l2` through the metadata in the `field`**
-
-```python
-import jax
-from jax import numpy as jnp
-import pytreeclass as pytc
-import matplotlib.pyplot as plt
-from dataclasses import  field 
-
-@pytc.treeclass
-class Linear :
-   weight : jnp.ndarray
-   bias   : jnp.ndarray
-
-   def __init__(self,key,in_dim,out_dim):
-       self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
-       self.bias = jnp.ones((1,out_dim))
-
-   def __call__(self,x):
-       return x @ self.weight + self.bias
-
-@pytc.treeclass
-class StackedLinear:
-    l1 : Linear = field(metadata={"description": "First layer"})
-    l2 : Linear = field(metadata={"description": "Second layer"})
-
-    def __init__(self,key,in_dim,out_dim,hidden_dim):
-        keys= jax.random.split(key,3)
-
-        self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
-        self.l2 = Linear(key=keys[2],in_dim=hidden_dim,out_dim=out_dim)
-
-    def __call__(self,x):
-        x = self.l1(x)
-        x = jax.nn.tanh(x)
-        x = self.l2(x)
-
-        return x
-        
-model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=5,key=jax.random.PRNGKey(0))
-```
-
-* Raw model values before any filtering.
-```python
->>> print(model)
-
-StackedLinear(
-  l1=Linear(
-    weight=[[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812]],
-    bias=[[1. 1. 1. 1. 1.]]),
-  l2=Linear(
-    weight=
-      [[ 0.98507565]
-       [ 0.99815285]
-       [-1.0687716 ]
-       [-0.19255024]
-       [-1.2108876 ]],
-    bias=[[1.]]))
-```
-
-#### Filter by value
-
-* Get all negative values
-```python
->>> print(model.at[model<0].get())
-StackedLinear(
-  l1=Linear(
-    weight=[-1.6248673  -2.8383057  -0.40784812],
-    bias=[]),
-  l2=Linear(
-    weight=[-1.0687716  -0.19255024 -1.2108876 ],
-    bias=[]))
-```
-
-*  Set negative values to 0
-```python
->>> print(model.at[model<0].set(0))
-StackedLinear(
-  l1=Linear(
-    weight=[[0.        0.        1.3969219 1.3169124 0.       ]],
-    bias=[[1. 1. 1. 1. 1.]]),
-  l2=Linear(
-    weight=
-      [[0.98507565]
-       [0.99815285]
-       [0.        ]
-       [0.        ]
-       [0.        ]],
-    bias=[[1.]]))
-```
-
-* Apply f(x)=x^2 to negative values
-```python
->>> print(model.at[model<0].apply(lambda x:x**2))
-StackedLinear(
-  l1=Linear(
-    weight=[[2.6401937  8.05598    1.3969219  1.3169124  0.16634008]],
-    bias=[[1. 1. 1. 1. 1.]]),
-  l2=Linear(
-    weight=
-      [[0.98507565]
-       [0.99815285]
-       [1.1422727 ]
-       [0.03707559]
-       [1.4662486 ]],
-    bias=[[1.]]))
-```
-* Sum all negative values
-```python
->>> print(model.at[model<0].reduce_sum())
--7.3432307
-```
-
-#### Filter by field name
-
-* Get all fields named `l1`
-```python
->>> print(model.at[model == "l1"].get())
-StackedLinear(
-  l1=Linear(
-    weight=[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812],
-    bias=[1. 1. 1. 1. 1.]),
-  l2=Linear(weight=[],bias=[]))
-```
-
-#### Filter by field type
-* Get all fields of `Linear` type
-```python
->>> print(model.at[model == Linear].get())
-StackedLinear(
-  l1=Linear(
-    weight=[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812],
-    bias=[1. 1. 1. 1. 1.]),
-  l2=Linear(
-    weight=[ 0.98507565  0.99815285 -1.0687716  -0.19255024 -1.2108876 ],
-    bias=[1.]))
-```
-
-#### Filter by field metadata
-* Get all fields of with `{"description": "First layer"}` in their metadata
-```python
->>> print(model.at[model == {"description": "First layer"}].get())
-StackedLinear(
-  l1=Linear(
-    weight=[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812],
-    bias=[1. 1. 1. 1. 1.]),
-  l2=Linear(weight=[],bias=[]))
-```
-
-### Filterning example applications 
-
--  Manipulate certain modules attributes values.
--  Set certain modules (e.g. `Dropout`) to eval mode
-
-<details>
-
-<summary>Model definition</summary>
-
-```python
-import jax
-from jax import numpy as jnp
-import jax.random as jr
-import pytreeclass as pytc
-
-@pytc.treeclass
-class Linear :
-   weight : jnp.ndarray
-   bias   : jnp.ndarray
-
-   def __init__(self,key,in_dim,out_dim):
-       self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
-       self.bias = jnp.ones((1,out_dim))
-
-   def __call__(self,x):
-       return x @ self.weight + self.bias
-
-
-@pytc.treeclass
-class Dropout:
-    p: float
-    eval : bool | None
-
-    def __init__(self, p: float = 0.5, eval: bool | None = None):
-        """p : probability of an element to be zeroed out"""
-        self.p = p
-        self.eval = eval
-
-    def __call__(self, x, *, key=jr.PRNGKey(0)):
-        return ( 
-            x if (self.eval is True) 
-            else 
-            jnp.where(jr.bernoulli(key, (1 - self.p), x.shape), x / (1 - self.p), 0)
-        )
-
-@pytc.treeclass
-class LinearWithDropout:
-    def __init__(self):
-        self.l1 = Linear(key=jr.PRNGKey(0), in_dim=1, out_dim=5)
-        self.d1 = Dropout(p = 1.) # zero out all elements 
-
-    def __call__(self, x):
-        x = self.l1(x)
-        x = self.d1(x)
-        return x
-```
-</details>
-
-```python
-# Linear module with dropout
->>> model = LinearWithDropout()
->>> print("Model output with dropout :\n",model(jnp.ones((1,1))))
-```
-```
-Model output with dropout :
- [[0. 0. 0. 0. 0.]]
-```
-
-```python
-# Linear module without dropout
->>> mask = (model == "eval")
->>> model_no_dropout = model.at[mask].set(True, is_leaf = lambda x:x is None)
->>> print("Module output without dropout :\n",model_no_dropout(jnp.ones((1,1))))
-```
-
-```
-Module output without dropout :
- [[ 1.2656513  -0.8149204   0.61661845  2.7664368   1.3457328 ]]
-```
-
-```python
-# Linear module bias set to 0
->>> mask = (model == "bias") & (model == Linear) 
-# combining two masks ( by attribute name and class type)
->>> model_no_linear_bias = model.at[mask ].set(0)
->>> print("Model output with zero bias :\n" , model_no_linear_bias)
-```
-```
-Model output with zero bias :
- LinearWithDropout(
-  l1=Linear(
-    weight=[[ 0.26565132 -1.8149204  -0.38338155  1.7664368   0.34573284]],
-    bias=[[0. 0. 0. 0. 0.]]),
-  d1=Dropout(p=1.0,eval=None))
-```
-
-
-
-
-## 📝 Applications<a id="Applications"></a>
-- [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
-
 
 <details id="AE" ><summary>Simple AutoEncoder from scratch</summary>
 
@@ -1128,9 +1162,8 @@ flowchart LR
 ```
 </details>
 
-
-
 </details>
+
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 - [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
