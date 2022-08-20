@@ -20,13 +20,14 @@ PyTree = Any
 
 def _func_repr(func):
     args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(func)
-    ARGS = (",".join(args)) if len(args) > 0 else ""
-    VARARGS = ("*" + varargs) if varargs is not None else ""
-    KWONLYARGS = (",".join(kwonlyargs)) if len(kwonlyargs) > 0 else ""
-    VARKW = ("**" + varkw) if varkw is not None else ""
+    args = (",".join(args)) if len(args) > 0 else ""
+    varargs = ("*" + varargs) if varargs is not None else ""
+    kwonlyargs = (",".join(kwonlyargs)) if len(kwonlyargs) > 0 else ""
+    varkw = ("**" + varkw) if varkw is not None else ""
+    name = "Lambda" if (func.__name__ == "<lambda>") else func.__name__
     return (
-        f"{func.__name__}("
-        + ",".join(item for item in [ARGS, VARARGS, KWONLYARGS, VARKW] if item != "")
+        f"{name}("
+        + ",".join(item for item in [args, varargs, kwonlyargs, varkw] if item != "")
         + ")"
     )
 

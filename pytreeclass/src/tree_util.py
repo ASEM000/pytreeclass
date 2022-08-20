@@ -11,6 +11,18 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.tree_viz_util import _format_node_repr, _format_node_str
+
+
+class static_value:
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return f"<{_format_node_repr(self.value,0)}>"
+
+    def __str__(self):
+        return f"<{_format_node_str(self.value,0)}>"
 
 
 def static_field(**kwargs):
@@ -37,7 +49,7 @@ def is_treeclass_leaf(tree):
         fields = tree.__dataclass_fields__.values()
 
         return is_treeclass(tree) and not any(
-            [is_treeclass(tree.__dict__[field.name]) for field in fields]
+            [is_treeclass(tree.__dict__[fi.name]) for fi in fields]
         )
     else:
         return False
@@ -59,14 +71,15 @@ def is_treeclass_equal(lhs, rhs):
     )
 
 
-def is_excluded(fld: dataclasses.field) -> bool:
+def is_excluded(field_item: dataclasses.field, node_item: Any) -> bool:
     """Check if a field is excluded
 
     Returns:
         bool: boolean if the field should be excluded or not.
     """
-    excluded_by_meta = fld.metadata.get("static", False)
-    return excluded_by_meta
+    excluded_by_meta = field_item.metadata.get("static", False)
+    excluded_by_type = isinstance(node_item, static_value)
+    return excluded_by_meta or excluded_by_type
 
 
 def sequential_tree_shape_eval(tree, array):
@@ -94,6 +107,8 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
     Returns:
         complex: Complex number of (inexact, non-exact) parameters for count/size
     """
+
+    node = node.value if isinstance(node, static_value) else node
 
     if isinstance(node, (jnp.ndarray, np.ndarray)):
         # inexact(trainable) array
@@ -148,6 +163,7 @@ def _dispatched_tree_map(func, lhs, rhs=None):
     @_tree_map.register(float)
     @_tree_map.register(complex)
     @_tree_map.register(bool)
+    @_tree_map.register(str)
     def _(lhs, rhs):
         lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
 

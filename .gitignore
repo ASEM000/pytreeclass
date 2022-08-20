@@ -10,5 +10,5 @@ tensorboard
 experimental
 TODO.txt
 test.ipynb
-
+tests/nn_tests
 .vscode/settings.json

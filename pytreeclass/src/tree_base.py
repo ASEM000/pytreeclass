@@ -11,6 +11,7 @@ from pytreeclass.src.tree_util import (
     _unfreeze_nodes,
     is_treeclass,
     is_treeclass_leaf,
+    static_value,
 )
 from pytreeclass.src.tree_viz import (
     tree_box,
@@ -30,61 +31,6 @@ class fieldDict(dict):
     # relevant issue : https://github.com/google/jax/issues/11089
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
-
-
-def tree_fields(self) -> tuple[dict[str, Any], dict[str, Any]]:
-    static, dynamic = fieldDict(), fieldDict()
-    # register other variables defined in other context
-    # if their value is an instance of treeclass
-    # to avoid redefining them as dataclass fields.
-
-    # register all dataclass fields
-    for fi in self.__dataclass_fields__.values():
-        # field value is defined in class dict
-        if fi.name in self.__dict__:
-            value = self.__dict__[fi.name]
-
-        # field value is defined in field default
-        elif fi.default is not MISSING:
-            self.__dict__[fi.name] = fi.default
-            value = fi.default
-
-        else:
-            # the user did not declare a variable defined in field
-            raise ValueError(f"field={fi.name} is not declared.")
-
-        # if the parent is frozen, freeze all dataclass fields children
-        # exclude any string
-        # and mutate the class field static metadata for this variable for future instances
-
-        excluded_by_meta = fi.metadata.get("static", False)
-
-        if excluded_by_meta:
-            static[fi.name] = value
-
-        else:
-            dynamic[fi.name] = value
-
-    return (dynamic, static)
-
-
-def register_treeclass_instance_variables(self) -> None:
-    for var_name, var_value in self.__dict__.items():
-        # check if a variable in self.__dict__ is treeclass
-        # that is not defined in fields
-        if (
-            isinstance(var_name, str)
-            and is_treeclass(var_value)
-            and var_name not in self.__dataclass_fields__
-        ):
-
-            # create field
-            field_value = field()
-            setattr(field_value, "name", var_name)
-            setattr(field_value, "type", type(var_value))
-
-            # register it to class
-            self.__dataclass_fields__.update({var_name: field_value})
 
 
 class treeBase:
@@ -232,7 +178,12 @@ class treeBase:
     def asdict(self) -> dict[str, Any]:
         """Dictionary representation of dataclass_fields"""
         dynamic, static = self.__tree_fields__
-        return {**dynamic, **static}
+        return {
+            **dynamic,
+            **jtu.tree_map(
+                lambda x: x.value if isinstance(x, static_value) else x, dict(static)
+            ),
+        }
 
     def register_node(
         self, node: Any, *, name: str, static: bool = False, repr: bool = True
@@ -267,6 +218,38 @@ class treeBase:
     def tree_box(self, array: jnp.ndarray = None) -> str:
         return tree_box(self, array)
 
+    def __generate_tree_fields__(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        dynamic, static = fieldDict(), fieldDict()
+        # register other variables defined in other context
+        # if their value is an instance of treeclass
+        # to avoid redefining them as dataclass fields.
+
+        # register all dataclass fields
+        for fi in self.__dataclass_fields__.values():
+            # field value is defined in class dict
+            if fi.name in self.__dict__:
+                value = self.__dict__[fi.name]
+
+            # field value is defined in field default
+            elif fi.default is not MISSING:
+                self.__dict__[fi.name] = fi.default
+                value = fi.default
+
+            else:
+                # the user did not declare a variable defined in field
+                raise ValueError(f"field={fi.name} is not declared.")
+
+            excluded_by_meta = fi.metadata.get("static", False)
+            excluded_by_type = isinstance(value, static_value)
+
+            if excluded_by_type or excluded_by_meta:
+                static[fi.name] = value
+
+            else:
+                dynamic[fi.name] = value
+
+        return (dynamic, static)
+
 
 class explicitTreeBase:
     """ "Register  dataclass fields only"""
@@ -281,11 +264,29 @@ class explicitTreeBase:
         if self.__dict__.get("__frozen_tree_fields__", None) is not None:
             return self.__frozen_tree_fields__
         else:
-            return tree_fields(self)
+            return self.__generate_tree_fields__()
 
 
 class implicitTreeBase:
     """Register dataclass fields and treeclass instance variables"""
+
+    def __register_treeclass_instance_variables__(self) -> None:
+        for var_name, var_value in self.__dict__.items():
+            # check if a variable in self.__dict__ is treeclass
+            # that is not defined in fields
+            if (
+                isinstance(var_name, str)
+                and is_treeclass(var_value)
+                and var_name not in self.__dataclass_fields__
+            ):
+
+                # create field
+                field_value = field()
+                setattr(field_value, "name", var_name)
+                setattr(field_value, "type", type(var_value))
+
+                # register it to class
+                self.__dataclass_fields__.update({var_name: field_value})
 
     @property
     def __tree_fields__(self):
@@ -298,5 +299,5 @@ class implicitTreeBase:
             return self.__frozen_tree_fields__
 
         else:
-            register_treeclass_instance_variables(self)
-            return tree_fields(self)
+            self.__register_treeclass_instance_variables__()
+            return self.__generate_tree_fields__()

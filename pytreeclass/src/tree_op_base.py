@@ -9,6 +9,7 @@ import jax.tree_util as jtu
 
 import pytreeclass.src.tree_util as ptu
 from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.tree_util import is_excluded
 
 
 def _append_math_op(func):
@@ -67,7 +68,7 @@ def _append_math_eq_ne(func):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
 
                     cur_node = tree.__dict__[fld.name]
-                    if not ptu.is_excluded(fld) and ptu.is_treeclass(cur_node):
+                    if not is_excluded(fld, cur_node) and ptu.is_treeclass(cur_node):
                         if fld.name == where:
                             # broadcast True to all subtrees
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
@@ -92,7 +93,7 @@ def _append_math_eq_ne(func):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
                     cur_node = tree.__dict__[fld.name]
 
-                    if not ptu.is_excluded(fld) and ptu.is_treeclass(cur_node):
+                    if not is_excluded(fld, cur_node) and ptu.is_treeclass(cur_node):
                         if isinstance(cur_node, where):
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:
@@ -124,7 +125,7 @@ def _append_math_eq_ne(func):
                 for i, fld in enumerate(tree.__dataclass_fields__.values()):
                     cur_node = tree.__dict__[fld.name]
 
-                    if not ptu.is_excluded(fld) and ptu.is_treeclass(cur_node):
+                    if not is_excluded(fld, cur_node) and ptu.is_treeclass(cur_node):
                         if in_metadata(fld):
                             tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
                         else:

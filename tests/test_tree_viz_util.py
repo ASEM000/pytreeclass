@@ -22,7 +22,7 @@ def test_func_repr():
         pass
 
     assert tree_viz_util._func_repr(example) == "example(a,b,*c,d,e,**f)"
-    assert tree_viz_util._func_repr(lambda x: x) == "<lambda>(x)"
+    assert tree_viz_util._func_repr(lambda x: x) == "Lambda(x)"
     assert tree_viz_util._func_repr(jax.nn.relu) == "relu(*args,**kwargs)"
     assert (
         tree_viz_util._func_repr(jax.nn.initializers.he_normal)

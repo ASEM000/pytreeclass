@@ -310,10 +310,8 @@ def tree_diagram(tree):
         nonlocal FMT
 
         if field_item.repr:
-            is_static = (
-                "static" in field_item.metadata and field_item.metadata["static"]
-            )
-            mark = "*" if is_static else ("#" if frozen_state else "─")
+            is_static_field = field_item.metadata.get("static", False)
+            mark = "#" if frozen_state else "─"
             is_last_field = node_index == 1
 
             FMT += "\n"
@@ -322,7 +320,8 @@ def tree_diagram(tree):
             )
 
             FMT += f"└{mark}─ " if is_last_field else f"├{mark}─ "
-            FMT += f"{field_item.name}={_format_node_diagram(node_item)}"
+            FMT += f"<{field_item.name}>" if is_static_field else f"{field_item.name}"
+            FMT += f"={_format_node_diagram(node_item)}"
 
         recurse(node_item, parent_level_count + [1], frozen_state)
 
@@ -333,10 +332,8 @@ def tree_diagram(tree):
 
         if field_item.repr:
             frozen_state = node_item.frozen
-            is_static = (
-                "static" in field_item.metadata and field_item.metadata["static"]
-            )
-            mark = "*" if is_static else ("#" if frozen_state else "─")
+            is_static_field = field_item.metadata.get("static", False)
+            mark = "#" if frozen_state else "─"
             layer_class_name = node_item.__class__.__name__
 
             is_last_field = node_index == 1
@@ -345,9 +342,9 @@ def tree_diagram(tree):
                 [(("│" if lvl > 1 else "") + "\t") for lvl in parent_level_count]
             )
 
-            FMT += (
-                f"└{mark}─ " if is_last_field else f"├{mark}─ "
-            ) + f"{field_item.name}={layer_class_name}"
+            FMT += f"└{mark}─ " if is_last_field else f"├{mark}─ "
+            FMT += f"<{field_item.name}>" if is_static_field else f"{field_item.name}"
+            FMT += f"={layer_class_name}"
 
             recurse(node_item, parent_level_count + [node_index], frozen_state)
 
@@ -398,13 +395,16 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            mark = (
-                "*"
-                if field_item.metadata.get("static", False)
-                else ("#" if frozen_state else "")
-            )
+            is_static_field = field_item.metadata.get("static", False)
+            mark = "#" if frozen_state else ""
+
             FMT += "\n" + "\t" * depth
-            FMT += f"{mark}{field_item.name}={format_width(_format_node_repr(node_item,depth))}"
+            FMT += (
+                f"{mark}<{field_item.name}>"
+                if is_static_field
+                else f"{field_item.name}"
+            )
+            FMT += f"={format_width(_format_node_repr(node_item,depth))}"
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, frozen_state)
@@ -415,14 +415,19 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
         assert is_treeclass(node_item)
         if field_item.repr:
-            mark = (
-                "*"
-                if field_item.metadata.get("static", False)
-                else ("#" if frozen_state else "")
-            )
+            is_static_field = field_item.metadata.get("static", False)
+            mark = "#" if frozen_state else ""
+
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
-            FMT += f"{mark}{field_item.name}={layer_class_name}" + "("
+
+            FMT += (
+                f"{mark}<{field_item.name}>"
+                if is_static_field
+                else f"{mark}{field_item.name}"
+            )
+            FMT += f"={layer_class_name}" + "("
+
             start_cursor = len(FMT)  # capture children repr
 
             recurse(node_item, depth=depth + 1, frozen_state=node_item.frozen)
@@ -479,13 +484,18 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            mark = (
-                "*"
-                if field_item.metadata.get("static", False)
-                else ("#" if frozen_state else "")
-            )
+            is_static_field = field_item.metadata.get("static", False)
+            mark = "#" if frozen_state else ""
+
             FMT += "\n" + "\t" * depth
-            FMT += f"{mark}{field_item.name}={format_width(_format_node_str(node_item,depth))}"
+
+            FMT += (
+                f"{mark}<{field_item.name}>"
+                if is_static_field
+                else f"{mark}{field_item.name}"
+            )
+            FMT += f"={format_width(_format_node_str(node_item,depth))}"
+
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, frozen_state)
@@ -497,14 +507,18 @@ def tree_str(tree, width: int = 40) -> str:
         assert is_treeclass(node_item)
 
         if field_item.repr:
-            mark = (
-                "*"
-                if field_item.metadata.get("static", False)
-                else ("#" if frozen_state else "")
-            )
+            is_static_field = field_item.metadata.get("static", False)
+            mark = "#" if frozen_state else ""
+
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
-            FMT += f"{mark}{field_item.name}={layer_class_name}" + "("
+
+            FMT += (
+                f"{mark}<{field_item.name}>"
+                if is_static_field
+                else f"{mark}{field_item.name}"
+            )
+            FMT += f"={layer_class_name}" + "("
             start_cursor = len(FMT)  # capture children repr
 
             recurse(node_item, depth=depth + 1, frozen_state=node_item.frozen)
