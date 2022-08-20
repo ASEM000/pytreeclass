@@ -6,6 +6,7 @@ from pytreeclass.src.tree_util import (
     _node_count_and_size,
     is_treeclass,
     is_treeclass_leaf,
+    _dispatched_tree_map
 )
 
 
@@ -68,3 +69,11 @@ def test__node_count_and_size():
 
     with pytest.raises(ValueError):
         xx.test = 1
+
+    
+def test_dispatched_tree_map():
+
+    with pytest.raises(NotImplementedError):
+        class A : ... 
+        _dispatched_tree_map(lambda x,y: x, 1,A())
+

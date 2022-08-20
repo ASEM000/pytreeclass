@@ -64,15 +64,6 @@ def test_model_viz_frozen_value():
             self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
             self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
 
-        def __call__(self, x):
-            x = self.l1(x)
-            x = jax.nn.tanh(x)
-            x = self.l2(x)
-            x = jax.nn.tanh(x)
-            x = self.l3(x)
-
-            return x
-
     model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
     x = jnp.linspace(0, 1, 100)[:, None]
 
@@ -166,14 +157,6 @@ def test_model_viz_frozen_field():
             self.l2 = Linear(key=keys[1], in_dim=128, out_dim=128)
             self.l3 = Linear(key=keys[2], in_dim=128, out_dim=out_dim)
 
-        def __call__(self, x):
-            x = self.l1(x)
-            x = jax.nn.tanh(x)
-            x = self.l2(x)
-            x = jax.nn.tanh(x)
-            x = self.l3(x)
-
-            return x
 
     model = StackedLinear(in_dim=1, out_dim=1, key=jax.random.PRNGKey(0))
     x = jnp.linspace(0, 1, 100)[:, None]

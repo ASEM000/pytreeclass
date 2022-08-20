@@ -334,6 +334,13 @@ def test_setter_by_metadata():
     rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
     assert is_treeclass_equal(lhs, rhs)
 
+    @pytc.treeclass
+    class T:
+        a: jnp.ndarray
+
+    t = T(True)
+    assert is_treeclass_equal(t.at[t == bool].set(False), T(a=False))
+
 
 def test_apply_and_its_derivatives():
     @pytc.treeclass

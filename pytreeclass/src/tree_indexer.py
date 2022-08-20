@@ -223,14 +223,7 @@ def _at_reduce(tree, where, func, **kwargs):
 
 
 def _at_static(tree, where, **kwargs):
-    @dispatch(argnum=1)
     def __at_static(tree, where, **kwargs):
-        raise NotImplementedError(
-            f"Static where type = {type(where)} is not implemented."
-        )
-
-    @__at_static.register(type(tree))
-    def _(tree, where, **kwargs):
         return tree.at[where].apply(static_value, array_as_leaves=False)
 
     return __at_static(tree, where, **kwargs)
