@@ -149,6 +149,7 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
 
 
 def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
+    assert is_treeclass(tree), "tree must be a treeclass object"
 
     if array is not None:
         shape = sequential_tree_shape_eval(tree, array)
@@ -179,7 +180,6 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
 
     @recurse.register(pytreeclass.src.tree_base.treeBase)
     def _(tree, path=(), frozen_state=None):
-        assert is_treeclass(tree)
         _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
 
         nonlocal ROWS, COUNT, SIZE
@@ -232,6 +232,7 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
     COUNT = [0, 0]
     SIZE = [0, 0]
 
+    
     recurse(tree, path=(), frozen_state=tree.frozen)
 
     COLS = [list(c) for c in zip(*ROWS)]
@@ -304,6 +305,7 @@ def tree_diagram(tree):
     === Args
         tree : boolean to create tree-structure
     """
+    assert is_treeclass(tree), "tree must be a treeclass object"
 
     @dispatch(argnum=1)
     def recurse_field(
@@ -330,7 +332,6 @@ def tree_diagram(tree):
     @recurse_field.register(pytreeclass.src.tree_base.treeBase)
     def _(field_item, node_item, frozen_state, parent_level_count, node_index):
         nonlocal FMT
-        assert is_treeclass(node_item)
 
         if field_item.repr:
             frozen_state = node_item.frozen
@@ -358,8 +359,6 @@ def tree_diagram(tree):
     def _(tree, parent_level_count, frozen_state):
         nonlocal FMT
 
-        assert is_treeclass(tree)
-
         leaves_count = len(tree.__dataclass_fields__)
 
         for i, fi in enumerate(tree.__dataclass_fields__.values()):
@@ -384,6 +383,7 @@ def tree_repr(tree, width: int = 40) -> str:
     Returns:
         str: indented tree leaves.
     """
+    assert is_treeclass(tree), "tree must be a treeclass object"
 
     def format_width(string, width=width):
         """strip newline/tab characters if less than max width"""
@@ -411,7 +411,6 @@ def tree_repr(tree, width: int = 40) -> str:
     def _(field_item, node_item, depth, frozen_state, is_last_field):
         """format treeclass field"""
         nonlocal FMT
-        assert is_treeclass(node_item)
         if field_item.repr:
             is_static_field = field_item.metadata.get("static", False)
             mark = "*" if is_static_field else ("#" if frozen_state else "")
@@ -465,6 +464,7 @@ def tree_str(tree, width: int = 40) -> str:
     Returns:
         str: indented tree leaves.
     """
+    assert is_treeclass(tree), "tree must be a treeclass object"
 
     def format_width(string, width=width):
         """strip newline/tab characters if less than max width"""
@@ -492,7 +492,6 @@ def tree_str(tree, width: int = 40) -> str:
     def _(field_item, node_item, depth, frozen_state, is_last_field):
         """format treeclass field"""
         nonlocal FMT
-        assert is_treeclass(node_item)
 
         if field_item.repr:
             is_static_field = field_item.metadata.get("static", False)
@@ -541,6 +540,8 @@ def tree_str(tree, width: int = 40) -> str:
 
 
 def _tree_mermaid(tree):
+    assert is_treeclass(tree), "tree must be a treeclass object"
+
     def node_id(input):
         """hash a node by its location in a tree"""
         return ctypes.c_size_t(hash(input)).value
@@ -565,7 +566,6 @@ def _tree_mermaid(tree):
     @recurse_field.register(pytreeclass.src.tree_base.treeBase)
     def _(field_item, node_item, depth, prev_id, order, frozen_state):
         nonlocal FMT
-        assert is_treeclass(node_item)
 
         if field_item.repr:
             layer_class_name = node_item.__class__.__name__

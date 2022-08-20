@@ -8,9 +8,8 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-import pytreeclass.src.tree_util as ptu
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import static_value
+from pytreeclass.src.tree_util import is_treeclass_leaf_bool, static_value
 
 """ Getter """
 
@@ -56,11 +55,6 @@ def _at_get(tree, where, **kwargs):
 
     @__at_get.register(type(tree))
     def _(tree, where, **kwargs):
-
-        assert all(
-            ptu.is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(where)
-        ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(where)}"
-
         lhs_leaves, lhs_treedef = jtu.tree_flatten(tree)
         where_leaves, where_treedef = jtu.tree_flatten(where)
         lhs_leaves = [
@@ -104,6 +98,12 @@ def _at_set(tree, where, set_value, **kwargs):
         # satisfied by the where condition
         return set_value if jnp.all(where) else lhs
 
+    @_array_node.register(bool)
+    def _(lhs, where, set_value):
+        # in python isinstance(True/False,int) is True
+        # without this dispatch, it will be handled with the int dispatch
+        return set_value if jnp.all(where) else lhs
+
     @_array_node.register(int)
     @_array_node.register(float)
     @_array_node.register(complex)
@@ -111,6 +111,7 @@ def _at_set(tree, where, set_value, **kwargs):
     def _(lhs, where, set_value, array_as_leaves: bool = True):
         # lhs is numeric node
         # set_value in acceptable set_value type for a numeric node
+        # For some reason python isinstance(True,int) is True ?
         return (
             jnp.where(where, set_value, lhs)
             if array_as_leaves
@@ -132,11 +133,6 @@ def _at_set(tree, where, set_value, **kwargs):
 
     @__at_set.register(type(tree))
     def _(tree, where, set_value, **kwargs):
-
-        assert all(
-            ptu.is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(where)
-        ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(where)}"
-
         lhs_leaves, lhs_treedef = jtu.tree_flatten(tree)
         where_leaves, rhs_treedef = jtu.tree_flatten(where)
         lhs_leaves = [
@@ -193,10 +189,6 @@ def _at_apply(tree, where, func, **kwargs):
 
     @__at_apply.register(type(tree))
     def _(tree, where, func, **kwargs):
-
-        assert all(
-            ptu.is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(where)
-        ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(where)}"
 
         lhs_leaves, lhs_treedef = jtu.tree_flatten(tree)
         where_leaves, rhs_treedef = jtu.tree_flatten(where)
@@ -293,6 +285,10 @@ class treeIndexer:
             @__getitem__.register(type(self))
             def _(inner_self, arg):
                 """indexing by boolean pytree"""
+
+                assert all(
+                    is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(arg)
+                ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(arg)}"
 
                 class getterSetterIndexer(treeIndexerMethods):
                     def get(getter_setter_self, **kwargs):

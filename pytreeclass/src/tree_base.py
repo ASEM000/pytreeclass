@@ -280,10 +280,10 @@ class implicitTreeBase:
                 and var_name not in self.__dataclass_fields__
             ):
 
-                # create field
                 field_value = field()
-                setattr(field_value, "name", var_name)
-                setattr(field_value, "type", type(var_value))
+
+                object.__setattr__(field_value, "name", var_name)
+                object.__setattr__(field_value, "type", type(var_value))
 
                 # register it to class
                 self.__dataclass_fields__.update({var_name: field_value})
