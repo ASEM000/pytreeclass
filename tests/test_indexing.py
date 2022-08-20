@@ -757,3 +757,20 @@ def test_not_implemented():
 
     with pytest.raises(NotImplementedError):
         _at_apply(t == t, lambda x: x, np.array([1, 2, 3]))
+
+
+def test_is_leaf():
+    @pytc.treeclass
+    class Test:
+        a: int
+
+    t = Test([1, 2, 3, None])
+
+    assert is_treeclass_equal(
+        t.at[...].set(10, is_leaf=lambda x: x is None), Test([10, 10, 10, 10])
+    )
+
+    assert is_treeclass_equal(
+        t.at[...].apply(lambda x: 10, is_leaf=lambda x: x is None),
+        Test([10, 10, 10, 10]),
+    )

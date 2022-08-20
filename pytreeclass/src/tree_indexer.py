@@ -54,9 +54,9 @@ def _at_get(tree, where, **kwargs):
         raise NotImplementedError(f"Get where type = {type(where)} is not implemented.")
 
     @__at_get.register(type(tree))
-    def _(tree, where, **kwargs):
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree)
-        where_leaves, where_treedef = jtu.tree_flatten(where)
+    def _(tree, where, is_leaf=None, **kwargs):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
+        where_leaves, where_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
         lhs_leaves = [
             _node_get(lhs_leaf, where_leaf, **kwargs)
             for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
@@ -124,17 +124,20 @@ def _at_set(tree, where, set_value, **kwargs):
     @_node_set.register(tuple)
     @_node_set.register(list)
     @_node_set.register(str)
+    @_node_set.register(type(None))
     def _(lhs, where, set_value, **kwargs):
-        return set_value if where else lhs
+        # where == None can be obtained by
+        # is_leaf = lambda x : x is None
+        return set_value if (where in [True, None]) else lhs
 
     @dispatch(argnum=1)
-    def __at_set(tree, where, set_value, **kwargs):
+    def __at_set(tree, where, set_value, is_leaf=None, **kwargs):
         raise NotImplementedError(f"Set where type = {type(where)} is not implemented.")
 
     @__at_set.register(type(tree))
-    def _(tree, where, set_value, **kwargs):
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree)
-        where_leaves, rhs_treedef = jtu.tree_flatten(where)
+    def _(tree, where, set_value, is_leaf=None, **kwargs):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
+        where_leaves, rhs_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
         lhs_leaves = [
             _node_set(lhs_leaf, where_leaf, set_value, **kwargs)
             for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
@@ -178,8 +181,9 @@ def _at_apply(tree, where, func, **kwargs):
     @_node_apply.register(tuple)
     @_node_apply.register(list)
     @_node_apply.register(str)
+    @_node_apply.register(type(None))
     def _(lhs, where, func, **kwargs):
-        return func(lhs) if where else lhs
+        return func(lhs) if (where in [True, None]) else lhs
 
     @dispatch(argnum=1)
     def __at_apply(tree, where, func, **kwargs):
@@ -188,10 +192,10 @@ def _at_apply(tree, where, func, **kwargs):
         )
 
     @__at_apply.register(type(tree))
-    def _(tree, where, func, **kwargs):
+    def _(tree, where, func, is_leaf=None, **kwargs):
 
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree)
-        where_leaves, rhs_treedef = jtu.tree_flatten(where)
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
+        where_leaves, rhs_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
         lhs_leaves = [
             _node_apply(lhs_leaf, where_leaf, func, **kwargs)
             for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
