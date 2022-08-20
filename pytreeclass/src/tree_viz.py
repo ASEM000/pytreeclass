@@ -194,7 +194,9 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
                     cur_node, path + (cur_node.__class__.__name__,), cur_node.frozen
                 )
 
-            elif is_treeclass_leaf(cur_node) or not is_treeclass(cur_node):
+            elif (
+                is_treeclass_leaf(cur_node) or not is_treeclass(cur_node)
+            ) and fi.repr:
                 # Leaf node (treeclass or non-treeclass)
                 count, size = _leaf_info(cur_node)
                 frozen_str = "\n(frozen)" if frozen_state else ""
