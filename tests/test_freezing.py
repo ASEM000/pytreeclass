@@ -6,7 +6,12 @@ import numpy as np
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.tree_util import _freeze_nodes, _unfreeze_nodes, static_value
+from pytreeclass.src.tree_util import (
+    _freeze_nodes,
+    _unfreeze_nodes,
+    is_treeclass_equal,
+    static_value,
+)
 
 
 def test_freezing_unfreezing():
@@ -250,3 +255,48 @@ def test_freezing_unfreezing():
     t.unfreeze()
     t.freeze()
     assert t.frozen is False
+
+    @pytc.treeclass
+    class Test:
+        a: int
+
+    t = Test(100).freeze()
+
+    with pytest.raises(ValueError):
+        t.at[...].set(0)
+
+    with pytest.raises(ValueError):
+        t.at[...].apply(lambda x: x + 1)
+
+    with pytest.raises(ValueError):
+        t.at[...].reduce(jnp.sin)
+
+    with pytest.raises(ValueError):
+        t.at[...].static()
+
+    class T:
+        pass
+
+    t = Test(T())
+
+    with pytest.raises(NotImplementedError):
+        t.at[...].set(0)
+
+    with pytest.raises(NotImplementedError):
+        t.at[...].apply(jnp.sin)
+
+    with pytest.raises(NotImplementedError):
+        t.at[...].reduce(jnp.sin)
+
+    with pytest.raises(NotImplementedError):
+        t.at[...].static()
+
+    @pytc.treeclass
+    class Test:
+        x: jnp.ndarray
+
+        def __init__(self, x):
+            self.x = x
+
+    t = Test(jnp.array([1, 2, 3]))
+    assert is_treeclass_equal(t.at[...].set(None), Test(x=None))
