@@ -19,10 +19,10 @@ class static_value:
         self.value = value
 
     def __repr__(self):
-        return f"<{_format_node_repr(self.value,0)}>"
+        return f"*{_format_node_repr(self.value,0)}"
 
     def __str__(self):
-        return f"<{_format_node_str(self.value,0)}>"
+        return f"*{_format_node_str(self.value,0)}"
 
 
 def static_field(**kwargs):
