@@ -10,8 +10,11 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
+import pytreeclass
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_viz_util import _format_node_repr, _format_node_str
+
+PyTree = Any
 
 
 class static_value:
@@ -55,6 +58,10 @@ def is_treeclass_leaf(tree):
         return False
 
 
+def is_treeclass_non_leaf(tree):
+    return is_treeclass(tree) and not is_treeclass_leaf(tree)
+
+
 def is_treeclass_equal(lhs, rhs):
     """Assert if two treeclasses are equal"""
     lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
@@ -69,6 +76,26 @@ def is_treeclass_equal(lhs, rhs):
     return (lhs_treedef == rhs_treedef) and all(
         [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
     )
+
+
+def _leaf_info(tree_leaf: PyTree | Any) -> tuple[str, complex, complex]:
+    """return (name, count, size) of a treeclass leaf / Any object"""
+
+    @dispatch(argnum=0)
+    def _info(leaf):
+        """Any object"""
+        count, size = _reduce_count_and_size(leaf)
+        return (count, size)
+
+    @_info.register(pytreeclass.src.tree_base.treeBase)
+    def _(leaf):
+        """treeclass leaf"""
+        dynamic, static = leaf.__tree_fields__
+        all_fields = {**dynamic, **static}
+        count, size = _reduce_count_and_size(all_fields)
+        return (count, size)
+
+    return _info(tree_leaf)
 
 
 def is_excluded(field_item: dataclasses.field, node_item: Any) -> bool:

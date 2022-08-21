@@ -9,10 +9,12 @@ import requests
 import pytreeclass
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import (
-    _reduce_count_and_size,
+    _leaf_info,
     is_treeclass,
     is_treeclass_leaf,
+    is_treeclass_non_leaf,
     sequential_tree_shape_eval,
+    static_value,
 )
 from pytreeclass.src.tree_viz_util import (
     _format_count,
@@ -37,31 +39,12 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
     def _cell(text):
         return f"<td align = 'center'> {text} </td>"
 
-    def _leaf_info(tree_leaf: PyTree | Any) -> tuple[str, complex, complex]:
-        """return (name, count, size) of a treeclass leaf / Any object"""
-
-        @dispatch(argnum=0)
-        def _info(leaf):
-            """Any non-treeclass object"""
-            count, size = _reduce_count_and_size(leaf)
-            return (count, size)
-
-        @_info.register(pytreeclass.src.tree_base.treeBase)
-        def _(leaf):
-            """treeclass leaf"""
-            dynamic, static = leaf.__tree_fields__
-            all_fields = {**dynamic, **static}
-            count, size = _reduce_count_and_size(all_fields)
-            return (count, size)
-
-        return _info(tree_leaf)
-
     @dispatch(argnum=0)
-    def recurse(tree, path=(), frozen_state=None):
+    def recurse(tree, path=(), is_frozen=None):
         ...
 
     @recurse.register(pytreeclass.src.tree_base.treeBase)
-    def _(tree, path=(), frozen_state=None):
+    def _(tree, path=(), is_frozen=None):
         assert is_treeclass(tree)
 
         nonlocal FMT, COUNT, SIZE
@@ -74,16 +57,14 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
 
             cur_node = tree.__dict__[fi.name]
 
-            if is_treeclass(cur_node) and not is_treeclass_leaf(cur_node):
-                # Non leaf treeclass node
-                recurse(
-                    cur_node, path + (cur_node.__class__.__name__,), cur_node.frozen
-                )
+            if is_treeclass_non_leaf(cur_node):
+                class_name = cur_node.__class__.__name__
+                recurse(cur_node, path + (class_name,), cur_node.frozen)
 
-            elif is_treeclass_leaf(cur_node) or not is_treeclass(cur_node):
+            elif fi.repr:
                 # Leaf node (treeclass or non-treeclass)
                 count, size = _leaf_info(cur_node)
-                frozen_str = "<br>(frozen)" if frozen_state else ""
+                frozen_str = "<br>(frozen)" if is_frozen else ""
                 name_str = f"{fi.name}{frozen_str}"
                 type_str = "/".join(path + (cur_node.__class__.__name__,))
                 count_str = _format_count(count, True)
@@ -105,8 +86,8 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
                     else ""
                 )
 
-                COUNT[1 if frozen_state else 0] += count
-                SIZE[1 if frozen_state else 0] += size
+                COUNT[1 if is_frozen else 0] += count
+                SIZE[1 if is_frozen else 0] += size
 
                 FMT += (
                     "<tr>"
@@ -134,7 +115,7 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
     COUNT = [0, 0]
     SIZE = [0, 0]
 
-    recurse(tree, path=(), frozen_state=tree.frozen)
+    recurse(tree, path=(), is_frozen=tree.frozen)
 
     FMT += "</table>"
 
@@ -159,31 +140,12 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
         shape = sequential_tree_shape_eval(tree, array)
         indim_shape, outdim_shape = shape[:-1], shape[1:]
 
-    def _leaf_info(tree_leaf: PyTree | Any) -> tuple[str, complex, complex]:
-        """return (name, count, size) of a treeclass leaf / Any object"""
-
-        @dispatch(argnum=0)
-        def _info(leaf):
-            """Any object"""
-            count, size = _reduce_count_and_size(leaf)
-            return (count, size)
-
-        @_info.register(pytreeclass.src.tree_base.treeBase)
-        def _(leaf):
-            """treeclass leaf"""
-            dynamic, static = leaf.__tree_fields__
-            all_fields = {**dynamic, **static}
-            count, size = _reduce_count_and_size(all_fields)
-            return (count, size)
-
-        return _info(tree_leaf)
-
     @dispatch(argnum=0)
-    def recurse(tree, path=(), frozen_state=None):
+    def recurse(tree, path=(), is_frozen=None):
         ...
 
     @recurse.register(pytreeclass.src.tree_base.treeBase)
-    def _(tree, path=(), frozen_state=None):
+    def _(tree, path=(), is_frozen=None):
         _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
 
         nonlocal ROWS, COUNT, SIZE
@@ -197,18 +159,17 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
 
             cur_node = tree.__dict__[fi.name]
 
-            if is_treeclass(cur_node) and not is_treeclass_leaf(cur_node):
+            if is_treeclass_non_leaf(cur_node):
                 # Non leaf treeclass node
-                recurse(
-                    cur_node, path + (cur_node.__class__.__name__,), cur_node.frozen
-                )
+                class_name = cur_node.__class__.__name__
+                recurse(cur_node, path + (class_name,), cur_node.frozen)
 
-            elif (
-                is_treeclass_leaf(cur_node) or not is_treeclass(cur_node)
-            ) and fi.repr:
-                # Leaf node (treeclass or non-treeclass)
+            elif fi.repr:
+                # Any Leaf node
                 count, size = _leaf_info(cur_node)
-                frozen_str = "\n(frozen)" if frozen_state else ""
+
+                # string representation of the node
+                frozen_str = "\n(frozen)" if is_frozen else ""
                 name_str = f"{fi.name}{frozen_str}"
                 type_str = "/".join(path + (cur_node.__class__.__name__,))
                 count_str = _format_count(count, True)
@@ -230,8 +191,11 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
                     else ""
                 )
 
-                COUNT[1 if frozen_state else 0] += count
-                SIZE[1 if frozen_state else 0] += size
+                is_static = fi.metadata.get("static", False) or isinstance(
+                    cur_node, static_value
+                )
+                COUNT[1 if (is_frozen or is_static) else 0] += count
+                SIZE[1 if (is_frozen or is_static) else 0] += size
 
                 ROWS.append(
                     [name_str, type_str, count_str, size_str, config_str, shape_str]
@@ -241,7 +205,7 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
     COUNT = [0, 0]
     SIZE = [0, 0]
 
-    recurse(tree, path=(), frozen_state=tree.frozen)
+    recurse(tree, path=(), is_frozen=tree.frozen)
 
     COLS = [list(c) for c in zip(*ROWS)]
     if array is None:
@@ -321,14 +285,12 @@ def tree_diagram(tree):
     assert is_treeclass(tree), "tree must be a treeclass object"
 
     @dispatch(argnum=1)
-    def recurse_field(
-        field_item, node_item, frozen_state, parent_level_count, node_index
-    ):
+    def recurse_field(field_item, node_item, is_frozen, parent_level_count, node_index):
         nonlocal FMT
 
         if field_item.repr:
             is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if frozen_state else "─")
+            mark = "*" if is_static_field else ("#" if is_frozen else "─")
             is_last_field = node_index == 1
 
             FMT += "\n"
@@ -340,16 +302,16 @@ def tree_diagram(tree):
             FMT += f"{field_item.name}"
             FMT += f"={_format_node_diagram(node_item)}"
 
-        recurse(node_item, parent_level_count + [1], frozen_state)
+        recurse(node_item, parent_level_count + [1], is_frozen)
 
     @recurse_field.register(pytreeclass.src.tree_base.treeBase)
-    def _(field_item, node_item, frozen_state, parent_level_count, node_index):
+    def _(field_item, node_item, is_frozen, parent_level_count, node_index):
         nonlocal FMT
 
         if field_item.repr:
-            frozen_state = node_item.frozen
+            is_frozen = node_item.frozen
             is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if frozen_state else "─")
+            mark = "*" if is_static_field else ("#" if is_frozen else "─")
             layer_class_name = node_item.__class__.__name__
 
             is_last_field = node_index == 1
@@ -362,14 +324,14 @@ def tree_diagram(tree):
             FMT += f"{field_item.name}"
             FMT += f"={layer_class_name}"
 
-            recurse(node_item, parent_level_count + [node_index], frozen_state)
+            recurse(node_item, parent_level_count + [node_index], is_frozen)
 
     @dispatch(argnum=0)
-    def recurse(tree, parent_level_count, frozen_state):
+    def recurse(tree, parent_level_count, is_frozen):
         ...
 
     @recurse.register(pytreeclass.src.tree_base.treeBase)
-    def _(tree, parent_level_count, frozen_state):
+    def _(tree, parent_level_count, is_frozen):
         nonlocal FMT
 
         __all_fields__ = {
@@ -382,9 +344,7 @@ def tree_diagram(tree):
 
             cur_node = tree.__dict__[fi.name]
 
-            recurse_field(
-                fi, cur_node, frozen_state, parent_level_count, leaves_count - i
-            )
+            recurse_field(fi, cur_node, is_frozen, parent_level_count, leaves_count - i)
         FMT += "\t"
 
     FMT = f"{(tree.__class__.__name__)}"
@@ -409,28 +369,28 @@ def tree_repr(tree, width: int = 40) -> str:
         return string if children_length > width else stripped_string
 
     @dispatch(argnum=1)
-    def recurse_field(field_item, node_item, depth, frozen_state, is_last_field):
+    def recurse_field(field_item, node_item, depth, is_frozen, is_last_field):
         """format non-treeclass field"""
         nonlocal FMT
 
         if field_item.repr:
             is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if frozen_state else "")
+            mark = "*" if is_static_field else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
             FMT += f"={format_width(_format_node_repr(node_item,depth))}"
             FMT += "" if is_last_field else ","
 
-        recurse(node_item, depth, frozen_state)
+        recurse(node_item, depth, is_frozen)
 
     @recurse_field.register(pytreeclass.src.tree_base.treeBase)
-    def _(field_item, node_item, depth, frozen_state, is_last_field):
+    def _(field_item, node_item, depth, is_frozen, is_last_field):
         """format treeclass field"""
         nonlocal FMT
         if field_item.repr:
             is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if frozen_state else "")
+            mark = "*" if is_static_field else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
@@ -440,17 +400,17 @@ def tree_repr(tree, width: int = 40) -> str:
 
             start_cursor = len(FMT)  # capture children repr
 
-            recurse(node_item, depth=depth + 1, frozen_state=node_item.frozen)
+            recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
 
             FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
             FMT += "" if is_last_field else ","
 
     @dispatch(argnum=0)
-    def recurse(tree, depth, frozen_state):
+    def recurse(tree, depth, is_frozen):
         ...
 
     @recurse.register(pytreeclass.src.tree_base.treeBase)
-    def _(tree, depth, frozen_state):
+    def _(tree, depth, is_frozen):
         nonlocal FMT
         is_treeclass(tree)
 
@@ -469,12 +429,12 @@ def tree_repr(tree, width: int = 40) -> str:
                 fi,
                 cur_node,
                 depth,
-                frozen_state,
+                is_frozen,
                 True if i == (leaves_count - 1) else False,
             )
 
     FMT = ""
-    recurse(tree, depth=1, frozen_state=tree.frozen)
+    recurse(tree, depth=1, is_frozen=tree.frozen)
     FMT = f"{(tree.__class__.__name__)}({format_width(FMT,width)})"
 
     return FMT.expandtabs(2)
@@ -495,29 +455,29 @@ def tree_str(tree, width: int = 40) -> str:
         return string if children_length > width else stripped_string
 
     @dispatch(argnum=1)
-    def recurse_field(field_item, node_item, depth, frozen_state, is_last_field):
+    def recurse_field(field_item, node_item, depth, is_frozen, is_last_field):
         """format non-treeclass field"""
         nonlocal FMT
 
         if field_item.repr:
             is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if frozen_state else "")
+            mark = "*" if is_static_field else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
             FMT += f"={format_width(_format_node_str(node_item,depth))}"
             FMT += "" if is_last_field else ","
 
-        recurse(node_item, depth, frozen_state)
+        recurse(node_item, depth, is_frozen)
 
     @recurse_field.register(pytreeclass.src.tree_base.treeBase)
-    def _(field_item, node_item, depth, frozen_state, is_last_field):
+    def _(field_item, node_item, depth, is_frozen, is_last_field):
         """format treeclass field"""
         nonlocal FMT
 
         if field_item.repr:
             is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if frozen_state else "")
+            mark = "*" if is_static_field else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
@@ -526,17 +486,17 @@ def tree_str(tree, width: int = 40) -> str:
             FMT += f"={layer_class_name}" + "("
             start_cursor = len(FMT)  # capture children repr
 
-            recurse(node_item, depth=depth + 1, frozen_state=node_item.frozen)
+            recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
 
             FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
             FMT += "" if is_last_field else ","
 
     @dispatch(argnum=0)
-    def recurse(tree, depth, frozen_state):
+    def recurse(tree, depth, is_frozen):
         ...
 
     @recurse.register(pytreeclass.src.tree_base.treeBase)
-    def _(tree, depth, frozen_state):
+    def _(tree, depth, is_frozen):
         nonlocal FMT
         assert is_treeclass(tree)
 
@@ -555,12 +515,12 @@ def tree_str(tree, width: int = 40) -> str:
                 fi,
                 cur_node,
                 depth,
-                frozen_state,
+                is_frozen,
                 True if i == (leaves_count - 1) else False,
             )
 
     FMT = ""
-    recurse(tree, depth=1, frozen_state=tree.frozen)
+    recurse(tree, depth=1, is_frozen=tree.frozen)
     FMT = f"{(tree.__class__.__name__)}({format_width(FMT,width)})"
 
     return FMT.expandtabs(2)
@@ -574,7 +534,7 @@ def _tree_mermaid(tree):
         return ctypes.c_size_t(hash(input)).value
 
     @dispatch(argnum=1)
-    def recurse_field(field_item, node_item, depth, prev_id, order, frozen_state):
+    def recurse_field(field_item, node_item, depth, prev_id, order, is_frozen):
         nonlocal FMT
 
         if field_item.repr:
@@ -583,15 +543,15 @@ def _tree_mermaid(tree):
             mark = (
                 "--x"
                 if field_item.metadata.get("static", False)
-                else ("-.-" if frozen_state else "---")
+                else ("-.-" if is_frozen else "---")
             )
             FMT += f'\n\tid{prev_id} {mark} id{cur_id}["{field_item.name}\\n{_format_node_diagram(node_item)}"]'
             prev_id = cur_id
 
-        recurse(node_item, depth, prev_id, frozen_state)
+        recurse(node_item, depth, prev_id, is_frozen)
 
     @recurse_field.register(pytreeclass.src.tree_base.treeBase)
-    def _(field_item, node_item, depth, prev_id, order, frozen_state):
+    def _(field_item, node_item, depth, prev_id, order, is_frozen):
         nonlocal FMT
 
         if field_item.repr:
@@ -601,11 +561,11 @@ def _tree_mermaid(tree):
             recurse(node_item, depth + 1, cur_id, node_item.frozen)
 
     @dispatch(argnum=0)
-    def recurse(tree, depth, prev_id, frozen_state):
+    def recurse(tree, depth, prev_id, is_frozen):
         ...
 
     @recurse.register(pytreeclass.src.tree_base.treeBase)
-    def _(tree, depth, prev_id, frozen_state):
+    def _(tree, depth, prev_id, is_frozen):
         nonlocal FMT
         assert is_treeclass(tree)
 
@@ -625,7 +585,7 @@ def _tree_mermaid(tree):
                 depth,
                 prev_id,
                 i,
-                frozen_state,
+                is_frozen,
             )
 
     cur_id = node_id((0, 0, -1, 0))
