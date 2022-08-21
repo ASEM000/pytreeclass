@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+from dataclasses import field
 from typing import Any
 
 import jax.numpy as jnp
@@ -285,7 +286,9 @@ def tree_diagram(tree):
     assert is_treeclass(tree), "tree must be a treeclass object"
 
     @dispatch(argnum=1)
-    def recurse_field(field_item, node_item, is_frozen, parent_level_count, node_index):
+    def recurse_field(
+        field_item, node_item, is_frozen, parent_level_count, node_index
+    ):
         nonlocal FMT
 
         if field_item.repr:
@@ -301,6 +304,33 @@ def tree_diagram(tree):
             FMT += f"└{mark}─ " if is_last_field else f"├{mark}─ "
             FMT += f"{field_item.name}"
             FMT += f"={_format_node_diagram(node_item)}"
+
+        recurse(node_item, parent_level_count + [1], is_frozen)
+
+    @recurse_field.register(list)
+    @recurse_field.register(tuple)
+    def _(field_item, node_item, is_frozen, parent_level_count, node_index):
+        nonlocal FMT
+
+        if field_item.repr:
+            leaves_count = len(node_item)
+
+            recurse_field(
+                field_item, node_item.__class__, is_frozen, parent_level_count, 0
+            )
+
+            for i, layer in enumerate(node_item):
+                new_field = field()
+                object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
+                object.__setattr__(new_field, "type", type(layer))
+
+                recurse_field(
+                    new_field,
+                    layer,
+                    is_frozen,
+                    parent_level_count + [2],
+                    leaves_count - i,
+                )
 
         recurse(node_item, parent_level_count + [1], is_frozen)
 
@@ -344,7 +374,9 @@ def tree_diagram(tree):
 
             cur_node = tree.__dict__[fi.name]
 
-            recurse_field(fi, cur_node, is_frozen, parent_level_count, leaves_count - i)
+            recurse_field(
+                fi, cur_node, is_frozen, parent_level_count, leaves_count - i
+            )
         FMT += "\t"
 
     FMT = f"{(tree.__class__.__name__)}"
