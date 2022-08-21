@@ -4,7 +4,9 @@ from dataclasses import field
 
 import jax
 import jax.numpy as jnp
+import jax.random as jr
 import numpy as np
+import numpy.testing as npt
 import pytest
 
 import pytreeclass as pytc
@@ -773,4 +775,60 @@ def test_is_leaf():
     assert is_treeclass_equal(
         t.at[...].apply(lambda x: 10, is_leaf=lambda x: x is None),
         Test([10, 10, 10, 10]),
+    )
+
+
+def test_masking():
+    @pytc.treeclass
+    class Linear:
+        weight: jnp.ndarray
+        bias: jnp.ndarray
+
+        def __init__(self, key, in_dim, out_dim):
+            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
+                2 / in_dim
+            )
+            self.bias = jnp.ones((1, out_dim))
+
+        def __call__(self, x):
+            return x @ self.weight + self.bias
+
+    @pytc.treeclass
+    class Dropout:
+        p: float
+        eval: bool | None
+
+        def __init__(self, p: float = 0.5, eval: bool | None = None):
+            """p : probability of an element to be zeroed out"""
+            self.p = p
+            self.eval = eval
+
+        def __call__(self, x, *, key=jr.PRNGKey(0)):
+            return (
+                x
+                if (self.eval is True)
+                else jnp.where(
+                    jr.bernoulli(key, (1 - self.p), x.shape), x / (1 - self.p), 0
+                )
+            )
+
+    @pytc.treeclass
+    class LinearWithDropout:
+        def __init__(self):
+            self.l1 = Linear(key=jr.PRNGKey(0), in_dim=1, out_dim=5)
+            self.d1 = Dropout(p=1.0)  # zero out all elements
+
+        def __call__(self, x):
+            x = self.l1(x)
+            x = self.d1(x)
+            return x
+
+    model = LinearWithDropout()
+    npt.assert_allclose(model(jnp.ones((1, 1))), jnp.array([[0.0, 0.0, 0.0, 0.0, 0.0]]))
+
+    mask = model == "eval"
+    model_no_dropout = model.at[mask].set(True, is_leaf=lambda x: x is None)
+    npt.assert_allclose(
+        model_no_dropout(jnp.ones((1, 1))),
+        jnp.array([[1.2656513, -0.8149204, 0.61661845, 2.7664368, 1.3457328]]),
     )

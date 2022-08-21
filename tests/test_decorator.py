@@ -53,7 +53,7 @@ def test_field_only():
     model = StackedLinear(key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2)
     model.__tree_fields__
 
-    assert "l1" in model.__dataclass_fields__
+    assert "l1" in model.__treeclass_fields__
 
     @pytc.treeclass(field_only=False)
     class StackedLinear:
@@ -94,7 +94,7 @@ def test_field_only():
 def test_hash():
     @pytc.treeclass
     class T:
-        a : jnp.ndarray 
+        a: jnp.ndarray
 
     with pytest.raises(TypeError):
-        hash(T(jnp.array([1,2,3])))
+        hash(T(jnp.array([1, 2, 3])))
