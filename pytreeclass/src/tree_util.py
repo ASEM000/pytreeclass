@@ -194,7 +194,7 @@ def _reduce_count_and_size(leaf):
 def _freeze_nodes(tree):
     """inplace freezing"""
     if is_treeclass(tree):
-        object.__setattr__(tree, "__frozen_tree_fields__", None)
+        object.__setattr__(tree, "__frozen_fields__", None)
         for kw, leaf in tree.__dataclass_fields__.items():
             _freeze_nodes(tree.__dict__[kw])
     return tree
@@ -203,8 +203,8 @@ def _freeze_nodes(tree):
 def _unfreeze_nodes(tree):
     """inplace unfreezing"""
     if is_treeclass(tree):
-        if hasattr(tree, "__frozen_tree_fields__"):
-            object.__delattr__(tree, "__frozen_tree_fields__")
+        if hasattr(tree, "__frozen_fields__"):
+            object.__delattr__(tree, "__frozen_fields__")
         for kw, leaf in tree.__dataclass_fields__.items():
             _unfreeze_nodes(tree.__dict__[kw])
     return tree

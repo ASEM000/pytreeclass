@@ -65,8 +65,12 @@ def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
         assert is_treeclass(tree)
 
         nonlocal FMT, COUNT, SIZE
+        __all_fields__ = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
 
-        for i, fi in enumerate(tree.__dataclass_fields__.values()):
+        for i, fi in enumerate(__all_fields__.values()):
 
             cur_node = tree.__dict__[fi.name]
 
@@ -184,7 +188,12 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
 
         nonlocal ROWS, COUNT, SIZE
 
-        for i, fi in enumerate(tree.__dataclass_fields__.values()):
+        __all_fields__ = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
+
+        for i, fi in enumerate(__all_fields__.values()):
 
             cur_node = tree.__dict__[fi.name]
 
@@ -232,7 +241,6 @@ def tree_summary(tree: PyTree, array: jnp.ndarray | None = None) -> str:
     COUNT = [0, 0]
     SIZE = [0, 0]
 
-    
     recurse(tree, path=(), frozen_state=tree.frozen)
 
     COLS = [list(c) for c in zip(*ROWS)]
@@ -280,7 +288,12 @@ def tree_box(tree, array=None):
         else:
             level_nodes = []
 
-            for fi in tree.__dataclass_fields__.values():
+            __all_fields__ = {
+                **tree.__dataclass_fields__,
+                **tree.__dict__.get("__treeclass_fields__", {}),
+            }
+
+            for fi in __all_fields__.values():
                 cur_node = tree.__dict__[fi.name]
 
                 if is_treeclass(cur_node):
@@ -359,9 +372,13 @@ def tree_diagram(tree):
     def _(tree, parent_level_count, frozen_state):
         nonlocal FMT
 
-        leaves_count = len(tree.__dataclass_fields__)
+        __all_fields__ = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
+        leaves_count = len(__all_fields__)
 
-        for i, fi in enumerate(tree.__dataclass_fields__.values()):
+        for i, fi in enumerate(__all_fields__.values()):
 
             cur_node = tree.__dict__[fi.name]
 
@@ -437,8 +454,13 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
         is_treeclass(tree)
 
-        leaves_count = len(tree.__dataclass_fields__)
-        for i, fi in enumerate(tree.__dataclass_fields__.values()):
+        __all_fields__ = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
+
+        leaves_count = len(__all_fields__)
+        for i, fi in enumerate(__all_fields__.values()):
 
             # retrieve node item
             cur_node = tree.__dict__[fi.name]
@@ -518,8 +540,13 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
         assert is_treeclass(tree)
 
-        leaves_count = len(tree.__dataclass_fields__)
-        for i, fi in enumerate(tree.__dataclass_fields__.values()):
+        __all_fields__ = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
+
+        leaves_count = len(__all_fields__)
+        for i, fi in enumerate(__all_fields__.values()):
 
             # retrieve node item
             cur_node = tree.__dict__[fi.name]
@@ -582,7 +609,12 @@ def _tree_mermaid(tree):
         nonlocal FMT
         assert is_treeclass(tree)
 
-        for i, fi in enumerate(tree.__dataclass_fields__.values()):
+        __all_fields__ = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
+
+        for i, fi in enumerate(__all_fields__.values()):
 
             # retrieve node item
             cur_node = tree.__dict__[fi.name]
