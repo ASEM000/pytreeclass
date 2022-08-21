@@ -536,9 +536,3 @@ def test_static_in_summary():
         # trunk-ignore(flake8/E501)
         == "┌──────┬─────┬───────┬────────┬────────┐\n│Name  │Type │Param #│Size    │Config  │\n├──────┼─────┼───────┼────────┼────────┤\n│in_dim│int  │0      │0.00B   │in_dim=1│\n│      │     │(1)    │(28.00B)│        │\n└──────┴─────┴───────┴────────┴────────┘\nTotal # :\t\t0(1)\nDynamic #:\t\t0(0)\nStatic/Frozen #:\t0(1)\n----------------------------------------\nTotal size :\t\t0.00B(28.00B)\nDynamic size:\t\t0.00B(0.00B)\nStatic/Frozen size:\t0.00B(28.00B)\n========================================"
     )
-
-    assert (
-        pytc.tree_viz.tree_mermaid(t)
-        # trunk-ignore(flake8/E501)
-        == 'flowchart LR\n    id15696277213149321320[Test]\n    id15696277213149321320 --x id159132120600507116["in_dim\\n1"]'
-    )
