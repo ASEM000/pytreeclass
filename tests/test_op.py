@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import pytest
 
 from pytreeclass import treeclass
-from pytreeclass.src.tree_util import is_treeclass_equal, static_value
+from pytreeclass.src.tree_util import static_value
 
 
 @treeclass
@@ -67,20 +67,3 @@ def test_ops():
 def test_asdict():
     A = Test(10, 20, 30, static_value("A"))
     assert A.asdict() == {"a": 10, "b": 20, "c": 30, "name": "A"}
-
-
-def test_or():
-    @treeclass
-    class test:
-        a: jnp.ndarray
-        b: jnp.ndarray
-
-    x = test(jnp.array([]), jnp.array([4, 5, 6]))
-    y = test(jnp.array([1, 2, 3]), jnp.array([]))
-
-    assert is_treeclass_equal((x | y), test(jnp.array([1, 2, 3]), jnp.array([4, 5, 6])))
-
-    # with pytest.raises(ValueError):
-    x = test(jnp.array([]), jnp.array([]))
-    y = test(jnp.array([1, 2, 3]), None)
-    assert is_treeclass_equal(x | y, test(jnp.array([1, 2, 3]), jnp.array([])))

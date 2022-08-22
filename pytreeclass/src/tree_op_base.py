@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import functools
+import functools as ft
 import operator as op
 
 import jax
@@ -14,7 +14,7 @@ from pytreeclass.src.tree_util import _dispatched_tree_map, is_excluded, is_tree
 def _append_math_op(func):
     """binary and unary magic operations"""
 
-    @functools.wraps(func)
+    @ft.wraps(func)
     def wrapper(self, rhs=None):
         return _dispatched_tree_map(func, self, rhs)
 
@@ -43,7 +43,7 @@ def _append_math_eq_ne(func):
         else:
             return False
 
-    @functools.wraps(func)
+    @ft.wraps(func)
     def wrapper(self, rhs):
         @dispatch(argnum=1)
         def inner_wrapper(tree, where, **kwargs):
@@ -188,6 +188,7 @@ class treeOpBase:
     __ne__ = _append_math_eq_ne(op.ne)
     __neg__ = _append_math_op(op.neg)
     __not__ = _append_math_op(op.not_)
+    __or__ = _append_math_op(op.or_)
     __pos__ = _append_math_op(op.pos)
     __pow__ = _append_math_op(op.pow)
     __rshift__ = _append_math_op(op.rshift)
@@ -195,21 +196,3 @@ class treeOpBase:
     __rsub__ = _append_math_op(op.sub)
     __truediv__ = _append_math_op(op.truediv)
     __xor__ = _append_math_op(op.xor)
-
-    def __or__(lhs, rhs):
-        @dispatch(argnum=0)
-        def or_func(x, y):
-            return x or y
-
-        @or_func.register(jnp.ndarray)
-        def lhs_array(x, y):
-            if jnp.array_equal(x, jnp.array([])):
-                return y if y is not None else x
-
-            elif isinstance(y, jnp.ndarray):
-                if jnp.array_equal(y, jnp.array([])):
-                    return x if x is not None else y
-                else:
-                    return jnp.logical_or(x, y)
-
-        return jtu.tree_map(or_func, lhs, rhs, is_leaf=lambda x: x is None)
