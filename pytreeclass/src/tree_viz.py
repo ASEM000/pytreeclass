@@ -136,7 +136,6 @@ PyTree = Any
 
 
 def tree_summary(tree, array: jnp.ndarray = None) -> str:
-    assert is_treeclass(tree), "tree must be treeclass"
 
     _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
 
@@ -281,7 +280,6 @@ def tree_box(tree, array=None):
     """
     === plot tree classes
     """
-    assert is_treeclass(tree), "tree must be treeclass."
 
     def recurse(tree, parent_name):
 
@@ -332,7 +330,6 @@ def tree_diagram(tree):
     === Args
         tree : boolean to create tree-structure
     """
-    assert is_treeclass(tree), "tree must be a treeclass object"
 
     @dispatch(argnum="node_item")
     def recurse_field(field_item, node_item, is_frozen, parent_level_count, node_index):
@@ -446,7 +443,6 @@ def tree_repr(tree, width: int = 40) -> str:
     Returns:
         str: indented tree leaves.
     """
-    assert is_treeclass(tree), "tree must be a treeclass object"
 
     def format_width(string, width=width):
         """strip newline/tab characters if less than max width"""
@@ -532,7 +528,6 @@ def tree_str(tree, width: int = 40) -> str:
     Returns:
         str: indented tree leaves.
     """
-    assert is_treeclass(tree), "tree must be a treeclass object"
 
     def format_width(string, width=width):
         """strip newline/tab characters if less than max width"""
@@ -613,8 +608,6 @@ def tree_str(tree, width: int = 40) -> str:
 
 
 def _tree_mermaid(tree):
-    assert is_treeclass(tree), "tree must be a treeclass object"
-
     def node_id(input):
         """hash a node by its location in a tree"""
         return ctypes.c_size_t(hash(input)).value

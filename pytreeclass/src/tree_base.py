@@ -34,6 +34,14 @@ class fieldDict(dict):
 
 
 class treeBase:
+    def __new__(cls, *args, **kwargs):
+        obj = super().__new__(cls)
+
+        for field_item in cls.__dataclass_fields__.values():
+            if field_item.default is not MISSING:
+                object.__setattr__(obj, field_item.name, field_item.default)
+        return obj
+
     def freeze(self) -> PyTree:
         """Freeze treeclass.
 
@@ -238,12 +246,6 @@ class treeBase:
             # field value is defined in class dict
             if fi.name in self.__dict__:
                 value = self.__dict__[fi.name]
-
-            # field value is defined in field default
-            elif fi.default is not MISSING:
-                self.__dict__[fi.name] = fi.default
-                value = fi.default
-
             else:
                 # the user did not declare a variable defined in field
                 raise ValueError(f"field={fi.name} is not declared.")
