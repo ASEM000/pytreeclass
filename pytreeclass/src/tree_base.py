@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import MISSING, field
-from typing import Any, Sequence
+from typing import Any
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -10,7 +10,6 @@ from pytreeclass.src.tree_util import (
     _freeze_nodes,
     _unfreeze_nodes,
     is_treeclass,
-    is_treeclass_leaf,
     static_value,
 )
 from pytreeclass.src.tree_viz import (
@@ -134,48 +133,6 @@ class treeBase:
         for k, v in attrs.items():
             object.__setattr__(new_cls, k, v)
         return new_cls
-
-    @property
-    def treeclass_leaves(self) -> Sequence[PyTree | Any, ...]:
-        """Tree leaves of treeclass
-
-        Example:
-
-            @pytc.treeclass
-            class T0:
-                a : int = 1
-                b : int = 2
-
-            @pytc.treeclass
-            class T1:
-                c : T0 = T0()
-                d : int = 3
-
-
-            @pytc.treeclass
-            class T2 :
-                e : T1 = T1()
-                f : T0 = T0()
-                g : int = 4
-
-            >>> t = T2()
-
-            >>> print(t.tree_diagram())
-            T2
-                ├── e=T1
-                │   ├── c=T0
-                │   │   ├── a=1
-                │   │   └── b=2
-                │   └── d=3
-                ├── f=T0
-                │   ├── a=1
-                │   └── b=2
-                └── g=4
-
-            >>> print(t.treeclass_leaves)
-            [T0(a=1,b=2), 3, T0(a=1,b=2), 4]
-        """
-        return jtu.tree_leaves(self, is_treeclass_leaf)
 
     def __hash__(self):
         return hash(tuple(*jtu.tree_flatten(self)))
