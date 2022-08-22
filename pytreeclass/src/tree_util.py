@@ -10,7 +10,6 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-import pytreeclass
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_viz_util import _format_node_repr, _format_node_str
 
@@ -76,26 +75,6 @@ def is_treeclass_equal(lhs, rhs):
     return (lhs_treedef == rhs_treedef) and all(
         [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
     )
-
-
-def _leaf_info(tree_leaf: PyTree | Any) -> tuple[str, complex, complex]:
-    """return (name, count, size) of a treeclass leaf / Any object"""
-
-    @dispatch(argnum=0)
-    def _info(leaf):
-        """Any object"""
-        count, size = _reduce_count_and_size(leaf)
-        return (count, size)
-
-    @_info.register(pytreeclass.src.tree_base.treeBase)
-    def _(leaf):
-        """treeclass leaf"""
-        dynamic, static = leaf.__tree_fields__
-        all_fields = {**dynamic, **static}
-        count, size = _reduce_count_and_size(all_fields)
-        return (count, size)
-
-    return _info(tree_leaf)
 
 
 def is_excluded(field_item: dataclasses.field, node_item: Any) -> bool:
@@ -166,6 +145,17 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
     return (count, size)
 
 
+def _reduce_count_and_size(leaf):
+    """reduce params count and params size of a tree of leaves"""
+
+    def reduce_func(acc, node):
+        lhs_count, lhs_size = acc
+        rhs_count, rhs_size = _node_count_and_size(node)
+        return (lhs_count + rhs_count, lhs_size + rhs_size)
+
+    return jtu.tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
+
+
 def _dispatched_tree_map(func, lhs, rhs=None):
     """Slightly different implementation to jtu.tree_map for unary/binary operators broadcasting"""
 
@@ -205,17 +195,6 @@ def _dispatched_tree_map(func, lhs, rhs=None):
         return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
 
     return _tree_map(lhs, rhs)
-
-
-def _reduce_count_and_size(leaf):
-    """reduce params count and params size of a tree of leaves"""
-
-    def reduce_func(acc, node):
-        lhs_count, lhs_size = acc
-        rhs_count, rhs_size = _node_count_and_size(node)
-        return (lhs_count + rhs_count, lhs_size + rhs_size)
-
-    return jtu.tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
 
 
 def _freeze_nodes(tree):
