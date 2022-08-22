@@ -549,3 +549,32 @@ def test_static_in_summary():
         # trunk-ignore(flake8/E501)
         == "┌────┬─────┬───────┬─────┬──────┐\n│Name│Type │Param #│Size │Config│\n└────┴─────┴───────┴─────┴──────┘\nTotal count :\t0(0)\nDynamic count :\t0(0)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t0.00B(0.00B)\nDynamic size :\t0.00B(0.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
     )
+
+
+def test_summary():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: int = 2.0
+
+    assert (
+        Test().summary()
+        # trunk-ignore(flake8/E501)
+        == "┌────┬─────┬───────┬────────┬──────┐\n│Name│Type │Param #│Size    │Config│\n├────┼─────┼───────┼────────┼──────┤\n│a   │int  │0(1)   │0.00B   │a=1   │\n│    │     │       │(28.00B)│      │\n├────┼─────┼───────┼────────┼──────┤\n│b   │float│1(0)   │24.00B  │b=2.0 │\n│    │     │       │(0.00B) │      │\n└────┴─────┴───────┴────────┴──────┘\nTotal count :\t1(1)\nDynamic count :\t1(1)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t24.00B(28.00B)\nDynamic size :\t24.00B(28.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
+    )
+
+    @pytc.treeclass
+    class level0:
+        a: int = 1
+        b: int = 2
+
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: int = level0()
+
+    assert (
+        Test().summary()
+        # trunk-ignore(flake8/E501)
+        == "┌────┬──────┬───────┬────────┬──────┐\n│Name│Type  │Param #│Size    │Config│\n├────┼──────┼───────┼────────┼──────┤\n│a   │int   │0(1)   │0.00B   │a=1   │\n│    │      │       │(28.00B)│      │\n├────┼──────┼───────┼────────┼──────┤\n│b   │level0│0(2)   │0.00B   │a=1   │\n│    │      │       │(56.00B)│b=2   │\n└────┴──────┴───────┴────────┴──────┘\nTotal count :\t0(3)\nDynamic count :\t0(3)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t0.00B(84.00B)\nDynamic size :\t0.00B(84.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
+    )
