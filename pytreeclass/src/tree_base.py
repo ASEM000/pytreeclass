@@ -187,12 +187,12 @@ class treeBase:
         self, node: Any, *, name: str, static: bool = False, repr: bool = True
     ) -> Any:
         """Add item to dataclass fields to bee seen by jax computations"""
-        __all_fields__ = {
+        all_fields = {
             **self.__dataclass_fields__,
             **self.__dict__.get("__treeclass_fields__", {}),
         }
 
-        if name not in __all_fields__:
+        if name not in all_fields:
             # create field
             field_value = field(repr=repr, metadata={"static": static})
 
@@ -229,12 +229,12 @@ class treeBase:
         # to avoid redefining them as dataclass fields.
 
         # register *all* dataclass fields
-        __all_fields__ = {
+        all_fields = {
             **self.__dataclass_fields__,
             **self.__dict__.get("__treeclass_fields__", {}),
         }
 
-        for fi in __all_fields__.values():
+        for fi in all_fields.values():
             # field value is defined in class dict
             if fi.name in self.__dict__:
                 value = self.__dict__[fi.name]

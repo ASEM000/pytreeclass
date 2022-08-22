@@ -136,6 +136,8 @@ PyTree = Any
 
 
 def tree_summary(tree, array: jnp.ndarray = None) -> str:
+    assert is_treeclass(tree), "tree must be treeclass"
+
     _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
 
     if array is not None:
@@ -279,6 +281,7 @@ def tree_box(tree, array=None):
     """
     === plot tree classes
     """
+    assert is_treeclass(tree), "tree must be treeclass."
 
     def recurse(tree, parent_name):
 
