@@ -494,6 +494,17 @@ def test_tree_with_containers():
         == "level2\n    ├── e=<class 'tuple'>\n    │   ├── e_0=level1\n    │   │   ├── c=<class 'tuple'>\n    │   │   │   ├── c_0=level0\n    │   │   │   │   ├── a=1\n    │   │   │   │   └── b=2 \n    │   │   │   └── c_1=level0\n    │   │   │       ├── a=1\n    │   │   │       └── b=2 \n    │   │   └── d=2 \n    │   └── e_1=1\n    └── f=level0\n        ├── a=1\n        └── b=2     "
     )
 
+    @pytc.treeclass
+    class Test:
+        a: int
+        b: int
+
+    assert (
+        Test((1, Test(2, 10), (3, 4, (5, 6))), 1).tree_diagram()
+        # trunk-ignore(flake8/E501)
+        == "Test\n    ├── a=<class 'tuple'>\n    │   ├── a_0=1\n    │   ├── a_1=Test\n    │   │   ├── a=2\n    │   │   └── b=10    \n    │   └── a_2=<class 'tuple'>\n    │       ├── a_2_0=3\n    │       ├── a_2_1=4\n    │       └── a_2_2=<class 'tuple'>\n    │           ├── a_2_2_0=5\n    │           └── a_2_2_1=6\n    └── b=1 "
+    )
+
 
 def test_func_repr():
     @pytc.treeclass
