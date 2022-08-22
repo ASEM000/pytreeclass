@@ -28,6 +28,10 @@
 ```python
 pip install pytreeclass
 ```
+**Install development version**
+```python
+pip install git+https://github.com/ASEM000/PyTreeClass
+```
 
 ## 📖 Description<a id="Description"></a>
 
@@ -42,7 +46,6 @@ PyTreeClass offers a JAX compatible `dataclass` like datastructure with the foll
 
 ### 🏗️ Create simple MLP <a id="Pytorch">
 
-_For Autoencoder example from scratch see_ [here](#AE)
 
 ```python
 import jax
