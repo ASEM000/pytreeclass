@@ -167,6 +167,25 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
             COUNT[1 if is_frozen else 0] += count
             SIZE[1 if is_frozen else 0] += size
 
+    @recurse_field.register(list)
+    @recurse_field.register(tuple)
+    def _(field_item, node_item, is_frozen, name_path, type_path):
+
+        if field_item.repr:
+
+            for i, layer in enumerate(node_item):
+                new_field = field()
+                object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
+                object.__setattr__(new_field, "type", type(layer))
+
+                recurse_field(
+                    field_item=new_field,
+                    node_item=layer,
+                    is_frozen=is_frozen,
+                    name_path=name_path + (f"{field_item.name}_{i}",),
+                    type_path=type_path + (layer.__class__.__name__,),
+                )
+
     @recurse_field.register(pytreeclass.src.tree_base.treeBase)
     def _(field_item, node_item, is_frozen, name_path, type_path):
         nonlocal ROWS, COUNT, SIZE
