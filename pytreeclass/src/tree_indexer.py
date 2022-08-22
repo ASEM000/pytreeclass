@@ -233,96 +233,100 @@ def _at_static(tree, where, **kwargs):
     return __at_static(tree, where, **kwargs)
 
 
-class treeIndexerMethods:
-    def add(getter_setter_self, set_value):
-        return getter_setter_self.apply(lambda x: x + set_value)
-
-    def multiply(getter_setter_self, set_value):
-        return getter_setter_self.apply(lambda x: x * set_value)
-
-    def divide(getter_setter_self, set_value):
-        return getter_setter_self.apply(lambda x: x / set_value)
-
-    def power(getter_setter_self, set_value):
-        return getter_setter_self.apply(lambda x: x**set_value)
-
-    def min(getter_setter_self, set_value):
-        return getter_setter_self.apply(lambda x: jnp.minimum(x, set_value))
-
-    def max(getter_setter_self, set_value):
-        return getter_setter_self.apply(lambda x: jnp.maximum(x, set_value))
-
-    def reduce_sum(getter_setter_self):
-        return getter_setter_self.reduce(lambda x, y: x + jnp.sum(y))
-
-    def reduce_product(getter_setter_self):
-        return getter_setter_self.reduce(lambda x, y: x * jnp.prod(y), initializer=1)
-
-    def reduce_max(getter_setter_self):
-        return getter_setter_self.reduce(
-            lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
-        )
-
-    def reduce_min(getter_setter_self):
-        return getter_setter_self.reduce(
-            lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=+jnp.inf
-        )
-
-
 class treeIndexer:
     @property
     def at(self):
         class indexer:
             @dispatch(argnum=1)
-            def __getitem__(inner_self, *args):
+            def __getitem__(mask_self, *args):
                 raise NotImplementedError(
                     f"Indexing with type{tuple(type(arg) for arg in args)} is not implemented."
                 )
 
             @__getitem__.register(type(self))
-            def _(inner_self, arg):
+            def _(mask_self, arg):
                 """indexing by boolean pytree"""
 
                 assert all(
                     is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(arg)
                 ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(arg)}"
 
-                class getterSetterIndexer(treeIndexerMethods):
-                    def get(getter_setter_self, **kwargs):
+                class opIndexer:
+                    def get(op_self, **kwargs):
                         return ft.partial(_at_get, where=arg)(tree=self, **kwargs)
 
-                    def set(getter_setter_self, set_value, **kwargs):
+                    def set(op_self, set_value, **kwargs):
                         if self.frozen:
                             raise ValueError("Cannot set to a frozen treeclass.")
                         return ft.partial(_at_set, where=arg)(
                             tree=self, set_value=set_value, **kwargs
                         )
 
-                    def apply(getter_setter_self, func, **kwargs):
+                    def apply(op_self, func, **kwargs):
                         if self.frozen:
                             raise ValueError("Cannot apply to a frozen treeclass.")
                         return ft.partial(_at_apply, where=arg)(
                             tree=self, func=func, **kwargs
                         )
 
-                    def reduce(getter_setter_self, func, **kwargs):
+                    def reduce(op_self, func, **kwargs):
                         if self.frozen:
                             raise ValueError("Cannot reduce to a frozen treeclass.")
                         return ft.partial(_at_reduce, where=arg)(
                             tree=self, func=func, **kwargs
                         )
 
-                    def static(getter_setter_self, **kwargs):
+                    def static(op_self, **kwargs):
                         if self.frozen:
                             raise ValueError(
                                 "Cannot apply static to a frozen treeclass."
                             )
                         return ft.partial(_at_static, where=arg)(tree=self, **kwargs)
 
-                return getterSetterIndexer()
+                    # derived methods
+
+                    def add(op_self, set_value):
+                        return op_self.apply(lambda x: x + set_value)
+
+                    def multiply(op_self, set_value):
+                        return op_self.apply(lambda x: x * set_value)
+
+                    def divide(op_self, set_value):
+                        return op_self.apply(lambda x: x / set_value)
+
+                    def power(op_self, set_value):
+                        return op_self.apply(lambda x: x**set_value)
+
+                    def min(op_self, set_value):
+                        return op_self.apply(lambda x: jnp.minimum(x, set_value))
+
+                    def max(op_self, set_value):
+                        return op_self.apply(lambda x: jnp.maximum(x, set_value))
+
+                    def reduce_sum(op_self):
+                        return op_self.reduce(lambda x, y: x + jnp.sum(y))
+
+                    def reduce_product(op_self):
+                        return op_self.reduce(
+                            lambda x, y: x * jnp.prod(y), initializer=1
+                        )
+
+                    def reduce_max(op_self):
+                        return op_self.reduce(
+                            lambda x, y: jnp.maximum(x, jnp.max(y)),
+                            initializer=-jnp.inf,
+                        )
+
+                    def reduce_min(op_self):
+                        return op_self.reduce(
+                            lambda x, y: jnp.minimum(x, jnp.min(y)),
+                            initializer=+jnp.inf,
+                        )
+
+                return opIndexer()
 
             @__getitem__.register(type(Ellipsis))
-            def _(inner_self, arg):
+            def _(mask_self, arg):
                 """Ellipsis as an alias for all elements"""
                 return self.at.__getitem__(self == self)
 
