@@ -2,18 +2,18 @@ from dataclasses import field
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 import numpy as np
 import pytest
 
 import pytreeclass as pytc
+from pytreeclass.src.decorator import ImmutableInstanceError
 from pytreeclass.src.tree_util import (
     _freeze_nodes,
     _unfreeze_nodes,
     is_treeclass_equal,
     static_value,
 )
-
-from pytreeclass.src.decorator import ImmutableInstanceError
 
 
 def test_freezing_unfreezing():
@@ -26,15 +26,15 @@ def test_freezing_unfreezing():
     b = a.freeze()
     c = a.unfreeze()
 
-    assert jax.tree_util.tree_leaves(a) == [1, 2]
-    assert jax.tree_util.tree_leaves(b) == []
-    assert jax.tree_util.tree_leaves(c) == [1, 2]
+    assert jtu.tree_leaves(a) == [1, 2]
+    assert jtu.tree_leaves(b) == []
+    assert jtu.tree_leaves(c) == [1, 2]
 
     a = A(1, 2)
     b = a.at[...].static()
 
-    assert jax.tree_util.tree_leaves(a) == [1, 2]
-    assert jax.tree_util.tree_leaves(b) == []
+    assert jtu.tree_leaves(a) == [1, 2]
+    assert jtu.tree_leaves(b) == []
 
     @pytc.treeclass
     class A:
@@ -62,9 +62,27 @@ def test_freezing_unfreezing():
     b = a.freeze()
     c = a.unfreeze()
 
-    assert jax.tree_util.tree_leaves(a) == [1, 2]
-    assert jax.tree_util.tree_leaves(b) == []
-    assert jax.tree_util.tree_leaves(c) == [1, 2]
+    assert jtu.tree_leaves(a) == [1, 2]
+    assert jtu.tree_leaves(b) == []
+    assert jtu.tree_leaves(c) == [1, 2]
+
+    @pytc.treeclass
+    class l0:
+        a: int = 0
+
+    @pytc.treeclass
+    class l1:
+        b: l0 = l0()
+
+    @pytc.treeclass
+    class l2:
+        c: l1 = l1()
+
+    t = l2().freeze()
+
+    assert jtu.tree_leaves(t) == []
+    assert jtu.tree_leaves(t.c) == []
+    assert jtu.tree_leaves(t.c.b) == []
 
     @pytc.treeclass
     class A:
@@ -244,7 +262,7 @@ def test_freezing_unfreezing():
         c: str = field(default=static_value("test"))
 
     t = Test()
-    assert jax.tree_util.tree_leaves(t) == [1]
+    assert jtu.tree_leaves(t) == [1]
 
     with pytest.raises(ImmutableInstanceError):
         t.freeze().a = 1

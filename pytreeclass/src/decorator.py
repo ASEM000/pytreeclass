@@ -10,8 +10,10 @@ from pytreeclass.src.tree_base import explicitTreeBase, implicitTreeBase, treeBa
 from pytreeclass.src.tree_indexer import treeIndexer
 from pytreeclass.src.tree_op_base import treeOpBase
 
+
 class ImmutableInstanceError(Exception):
     pass
+
 
 def _immutate_treeclass(cls):
 

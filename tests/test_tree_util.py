@@ -2,14 +2,13 @@ import jax.numpy as jnp
 import pytest
 
 from pytreeclass import treeclass
+from pytreeclass.src.decorator import ImmutableInstanceError
 from pytreeclass.src.tree_util import (
     _dispatched_tree_map,
     _node_count_and_size,
     is_treeclass,
     is_treeclass_leaf,
 )
-
-from pytreeclass.src.decorator import ImmutableInstanceError
 
 
 @treeclass
