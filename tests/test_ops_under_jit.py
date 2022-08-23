@@ -94,7 +94,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.freeze()
+        model = model.at[...].freeze()
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 

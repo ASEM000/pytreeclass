@@ -64,7 +64,7 @@ def test__node_count_and_size():
     xx = x()
     # xx.cc = 1
     # assert xx.cc == 1
-    xx = xx.freeze()
+    xx = xx.at[...].freeze()
 
     with pytest.raises(ImmutableInstanceError):
         xx.test = 1

@@ -23,8 +23,8 @@ def test_freezing_unfreezing():
         b: int
 
     a = A(1, 2)
-    b = a.freeze()
-    c = a.unfreeze()
+    b = a.at[...].freeze()
+    c = a.at[...].unfreeze()
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
@@ -59,8 +59,8 @@ def test_freezing_unfreezing():
         b: int
 
     a = A(1, 2)
-    b = a.freeze()
-    c = a.unfreeze()
+    b = a.at[...].freeze()
+    c = a.at[...].unfreeze()
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
@@ -78,11 +78,16 @@ def test_freezing_unfreezing():
     class l2:
         c: l1 = l1()
 
-    t = l2().freeze()
+    t = l2().at[...].freeze()
 
     assert jtu.tree_leaves(t) == []
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
+
+    tt = t.at[...].unfreeze()
+    assert jtu.tree_leaves(tt) != []
+    assert jtu.tree_leaves(tt.c) != []
+    assert jtu.tree_leaves(tt.c.b) != []
 
     @pytc.treeclass
     class l1:
@@ -94,7 +99,7 @@ def test_freezing_unfreezing():
         def __init__(self):
             self.c = l1()
 
-    t = l2().freeze()
+    t = l2().at[...].freeze()
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
 
@@ -157,7 +162,7 @@ def test_freezing_unfreezing():
 
     model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
 
-    model = model.freeze()
+    model = model.at[...].freeze()
 
     def loss_func(model, x, y):
         return jnp.mean((model(x) - y) ** 2)
@@ -221,7 +226,7 @@ def test_freezing_unfreezing():
 
     model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
 
-    model = model.freeze()
+    model = model.at[...].freeze()
 
     @jax.jit
     def update(model, x, y):
@@ -267,7 +272,7 @@ def test_freezing_unfreezing():
     t = Test()
 
     with pytest.raises(ImmutableInstanceError):
-        t.freeze().a = 1
+        t.at[...].freeze().a = 1
 
     @pytc.treeclass(field_only=True)
     class Test:
@@ -279,16 +284,16 @@ def test_freezing_unfreezing():
     assert jtu.tree_leaves(t) == [1]
 
     with pytest.raises(ImmutableInstanceError):
-        t.freeze().a = 1
+        t.at[...].freeze().a = 1
 
     with pytest.raises(ImmutableInstanceError):
-        t.unfreeze().a = 1
+        t.at[...].unfreeze().a = 1
 
     hash(t)
 
     t = Test()
-    t.unfreeze()
-    t.freeze()
+    t.at[...].unfreeze()
+    t.at[...].freeze()
     assert t.frozen is False
 
     @pytc.treeclass

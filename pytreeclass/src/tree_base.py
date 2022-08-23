@@ -6,13 +6,7 @@ from typing import Any
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass.src.tree_util import (
-    _freeze_nodes,
-    _unfreeze_nodes,
-    is_treeclass,
-    static_value,
-    tree_copy,
-)
+from pytreeclass.src.tree_util import is_treeclass, static_value
 from pytreeclass.src.tree_viz import (
     tree_box,
     tree_diagram,
@@ -44,32 +38,6 @@ class treeBase:
             if field_item.default is not MISSING:
                 object.__setattr__(obj, field_item.name, field_item.default)
         return obj
-
-    def freeze(self) -> PyTree:
-        """Freeze treeclass.
-
-        Returns:
-            New frozen instance.
-
-        Example:
-
-        >>> model = model.freeze()
-        >>> assert model.frozen == True
-        """
-        return _freeze_nodes(tree_copy(self))
-
-    def unfreeze(self) -> PyTree:
-        """Unfreeze treeclass.
-
-        Returns:
-            New unfrozen instance.
-
-        Example :
-
-        >>> model = model.unfreeze()
-        >>> assert model.frozen == False
-        """
-        return _unfreeze_nodes(tree_copy(self))
 
     @property
     def frozen(self) -> bool:

@@ -9,7 +9,13 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import is_treeclass_leaf_bool, static_value, tree_copy
+from pytreeclass.src.tree_util import (
+    _freeze_nodes,
+    _unfreeze_nodes,
+    is_treeclass_leaf_bool,
+    static_value,
+    tree_copy,
+)
 
 """ Getter """
 
@@ -335,16 +341,39 @@ class treeIndexer:
                         return new_self
 
                     def freeze(op_self):
-                        return self.at[arg].set(getattr(self, arg).freeze())
+                        return self.at[arg].set(
+                            _freeze_nodes(tree_copy(getattr(self, arg)))
+                        )
 
                     def unfreeze(op_self):
-                        return self.at[arg].set(getattr(self, arg).unfreeze())
+                        return self.at[arg].set(
+                            _freeze_nodes(tree_copy(getattr(self, arg)))
+                        )
 
                 return opIndexer()
 
             @__getitem__.register(type(Ellipsis))
             def _(mask_self, arg):
                 """Ellipsis as an alias for all elements"""
-                return self.at.__getitem__(self == self)
+
+                class opIndexer:
+
+                    freeze = lambda _: _freeze_nodes(tree_copy(self))
+                    unfreeze = lambda _: _unfreeze_nodes(tree_copy(self))
+                    get = self.at[self == self].get
+                    set = self.at[self == self].set
+                    apply = self.at[self == self].apply
+                    reduce = self.at[self == self].reduce
+                    static = self.at[self == self].static
+                    add = self.at[self == self].add
+                    multiply = self.at[self == self].multiply
+                    divide = self.at[self == self].divide
+                    power = self.at[self == self].power
+                    min = self.at[self == self].min
+                    max = self.at[self == self].max
+                    reduce_sum = self.at[self == self].reduce_sum
+                    reduce_max = self.at[self == self].reduce_max
+
+                return opIndexer()
 
         return indexer()
