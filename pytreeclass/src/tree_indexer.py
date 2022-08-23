@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 from collections.abc import Callable
+from types import MethodType
 from typing import Any
 
 import jax
@@ -9,7 +10,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import is_treeclass_leaf_bool, static_value
+from pytreeclass.src.tree_util import is_treeclass_leaf_bool, static_value, tree_copy
 
 """ Getter """
 
@@ -322,6 +323,28 @@ class treeIndexer:
                             lambda x, y: jnp.minimum(x, jnp.min(y)),
                             initializer=+jnp.inf,
                         )
+
+                return opIndexer()
+
+            @__getitem__.register(str)
+            def _(mask_self, arg):
+                class opIndexer:
+                    def __call__(op_self, *args, **kwargs):
+                        cur_attr = getattr(self, arg)
+                        assert isinstance(
+                            cur_attr, MethodType
+                        ), f"Call requires self class method. Found {arg}"
+
+                        new_self = tree_copy(self)
+                        value = getattr(new_self, arg).__call__(*args, **kwargs)
+                        return value, new_self
+
+                    def set(op_self, set_value):
+                        getattr(self, arg)
+
+                        new_self = tree_copy(self)
+                        object.__setattr__(new_self, arg, set_value)
+                        return new_self
 
                 return opIndexer()
 

@@ -165,6 +165,13 @@ def _append_math_eq_ne(func):
     return wrapper
 
 
+def _append_exception(func):
+    def exception(*args, **kwargs):
+        raise Exception(f"{func} is not supported.")
+
+    return exception
+
+
 class treeOpBase:
 
     __abs__ = _append_math_op(op.abs)
@@ -196,3 +203,17 @@ class treeOpBase:
     __rsub__ = _append_math_op(op.sub)
     __truediv__ = _append_math_op(op.truediv)
     __xor__ = _append_math_op(op.xor)
+
+    # raise exception for inplace operators
+    __iadd__ = _append_exception(op.iadd)
+    __iand__ = _append_exception(op.iand)
+    __ifloordiv__ = _append_exception(op.ifloordiv)
+    __ilshift__ = _append_exception(op.ilshift)
+    __imatmul__ = _append_exception(op.imatmul)
+    __imod__ = _append_exception(op.imod)
+    __imul__ = _append_exception(op.imul)
+    __ior__ = _append_exception(op.ior)
+    __ipow__ = _append_exception(op.ipow)
+    __irshift__ = _append_exception(op.irshift)
+    __itruediv__ = _append_exception(op.itruediv)
+    __ixor__ = _append_exception(op.ixor)

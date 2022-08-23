@@ -104,6 +104,10 @@ def sequential_tree_shape_eval(tree, array):
     return shape
 
 
+def tree_copy(tree):
+    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
+
+
 def _node_count_and_size(node: Any) -> tuple[complex, complex]:
     """Calculate number and size of `trainable` and `non-trainable` parameters
 

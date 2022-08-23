@@ -119,13 +119,13 @@ def test_getter_by_param():
     rhs = L2(10, None, None, L1(1, None, None, L0(1, None, None)))
     assert is_treeclass_equal(lhs, rhs)
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(AttributeError):
         t.at["s"].get()
 
-    with pytest.raises(NotImplementedError):
-        t.at["s"].set(100)
+    # with pytest.raises(NotImplementedError):
+    # t.at["s"].set(100)
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(AttributeError):
         t.at["s"].apply(lambda _: 100)
 
 
@@ -832,3 +832,37 @@ def test_masking():
         model_no_dropout(jnp.ones((1, 1))),
         jnp.array([[1.2656513, -0.8149204, 0.61661845, 2.7664368, 1.3457328]]),
     )
+
+
+def test_attribute_set():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+
+    t = Test()
+    t.at["a"].set(10)
+
+    assert is_treeclass_equal(t, Test())
+    assert is_treeclass_equal(t.at["a"].set(10), Test(10))
+
+    with pytest.raises(AttributeError):
+        t.at["b"].set(10)
+
+
+def test_method_call():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+
+        def increment(self):
+            self.a += 1
+
+    t = Test()
+
+    assert is_treeclass_equal(t.at["increment"]()[1], Test(2))
+
+    with pytest.raises(AttributeError):
+        t.at["bla"]()
+
+    with pytest.raises(AssertionError):
+        t.at["a"]()
