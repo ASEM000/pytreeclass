@@ -11,6 +11,7 @@ from pytreeclass.src.tree_util import (
     _unfreeze_nodes,
     is_treeclass,
     static_value,
+    tree_copy,
 )
 from pytreeclass.src.tree_viz import (
     tree_box,
@@ -55,7 +56,7 @@ class treeBase:
         >>> model = model.freeze()
         >>> assert model.frozen == True
         """
-        return _freeze_nodes(jtu.tree_unflatten(*jtu.tree_flatten(self)[::-1]))
+        return _freeze_nodes(tree_copy(self))
 
     def unfreeze(self) -> PyTree:
         """Unfreeze treeclass.
@@ -68,7 +69,7 @@ class treeBase:
         >>> model = model.unfreeze()
         >>> assert model.frozen == False
         """
-        return _unfreeze_nodes(jtu.tree_unflatten(*jtu.tree_flatten(self)[::-1]))
+        return _unfreeze_nodes(tree_copy(self))
 
     @property
     def frozen(self) -> bool:

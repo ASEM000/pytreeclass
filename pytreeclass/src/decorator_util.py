@@ -81,8 +81,10 @@ def _immutate_treeclass(cls):
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             func(self, *args, **kwargs)
-            # execute after initialization
-            self.__immutable_treeclass__ = True
+
+            # post inititialization
+            object.__setattr__(self, "__register_treeclass_instance_variables__", None)
+            object.__setattr__(self, "__immutable_treeclass__", True)
 
         return wrapper
 
