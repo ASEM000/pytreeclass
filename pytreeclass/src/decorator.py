@@ -10,6 +10,8 @@ from pytreeclass.src.tree_base import explicitTreeBase, implicitTreeBase, treeBa
 from pytreeclass.src.tree_indexer import treeIndexer
 from pytreeclass.src.tree_op_base import treeOpBase
 
+class ImmutablInstanceError(Exception):
+    pass
 
 def _immutate_treeclass(cls):
 
@@ -18,7 +20,7 @@ def _immutate_treeclass(cls):
 
     def immutable_setattr(self, key, value):
         if self.__immutable_treeclass__:
-            raise ValueError(f"Immutable treeclass. Cannot set {key} = {value}.")
+            raise ImmutablInstanceError(f"Cannot set {key} = {value}.")
         mutable_setattr(self, key, value)
 
     def execute_post_init(func):

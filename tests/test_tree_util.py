@@ -9,6 +9,8 @@ from pytreeclass.src.tree_util import (
     is_treeclass_leaf,
 )
 
+from pytreeclass.src.decorator import ImmutablInstanceError
+
 
 @treeclass
 class Test:
@@ -65,7 +67,7 @@ def test__node_count_and_size():
     # assert xx.cc == 1
     xx = xx.freeze()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ImmutablInstanceError):
         xx.test = 1
 
 

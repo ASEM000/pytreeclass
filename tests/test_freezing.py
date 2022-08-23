@@ -13,6 +13,8 @@ from pytreeclass.src.tree_util import (
     static_value,
 )
 
+from pytreeclass.src.decorator import ImmutablInstanceError
+
 
 def test_freezing_unfreezing():
     @pytc.treeclass
@@ -232,7 +234,7 @@ def test_freezing_unfreezing():
 
     t = Test()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ImmutablInstanceError):
         t.freeze().a = 1
 
     @pytc.treeclass(field_only=True)
@@ -244,10 +246,10 @@ def test_freezing_unfreezing():
     t = Test()
     assert jax.tree_util.tree_leaves(t) == [1]
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ImmutablInstanceError):
         t.freeze().a = 1
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ImmutablInstanceError):
         t.unfreeze().a = 1
 
     hash(t)
