@@ -85,6 +85,20 @@ def test_freezing_unfreezing():
     assert jtu.tree_leaves(t.c.b) == []
 
     @pytc.treeclass
+    class l1:
+        def __init__(self):
+            self.b = l0()
+
+    @pytc.treeclass
+    class l2:
+        def __init__(self):
+            self.c = l1()
+
+    t = l2().freeze()
+    assert jtu.tree_leaves(t.c) == []
+    assert jtu.tree_leaves(t.c.b) == []
+
+    @pytc.treeclass
     class A:
         a: int
         b: int
