@@ -338,9 +338,9 @@ class treeIndexer:
 
                     def __call__(op_self, *args, **kwargs):
                         new_self = tree_copy(self)
-                        cur_attr = getattr(new_self, arg)
+                        method = getattr(new_self, arg)
                         object.__setattr__(new_self, "__immutable_treeclass__", False)
-                        value = cur_attr(*args, **kwargs)
+                        value = method(*args, **kwargs)
                         object.__setattr__(new_self, "__immutable_treeclass__", True)
                         return value, new_self
 
@@ -361,7 +361,6 @@ class treeIndexer:
                 """Ellipsis as an alias for all elements"""
 
                 class opIndexer:
-
                     freeze = lambda _: _freeze_nodes(tree_copy(self))
                     unfreeze = lambda _: _unfreeze_nodes(tree_copy(self))
                     get = self.at[self == self].get
