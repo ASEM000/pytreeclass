@@ -351,7 +351,7 @@ class treeIndexer:
 
                     def unfreeze(op_self):
                         return self.at[arg].set(
-                            _freeze_nodes(tree_copy(getattr(self, arg)))
+                            _unfreeze_nodes(tree_copy(getattr(self, arg)))
                         )
 
                 return opIndexer()

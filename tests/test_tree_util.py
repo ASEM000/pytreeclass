@@ -69,6 +69,8 @@ def test__node_count_and_size():
     with pytest.raises(ImmutableInstanceError):
         xx.test = 1
 
+    assert _node_count_and_size("string") == (complex(0, 0), complex(0, 0))
+
 
 def test_dispatched_tree_map():
 
