@@ -65,30 +65,3 @@ def dispatch(*args, **kwargs):
         # def f(..):
         argnum = kwargs["argnum"] if "argnum" in kwargs else 0
         return functools.partial(dispatch_wrapper, argnum=argnum)
-
-
-def _immutate_treeclass(cls):
-
-    cls.__immutable_treeclass__ = False
-    mutable_setattr = cls.__setattr__
-
-    def immutable_setattr(self, key, value):
-        if self.__immutable_treeclass__:
-            raise ValueError(f"Immutable treeclass. Cannot set {key} = {value}.")
-        mutable_setattr(self, key, value)
-
-    def execute_post_init(func):
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
-            func(self, *args, **kwargs)
-
-            # post inititialization
-            object.__setattr__(self, "__register_treeclass_instance_variables__", None)
-            object.__setattr__(self, "__immutable_treeclass__", True)
-
-        return wrapper
-
-    cls.__setattr__ = immutable_setattr
-    cls.__init__ = execute_post_init(cls.__init__)
-
-    return cls

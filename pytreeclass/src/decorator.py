@@ -6,10 +6,35 @@ from dataclasses import dataclass
 
 import jax
 
-from pytreeclass.src.decorator_util import _immutate_treeclass
 from pytreeclass.src.tree_base import explicitTreeBase, implicitTreeBase, treeBase
 from pytreeclass.src.tree_indexer import treeIndexer
 from pytreeclass.src.tree_op_base import treeOpBase
+
+
+def _immutate_treeclass(cls):
+
+    cls.__immutable_treeclass__ = False
+    mutable_setattr = cls.__setattr__
+
+    def immutable_setattr(self, key, value):
+        if self.__immutable_treeclass__:
+            raise ValueError(f"Immutable treeclass. Cannot set {key} = {value}.")
+        mutable_setattr(self, key, value)
+
+    def execute_post_init(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            func(self, *args, **kwargs)
+
+            # post inititialization
+            object.__setattr__(self, "__immutable_treeclass__", True)
+
+        return wrapper
+
+    cls.__setattr__ = immutable_setattr
+    cls.__init__ = execute_post_init(cls.__init__)
+
+    return cls
 
 
 def treeclass(*args, **kwargs):

@@ -240,8 +240,6 @@ class explicitTreeBase:
             return self.__generate_tree_fields__()
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if self.frozen:
-            raise ValueError("Cannot set a value to a frozen treeclass.")
         object.__setattr__(self, name, value)
 
 
@@ -273,8 +271,6 @@ class implicitTreeBase:
             object.__setattr__(self, "__treeclass_fields__", __treeclass_fields__)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if self.frozen:
-            raise ValueError("Cannot set a value to a frozen treeclass.")
         object.__setattr__(self, name, value)
         self.__register_treeclass_instance_variables__()
 
