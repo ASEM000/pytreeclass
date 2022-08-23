@@ -4,7 +4,6 @@ import pytest
 from pytreeclass import treeclass
 from pytreeclass.src.decorator import ImmutableInstanceError
 from pytreeclass.src.tree_util import (
-    _dispatched_tree_map,
     _node_count_and_size,
     is_treeclass,
     is_treeclass_leaf,
@@ -70,13 +69,3 @@ def test__node_count_and_size():
         xx.test = 1
 
     assert _node_count_and_size("string") == (complex(0, 0), complex(0, 0))
-
-
-def test_dispatched_tree_map():
-
-    with pytest.raises(NotImplementedError):
-
-        class A:
-            ...
-
-        _dispatched_tree_map(lambda x, y: x, 1, A())

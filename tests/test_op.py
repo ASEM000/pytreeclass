@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import pytest
 
 from pytreeclass import treeclass
+from pytreeclass.src.tree_op_base import _dispatched_op_tree_map
 from pytreeclass.src.tree_util import static_value
 
 
@@ -67,3 +68,13 @@ def test_ops():
 def test_asdict():
     A = Test(10, 20, 30, static_value("A"))
     assert A.asdict() == {"a": 10, "b": 20, "c": 30, "name": "A"}
+
+
+def test_dispatched_tree_map():
+
+    with pytest.raises(NotImplementedError):
+
+        class A:
+            ...
+
+        _dispatched_op_tree_map(lambda x, y: x, 1, A())

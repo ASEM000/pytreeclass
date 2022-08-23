@@ -8,7 +8,46 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import _dispatched_tree_map, is_excluded, is_treeclass
+from pytreeclass.src.tree_util import is_excluded, is_treeclass
+
+
+def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
+    """Slightly different implementation to jtu.tree_map for unary/binary operators broadcasting"""
+
+    @dispatch(argnum=1)
+    def _tree_map(lhs, rhs):
+        raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
+
+    @_tree_map.register(type(lhs))
+    def _(lhs, rhs):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs, is_leaf=is_leaf)
+        rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs, is_leaf=is_leaf)
+
+        lhs_leaves = [
+            func(lhs_leaf, rhs_leaf) if rhs_leaf is not None else lhs_leaf
+            for (lhs_leaf, rhs_leaf) in zip(lhs_leaves, rhs_leaves)
+        ]
+
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    @_tree_map.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
+    @_tree_map.register(int)
+    @_tree_map.register(float)
+    @_tree_map.register(complex)
+    @_tree_map.register(bool)
+    @_tree_map.register(str)
+    def _(lhs, rhs):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs, is_leaf=is_leaf)
+        lhs_leaves = [func(leaf, rhs) for leaf in lhs_leaves]
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    @_tree_map.register(type(None))
+    def _(lhs, rhs=None):
+        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs, is_leaf=is_leaf)
+        lhs_leaves = [func(lhs_node) for lhs_node in lhs_leaves]
+        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+
+    return _tree_map(lhs, rhs)
 
 
 def _append_math_op(func):
@@ -16,7 +55,7 @@ def _append_math_op(func):
 
     @ft.wraps(func)
     def wrapper(self, rhs=None):
-        return _dispatched_tree_map(func, self, rhs)
+        return _dispatched_op_tree_map(func, self, rhs)
 
     return wrapper
 
@@ -56,7 +95,7 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(type(self))
         @inner_wrapper.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
         def _(self, rhs):
-            return _dispatched_tree_map(func, self, rhs)
+            return _dispatched_op_tree_map(func, self, rhs)
 
         @inner_wrapper.register(str)
         def _(tree, where, **kwargs):
