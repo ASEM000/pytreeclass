@@ -9,7 +9,13 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import is_treeclass_leaf_bool, static_value
+from pytreeclass.src.tree_util import (
+    _freeze_nodes,
+    _unfreeze_nodes,
+    is_treeclass_leaf_bool,
+    static_value,
+    tree_copy,
+)
 
 """ Getter """
 
@@ -256,31 +262,21 @@ class treeIndexer:
                         return ft.partial(_at_get, where=arg)(tree=self, **kwargs)
 
                     def set(op_self, set_value, **kwargs):
-                        if self.frozen:
-                            raise ValueError("Cannot set to a frozen treeclass.")
                         return ft.partial(_at_set, where=arg)(
                             tree=self, set_value=set_value, **kwargs
                         )
 
                     def apply(op_self, func, **kwargs):
-                        if self.frozen:
-                            raise ValueError("Cannot apply to a frozen treeclass.")
                         return ft.partial(_at_apply, where=arg)(
                             tree=self, func=func, **kwargs
                         )
 
                     def reduce(op_self, func, **kwargs):
-                        if self.frozen:
-                            raise ValueError("Cannot reduce to a frozen treeclass.")
                         return ft.partial(_at_reduce, where=arg)(
                             tree=self, func=func, **kwargs
                         )
 
                     def static(op_self, **kwargs):
-                        if self.frozen:
-                            raise ValueError(
-                                "Cannot apply static to a frozen treeclass."
-                            )
                         return ft.partial(_at_static, where=arg)(tree=self, **kwargs)
 
                     # derived methods
@@ -325,9 +321,62 @@ class treeIndexer:
 
                 return opIndexer()
 
+            @__getitem__.register(str)
+            def _(mask_self, arg):
+                class opIndexer:
+                    def get(op_self):
+                        return getattr(self, arg)
+
+                    def set(op_self, set_value):
+                        getattr(self, arg)  # check if attribute already defined
+                        new_self = tree_copy(self)
+                        object.__setattr__(new_self, arg, set_value)
+                        return new_self
+
+                    def apply(op_self, func, **kwargs):
+                        return self.at[arg].set(func(self.at[arg].get()))
+
+                    def __call__(op_self, *args, **kwargs):
+                        new_self = tree_copy(self)
+                        method = getattr(new_self, arg)
+                        object.__setattr__(new_self, "__immutable_treeclass__", False)
+                        value = method(*args, **kwargs)
+                        object.__setattr__(new_self, "__immutable_treeclass__", True)
+                        return value, new_self
+
+                    def freeze(op_self):
+                        return self.at[arg].set(
+                            _freeze_nodes(tree_copy(getattr(self, arg)))
+                        )
+
+                    def unfreeze(op_self):
+                        return self.at[arg].set(
+                            _freeze_nodes(tree_copy(getattr(self, arg)))
+                        )
+
+                return opIndexer()
+
             @__getitem__.register(type(Ellipsis))
             def _(mask_self, arg):
                 """Ellipsis as an alias for all elements"""
-                return self.at.__getitem__(self == self)
+
+                class opIndexer:
+                    freeze = lambda _: _freeze_nodes(tree_copy(self))
+                    unfreeze = lambda _: _unfreeze_nodes(tree_copy(self))
+                    get = self.at[self == self].get
+                    set = self.at[self == self].set
+                    apply = self.at[self == self].apply
+                    reduce = self.at[self == self].reduce
+                    static = self.at[self == self].static
+                    add = self.at[self == self].add
+                    multiply = self.at[self == self].multiply
+                    divide = self.at[self == self].divide
+                    power = self.at[self == self].power
+                    min = self.at[self == self].min
+                    max = self.at[self == self].max
+                    reduce_sum = self.at[self == self].reduce_sum
+                    reduce_max = self.at[self == self].reduce_max
+
+                return opIndexer()
 
         return indexer()

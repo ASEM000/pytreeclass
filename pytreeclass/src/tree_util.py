@@ -34,7 +34,7 @@ def static_field(**kwargs):
 
 def is_treeclass(tree):
     """check if a class is treeclass"""
-    return hasattr(tree, "__tree_fields__")
+    return hasattr(tree, "__treeclass_structure__")
 
 
 def is_treeclass_leaf_bool(node):
@@ -93,8 +93,8 @@ def sequential_tree_shape_eval(tree, array):
 
     # all dynamic/static leaves
     all_leaves = (
-        *tree.__tree_fields__[0].values(),
-        *tree.__tree_fields__[1].values(),
+        *tree.__treeclass_structure__[0].values(),
+        *tree.__treeclass_structure__[1].values(),
     )
     leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
 
@@ -102,6 +102,10 @@ def sequential_tree_shape_eval(tree, array):
     for leave in leaves:
         shape += [jax.eval_shape(leave, shape[-1])]
     return shape
+
+
+def tree_copy(tree):
+    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
 
 def _node_count_and_size(node: Any) -> tuple[complex, complex]:
@@ -199,7 +203,13 @@ def _freeze_nodes(tree):
     """inplace freezing"""
     if is_treeclass(tree):
         object.__setattr__(tree, "__frozen_fields__", None)
-        for kw, leaf in tree.__dataclass_fields__.items():
+
+        all_fields = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
+
+        for kw, leaf in all_fields.items():
             _freeze_nodes(tree.__dict__[kw])
     return tree
 
@@ -209,6 +219,12 @@ def _unfreeze_nodes(tree):
     if is_treeclass(tree):
         if hasattr(tree, "__frozen_fields__"):
             object.__delattr__(tree, "__frozen_fields__")
-        for kw, leaf in tree.__dataclass_fields__.items():
+
+        all_fields = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
+
+        for kw, leaf in all_fields.items():
             _unfreeze_nodes(tree.__dict__[kw])
     return tree

@@ -6,12 +6,7 @@ from typing import Any
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass.src.tree_util import (
-    _freeze_nodes,
-    _unfreeze_nodes,
-    is_treeclass,
-    static_value,
-)
+from pytreeclass.src.tree_util import is_treeclass, static_value
 from pytreeclass.src.tree_viz import (
     tree_box,
     tree_diagram,
@@ -34,38 +29,15 @@ class fieldDict(dict):
 
 class treeBase:
     def __new__(cls, *args, **kwargs):
+        # register dataclass fields to instance dict
+        # otherwise will raise undeclared error for non defined
+        # init classes.
         obj = super().__new__(cls)
 
         for field_item in cls.__dataclass_fields__.values():
             if field_item.default is not MISSING:
                 object.__setattr__(obj, field_item.name, field_item.default)
         return obj
-
-    def freeze(self) -> PyTree:
-        """Freeze treeclass.
-
-        Returns:
-            New frozen instance.
-
-        Example:
-
-        >>> model = model.freeze()
-        >>> assert model.frozen == True
-        """
-        return _freeze_nodes(jtu.tree_unflatten(*jtu.tree_flatten(self)[::-1]))
-
-    def unfreeze(self) -> PyTree:
-        """Unfreeze treeclass.
-
-        Returns:
-            New unfrozen instance.
-
-        Example :
-
-        >>> model = model.unfreeze()
-        >>> assert model.frozen == False
-        """
-        return _unfreeze_nodes(jtu.tree_unflatten(*jtu.tree_flatten(self)[::-1]))
 
     @property
     def frozen(self) -> bool:
@@ -82,10 +54,7 @@ class treeBase:
         Returns:
             Tuple of dynamic values and (dynamic keys,static dict)
         """
-        # we need to transfer the state for the next instance through static
-        # we also need to retrieve it for the current instance
-
-        dynamic, static = self.__tree_fields__
+        dynamic, static = self.__treeclass_structure__
 
         if self.frozen:
             return (), ((), {"__frozen_fields__": (dynamic, static)})
@@ -108,7 +77,6 @@ class treeBase:
             New class instance
         """
 
-        # new_cls = type(cls.__name__, cls.__bases__[1:], dict(cls.__dict__))
         new_cls = cls.__new__(cls)
 
         tree_fields = treedef[1].get("__frozen_fields__", None)
@@ -139,8 +107,9 @@ class treeBase:
 
     def asdict(self) -> dict[str, Any]:
         """Dictionary representation of dataclass_fields"""
-        dynamic, static = self.__tree_fields__
+        dynamic, static = self.__treeclass_structure__
         static.pop("__treeclass_fields__", None)
+        static.pop("__immutable_treeclass__", None)
         return {
             **dynamic,
             **jtu.tree_map(
@@ -194,10 +163,9 @@ class treeBase:
         # to avoid redefining them as dataclass fields.
 
         # register *all* dataclass fields
-        all_fields = {
-            **self.__dataclass_fields__,
-            **self.__dict__.get("__treeclass_fields__", {}),
-        }
+        treeclass_fields = self.__dict__.get("__treeclass_fields__", {})
+
+        all_fields = {**self.__dataclass_fields__, **treeclass_fields}
 
         for fi in all_fields.values():
             # field value is defined in class dict
@@ -216,7 +184,10 @@ class treeBase:
             else:
                 dynamic[fi.name] = value
 
-        static["__treeclass_fields__"] = self.__dict__.get("__treeclass_fields__", {})
+        static["__treeclass_fields__"] = treeclass_fields
+        static["__immutable_treeclass__"] = self.__dict__.get(
+            "__immutable_treeclass__", False
+        )
 
         return (dynamic, static)
 
@@ -225,7 +196,7 @@ class explicitTreeBase:
     """ "Register  dataclass fields only"""
 
     @property
-    def __tree_fields__(self):
+    def __treeclass_structure__(self):
         """Computes the dynamic and static fields.
 
         Returns:
@@ -237,8 +208,6 @@ class explicitTreeBase:
             return self.__generate_tree_fields__()
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if self.frozen:
-            raise ValueError("Cannot set a value to a frozen treeclass.")
         object.__setattr__(self, name, value)
 
 
@@ -270,13 +239,11 @@ class implicitTreeBase:
             object.__setattr__(self, "__treeclass_fields__", __treeclass_fields__)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if self.frozen:
-            raise ValueError("Cannot set a value to a frozen treeclass.")
         object.__setattr__(self, name, value)
         self.__register_treeclass_instance_variables__()
 
     @property
-    def __tree_fields__(self):
+    def __treeclass_structure__(self):
         """Computes the dynamic and static fields.
 
         Returns:

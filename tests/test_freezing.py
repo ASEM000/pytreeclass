@@ -2,10 +2,12 @@ from dataclasses import field
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 import numpy as np
 import pytest
 
 import pytreeclass as pytc
+from pytreeclass.src.decorator import ImmutableInstanceError
 from pytreeclass.src.tree_util import (
     _freeze_nodes,
     _unfreeze_nodes,
@@ -21,18 +23,18 @@ def test_freezing_unfreezing():
         b: int
 
     a = A(1, 2)
-    b = a.freeze()
-    c = a.unfreeze()
+    b = a.at[...].freeze()
+    c = a.at[...].unfreeze()
 
-    assert jax.tree_util.tree_leaves(a) == [1, 2]
-    assert jax.tree_util.tree_leaves(b) == []
-    assert jax.tree_util.tree_leaves(c) == [1, 2]
+    assert jtu.tree_leaves(a) == [1, 2]
+    assert jtu.tree_leaves(b) == []
+    assert jtu.tree_leaves(c) == [1, 2]
 
     a = A(1, 2)
     b = a.at[...].static()
 
-    assert jax.tree_util.tree_leaves(a) == [1, 2]
-    assert jax.tree_util.tree_leaves(b) == []
+    assert jtu.tree_leaves(a) == [1, 2]
+    assert jtu.tree_leaves(b) == []
 
     @pytc.treeclass
     class A:
@@ -45,7 +47,7 @@ def test_freezing_unfreezing():
         d: A = A(1, 2)
 
     a = B()
-    a.d = a.d.freeze()
+    a = a.at["d"].freeze()  # = a.d.freeze()
     assert a.d.frozen is True
     assert (
         pytc.tree_viz.tree_diagram(a)
@@ -57,12 +59,49 @@ def test_freezing_unfreezing():
         b: int
 
     a = A(1, 2)
-    b = a.freeze()
-    c = a.unfreeze()
+    b = a.at[...].freeze()
+    c = a.at[...].unfreeze()
 
-    assert jax.tree_util.tree_leaves(a) == [1, 2]
-    assert jax.tree_util.tree_leaves(b) == []
-    assert jax.tree_util.tree_leaves(c) == [1, 2]
+    assert jtu.tree_leaves(a) == [1, 2]
+    assert jtu.tree_leaves(b) == []
+    assert jtu.tree_leaves(c) == [1, 2]
+
+    @pytc.treeclass
+    class l0:
+        a: int = 0
+
+    @pytc.treeclass
+    class l1:
+        b: l0 = l0()
+
+    @pytc.treeclass
+    class l2:
+        c: l1 = l1()
+
+    t = l2().at[...].freeze()
+
+    assert jtu.tree_leaves(t) == []
+    assert jtu.tree_leaves(t.c) == []
+    assert jtu.tree_leaves(t.c.b) == []
+
+    tt = t.at[...].unfreeze()
+    assert jtu.tree_leaves(tt) != []
+    assert jtu.tree_leaves(tt.c) != []
+    assert jtu.tree_leaves(tt.c.b) != []
+
+    @pytc.treeclass
+    class l1:
+        def __init__(self):
+            self.b = l0()
+
+    @pytc.treeclass
+    class l2:
+        def __init__(self):
+            self.c = l1()
+
+    t = l2().at[...].freeze()
+    assert jtu.tree_leaves(t.c) == []
+    assert jtu.tree_leaves(t.c.b) == []
 
     @pytc.treeclass
     class A:
@@ -75,7 +114,7 @@ def test_freezing_unfreezing():
         d: A = A(1, 2)
 
     a = B()
-    a.d = a.d.freeze()
+    a = a.at["d"].freeze()
     assert a.d.frozen is True
     assert (
         pytc.tree_viz.tree_diagram(a)
@@ -123,7 +162,7 @@ def test_freezing_unfreezing():
 
     model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
 
-    model = model.freeze()
+    model = model.at[...].freeze()
 
     def loss_func(model, x, y):
         return jnp.mean((model(x) - y) ** 2)
@@ -187,7 +226,7 @@ def test_freezing_unfreezing():
 
     model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
 
-    model = model.freeze()
+    model = model.at[...].freeze()
 
     @jax.jit
     def update(model, x, y):
@@ -232,8 +271,8 @@ def test_freezing_unfreezing():
 
     t = Test()
 
-    with pytest.raises(ValueError):
-        t.freeze().a = 1
+    with pytest.raises(ImmutableInstanceError):
+        t.at[...].freeze().a = 1
 
     @pytc.treeclass(field_only=True)
     class Test:
@@ -242,37 +281,38 @@ def test_freezing_unfreezing():
         c: str = field(default=static_value("test"))
 
     t = Test()
-    assert jax.tree_util.tree_leaves(t) == [1]
+    assert jtu.tree_leaves(t) == [1]
 
-    with pytest.raises(ValueError):
-        t.freeze().a = 1
+    with pytest.raises(ImmutableInstanceError):
+        t.at[...].freeze().a = 1
 
-    t.unfreeze().a = 1
+    with pytest.raises(ImmutableInstanceError):
+        t.at[...].unfreeze().a = 1
 
     hash(t)
 
     t = Test()
-    t.unfreeze()
-    t.freeze()
+    t.at[...].unfreeze()
+    t.at[...].freeze()
     assert t.frozen is False
 
     @pytc.treeclass
     class Test:
         a: int
 
-    t = Test(100).freeze()
+    # t = Test(100).freeze()
 
-    with pytest.raises(ValueError):
-        t.at[...].set(0)
+    # with pytest.raises(ValueError):
+    #     t.at[...].set(0)
 
-    with pytest.raises(ValueError):
-        t.at[...].apply(lambda x: x + 1)
+    # with pytest.raises(ValueError):
+    #     t.at[...].apply(lambda x: x + 1)
 
-    with pytest.raises(ValueError):
-        t.at[...].reduce(jnp.sin)
+    # with pytest.raises(ValueError):
+    #     t.at[...].reduce(jnp.sin)
 
-    with pytest.raises(ValueError):
-        t.at[...].static()
+    # with pytest.raises(ValueError):
+    #     t.at[...].static()
 
     class T:
         pass

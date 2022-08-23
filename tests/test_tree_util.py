@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import pytest
 
 from pytreeclass import treeclass
+from pytreeclass.src.decorator import ImmutableInstanceError
 from pytreeclass.src.tree_util import (
     _dispatched_tree_map,
     _node_count_and_size,
@@ -61,11 +62,11 @@ def test__node_count_and_size():
     assert hash(x())
 
     xx = x()
-    xx.cc = 1
-    assert xx.cc == 1
-    xx = xx.freeze()
+    # xx.cc = 1
+    # assert xx.cc == 1
+    xx = xx.at[...].freeze()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ImmutableInstanceError):
         xx.test = 1
 
 

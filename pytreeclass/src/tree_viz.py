@@ -193,7 +193,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
         if field_item.repr:
             is_frozen = node_item.frozen
-            count, size = _reduce_count_and_size(node_item.unfreeze())
+            count, size = _reduce_count_and_size(node_item.at[...].unfreeze())
 
             ROWS.append(
                 [
@@ -205,7 +205,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     "\n".join(
                         [
                             f"{k}={_format_node(v)}"
-                            for k, v in node_item.__tree_fields__[0].items()
+                            for k, v in node_item.__treeclass_structure__[0].items()
                         ]
                     ),
                 ]

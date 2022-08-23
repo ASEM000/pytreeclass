@@ -35,7 +35,7 @@ def test_field_only():
             self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
 
     model = StackedLinear(key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2)
-    model.__tree_fields__
+    model.__treeclass_structure__
 
     assert "l1" not in model.__dataclass_fields__
 
@@ -51,7 +51,7 @@ def test_field_only():
             self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
 
     model = StackedLinear(key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2)
-    model.__tree_fields__
+    model.__treeclass_structure__
 
     assert "l1" in model.__treeclass_fields__
 
@@ -73,7 +73,7 @@ def test_field_only():
         model = StackedLinear(
             key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2
         )
-        model.__tree_fields__
+        model.__treeclass_structure__
 
     @pytc.treeclass(field_only=True)
     class StackedLinear:
@@ -88,7 +88,7 @@ def test_field_only():
         model = StackedLinear(
             key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2
         )
-        model.__tree_fields__
+        model.__treeclass_structure__
 
 
 def test_hash():
