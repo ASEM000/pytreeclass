@@ -144,25 +144,25 @@ Frozen size :	0.00B(0.00B)
 # ** note ** : the created modules 
 # in __init__ should be in the same order
 # where they are called in __call__
-┌─────────────────────────────────────┐
-│StackedLinear(Parent)                │
-├─────────────────────────────────────┤
-│┌────────────┬────────┬─────────────┐│
-││            │ Input  │ f32[100,1]  ││
-││ Linear(l1) │────────┼─────────────┤│
-││            │ Output │ f32[100,10] ││
-│└────────────┴────────┴─────────────┘│
-│┌────────────┬────────┬─────────────┐│
-││            │ Input  │ f32[100,10] ││
-││ Linear(l2) │────────┼─────────────┤│
-││            │ Output │ f32[100,10] ││
-│└────────────┴────────┴─────────────┘│
-│┌────────────┬────────┬─────────────┐│
-││            │ Input  │ f32[100,10] ││
-││ Linear(l3) │────────┼─────────────┤│
-││            │ Output │ f32[100,1]  ││
-│└────────────┴────────┴─────────────┘│
-└─────────────────────────────────────┘
+┌──────────────────────────────────────┐
+│StackedLinear[Parent]                 │
+├──────────────────────────────────────┤
+│┌────────────┬────────┬──────────────┐│
+││            │ Input  │ f32[100,1]   ││
+││ Linear[l1] │────────┼──────────────┤│
+││            │ Output │ f32[100,128] ││
+│└────────────┴────────┴──────────────┘│
+│┌────────────┬────────┬──────────────┐│
+││            │ Input  │ f32[100,128] ││
+││ Linear[l2] │────────┼──────────────┤│
+││            │ Output │ f32[100,128] ││
+│└────────────┴────────┴──────────────┘│
+│┌────────────┬────────┬──────────────┐│
+││            │ Input  │ f32[100,128] ││
+││ Linear[l3] │────────┼──────────────┤│
+││            │ Output │ f32[100,1]   ││
+│└────────────┴────────┴──────────────┘│
+└──────────────────────────────────────┘
 ```
 </td>
  
@@ -241,18 +241,20 @@ flowchart LR
 
 ```python
 # freeze l1
->>> model.l1 = model.l1.freeze()
+model = model.at["l1"].freeze()
 
-# set negative values in l2 to 0
->>> model.l2 = model.l2.at[model.l2<0].set(0)
+# Set negative_values in l2 to 0
+filtered_l2 =  model.l2.at[model.l2<0].set(0) 
+model = model.at["l2"].set( filtered_l2 )
 
 # apply sin(x) to all values in l3
->>> model.l3 = model.l3.at[...].apply(jnp.sin)
+filtered_l3 = model.l3.at[...].apply(jnp.sin)
+model  = model.at["l3"].set(filtered_l3)
 
 # frozen nodes are marked with #
 >>> print(model.tree_diagram())
 StackedLinear
-    ├── l1=Linear
+    ├#─ l1=Linear
     │   ├#─ weight=f32[1,10]
     │   └#─ bias=f32[1,10]  
     ├── l2=Linear
@@ -539,7 +541,7 @@ Under jax.jit jax requires states to be explicit, this means that for any class 
 <details>
 
 
-Using the following pattern,Updating state can be achieved under `jax.jit`
+Using the following pattern,Updating state **functionally** can be achieved under `jax.jit`
 
 ```python
 @pytc.treeclass
@@ -550,18 +552,20 @@ class Counter:
         self.calls += 1 
         
 
->>> c = Counter()
+>>> counter = Counter()
 
 @jax.jit
-def update(c):
-    c.increment()
-    return c 
+def update(counter):
+    # update the function functionally
+    # return the call output value and 
+    # the updated model
+    value, new_counter = counter.at["increment"]()
+    return new_counter
 
 for i in range(10):
-    c = update(c)
+    counter = update(counter)
 
->>> print(c.calls)
-10
+>>> print(counter.calls)
 ```
 
 
