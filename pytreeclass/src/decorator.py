@@ -22,7 +22,10 @@ def _immutate_treeclass(cls):
 
     def immutable_setattr(self, key, value):
         if self.__immutable_treeclass__:
-            raise ImmutableInstanceError(f"Cannot set {key} = {value}.")
+            raise ImmutableInstanceError(
+                f"Cannot set {key} = {value}. Use `.at['{key}'].set({value})` instead."
+            )
+
         mutable_setattr(self, key, value)
 
     def execute_post_init(func):

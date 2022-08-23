@@ -818,6 +818,15 @@ def test_masking():
     )
 
 
+def test_attribute_get():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+
+    t = Test()
+    assert t.at["a"].get() == 1
+
+
 def test_attribute_set():
     @pytc.treeclass
     class Test:
@@ -831,6 +840,21 @@ def test_attribute_set():
 
     with pytest.raises(AttributeError):
         t.at["b"].set(10)
+
+
+def test_attribute_apply():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+
+    t = Test()
+    t.at["a"].apply(lambda _: 10)
+
+    assert is_treeclass_equal(t, Test())
+    assert is_treeclass_equal(t.at["a"].apply(lambda _: 10), Test(10))
+
+    with pytest.raises(AttributeError):
+        t.at["b"].apply(lambda _: 10)
 
 
 def test_method_call():

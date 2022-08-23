@@ -324,21 +324,25 @@ class treeIndexer:
             @__getitem__.register(str)
             def _(mask_self, arg):
                 class opIndexer:
-                    def __call__(op_self, *args, **kwargs):
-                        new_self = tree_copy(self)
-                        cur_attr = getattr(new_self, arg)
-
-                        object.__setattr__(new_self, "__immutable_treeclass__", False)
-                        value = cur_attr(*args, **kwargs)
-                        object.__setattr__(new_self, "__immutable_treeclass__", True)
-
-                        return value, new_self
+                    def get(op_self):
+                        return getattr(self, arg)
 
                     def set(op_self, set_value):
                         getattr(self, arg)  # check if attribute already defined
                         new_self = tree_copy(self)
                         object.__setattr__(new_self, arg, set_value)
                         return new_self
+
+                    def apply(op_self, func, **kwargs):
+                        return self.at[arg].set(func(self.at[arg].get()))
+
+                    def __call__(op_self, *args, **kwargs):
+                        new_self = tree_copy(self)
+                        cur_attr = getattr(new_self, arg)
+                        object.__setattr__(new_self, "__immutable_treeclass__", False)
+                        value = cur_attr(*args, **kwargs)
+                        object.__setattr__(new_self, "__immutable_treeclass__", True)
+                        return value, new_self
 
                     def freeze(op_self):
                         return self.at[arg].set(
