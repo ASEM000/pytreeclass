@@ -34,6 +34,9 @@ class fieldDict(dict):
 
 class treeBase:
     def __new__(cls, *args, **kwargs):
+        # register dataclass fields to instance dict
+        # otherwise will raise undeclared error for non defined
+        # init classes.
         obj = super().__new__(cls)
 
         for field_item in cls.__dataclass_fields__.values():
@@ -76,20 +79,13 @@ class treeBase:
         """
         return True if hasattr(self, "__frozen_fields__") else False
 
-    @property
-    def immutable(self) -> bool:
-        return True if hasattr(self, "__immutable_treeclass__") else False
-
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
 
         Returns:
             Tuple of dynamic values and (dynamic keys,static dict)
         """
-        # we need to transfer the state for the next instance through static
-        # we also need to retrieve it for the current instance
-
-        dynamic, static = self.__tree_fields__
+        dynamic, static = self.__treeclass_structure__
 
         if self.frozen:
             return (), ((), {"__frozen_fields__": (dynamic, static)})
@@ -112,7 +108,6 @@ class treeBase:
             New class instance
         """
 
-        # new_cls = type(cls.__name__, cls.__bases__[1:], dict(cls.__dict__))
         new_cls = cls.__new__(cls)
 
         tree_fields = treedef[1].get("__frozen_fields__", None)
@@ -143,7 +138,7 @@ class treeBase:
 
     def asdict(self) -> dict[str, Any]:
         """Dictionary representation of dataclass_fields"""
-        dynamic, static = self.__tree_fields__
+        dynamic, static = self.__treeclass_structure__
         static.pop("__treeclass_fields__", None)
         static.pop("__immutable_treeclass__", None)
         return {
@@ -232,7 +227,7 @@ class explicitTreeBase:
     """ "Register  dataclass fields only"""
 
     @property
-    def __tree_fields__(self):
+    def __treeclass_structure__(self):
         """Computes the dynamic and static fields.
 
         Returns:
@@ -283,7 +278,7 @@ class implicitTreeBase:
         self.__register_treeclass_instance_variables__()
 
     @property
-    def __tree_fields__(self):
+    def __treeclass_structure__(self):
         """Computes the dynamic and static fields.
 
         Returns:

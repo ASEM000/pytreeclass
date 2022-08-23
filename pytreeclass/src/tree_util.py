@@ -34,7 +34,7 @@ def static_field(**kwargs):
 
 def is_treeclass(tree):
     """check if a class is treeclass"""
-    return hasattr(tree, "__tree_fields__")
+    return hasattr(tree, "__treeclass_structure__")
 
 
 def is_treeclass_leaf_bool(node):
@@ -93,8 +93,8 @@ def sequential_tree_shape_eval(tree, array):
 
     # all dynamic/static leaves
     all_leaves = (
-        *tree.__tree_fields__[0].values(),
-        *tree.__tree_fields__[1].values(),
+        *tree.__treeclass_structure__[0].values(),
+        *tree.__treeclass_structure__[1].values(),
     )
     leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
 
