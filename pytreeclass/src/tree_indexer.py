@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools as ft
 from collections.abc import Callable
-from types import MethodType
 from typing import Any
 
 import jax
@@ -330,21 +329,26 @@ class treeIndexer:
             def _(mask_self, arg):
                 class opIndexer:
                     def __call__(op_self, *args, **kwargs):
-                        cur_attr = getattr(self, arg)
-                        assert isinstance(
-                            cur_attr, MethodType
-                        ), f"Call requires self class method. Found {arg}"
-
                         new_self = tree_copy(self)
-                        value = getattr(new_self, arg).__call__(*args, **kwargs)
+                        cur_attr = getattr(new_self, arg)
+
+                        object.__setattr__(new_self, "__immutable_treeclass__", False)
+                        value = cur_attr(*args, **kwargs)
+                        object.__setattr__(new_self, "__immutable_treeclass__", True)
+
                         return value, new_self
 
                     def set(op_self, set_value):
-                        getattr(self, arg)
-
+                        getattr(self, arg)  # check if attribute already defined
                         new_self = tree_copy(self)
                         object.__setattr__(new_self, arg, set_value)
                         return new_self
+
+                    def freeze(op_self):
+                        return self.at[arg].set(getattr(self, arg).freeze())
+
+                    def unfreeze(op_self):
+                        return self.at[arg].set(getattr(self, arg).unfreeze())
 
                 return opIndexer()
 

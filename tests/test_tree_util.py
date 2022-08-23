@@ -61,8 +61,8 @@ def test__node_count_and_size():
     assert hash(x())
 
     xx = x()
-    xx.cc = 1
-    assert xx.cc == 1
+    # xx.cc = 1
+    # assert xx.cc == 1
     xx = xx.freeze()
 
     with pytest.raises(ValueError):

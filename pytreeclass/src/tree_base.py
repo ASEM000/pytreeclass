@@ -76,6 +76,10 @@ class treeBase:
         """
         return True if hasattr(self, "__frozen_fields__") else False
 
+    @property
+    def immutable(self) -> bool:
+        return True if hasattr(self, "__immutable_treeclass__") else False
+
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
 
@@ -141,6 +145,7 @@ class treeBase:
         """Dictionary representation of dataclass_fields"""
         dynamic, static = self.__tree_fields__
         static.pop("__treeclass_fields__", None)
+        static.pop("__immutable_treeclass__", None)
         return {
             **dynamic,
             **jtu.tree_map(
@@ -194,10 +199,9 @@ class treeBase:
         # to avoid redefining them as dataclass fields.
 
         # register *all* dataclass fields
-        all_fields = {
-            **self.__dataclass_fields__,
-            **self.__dict__.get("__treeclass_fields__", {}),
-        }
+        treeclass_fields = self.__dict__.get("__treeclass_fields__", {})
+
+        all_fields = {**self.__dataclass_fields__, **treeclass_fields}
 
         for fi in all_fields.values():
             # field value is defined in class dict
@@ -216,7 +220,10 @@ class treeBase:
             else:
                 dynamic[fi.name] = value
 
-        static["__treeclass_fields__"] = self.__dict__.get("__treeclass_fields__", {})
+        static["__treeclass_fields__"] = treeclass_fields
+        static["__immutable_treeclass__"] = self.__dict__.get(
+            "__immutable_treeclass__", False
+        )
 
         return (dynamic, static)
 

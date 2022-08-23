@@ -864,5 +864,5 @@ def test_method_call():
     with pytest.raises(AttributeError):
         t.at["bla"]()
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(TypeError):
         t.at["a"]()

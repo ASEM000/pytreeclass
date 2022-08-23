@@ -45,7 +45,7 @@ def test_freezing_unfreezing():
         d: A = A(1, 2)
 
     a = B()
-    a.d = a.d.freeze()
+    a = a.at["d"].freeze()  # = a.d.freeze()
     assert a.d.frozen is True
     assert (
         pytc.tree_viz.tree_diagram(a)
@@ -75,7 +75,7 @@ def test_freezing_unfreezing():
         d: A = A(1, 2)
 
     a = B()
-    a.d = a.d.freeze()
+    a = a.at["d"].freeze()
     assert a.d.frozen is True
     assert (
         pytc.tree_viz.tree_diagram(a)
@@ -247,7 +247,8 @@ def test_freezing_unfreezing():
     with pytest.raises(ValueError):
         t.freeze().a = 1
 
-    t.unfreeze().a = 1
+    with pytest.raises(ValueError):
+        t.unfreeze().a = 1
 
     hash(t)
 
