@@ -261,19 +261,19 @@ def test_freezing_unfreezing():
     class Test:
         a: int
 
-    t = Test(100).freeze()
+    # t = Test(100).freeze()
 
-    with pytest.raises(ValueError):
-        t.at[...].set(0)
+    # with pytest.raises(ValueError):
+    #     t.at[...].set(0)
 
-    with pytest.raises(ValueError):
-        t.at[...].apply(lambda x: x + 1)
+    # with pytest.raises(ValueError):
+    #     t.at[...].apply(lambda x: x + 1)
 
-    with pytest.raises(ValueError):
-        t.at[...].reduce(jnp.sin)
+    # with pytest.raises(ValueError):
+    #     t.at[...].reduce(jnp.sin)
 
-    with pytest.raises(ValueError):
-        t.at[...].static()
+    # with pytest.raises(ValueError):
+    #     t.at[...].static()
 
     class T:
         pass

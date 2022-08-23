@@ -517,22 +517,6 @@ def test_apply_and_its_derivatives():
     rhs = init.at[init != "a"].divide(2.0)
     assert is_treeclass_equal(lhs, rhs)
 
-    # raise
-    with pytest.raises(ValueError):
-        init.freeze().at[init == "a"].apply(lambda x: x**2)
-
-    with pytest.raises(ValueError):
-        init.freeze().at[(init == "a") | (A == "b")].apply(lambda x: x**2)
-
-    with pytest.raises(ValueError):
-        init.freeze().at[(init == "a") | (A == "b")].set(0)
-
-    with pytest.raises(ValueError):
-        init.freeze().at[(init == init) | (A == "b")].set(0)
-
-    with pytest.raises(ValueError):
-        init.freeze().at[(init == init) | (A == "b")].reduce_sum()
-
     @pytc.treeclass
     class Test:
         a: float = field(metadata={"name": "a", "unit": "m"})

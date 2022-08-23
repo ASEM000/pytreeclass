@@ -256,31 +256,21 @@ class treeIndexer:
                         return ft.partial(_at_get, where=arg)(tree=self, **kwargs)
 
                     def set(op_self, set_value, **kwargs):
-                        if self.frozen:
-                            raise ValueError("Cannot set to a frozen treeclass.")
                         return ft.partial(_at_set, where=arg)(
                             tree=self, set_value=set_value, **kwargs
                         )
 
                     def apply(op_self, func, **kwargs):
-                        if self.frozen:
-                            raise ValueError("Cannot apply to a frozen treeclass.")
                         return ft.partial(_at_apply, where=arg)(
                             tree=self, func=func, **kwargs
                         )
 
                     def reduce(op_self, func, **kwargs):
-                        if self.frozen:
-                            raise ValueError("Cannot reduce to a frozen treeclass.")
                         return ft.partial(_at_reduce, where=arg)(
                             tree=self, func=func, **kwargs
                         )
 
                     def static(op_self, **kwargs):
-                        if self.frozen:
-                            raise ValueError(
-                                "Cannot apply static to a frozen treeclass."
-                            )
                         return ft.partial(_at_static, where=arg)(tree=self, **kwargs)
 
                     # derived methods
