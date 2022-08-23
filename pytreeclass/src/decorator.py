@@ -16,7 +16,6 @@ class ImmutableInstanceError(Exception):
 
 
 def _immutate_treeclass(cls):
-
     cls.__immutable_treeclass__ = False
     mutable_setattr = cls.__setattr__
 
@@ -28,18 +27,17 @@ def _immutate_treeclass(cls):
 
         mutable_setattr(self, key, value)
 
-    def execute_post_init(func):
+    def post_execute(func):
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             func(self, *args, **kwargs)
-
             # post inititialization
             object.__setattr__(self, "__immutable_treeclass__", True)
 
         return wrapper
 
     cls.__setattr__ = immutable_setattr
-    cls.__init__ = execute_post_init(cls.__init__)
+    cls.__init__ = post_execute(cls.__init__)
 
     return cls
 
