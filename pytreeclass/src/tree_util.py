@@ -48,10 +48,14 @@ def is_treeclass_leaf_bool(node):
 def is_treeclass_leaf(tree):
     """assert if a node is treeclass leaf"""
     if is_treeclass(tree):
-        fields = tree.__dataclass_fields__.values()
+
+        all_fields = {
+            **tree.__dataclass_fields__,
+            **tree.__dict__.get("__treeclass_fields__", {}),
+        }
 
         return is_treeclass(tree) and not any(
-            [is_treeclass(tree.__dict__[fi.name]) for fi in fields]
+            [is_treeclass(tree.__dict__[fi.name]) for fi in all_fields.values()]
         )
     else:
         return False
