@@ -192,3 +192,17 @@ def _unfreeze_nodes(tree):
         for kw, leaf in all_fields.items():
             _unfreeze_nodes(tree.__dict__[kw])
     return tree
+
+
+class mutableContext:
+    """Allow mutable behvior within this context"""
+
+    def __init__(self, instance):
+        assert is_treeclass(instance), "instance must be a treeclass"
+        self.instance = instance
+
+    def __enter__(self):
+        object.__setattr__(self.instance, "__immutable_treeclass__", False)
+
+    def __exit__(self, type_, value, traceback):
+        object.__setattr__(self.instance, "__immutable_treeclass__", True)
