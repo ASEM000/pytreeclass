@@ -105,7 +105,7 @@ def _append_math_eq_ne(func):
             def recurse(tree, where, **kwargs):
                 __all_fields__ = {
                     **tree.__dataclass_fields__,
-                    **tree.__dict__.get("__treeclass_fields__", {}),
+                    **tree.__treeclass_fields__,
                 }
                 for i, fld in enumerate(__all_fields__.values()):
 
@@ -135,7 +135,7 @@ def _append_math_eq_ne(func):
 
                 __all_fields__ = {
                     **tree.__dataclass_fields__,
-                    **tree.__dict__.get("__treeclass_fields__", {}),
+                    **tree.__treeclass_fields__,
                 }
                 for i, fld in enumerate(__all_fields__.values()):
 
@@ -173,7 +173,7 @@ def _append_math_eq_ne(func):
 
                 __all_fields__ = {
                     **tree.__dataclass_fields__,
-                    **tree.__dict__.get("__treeclass_fields__", {}),
+                    **tree.__treeclass_fields__,
                 }
                 for i, fld in enumerate(__all_fields__.values()):
 

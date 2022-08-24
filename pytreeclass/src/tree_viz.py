@@ -218,10 +218,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
         nonlocal ROWS, COUNT, SIZE
 
-        all_fields = {
-            **tree.__dataclass_fields__,
-            **tree.__dict__.get("__treeclass_fields__", {}),
-        }
+        all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
 
         for field_item in all_fields.values():
             node_item = tree.__dict__[field_item.name]
@@ -300,10 +297,7 @@ def tree_box(tree, array=None):
         else:
             level_nodes = []
 
-            all_fields = {
-                **tree.__dataclass_fields__,
-                **tree.__dict__.get("__treeclass_fields__", {}),
-            }
+            all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
 
             for fi in all_fields.values():
                 cur_node = tree.__dict__[fi.name]
@@ -410,10 +404,7 @@ def tree_diagram(tree):
     def _(tree, parent_level_count, is_frozen):
         nonlocal FMT
 
-        all_fields = {
-            **tree.__dataclass_fields__,
-            **tree.__dict__.get("__treeclass_fields__", {}),
-        }
+        all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
 
         leaves_count = len(all_fields)
 
@@ -496,10 +487,7 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
         is_treeclass(tree)
 
-        all_fields = {
-            **tree.__dataclass_fields__,
-            **tree.__dict__.get("__treeclass_fields__", {}),
-        }
+        all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
 
         leaves_count = len(all_fields)
         for i, fi in enumerate(all_fields.values()):
@@ -581,10 +569,7 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
         assert is_treeclass(tree)
 
-        all_fields = {
-            **tree.__dataclass_fields__,
-            **tree.__dict__.get("__treeclass_fields__", {}),
-        }
+        all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
 
         leaves_count = len(all_fields)
         for i, fi in enumerate(all_fields.values()):
@@ -648,10 +633,7 @@ def _tree_mermaid(tree):
         nonlocal FMT
         assert is_treeclass(tree)
 
-        all_fields = {
-            **tree.__dataclass_fields__,
-            **tree.__dict__.get("__treeclass_fields__", {}),
-        }
+        all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
 
         for i, fi in enumerate(all_fields.values()):
 

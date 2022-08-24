@@ -32,12 +32,12 @@ class treeBase:
         # register dataclass fields to instance dict
         # otherwise will raise undeclared error for non defined
         # init classes.
-        obj = super().__new__(cls)
-
+        self = super().__new__(cls)
+        object.__setattr__(self, "__treeclass_fields__", {})
         for field_item in cls.__dataclass_fields__.values():
             if field_item.default is not MISSING:
-                object.__setattr__(obj, field_item.name, field_item.default)
-        return obj
+                object.__setattr__(self, field_item.name, field_item.default)
+        return self
 
     @property
     def frozen(self) -> bool:
@@ -103,7 +103,7 @@ class treeBase:
         return new_cls
 
     def __hash__(self):
-        return hash(tuple(*jtu.tree_flatten(self)))
+        return hash(tuple(jtu.tree_leaves(self)))
 
     def asdict(self) -> dict[str, Any]:
         """Dictionary representation of dataclass_fields"""
@@ -121,10 +121,7 @@ class treeBase:
         self, node: Any, *, name: str, static: bool = False, repr: bool = True
     ) -> Any:
         """Add item to dataclass fields to bee seen by jax computations"""
-        all_fields = {
-            **self.__dataclass_fields__,
-            **self.__dict__.get("__treeclass_fields__", {}),
-        }
+        all_fields = {**self.__dataclass_fields__, **self.__treeclass_fields__}
 
         if name not in all_fields:
             # create field
@@ -134,7 +131,7 @@ class treeBase:
             object.__setattr__(field_value, "type", type(node))
 
             # register it to class
-            __treeclass_fields__ = self.__dict__.get("__treeclass_fields__", {})
+            __treeclass_fields__ = self.__treeclass_fields__
             __treeclass_fields__[name] = field_value
             object.__setattr__(self, "__treeclass_fields__", __treeclass_fields__)
             object.__setattr__(self, name, node)
@@ -163,9 +160,9 @@ class treeBase:
         # to avoid redefining them as dataclass fields.
 
         # register *all* dataclass fields
-        treeclass_fields = self.__dict__.get("__treeclass_fields__", {})
+        # treeclass_fields = self.__dict__.get("__treeclass_fields__", {})
 
-        all_fields = {**self.__dataclass_fields__, **treeclass_fields}
+        all_fields = {**self.__dataclass_fields__, **self.__treeclass_fields__}
 
         for fi in all_fields.values():
             # field value is defined in class dict
@@ -184,10 +181,8 @@ class treeBase:
             else:
                 dynamic[fi.name] = value
 
-        static["__treeclass_fields__"] = treeclass_fields
-        static["__immutable_treeclass__"] = self.__dict__.get(
-            "__immutable_treeclass__", False
-        )
+        static["__treeclass_fields__"] = self.__treeclass_fields__
+        static["__immutable_treeclass__"] = self.__immutable_treeclass__
 
         return (dynamic, static)
 
