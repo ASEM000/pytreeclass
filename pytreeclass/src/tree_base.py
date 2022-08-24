@@ -175,13 +175,6 @@ class treeBase:
         return (dynamic, static)
 
 
-class explicitTreeBase:
-    """ "Register  dataclass fields only"""
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        object.__setattr__(self, name, value)
-
-
 class implicitTreeBase:
     """Register dataclass fields and treeclass instance variables"""
 
