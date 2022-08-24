@@ -26,31 +26,33 @@ def treeclass(*args, **kwargs):
         base_classes = (dCls, treeBase)
         base_classes += (treeOpBase, treeIndexer)
         base_classes += (explicitTreeBase,) if field_only else (implicitTreeBase,)
-
         new_cls = type(cls.__name__, base_classes, {})
-
-        new_cls.__immutable_treeclass__ = False
-        mutable_setattr = new_cls.__setattr__
 
         def immutable_setattr(self, key, value):
             if self.__immutable_treeclass__:
                 raise ImmutableInstanceError(
-                    f"Cannot set {key} = {value}. Use `.at['{key}'].set({value})` instead."
+                    f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
                 )
-
+            # execute original setattr
             mutable_setattr(self, key, value)
 
         def immutate_post_method(func):
             @functools.wraps(func)
             def wrapper(self, *args, **kwargs):
-
+                # modify instance mutable behavior
+                object.__setattr__(self, "__immutable_treeclass__", False)
+                # execute `func` with mutable behavior
                 func(self, *args, **kwargs)
+                # set instance as immutable after `func` is executed.
                 object.__setattr__(self, "__immutable_treeclass__", True)
 
             return wrapper
 
+        mutable_setattr = new_cls.__setattr__
+        new_cls.__immutable_treeclass__ = True
         new_cls.__setattr__ = immutable_setattr
         new_cls.__init__ = immutate_post_method(new_cls.__init__)
+
         return jax.tree_util.register_pytree_node_class(new_cls)
 
     if len(args) == 1 and inspect.isclass(args[0]):

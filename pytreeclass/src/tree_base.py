@@ -77,8 +77,7 @@ class treeBase:
             New class instance
         """
 
-        new_cls = cls.__new__(cls)
-
+        new_cls = object.__new__(cls)
         tree_fields = treedef[1].get("__frozen_fields__", None)
 
         if tree_fields is not None:
@@ -87,19 +86,10 @@ class treeBase:
             attrs = {**dynamic, **static}
 
         else:
+            attrs = {**dict(zip(treedef[0], children)), **treedef[1]}
 
-            dynamic_vals, dynamic_keys = children, treedef[0]
-            static_keys, static_vals = treedef[1].keys(), treedef[1].values()
+        new_cls.__dict__.update(attrs)
 
-            attrs = dict(
-                zip(
-                    (*dynamic_keys, *static_keys),
-                    (*dynamic_vals, *static_vals),
-                )
-            )
-
-        for k, v in attrs.items():
-            object.__setattr__(new_cls, k, v)
         return new_cls
 
     def __hash__(self):
@@ -169,23 +159,19 @@ class treeBase:
 
         for fi in all_fields.values():
             # field value is defined in class dict
-            if fi.name in self.__dict__:
-                value = self.__dict__[fi.name]
+            if hasattr(self, fi.name):
+                value = getattr(self, fi.name)
             else:
                 # the user did not declare a variable defined in field
                 raise ValueError(f"field={fi.name} is not declared.")
 
-            excluded_by_meta = fi.metadata.get("static", False)
-            excluded_by_type = isinstance(value, static_value)
-
-            if excluded_by_type or excluded_by_meta:
+            if fi.metadata.get("static", False) or isinstance(value, static_value):
                 static[fi.name] = value
 
             else:
                 dynamic[fi.name] = value
 
         static["__treeclass_fields__"] = self.__treeclass_fields__
-        static["__immutable_treeclass__"] = self.__immutable_treeclass__
 
         return (dynamic, static)
 
