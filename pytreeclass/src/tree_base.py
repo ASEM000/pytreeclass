@@ -99,7 +99,6 @@ class treeBase:
         """Dictionary representation of dataclass_fields"""
         dynamic, static = self.__treeclass_structure__
         static.pop("__treeclass_fields__", None)
-        static.pop("__immutable_treeclass__", None)
         return {
             **dynamic,
             **jtu.tree_map(
