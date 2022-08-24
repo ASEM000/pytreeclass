@@ -121,22 +121,22 @@ class treeBase:
         self, node: Any, *, name: str, static: bool = False, repr: bool = True
     ) -> Any:
         """Add item to dataclass fields to bee seen by jax computations"""
-        all_fields = {**self.__dataclass_fields__, **self.__treeclass_fields__}
+        if hasattr(self, name) and (
+            name in self.__dataclass_fields__ or name in self.__treeclass_fields__
+        ):
+            return getattr(self, name)
 
-        if name not in all_fields:
-            # create field
-            field_value = field(repr=repr, metadata={"static": static})
+        # create field
+        field_value = field(repr=repr, metadata={"static": static})
 
-            object.__setattr__(field_value, "name", name)
-            object.__setattr__(field_value, "type", type(node))
+        object.__setattr__(field_value, "name", name)
+        object.__setattr__(field_value, "type", type(node))
 
-            # register it to class
-            __treeclass_fields__ = self.__treeclass_fields__
-            __treeclass_fields__[name] = field_value
-            object.__setattr__(self, "__treeclass_fields__", __treeclass_fields__)
-            object.__setattr__(self, name, node)
+        # register it to class
+        self.__treeclass_fields__.update({name: field_value})
+        object.__setattr__(self, name, node)
 
-        return self.__dict__[name]
+        return getattr(self, name)
 
     def __repr__(self):
         return tree_repr(self)
@@ -153,14 +153,17 @@ class treeBase:
     def tree_box(self, array: jnp.ndarray = None) -> str:
         return tree_box(self, array)
 
-    def __generate_tree_fields__(self) -> tuple[dict[str, Any], dict[str, Any]]:
-        dynamic, static = fieldDict(), fieldDict()
-        # register other variables defined in other context
-        # if their value is an instance of treeclass
-        # to avoid redefining them as dataclass fields.
+    @property
+    def __treeclass_structure__(self):
+        """Computes the dynamic and static fields.
 
-        # register *all* dataclass fields
-        # treeclass_fields = self.__dict__.get("__treeclass_fields__", {})
+        Returns:
+            Pair of dynamic and static dictionaries.
+        """
+        if self.__dict__.get("__frozen_fields__", None) is not None:
+            return self.__frozen_fields__
+
+        dynamic, static = fieldDict(), fieldDict()
 
         all_fields = {**self.__dataclass_fields__, **self.__treeclass_fields__}
 
@@ -190,18 +193,6 @@ class treeBase:
 class explicitTreeBase:
     """ "Register  dataclass fields only"""
 
-    @property
-    def __treeclass_structure__(self):
-        """Computes the dynamic and static fields.
-
-        Returns:
-            Pair of dynamic and static dictionaries.
-        """
-        if self.__dict__.get("__frozen_fields__", None) is not None:
-            return self.__frozen_fields__
-        else:
-            return self.__generate_tree_fields__()
-
     def __setattr__(self, name: str, value: Any) -> None:
         object.__setattr__(self, name, value)
 
@@ -209,43 +200,20 @@ class explicitTreeBase:
 class implicitTreeBase:
     """Register dataclass fields and treeclass instance variables"""
 
-    def __register_treeclass_instance_variables__(self) -> None:
-
-        __treeclass_fields__ = {}
-
-        for var_name, var_value in self.__dict__.items():
-            # check if a variable in self.__dict__ is treeclass
-            # that is not defined in fields
-            if (
-                isinstance(var_name, str)
-                and is_treeclass(var_value)
-                and var_name not in self.__dataclass_fields__
-            ):
-
-                field_value = field()
-
-                object.__setattr__(field_value, "name", var_name)
-                object.__setattr__(field_value, "type", type(var_value))
-
-                # register it to class
-                __treeclass_fields__.update({var_name: field_value})
-
-        if len(__treeclass_fields__) > 0:
-            object.__setattr__(self, "__treeclass_fields__", __treeclass_fields__)
-
     def __setattr__(self, name: str, value: Any) -> None:
+
+        if (
+            (is_treeclass(value))
+            and (name not in self.__dataclass_fields__)
+            and (name not in self.__treeclass_fields__)
+        ):
+            # create field
+            field_value = field(repr=repr)
+
+            object.__setattr__(field_value, "name", name)
+            object.__setattr__(field_value, "type", type(value))
+
+            # register it to class
+            self.__treeclass_fields__.update({name: field_value})
+
         object.__setattr__(self, name, value)
-        self.__register_treeclass_instance_variables__()
-
-    @property
-    def __treeclass_structure__(self):
-        """Computes the dynamic and static fields.
-
-        Returns:
-            Pair of dynamic and static dictionaries.
-        """
-        if self.__dict__.get("__frozen_fields__", None) is not None:
-            return self.__frozen_fields__
-
-        else:
-            return self.__generate_tree_fields__()

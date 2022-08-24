@@ -167,7 +167,7 @@ def _freeze_nodes(tree):
 
         all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
 
-        for kw, leaf in all_fields.items():
+        for kw in all_fields:
             _freeze_nodes(tree.__dict__[kw])
     return tree
 
@@ -183,7 +183,7 @@ def _unfreeze_nodes(tree):
             **tree.__treeclass_fields__,
         }
 
-        for kw, leaf in all_fields.items():
+        for kw in all_fields:
             _unfreeze_nodes(tree.__dict__[kw])
     return tree
 
