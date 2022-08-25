@@ -1,11 +1,11 @@
 import jax
 import jax.numpy as jnp
 
-from pytreeclass import tree_viz, treeclass
+import pytreeclass as pytc
 
 
 def test_node():
-    @treeclass
+    @pytc.treeclass
     class Linear:
 
         weight: jnp.ndarray
@@ -20,7 +20,7 @@ def test_node():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @treeclass
+    @pytc.treeclass
     class MLP:
         def __init__(self, layers, key=jax.random.PRNGKey(0)):
 
@@ -44,7 +44,7 @@ def test_node():
     model = MLP(layers=[1, 128, 128, 1])
     x = jnp.linspace(0, 1, 100)[:, None]
     y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
-    print(tree_viz.tree_diagram(model))
+    print(pytc.tree_viz.tree_diagram(model))
 
     # leaves,treedef=jax.tree_flatten(model)
     def loss_func(model, x, y):
@@ -54,7 +54,7 @@ def test_node():
     def update(model, x, y):
         value, grads = jax.value_and_grad(loss_func)(model, x, y)
         # no need to use `jax.tree_map` to update the model
-        #  as it model is wrapped by @treeclass
+        #  as it model is wrapped by @pytc.treeclass
         return value, model - 1e-3 * grads
 
     for _ in range(1, 10_001):

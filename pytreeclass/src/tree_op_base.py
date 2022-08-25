@@ -193,13 +193,6 @@ def _append_math_eq_ne(func):
     return wrapper
 
 
-def _append_exception(func):
-    def exception(*args, **kwargs):
-        raise Exception(f"{func} is not supported.")
-
-    return exception
-
-
 class treeOpBase:
 
     __abs__ = _append_math_op(op.abs)
