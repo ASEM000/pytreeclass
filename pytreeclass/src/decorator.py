@@ -6,13 +6,10 @@ from dataclasses import dataclass
 
 import jax
 
+from pytreeclass.src.exceptions import ImmutableInstanceError
 from pytreeclass.src.tree_base import implicitTreeBase, treeBase
 from pytreeclass.src.tree_indexer import treeIndexer
 from pytreeclass.src.tree_op_base import treeOpBase
-
-
-class ImmutableInstanceError(Exception):
-    pass
 
 
 def treeclass(*args, **kwargs):

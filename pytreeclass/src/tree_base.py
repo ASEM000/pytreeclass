@@ -18,7 +18,7 @@ from pytreeclass.src.tree_viz import (
 PyTree = Any
 
 
-class fieldDict(dict):
+class field_dict(dict):
     # dict will throw
     # `ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()``
     # while this implementation will not.
@@ -120,12 +120,12 @@ class treeBase:
         # create field
         field_value = field(repr=repr, metadata={"static": static})
 
-        object.__setattr__(field_value, "name", name)
-        object.__setattr__(field_value, "type", type(node))
+        setattr(field_value, "name", name)
+        setattr(field_value, "type", type(node))
 
         # register it to class
         self.__treeclass_fields__.update({name: field_value})
-        object.__setattr__(self, name, node)
+        setattr(self, name, node)
 
         return getattr(self, name)
 
@@ -154,7 +154,7 @@ class treeBase:
         if self.__dict__.get("__frozen_fields__", None) is not None:
             return self.__frozen_fields__
 
-        dynamic, static = fieldDict(), fieldDict()
+        dynamic, static = field_dict(), field_dict()
 
         for fi in self.__treeclass_fields__.values():
             # field value is defined in class dict
@@ -182,7 +182,7 @@ class implicitTreeBase:
 
         if (is_treeclass(value)) and (name not in self.__treeclass_fields__):
             # create field
-            field_value = field(repr=repr)
+            field_value = field()
 
             object.__setattr__(field_value, "name", name)
             object.__setattr__(field_value, "type", type(value))

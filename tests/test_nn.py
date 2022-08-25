@@ -179,7 +179,7 @@ def test_compact_nn():
         return value, model - 1e-3 * grads
 
     # initialize the model
-    model(x)
+    _, model = model.at["__call__"](x)
 
     for _ in range(1, 10_001):
         value, model = update(model, x, y)
