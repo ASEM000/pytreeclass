@@ -29,12 +29,15 @@ class fieldDict(dict):
 
 class treeBase:
     def __new__(cls, *args, **kwargs):
+
+        self = super().__new__(cls)
+
+        object.__setattr__(self, "__treeclass_fields__", cls.__dataclass_fields__)
+
         # register dataclass fields to instance dict
         # otherwise will raise undeclared error for non defined
         # init classes.
-        self = super().__new__(cls)
-        object.__setattr__(self, "__treeclass_fields__", {})
-        for field_item in cls.__dataclass_fields__.values():
+        for field_item in self.__treeclass_fields__.values():
             if field_item.default is not MISSING:
                 object.__setattr__(self, field_item.name, field_item.default)
         return self
@@ -99,6 +102,7 @@ class treeBase:
         """Dictionary representation of dataclass_fields"""
         dynamic, static = self.__treeclass_structure__
         static.pop("__treeclass_fields__", None)
+        static.pop("__immutable_treeclass__", None)
         return {
             **dynamic,
             **jtu.tree_map(
@@ -110,9 +114,7 @@ class treeBase:
         self, node: Any, *, name: str, static: bool = False, repr: bool = True
     ) -> Any:
         """Add item to dataclass fields to bee seen by jax computations"""
-        if hasattr(self, name) and (
-            name in self.__dataclass_fields__ or name in self.__treeclass_fields__
-        ):
+        if hasattr(self, name) and (name in self.__treeclass_fields__):
             return getattr(self, name)
 
         # create field
@@ -154,9 +156,7 @@ class treeBase:
 
         dynamic, static = fieldDict(), fieldDict()
 
-        all_fields = {**self.__dataclass_fields__, **self.__treeclass_fields__}
-
-        for fi in all_fields.values():
+        for fi in self.__treeclass_fields__.values():
             # field value is defined in class dict
             if hasattr(self, fi.name):
                 value = getattr(self, fi.name)
@@ -180,11 +180,7 @@ class implicitTreeBase:
 
     def __setattr__(self, name: str, value: Any) -> None:
 
-        if (
-            (is_treeclass(value))
-            and (name not in self.__dataclass_fields__)
-            and (name not in self.__treeclass_fields__)
-        ):
+        if (is_treeclass(value)) and (name not in self.__treeclass_fields__):
             # create field
             field_value = field(repr=repr)
 

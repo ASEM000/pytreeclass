@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import functools
+import functools as ft
 import inspect
 from dataclasses import dataclass
 
@@ -37,7 +37,7 @@ def treeclass(*args, **kwargs):
             mutable_setattr(self, key, value)
 
         def immutate_post_method(func):
-            @functools.wraps(func)
+            @ft.wraps(func)
             def wrapper(self, *args, **kwargs):
                 # modify instance mutable behavior
                 object.__setattr__(self, "__immutable_treeclass__", False)
@@ -60,4 +60,4 @@ def treeclass(*args, **kwargs):
 
     elif len(args) == 0 and len(kwargs) > 0:
         field_only = kwargs.get("field_only", False)
-        return functools.partial(class_wrapper, field_only=field_only)
+        return ft.partial(class_wrapper, field_only=field_only)
