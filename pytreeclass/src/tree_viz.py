@@ -10,13 +10,13 @@ import requests
 
 import pytreeclass
 from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.misc import static_value
 from pytreeclass.src.tree_util import (
     _reduce_count_and_size,
     is_treeclass,
     is_treeclass_leaf,
     is_treeclass_non_leaf,
     sequential_tree_shape_eval,
-    static_value,
 )
 from pytreeclass.src.tree_viz_util import (
     _format_count,

@@ -1,6 +1,6 @@
 from .src import tree_util, tree_viz
 from .src.decorator import treeclass
-from .src.tree_util import static_field, static_value
+from .src.misc import static_field, static_value
 
 __all__ = (
     "tree_viz",

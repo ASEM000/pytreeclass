@@ -10,7 +10,7 @@ from jax import numpy as jnp
 
 import pytreeclass as pytc
 from pytreeclass import tree_viz
-from pytreeclass.src.tree_util import static_field, static_value
+from pytreeclass.src.misc import static_field, static_value
 from pytreeclass.src.tree_viz_util import _resolve_line
 
 

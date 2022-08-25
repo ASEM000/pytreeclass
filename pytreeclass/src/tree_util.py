@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import sys
-from dataclasses import field
 from typing import Any
 
 import jax
@@ -10,25 +9,9 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass.src.tree_viz_util import _format_node_repr, _format_node_str
+from pytreeclass.src.misc import static_value
 
 PyTree = Any
-
-
-class static_value:
-    def __init__(self, value):
-        self.value = value
-
-    def __repr__(self):
-        return f"*{_format_node_repr(self.value,0)}"
-
-    def __str__(self):
-        return f"*{_format_node_str(self.value,0)}"
-
-
-def static_field(**kwargs):
-    """ignore from pytree computations"""
-    return field(**{**kwargs, **{"metadata": {"static": True}}})
 
 
 def is_treeclass(tree):

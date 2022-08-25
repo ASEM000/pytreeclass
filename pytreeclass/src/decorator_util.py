@@ -63,5 +63,5 @@ def dispatch(*args, **kwargs):
     elif len(args) == 0 and len(kwargs) > 0:
         # @dispatch(argnum=...)
         # def f(..):
-        argnum = kwargs["argnum"] if "argnum" in kwargs else 0
+        argnum = kwargs.get("argnum", 0)
         return ft.partial(dispatch_wrapper, argnum=argnum)

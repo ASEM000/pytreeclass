@@ -2,12 +2,11 @@ import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.exceptions import ImmutableInstanceError
+from pytreeclass.src.misc import ImmutableInstanceError
 from pytreeclass.src.tree_util import (
     _node_count_and_size,
     is_treeclass,
     is_treeclass_leaf,
-    mutableContext,
 )
 
 
@@ -70,26 +69,3 @@ def test__node_count_and_size():
         xx.test = 1
 
     assert _node_count_and_size("string") == (complex(0, 0), complex(0, 0))
-
-
-def test_mutable_context():
-    @pytc.treeclass
-    class Test:
-        x: int
-
-        def __init__(self, x):
-            self.x = x
-
-    t = Test(1)
-
-    with mutableContext(t):
-        t.a = 12
-
-    assert getattr(t, "a") == 12
-
-    with pytest.raises(ImmutableInstanceError):
-        t.a = 100
-
-    with pytest.raises(AssertionError):
-        with mutableContext(1):
-            pass

@@ -7,7 +7,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass.src.tree_util import static_value
+from pytreeclass.src.misc import static_value
 
 
 def test_jit_freeze():

@@ -6,7 +6,8 @@ from typing import Any
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass.src.tree_util import is_treeclass, static_value
+from pytreeclass.src.misc import static_value
+from pytreeclass.src.tree_util import is_treeclass
 from pytreeclass.src.tree_viz import (
     tree_box,
     tree_diagram,
@@ -18,7 +19,7 @@ from pytreeclass.src.tree_viz import (
 PyTree = Any
 
 
-class field_dict(dict):
+class fieldDict(dict):
     # dict will throw
     # `ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()``
     # while this implementation will not.
@@ -154,7 +155,7 @@ class treeBase:
         if self.__dict__.get("__frozen_fields__", None) is not None:
             return self.__frozen_fields__
 
-        dynamic, static = field_dict(), field_dict()
+        dynamic, static = fieldDict(), fieldDict()
 
         for fi in self.__treeclass_fields__.values():
             # field value is defined in class dict

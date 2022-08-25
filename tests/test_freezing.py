@@ -7,13 +7,8 @@ import numpy as np
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.exceptions import ImmutableInstanceError
-from pytreeclass.src.tree_util import (
-    _freeze_nodes,
-    _unfreeze_nodes,
-    is_treeclass_equal,
-    static_value,
-)
+from pytreeclass.src.misc import ImmutableInstanceError, static_value
+from pytreeclass.src.tree_util import _freeze_nodes, _unfreeze_nodes, is_treeclass_equal
 
 
 def test_freezing_unfreezing():

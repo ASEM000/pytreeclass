@@ -6,6 +6,8 @@ import jax.tree_util as jtu
 
 from pytreeclass.src.decorator_util import dispatch
 
+# from pytreeclass.src.tree_util import static_field
+
 
 @ft.partial(ft.partial, jtu.tree_map)
 def is_inexact_array(node) -> bool:

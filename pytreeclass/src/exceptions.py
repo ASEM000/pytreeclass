@@ -1,2 +1,0 @@
-class ImmutableInstanceError(Exception):
-    pass

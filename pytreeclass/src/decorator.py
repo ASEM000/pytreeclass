@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import functools as ft
 import inspect
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 import jax
 
-from pytreeclass.src.exceptions import ImmutableInstanceError
+from pytreeclass.src.misc import ImmutableInstanceError
 from pytreeclass.src.tree_base import implicitTreeBase, treeBase
 from pytreeclass.src.tree_indexer import treeIndexer
 from pytreeclass.src.tree_op_base import treeOpBase
@@ -58,3 +59,13 @@ def treeclass(*args, **kwargs):
     elif len(args) == 0 and len(kwargs) > 0:
         field_only = kwargs.get("field_only", False)
         return ft.partial(class_wrapper, field_only=field_only)
+
+
+def static_field(**kwargs):
+    """ignore from pytree computations"""
+    return field(**{**kwargs, **{"metadata": {"static": True}}})
+
+
+@treeclass
+class staticValue:
+    value: Any = static_field()

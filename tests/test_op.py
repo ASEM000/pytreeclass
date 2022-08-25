@@ -2,8 +2,8 @@ import jax.numpy as jnp
 import pytest
 
 from pytreeclass import treeclass
+from pytreeclass.src.misc import static_value
 from pytreeclass.src.tree_op_base import _dispatched_op_tree_map
-from pytreeclass.src.tree_util import static_value
 
 
 @treeclass
