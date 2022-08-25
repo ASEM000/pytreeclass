@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import functools
+import functools as ft
 import inspect
 
 """ Porting utils """
@@ -18,7 +18,7 @@ class cached_property:
 
 
 def dispatch(*args, **kwargs):
-    """functools.singledispatch with option of choosing the position of the dispatched argument
+    """ft.singledispatch with option of choosing the position of the dispatched argument
     or keyword argument.
 
     For multiple dispatch use the following pattern
@@ -37,7 +37,7 @@ def dispatch(*args, **kwargs):
 
     def dispatch_wrapper(func, argnum: int | str = 0):
         """singledispatch by arg position/kw arg name"""
-        dispatcher = functools.singledispatch(func)
+        dispatcher = ft.singledispatch(func)
 
         def wrapper(*ar, **kw):
             if isinstance(argnum, int):
@@ -52,7 +52,7 @@ def dispatch(*args, **kwargs):
                 raise ValueError("argnum must be int or str")
 
         wrapper.register = dispatcher.register
-        functools.update_wrapper(wrapper, func)
+        ft.update_wrapper(wrapper, func)
         return wrapper
 
     if len(args) == 1 and inspect.isfunction(args[0]):
@@ -64,4 +64,4 @@ def dispatch(*args, **kwargs):
         # @dispatch(argnum=...)
         # def f(..):
         argnum = kwargs["argnum"] if "argnum" in kwargs else 0
-        return functools.partial(dispatch_wrapper, argnum=argnum)
+        return ft.partial(dispatch_wrapper, argnum=argnum)

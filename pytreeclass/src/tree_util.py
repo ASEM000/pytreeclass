@@ -48,10 +48,11 @@ def is_treeclass_leaf(tree):
     """assert if a node is treeclass leaf"""
     if is_treeclass(tree):
 
-        all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
-
         return is_treeclass(tree) and not any(
-            [is_treeclass(tree.__dict__[fi.name]) for fi in all_fields.values()]
+            [
+                is_treeclass(tree.__dict__[fi.name])
+                for fi in tree.__treeclass_fields__.values()
+            ]
         )
     else:
         return False
@@ -164,10 +165,7 @@ def _freeze_nodes(tree):
     """inplace freezing"""
     if is_treeclass(tree):
         object.__setattr__(tree, "__frozen_fields__", None)
-
-        all_fields = {**tree.__dataclass_fields__, **tree.__treeclass_fields__}
-
-        for kw in all_fields:
+        for kw in tree.__treeclass_fields__:
             _freeze_nodes(tree.__dict__[kw])
     return tree
 
@@ -177,13 +175,7 @@ def _unfreeze_nodes(tree):
     if is_treeclass(tree):
         if hasattr(tree, "__frozen_fields__"):
             object.__delattr__(tree, "__frozen_fields__")
-
-        all_fields = {
-            **tree.__dataclass_fields__,
-            **tree.__treeclass_fields__,
-        }
-
-        for kw in all_fields:
+        for kw in tree.__treeclass_fields__:
             _unfreeze_nodes(tree.__dict__[kw])
     return tree
 
