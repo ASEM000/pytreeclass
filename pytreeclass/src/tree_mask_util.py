@@ -64,3 +64,7 @@ def logical_and(lhs, rhs):
         return jnp.logical_and(x, y)
 
     return and_func(lhs, rhs)
+
+
+def where(cond, x, y):
+    return cond.at[cond].set(x).at[logical_not(cond)].set(y)

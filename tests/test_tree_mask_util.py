@@ -2,13 +2,16 @@ import jax.numpy as jnp
 import numpy.testing as npt
 import pytest
 
+import pytreeclass as pytc
 from pytreeclass.src.tree_mask_util import (
     is_inexact,
     is_inexact_array,
     logical_and,
     logical_not,
     logical_or,
+    where,
 )
+from pytreeclass.src.tree_util import is_treeclass_equal
 
 
 def test_is_inexact_array():
@@ -63,3 +66,15 @@ def test_logical_and():
 
     with pytest.raises(ValueError):
         logical_and([True, jnp.array([1, 2, 3])], [True, False])
+
+
+def test_where():
+    @pytc.treeclass
+    class Test:
+        a: int
+        b: jnp.ndarray
+
+    assert is_treeclass_equal(
+        where(Test(1, jnp.array([1, 2, 3])) > 1, 100, 0),
+        Test(0, jnp.array([0, 100, 100])),
+    )
