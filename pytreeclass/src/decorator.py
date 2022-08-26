@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools as ft
 import inspect
 from dataclasses import dataclass
+from types import FunctionType
 
 import jax
 
@@ -12,28 +13,35 @@ from pytreeclass.src.tree_indexer import _treeIndexer
 from pytreeclass.src.tree_op_base import _treeOpBase
 
 
+def mutable(instance_method):
+    """decorator that allow mutable behvior"""
+    assert isinstance(
+        instance_method, FunctionType
+    ), f"mutable can only be applied to methods. Found{type(instance_method)}"
+
+    @ft.wraps(instance_method)
+    def mutable_method(self, *args, **kwargs):
+        with mutableContext(self):
+            # return before exiting the context
+            # will lead to mutable behavior
+            return instance_method(self, *args, **kwargs)
+
+    return mutable_method
+
+
 def treeclass(*args, **kwargs):
+    def immutable_setattr(mutable_setattr):
+        def wrapper(self, key, value):
+            if self.__immutable_treeclass__:
+                raise ImmutableInstanceError(
+                    f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
+                )
+            # execute original setattr
+            mutable_setattr(self, key, value)
+
+        return wrapper
+
     def class_wrapper(cls, field_only: bool):
-        def immutable_setattr(mutable_setattr):
-            def wrapper(self, key, value):
-                if self.__immutable_treeclass__:
-                    raise ImmutableInstanceError(
-                        f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
-                    )
-                # execute original setattr
-                mutable_setattr(self, key, value)
-
-            return wrapper
-
-        def immutate_post_method(func):
-            @ft.wraps(func)
-            def wrapper(self, *args, **kwargs):
-                # execute `func` with mutable behavior
-                with mutableContext(self):
-                    func(self, *args, **kwargs)
-
-            return wrapper
-
         user_defined_init = "__init__" in cls.__dict__
         dCls = dataclass(init=not user_defined_init, repr=False, eq=False)(cls)
 
@@ -44,7 +52,7 @@ def treeclass(*args, **kwargs):
         mutable_setattr = new_cls.__setattr__
         new_cls.__immutable_treeclass__ = True
         new_cls.__setattr__ = immutable_setattr(mutable_setattr)
-        new_cls.__init__ = immutate_post_method(new_cls.__init__)
+        new_cls.__init__ = mutable(new_cls.__init__)
 
         return jax.tree_util.register_pytree_node_class(new_cls)
 

@@ -137,7 +137,7 @@ PyTree = Any
 
 
 def tree_summary(tree, array: jnp.ndarray = None) -> str:
-
+    EXCLUDED_TYPES = (src.misc.static,)
     _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
 
     if array is not None:
@@ -216,7 +216,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                         [
                             f"{k}={_format_node(v)}"
                             for k, v in node_item.__pytree_structure__[0].items()
-                            if not isinstance(v, src.misc.static)
+                            if not isinstance(v, EXCLUDED_TYPES)
                         ]
                     ),
                 ]
@@ -466,6 +466,7 @@ def tree_repr(tree, width: int = 40) -> str:
         """format treeclass field"""
         nonlocal FMT
         if field_item.repr:
+            is_frozen = node_item.frozen
             is_static_field = field_item.metadata.get("static", False)
             mark = "*" if is_static_field else ("#" if is_frozen else "")
 
@@ -547,6 +548,7 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
+            is_frozen = node_item.frozen
             is_static_field = field_item.metadata.get("static", False)
             mark = "*" if is_static_field else ("#" if is_frozen else "")
 
