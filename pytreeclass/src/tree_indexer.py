@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import jax.numpy as jnp
@@ -272,10 +273,18 @@ def _at_static(tree, where, **kwargs):
     return __at_static(tree, where, **kwargs)
 
 
+PyTree = Any
+
+
+@dataclass
 class _pyTreeIndexer:
-    def __init__(self, tree, where):
-        self.tree = tree
-        self.where = where
+    tree: PyTree
+    where: PyTree
+
+    def __post_init__(self):
+        assert all(
+            is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(self.where)
+        ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(self.where)}"
 
     def get(self, **kwargs):
         return ft.partial(_at_get, where=self.where)(tree=self.tree, **kwargs)
@@ -343,10 +352,10 @@ class _pyTreeIndexer:
     #     )
 
 
+@dataclass
 class _strIndexer:
-    def __init__(self, tree, where):
-        self.tree = tree
-        self.where = where
+    tree: PyTree
+    where: str
 
     def get(self):
         return getattr(self.tree, self.where)
@@ -358,6 +367,7 @@ class _strIndexer:
 
         new_self = tree_copy(self.tree)
         object.__setattr__(new_self, self.where, set_value)
+
         return new_self
 
     def apply(self, func, **kwargs):
@@ -366,8 +376,10 @@ class _strIndexer:
     def __call__(self, *args, **kwargs):
         new_self = tree_copy(self.tree)
         method = getattr(new_self, self.where)
+
         with mutableContext(new_self):
             value = method(*args, **kwargs)
+
         return value, new_self
 
     def freeze(self):
@@ -381,52 +393,12 @@ class _strIndexer:
         )
 
 
-class _ellipsisIndexer:
-    def __init__(self, tree, where):
-        self.tree = tree
-        self.where = where
-
+class _ellipsisIndexer(_pyTreeIndexer):
     def freeze(self):
         return _freeze_nodes(tree_copy(self.tree))
 
     def unfreeze(self):
         return _unfreeze_nodes(tree_copy(self.tree))
-
-    def get(self, **kwargs):
-        return self.tree.at[self.tree == self.tree].get(**kwargs)
-
-    def set(self, set_value, **kwargs):
-        return self.tree.at[self.tree == self.tree].set(set_value, **kwargs)
-
-    def apply(self, func, **kwargs):
-        return self.tree.at[self.tree == self.tree].apply(func, **kwargs)
-
-    def reduce(self, func, **kwargs):
-        return self.tree.at[self.tree == self.tree].reduce(func, **kwargs)
-
-    def static(self, **kwargs):
-        return self.tree.at[self.tree == self.tree].static(**kwargs)
-
-    def add(self, set_value, **kwargs):
-        return self.tree.at[self.tree == self.tree].add(set_value, **kwargs)
-
-    def multiply(self, set_value, **kwargs):
-        return self.tree.at[self.tree == self.tree].multiply(set_value, **kwargs)
-
-    def divide(self, set_value, **kwargs):
-        return self.tree.at[self.tree == self.tree].divide(set_value, **kwargs)
-
-    def power(self, set_value, **kwargs):
-        return self.tree.at[self.tree == self.tree].power(set_value, **kwargs)
-
-    def min(self, set_value, **kwargs):
-        return self.tree.at[self.tree == self.tree].min(set_value, **kwargs)
-
-    def max(self, set_value, **kwargs):
-        return self.tree.at[self.tree == self.tree].max(set_value, **kwargs)
-
-    def reduce_sum(self, **kwargs):
-        return self.tree.at[self.tree == self.tree].reduce_sum(**kwargs)
 
 
 class treeIndexer:
@@ -442,11 +414,6 @@ class treeIndexer:
             @__getitem__.register(type(self))
             def _(mask_self, where):
                 """indexing by boolean pytree"""
-
-                assert all(
-                    is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(where)
-                ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(where)}"
-
                 return _pyTreeIndexer(tree=self, where=where)
 
             @__getitem__.register(str)
@@ -456,6 +423,6 @@ class treeIndexer:
             @__getitem__.register(type(Ellipsis))
             def _(mask_self, where):
                 """Ellipsis as an alias for all elements"""
-                return _ellipsisIndexer(tree=self, where=where)
+                return _ellipsisIndexer(tree=self, where=(self == self))
 
         return indexer()
