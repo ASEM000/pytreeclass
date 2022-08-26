@@ -65,9 +65,9 @@ def test_ops():
     A = Test(a=jnp.array([-10, -10]), b=1, name="A")
 
 
-def test_asdict():
-    A = Test(10, 20, 30, static_value("A"))
-    assert A.asdict() == {"a": 10, "b": 20, "c": 30, "name": "A"}
+# def test_asdict():
+#     A = Test(10, 20, 30, static_value("A"))
+#     assert A.asdict() == {"a": 10, "b": 20, "c": 30, "name": "A"}
 
 
 def test_dispatched_tree_map():

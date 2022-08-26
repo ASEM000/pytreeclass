@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 import inspect
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 import jax
 
@@ -59,13 +58,3 @@ def treeclass(*args, **kwargs):
     elif len(args) == 0 and len(kwargs) > 0:
         field_only = kwargs.get("field_only", False)
         return ft.partial(class_wrapper, field_only=field_only)
-
-
-def static_field(**kwargs):
-    """ignore from pytree computations"""
-    return field(**{**kwargs, **{"metadata": {"static": True}}})
-
-
-@treeclass
-class staticValue:
-    value: Any = static_field()

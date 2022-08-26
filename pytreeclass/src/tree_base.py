@@ -6,7 +6,7 @@ from typing import Any
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass.src.misc import static_value
+# from pytreeclass.src.decorator import static_value
 from pytreeclass.src.tree_util import is_treeclass
 from pytreeclass.src.tree_viz import (
     tree_box,
@@ -33,12 +33,12 @@ class treeBase:
 
         self = super().__new__(cls)
 
-        object.__setattr__(self, "__treeclass_fields__", cls.__dataclass_fields__)
+        object.__setattr__(self, "__pytree_fields__", cls.__dataclass_fields__)
 
         # register dataclass fields to instance dict
         # otherwise will raise undeclared error for non defined
         # init classes.
-        for field_item in self.__treeclass_fields__.values():
+        for field_item in self.__pytree_fields__.values():
             if field_item.default is not MISSING:
                 object.__setattr__(self, field_item.name, field_item.default)
         return self
@@ -58,7 +58,7 @@ class treeBase:
         Returns:
             Tuple of dynamic values and (dynamic keys,static dict)
         """
-        dynamic, static = self.__treeclass_structure__
+        dynamic, static = self.__pytree_structure__
 
         if self.frozen:
             return (), ((), {"__frozen_fields__": (dynamic, static)})
@@ -99,23 +99,11 @@ class treeBase:
     def __hash__(self):
         return hash(tuple(jtu.tree_leaves(self)))
 
-    def asdict(self) -> dict[str, Any]:
-        """Dictionary representation of dataclass_fields"""
-        dynamic, static = self.__treeclass_structure__
-        static.pop("__treeclass_fields__", None)
-        static.pop("__immutable_treeclass__", None)
-        return {
-            **dynamic,
-            **jtu.tree_map(
-                lambda x: x.value if isinstance(x, static_value) else x, dict(static)
-            ),
-        }
-
     def register_node(
         self, node: Any, *, name: str, static: bool = False, repr: bool = True
     ) -> Any:
         """Add item to dataclass fields to bee seen by jax computations"""
-        if hasattr(self, name) and (name in self.__treeclass_fields__):
+        if hasattr(self, name) and (name in self.__pytree_fields__):
             return getattr(self, name)
 
         # create field
@@ -125,7 +113,7 @@ class treeBase:
         setattr(field_value, "type", type(node))
 
         # register it to class
-        self.__treeclass_fields__.update({name: field_value})
+        self.__pytree_fields__.update({name: field_value})
         setattr(self, name, node)
 
         return getattr(self, name)
@@ -146,7 +134,7 @@ class treeBase:
         return tree_box(self, array)
 
     @property
-    def __treeclass_structure__(self):
+    def __pytree_structure__(self):
         """Computes the dynamic and static fields.
 
         Returns:
@@ -157,7 +145,7 @@ class treeBase:
 
         dynamic, static = fieldDict(), fieldDict()
 
-        for fi in self.__treeclass_fields__.values():
+        for fi in self.__pytree_fields__.values():
             # field value is defined in class dict
             if hasattr(self, fi.name):
                 value = getattr(self, fi.name)
@@ -165,13 +153,13 @@ class treeBase:
                 # the user did not declare a variable defined in field
                 raise ValueError(f"field={fi.name} is not declared.")
 
-            if fi.metadata.get("static", False) or isinstance(value, static_value):
+            if fi.metadata.get("static", False):
                 static[fi.name] = value
 
             else:
                 dynamic[fi.name] = value
 
-        static["__treeclass_fields__"] = self.__treeclass_fields__
+        static["__pytree_fields__"] = self.__pytree_fields__
 
         return (dynamic, static)
 
@@ -181,7 +169,7 @@ class implicitTreeBase:
 
     def __setattr__(self, name: str, value: Any) -> None:
 
-        if (is_treeclass(value)) and (name not in self.__treeclass_fields__):
+        if (is_treeclass(value)) and (name not in self.__pytree_fields__):
             # create field
             field_value = field()
 
@@ -189,6 +177,6 @@ class implicitTreeBase:
             object.__setattr__(field_value, "type", type(value))
 
             # register it to class
-            self.__treeclass_fields__.update({name: field_value})
+            self.__pytree_fields__.update({name: field_value})
 
         object.__setattr__(self, name, value)

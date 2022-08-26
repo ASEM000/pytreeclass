@@ -272,6 +272,164 @@ def _at_static(tree, where, **kwargs):
     return __at_static(tree, where, **kwargs)
 
 
+class _pyTreeIndexer:
+    def __init__(self, tree, where):
+        self.tree = tree
+        self.where = where
+
+    def get(self, **kwargs):
+        return ft.partial(_at_get, where=self.where)(tree=self.tree, **kwargs)
+
+    def set(self, set_value, **kwargs):
+        return ft.partial(_at_set, where=self.where)(
+            tree=self.tree, set_value=set_value, **kwargs
+        )
+
+    def apply(self, func, **kwargs):
+        return ft.partial(_at_apply, where=self.where)(
+            tree=self.tree, func=func, **kwargs
+        )
+
+    def reduce(self, func, **kwargs):
+        return ft.partial(_at_reduce, where=self.where)(
+            tree=self.tree, func=func, **kwargs
+        )
+
+    def static(self, **kwargs):
+        return ft.partial(_at_static, where=self.where)(tree=self.tree, **kwargs)
+
+    # derived methods
+
+    def add(self, set_value):
+        return self.apply(lambda x: x + set_value)
+
+    def multiply(self, set_value):
+        return self.apply(lambda x: x * set_value)
+
+    def divide(self, set_value):
+        return self.apply(lambda x: x / set_value)
+
+    def power(self, set_value):
+        return self.apply(lambda x: x**set_value)
+
+    def min(self, set_value):
+        return self.apply(lambda x: jnp.minimum(x, set_value))
+
+    def max(self, set_value):
+        return self.apply(lambda x: jnp.maximum(x, set_value))
+
+    def reduce_sum(self):
+        return self.reduce(lambda x, y: x + jnp.sum(y))
+
+    def reduce_product(self):
+        return self.reduce(lambda x, y: x * jnp.prod(y), initializer=1)
+
+    def reduce_max(self):
+        return self.reduce(
+            lambda x, y: jnp.maximum(x, jnp.max(y)),
+            initializer=-jnp.inf,
+        )
+
+    def reduce_min(self):
+        return self.reduce(
+            lambda x, y: jnp.minimum(x, jnp.min(y)),
+            initializer=+jnp.inf,
+        )
+
+    # def reduce_and(self):
+    #     return self.reduce(
+    #         lambda acc, cur : jnp.logical_and(jnp.all(cur),acc),
+    #         initializer=True
+    #     )
+
+
+class _strIndexer:
+    def __init__(self, tree, where):
+        self.tree = tree
+        self.where = where
+
+    def get(self):
+        return getattr(self.tree, self.where)
+
+    def set(self, set_value):
+
+        if not hasattr(self.tree, self.where):
+            raise AttributeError(f"Cannot set {self.where} = {set_value}")
+
+        new_self = tree_copy(self.tree)
+        object.__setattr__(new_self, self.where, set_value)
+        return new_self
+
+    def apply(self, func, **kwargs):
+        return self.tree.at[self.where].set(func(self.tree.at[self.where].get()))
+
+    def __call__(self, *args, **kwargs):
+        new_self = tree_copy(self.tree)
+        method = getattr(new_self, self.where)
+        object.__setattr__(new_self, "__immutable_treeclass__", False)
+        value = method(*args, **kwargs)
+        object.__setattr__(new_self, "__immutable_treeclass__", True)
+        return value, new_self
+
+    def freeze(self):
+        return self.tree.at[self.where].set(
+            _freeze_nodes(tree_copy(getattr(self.tree, self.where)))
+        )
+
+    def unfreeze(self):
+        return self.tree.at[self.where].set(
+            _unfreeze_nodes(tree_copy(getattr(self.tree, self.where)))
+        )
+
+
+class _ellipsisIndexer:
+    def __init__(self, tree, where):
+        self.tree = tree
+        self.where = where
+
+    def freeze(self):
+        return _freeze_nodes(tree_copy(self.tree))
+
+    def unfreeze(self):
+        return _unfreeze_nodes(tree_copy(self.tree))
+
+    def get(self, **kwargs):
+        return self.tree.at[self.tree == self.tree].get(**kwargs)
+
+    def set(self, set_value, **kwargs):
+        return self.tree.at[self.tree == self.tree].set(set_value, **kwargs)
+
+    def apply(self, func, **kwargs):
+        return self.tree.at[self.tree == self.tree].apply(func, **kwargs)
+
+    def reduce(self, func, **kwargs):
+        return self.tree.at[self.tree == self.tree].reduce(func, **kwargs)
+
+    def static(self, **kwargs):
+        return self.tree.at[self.tree == self.tree].static(**kwargs)
+
+    def add(self, set_value, **kwargs):
+        return self.tree.at[self.tree == self.tree].add(set_value, **kwargs)
+
+    def multiply(self, set_value, **kwargs):
+        return self.tree.at[self.tree == self.tree].multiply(set_value, **kwargs)
+
+    def divide(self, set_value, **kwargs):
+        return self.tree.at[self.tree == self.tree].divide(set_value, **kwargs)
+
+    def power(self, set_value, **kwargs):
+        return self.tree.at[self.tree == self.tree].power(set_value, **kwargs)
+
+    def min(self, set_value, **kwargs):
+        return self.tree.at[self.tree == self.tree].min(set_value, **kwargs)
+
+    def max(self, set_value, **kwargs):
+        return self.tree.at[self.tree == self.tree].max(set_value, **kwargs)
+
+    def reduce_sum(self, **kwargs):
+        return self.tree.at[self.tree == self.tree].reduce_sum(**kwargs)
+
+
 class treeIndexer:
     @property
     def at(self):
@@ -283,133 +441,22 @@ class treeIndexer:
                 )
 
             @__getitem__.register(type(self))
-            def _(mask_self, arg):
+            def _(mask_self, where):
                 """indexing by boolean pytree"""
 
                 assert all(
-                    is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(arg)
-                ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(arg)}"
+                    is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(where)
+                ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(where)}"
 
-                class opIndexer:
-                    def get(op_self, **kwargs):
-                        return ft.partial(_at_get, where=arg)(tree=self, **kwargs)
-
-                    def set(op_self, set_value, **kwargs):
-                        return ft.partial(_at_set, where=arg)(
-                            tree=self, set_value=set_value, **kwargs
-                        )
-
-                    def apply(op_self, func, **kwargs):
-                        return ft.partial(_at_apply, where=arg)(
-                            tree=self, func=func, **kwargs
-                        )
-
-                    def reduce(op_self, func, **kwargs):
-                        return ft.partial(_at_reduce, where=arg)(
-                            tree=self, func=func, **kwargs
-                        )
-
-                    def static(op_self, **kwargs):
-                        return ft.partial(_at_static, where=arg)(tree=self, **kwargs)
-
-                    # derived methods
-
-                    def add(op_self, set_value):
-                        return op_self.apply(lambda x: x + set_value)
-
-                    def multiply(op_self, set_value):
-                        return op_self.apply(lambda x: x * set_value)
-
-                    def divide(op_self, set_value):
-                        return op_self.apply(lambda x: x / set_value)
-
-                    def power(op_self, set_value):
-                        return op_self.apply(lambda x: x**set_value)
-
-                    def min(op_self, set_value):
-                        return op_self.apply(lambda x: jnp.minimum(x, set_value))
-
-                    def max(op_self, set_value):
-                        return op_self.apply(lambda x: jnp.maximum(x, set_value))
-
-                    def reduce_sum(op_self):
-                        return op_self.reduce(lambda x, y: x + jnp.sum(y))
-
-                    def reduce_product(op_self):
-                        return op_self.reduce(
-                            lambda x, y: x * jnp.prod(y), initializer=1
-                        )
-
-                    def reduce_max(op_self):
-                        return op_self.reduce(
-                            lambda x, y: jnp.maximum(x, jnp.max(y)),
-                            initializer=-jnp.inf,
-                        )
-
-                    def reduce_min(op_self):
-                        return op_self.reduce(
-                            lambda x, y: jnp.minimum(x, jnp.min(y)),
-                            initializer=+jnp.inf,
-                        )
-
-                return opIndexer()
+                return _pyTreeIndexer(tree=self, where=where)
 
             @__getitem__.register(str)
-            def _(mask_self, arg):
-                class opIndexer:
-                    def get(op_self):
-                        return getattr(self, arg)
-
-                    def set(op_self, set_value):
-                        getattr(self, arg)  # check if attribute already defined
-                        new_self = tree_copy(self)
-                        object.__setattr__(new_self, arg, set_value)
-                        return new_self
-
-                    def apply(op_self, func, **kwargs):
-                        return self.at[arg].set(func(self.at[arg].get()))
-
-                    def __call__(op_self, *args, **kwargs):
-                        new_self = tree_copy(self)
-                        method = getattr(new_self, arg)
-                        object.__setattr__(new_self, "__immutable_treeclass__", False)
-                        value = method(*args, **kwargs)
-                        object.__setattr__(new_self, "__immutable_treeclass__", True)
-                        return value, new_self
-
-                    def freeze(op_self):
-                        return self.at[arg].set(
-                            _freeze_nodes(tree_copy(getattr(self, arg)))
-                        )
-
-                    def unfreeze(op_self):
-                        return self.at[arg].set(
-                            _unfreeze_nodes(tree_copy(getattr(self, arg)))
-                        )
-
-                return opIndexer()
+            def _(mask_self, where):
+                return _strIndexer(tree=self, where=where)
 
             @__getitem__.register(type(Ellipsis))
-            def _(mask_self, arg):
+            def _(mask_self, where):
                 """Ellipsis as an alias for all elements"""
-
-                class opIndexer:
-                    freeze = lambda _: _freeze_nodes(tree_copy(self))
-                    unfreeze = lambda _: _unfreeze_nodes(tree_copy(self))
-                    get = self.at[self == self].get
-                    set = self.at[self == self].set
-                    apply = self.at[self == self].apply
-                    reduce = self.at[self == self].reduce
-                    static = self.at[self == self].static
-                    add = self.at[self == self].add
-                    multiply = self.at[self == self].multiply
-                    divide = self.at[self == self].divide
-                    power = self.at[self == self].power
-                    min = self.at[self == self].min
-                    max = self.at[self == self].max
-                    reduce_sum = self.at[self == self].reduce_sum
-                    reduce_max = self.at[self == self].reduce_max
-
-                return opIndexer()
+                return _ellipsisIndexer(tree=self, where=where)
 
         return indexer()

@@ -9,14 +9,14 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass.src.misc import static_value
+# from pytreeclass.src.decorator import static_value
 
 PyTree = Any
 
 
 def is_treeclass(tree):
     """check if a class is treeclass"""
-    return hasattr(tree, "__treeclass_structure__")
+    return hasattr(tree, "__immutable_treeclass__")
 
 
 def is_treeclass_leaf_bool(node):
@@ -34,7 +34,7 @@ def is_treeclass_leaf(tree):
         return is_treeclass(tree) and not any(
             [
                 is_treeclass(tree.__dict__[fi.name])
-                for fi in tree.__treeclass_fields__.values()
+                for fi in tree.__pytree_fields__.values()
             ]
         )
     else:
@@ -68,8 +68,9 @@ def is_excluded(field_item: dataclasses.field, node_item: Any) -> bool:
         bool: boolean if the field should be excluded or not.
     """
     excluded_by_meta = field_item.metadata.get("static", False)
-    excluded_by_type = isinstance(node_item, static_value)
-    return excluded_by_meta or excluded_by_type
+    # excluded_by_type = isinstance(node_item, class_or_tuple)
+    # excluded_by_type = isinstance(node_item, static_value)
+    return excluded_by_meta  # or excluded_by_type
 
 
 def sequential_tree_shape_eval(tree, array):
@@ -77,8 +78,8 @@ def sequential_tree_shape_eval(tree, array):
 
     # all dynamic/static leaves
     all_leaves = (
-        *tree.__treeclass_structure__[0].values(),
-        *tree.__treeclass_structure__[1].values(),
+        *tree.__pytree_structure__[0].values(),
+        *tree.__pytree_structure__[1].values(),
     )
     leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
 
@@ -102,7 +103,7 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
         complex: Complex number of (inexact, non-exact) parameters for count/size
     """
 
-    node = node.value if isinstance(node, static_value) else node
+    # node = node.value if isinstance(node, static_value) else node
 
     if isinstance(node, (jnp.ndarray, np.ndarray)):
         # inexact(trainable) array
@@ -148,7 +149,7 @@ def _freeze_nodes(tree):
     """inplace freezing"""
     if is_treeclass(tree):
         object.__setattr__(tree, "__frozen_fields__", None)
-        for kw in tree.__treeclass_fields__:
+        for kw in tree.__pytree_fields__:
             _freeze_nodes(tree.__dict__[kw])
     return tree
 
@@ -158,7 +159,7 @@ def _unfreeze_nodes(tree):
     if is_treeclass(tree):
         if hasattr(tree, "__frozen_fields__"):
             object.__delattr__(tree, "__frozen_fields__")
-        for kw in tree.__treeclass_fields__:
+        for kw in tree.__pytree_fields__:
             _unfreeze_nodes(tree.__dict__[kw])
     return tree
 

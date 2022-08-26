@@ -104,7 +104,7 @@ def _append_math_eq_ne(func):
 
             def recurse(tree, where, **kwargs):
 
-                for i, fld in enumerate(tree.__treeclass_fields__.values()):
+                for i, fld in enumerate(tree.__pytree_fields__.values()):
 
                     cur_node = tree.__dict__[fld.name]
                     if not is_excluded(fld, cur_node) and is_treeclass(cur_node):
@@ -130,7 +130,7 @@ def _append_math_eq_ne(func):
 
             def recurse(tree, where, **kwargs):
 
-                for i, fld in enumerate(tree.__treeclass_fields__.values()):
+                for i, fld in enumerate(tree.__pytree_fields__.values()):
 
                     cur_node = tree.__dict__[fld.name]
 
@@ -164,7 +164,7 @@ def _append_math_eq_ne(func):
 
             def recurse(tree, where, **kwargs):
 
-                for i, fld in enumerate(tree.__treeclass_fields__.values()):
+                for i, fld in enumerate(tree.__pytree_fields__.values()):
 
                     cur_node = tree.__dict__[fld.name]
 

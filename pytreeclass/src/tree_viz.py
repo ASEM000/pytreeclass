@@ -10,7 +10,8 @@ import requests
 
 import pytreeclass
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.misc import static_value
+
+# from pytreeclass.src.misc import static_value
 from pytreeclass.src.tree_util import (
     _reduce_count_and_size,
     is_treeclass,
@@ -52,7 +53,7 @@ PyTree = Any
 #         nonlocal FMT, COUNT, SIZE
 #         all_fields = {
 #             **tree.__dataclass_fields__,
-#             **tree.__dict__.get("__treeclass_fields__", {}),
+#             **tree.__dict__.get("__pytree_fields__", {}),
 #         }
 
 #         for i, fi in enumerate(all_fields.values()):
@@ -150,6 +151,15 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
     @dispatch(argnum="node_item")
     def recurse_field(field_item, node_item, is_frozen, name_path, type_path):
+        ...
+
+    @recurse_field.register(int)
+    @recurse_field.register(float)
+    @recurse_field.register(complex)
+    @recurse_field.register(str)
+    @recurse_field.register(bool)
+    @recurse_field.register(jnp.ndarray)
+    def _(field_item, node_item, is_frozen, name_path, type_path):
         nonlocal ROWS, COUNT, SIZE
 
         if field_item.repr:
@@ -205,7 +215,8 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     "\n".join(
                         [
                             f"{k}={_format_node(v)}"
-                            for k, v in node_item.__treeclass_structure__[0].items()
+                            for k, v in node_item.__pytree_structure__[0].items()
+                            if not hasattr(v, "__static_pytree__")
                         ]
                     ),
                 ]
@@ -218,7 +229,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
         nonlocal ROWS, COUNT, SIZE
 
-        for field_item in tree.__treeclass_fields__.values():
+        for field_item in tree.__pytree_fields__.values():
             node_item = tree.__dict__[field_item.name]
 
             if is_treeclass_non_leaf(node_item):
@@ -232,9 +243,8 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
             else:
 
                 is_static_field = field_item.metadata.get("static", False)
-                is_static_value = isinstance(node_item, static_value)
 
-                if not (is_static_field or is_static_value):
+                if not (is_static_field):
                     recurse_field(
                         field_item=field_item,
                         node_item=node_item,
@@ -295,7 +305,7 @@ def tree_box(tree, array=None):
         else:
             level_nodes = []
 
-            for fi in tree.__treeclass_fields__.values():
+            for fi in tree.__pytree_fields__.values():
                 cur_node = tree.__dict__[fi.name]
 
                 if is_treeclass(cur_node):
@@ -400,9 +410,9 @@ def tree_diagram(tree):
     def _(tree, parent_level_count, is_frozen):
         nonlocal FMT
 
-        leaves_count = len(tree.__treeclass_fields__)
+        leaves_count = len(tree.__pytree_fields__)
 
-        for i, fi in enumerate(tree.__treeclass_fields__.values()):
+        for i, fi in enumerate(tree.__pytree_fields__.values()):
             cur_node = tree.__dict__[fi.name]
 
             recurse_field(
@@ -481,8 +491,8 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
         is_treeclass(tree)
 
-        leaves_count = len(tree.__treeclass_fields__)
-        for i, fi in enumerate(tree.__treeclass_fields__.values()):
+        leaves_count = len(tree.__pytree_fields__)
+        for i, fi in enumerate(tree.__pytree_fields__.values()):
 
             # retrieve node item
             cur_node = tree.__dict__[fi.name]
@@ -559,10 +569,9 @@ def tree_str(tree, width: int = 40) -> str:
     @recurse.register(pytreeclass.src.tree_base.treeBase)
     def _(tree, depth, is_frozen):
         nonlocal FMT
-        assert is_treeclass(tree)
 
-        leaves_count = len(tree.__treeclass_fields__)
-        for i, fi in enumerate(tree.__treeclass_fields__.values()):
+        leaves_count = len(tree.__pytree_fields__)
+        for i, fi in enumerate(tree.__pytree_fields__.values()):
 
             # retrieve node item
             cur_node = tree.__dict__[fi.name]
@@ -621,9 +630,8 @@ def _tree_mermaid(tree):
     @recurse.register(pytreeclass.src.tree_base.treeBase)
     def _(tree, depth, prev_id, is_frozen):
         nonlocal FMT
-        assert is_treeclass(tree)
 
-        for i, fi in enumerate(tree.__treeclass_fields__.values()):
+        for i, fi in enumerate(tree.__pytree_fields__.values()):
 
             # retrieve node item
             cur_node = tree.__dict__[fi.name]
