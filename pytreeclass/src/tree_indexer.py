@@ -11,6 +11,7 @@ from jax.interpreters.partial_eval import DynamicJaxprTracer
 
 from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.misc import mutableContext, static_value
+from pytreeclass.src.tree_mask_util import logical_and
 from pytreeclass.src.tree_util import (
     _freeze_nodes,
     _unfreeze_nodes,
@@ -437,7 +438,28 @@ class _treeIndexer:
             @__getitem__.register(type(self))
             def _(_, where):
                 """indexing by boolean pytree"""
-                return _pyTreeIndexer(tree=self, where=where)
+
+                @dataclass
+                class _pyTreeNestedIndexer(_pyTreeIndexer):
+                    # subclass preserve the tree state(i.e. self)
+                    # during recursive calls
+                    def __getitem__(nested_self, nested_where):
+                        return _pyTreeNestedIndexer(
+                            tree=self,
+                            where=logical_and(nested_self.where, nested_where),
+                        )
+
+                    def __getattr__(nested_self, name):
+                        if name == "at":
+                            return _pyTreeNestedIndexer(
+                                tree=self, where=nested_self.where
+                            )
+                        else:
+                            raise AttributeError(
+                                f"{name} is not a valid attribute of {nested_self}"
+                            )
+
+                return _pyTreeNestedIndexer(tree=self, where=where)
 
             @__getitem__.register(str)
             def _(_, where):

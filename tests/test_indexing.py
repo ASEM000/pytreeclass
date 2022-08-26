@@ -899,3 +899,16 @@ def test_method_call():
 
     with pytest.raises(TypeError):
         t.at["a"]()
+
+
+def test_composed_at():
+    @pytc.treeclass
+    class Test:
+        a: jnp.ndarray = jnp.array([1, 2, 3, 4, 5])
+
+    t = Test()
+
+    assert is_treeclass_equal(t.at[t > 0].at[t < 0].get(), Test(jnp.array([])))
+    assert is_treeclass_equal(
+        t.at[t > 0].at[t == "a"].get(), Test(jnp.array([1, 2, 3, 4, 5]))
+    )
