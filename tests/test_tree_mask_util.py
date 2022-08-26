@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from pytreeclass.src.tree_mask_util import (
     is_inexact,
@@ -44,6 +45,9 @@ def test_logical_or():
         jnp.array([True, False, True, True]),
     )
 
+    with pytest.raises(ValueError):
+        logical_or([True, jnp.array([1, 2, 3])], [True, False])
+
 
 def test_logical_and():
 
@@ -56,3 +60,6 @@ def test_logical_and():
         )[0],
         jnp.array([True, False, False, False]),
     )
+
+    with pytest.raises(ValueError):
+        logical_and([True, jnp.array([1, 2, 3])], [True, False])

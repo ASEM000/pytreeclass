@@ -9,8 +9,6 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-# from pytreeclass.src.decorator import static_value
-
 PyTree = Any
 
 
@@ -162,17 +160,3 @@ def _unfreeze_nodes(tree):
         for kw in tree.__pytree_fields__:
             _unfreeze_nodes(tree.__dict__[kw])
     return tree
-
-
-class mutableContext:
-    """Allow mutable behvior within this context"""
-
-    def __init__(self, instance):
-        assert is_treeclass(instance), "instance must be a treeclass"
-        self.instance = instance
-
-    def __enter__(self):
-        object.__setattr__(self.instance, "__immutable_treeclass__", False)
-
-    def __exit__(self, type_, value, traceback):
-        object.__setattr__(self.instance, "__immutable_treeclass__", True)

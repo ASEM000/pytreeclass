@@ -16,6 +16,7 @@ class static(treeBase):
     value: Any = field(metadata={"static": True})
     __static_pytree__ = True
 
+
 def static_value(value):
     return static(value)
 
@@ -31,7 +32,7 @@ class mutableContext:
     def __init__(self, instance):
         assert hasattr(
             instance, "__immutable_treeclass__"
-        ), "instance must be a treeclass"
+        ), "instance must be immutable treeclass"
         self.instance = instance
 
     def __enter__(self):

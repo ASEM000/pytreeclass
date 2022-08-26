@@ -19,7 +19,7 @@ def test__hbox():
 
 def test_func_repr():
     def example(a: int, b=1, *c, d, e=2, **f) -> str:
-        ...
+        ...  # fmt: skip
 
     assert tree_viz_util._func_repr(example) == "example(a,b,*c,d,e,**f)"
     assert tree_viz_util._func_repr(lambda x: x) == "Lambda(x)"
