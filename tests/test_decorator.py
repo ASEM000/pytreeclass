@@ -98,3 +98,16 @@ def test_hash():
 
     with pytest.raises(TypeError):
         hash(T(jnp.array([1, 2, 3])))
+
+
+def test_post_init():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+
+        def __post_init__(self):
+            self.a = 2
+
+    t = Test()
+
+    assert t.a == 2
