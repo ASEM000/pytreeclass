@@ -30,11 +30,8 @@ class fieldDict(dict):
 
 class _treeBase:
     def __new__(cls, *args, **kwargs):
-
         self = super().__new__(cls)
-
         object.__setattr__(self, "__pytree_fields__", cls.__dataclass_fields__)
-
         # register dataclass fields to instance dict
         # otherwise will raise undeclared error for non defined
         # init classes.

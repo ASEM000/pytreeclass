@@ -428,7 +428,7 @@ class _treeIndexer:
     @property
     def at(self):
         @dataclass
-        class indexer:
+        class _atIndexer:
             @dispatch(argnum=1)
             def __getitem__(_, *args):
                 raise NotImplementedError(
@@ -441,7 +441,7 @@ class _treeIndexer:
 
                 @dataclass
                 class _pyTreeNestedIndexer(_pyTreeIndexer):
-                    # subclass preserve the tree state(i.e. self)
+                    # subclass to preserve the tree state(i.e. self)
                     # during recursive calls
                     def __getitem__(nested_self, nested_where):
                         return _pyTreeNestedIndexer(
@@ -450,14 +450,11 @@ class _treeIndexer:
                         )
 
                     def __getattr__(nested_self, name):
-                        if name == "at":
-                            return _pyTreeNestedIndexer(
-                                tree=self, where=nested_self.where
-                            )
-                        else:
+                        if name != "at":
                             raise AttributeError(
                                 f"{name} is not a valid attribute of {nested_self}"
                             )
+                        return _pyTreeNestedIndexer(tree=self, where=nested_self.where)
 
                 return _pyTreeNestedIndexer(tree=self, where=where)
 
@@ -465,7 +462,7 @@ class _treeIndexer:
             def _(_, where):
                 @dataclass
                 class _strNestedIndexer(_strIndexer):
-                    # subclass preserve the tree state(i.e. self)
+                    # subclass to preserve the tree state(i.e. self)
                     # during recursive calls
                     def __getitem__(nested_self, nested_where):
                         return _strNestedIndexer(
@@ -473,12 +470,11 @@ class _treeIndexer:
                         )
 
                     def __getattr__(nested_self, name):
-                        if name == "at":
-                            return _strNestedIndexer(tree=self, where=nested_self.where)
-                        else:
+                        if name != "at":
                             raise AttributeError(
                                 f"{name} is not a valid attribute of {nested_self}"
                             )
+                        return _strNestedIndexer(tree=self, where=nested_self.where)
 
                 return _strNestedIndexer(tree=self, where=where)
 
@@ -487,4 +483,4 @@ class _treeIndexer:
                 """Ellipsis as an alias for all elements"""
                 return _ellipsisIndexer(tree=self, where=(self == self))
 
-        return indexer()
+        return _atIndexer()
