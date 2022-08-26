@@ -821,41 +821,65 @@ def test_masking():
 
 def test_attribute_get():
     @pytc.treeclass
+    class l0:
+        a: int = 2
+
+    @pytc.treeclass
     class Test:
         a: int = 1
+        b: l0 = l0()
 
     t = Test()
     assert t.at["a"].get() == 1
+    assert t.at["b"].at["a"].get() == 2
+
+    with pytest.raises(AttributeError):
+        t.at["a"].at["c"].get()
 
 
 def test_attribute_set():
     @pytc.treeclass
+    class l0:
+        a: int = 2
+
+    @pytc.treeclass
     class Test:
         a: int = 1
+        b: l0 = l0()
 
     t = Test()
     t.at["a"].set(10)
 
     assert is_treeclass_equal(t, Test())
-    assert is_treeclass_equal(t.at["a"].set(10), Test(10))
+    assert is_treeclass_equal(t.at["a"].set(10), Test(10, l0()))
+    assert is_treeclass_equal(t.at["b"].at["a"].set(100), Test(1, l0(100)))
 
     with pytest.raises(AttributeError):
-        t.at["b"].set(10)
+        t.at["c"].set(10)
+
+    with pytest.raises(AttributeError):
+        t.at["a"].at["c"].set(10)
 
 
 def test_attribute_apply():
     @pytc.treeclass
+    class l0:
+        a: int = 2
+
+    @pytc.treeclass
     class Test:
         a: int = 1
+        b: l0 = l0()
 
     t = Test()
     t.at["a"].apply(lambda _: 10)
 
     assert is_treeclass_equal(t, Test())
     assert is_treeclass_equal(t.at["a"].apply(lambda _: 10), Test(10))
+    assert is_treeclass_equal(t.at["b"].at["a"].apply(lambda _: 100), Test(1, l0(100)))
 
     with pytest.raises(AttributeError):
-        t.at["b"].apply(lambda _: 10)
+        t.at["c"].apply(lambda _: 10)
 
 
 def test_method_call():

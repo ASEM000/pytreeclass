@@ -3,7 +3,8 @@ from typing import Any
 
 import jax.tree_util as jtu
 
-from pytreeclass.src.tree_base import treeBase
+import pytreeclass.src as src
+from pytreeclass.src.tree_base import _treeBase
 
 
 class ImmutableInstanceError(Exception):
@@ -12,9 +13,8 @@ class ImmutableInstanceError(Exception):
 
 @jtu.register_pytree_node_class
 @dataclass(repr=False, eq=False, frozen=True)
-class static(treeBase):
+class static(_treeBase):
     value: Any = field(metadata={"static": True})
-    __static_pytree__ = True
 
 
 def static_value(value):
@@ -24,6 +24,22 @@ def static_value(value):
 def static_field(**kwargs):
     """ignore from pytree computations"""
     return field(**{**kwargs, **{"metadata": {"static": True}}})
+
+
+def mutate_tree(tree):
+    if src.tree_util.is_treeclass(tree):
+        object.__setattr__(tree, "__immutable_treeclass__", False)
+        for field_item in tree.__pytree_fields__.values():
+            if hasattr(tree, field_item.name):
+                mutate_tree(getattr(tree, field_item.name))
+
+
+def immutate_tree(tree):
+    if src.tree_util.is_treeclass(tree):
+        object.__setattr__(tree, "__immutable_treeclass__", True)
+        for field_item in tree.__pytree_fields__.values():
+            if hasattr(tree, field_item.name):
+                immutate_tree(getattr(tree, field_item.name))
 
 
 class mutableContext:
@@ -36,7 +52,7 @@ class mutableContext:
         self.instance = instance
 
     def __enter__(self):
-        object.__setattr__(self.instance, "__immutable_treeclass__", False)
+        mutate_tree(self.instance)
 
     def __exit__(self, type_, value, traceback):
-        object.__setattr__(self.instance, "__immutable_treeclass__", True)
+        immutate_tree(self.instance)

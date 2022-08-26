@@ -28,7 +28,7 @@ class fieldDict(dict):
         return self.__dict__ == other.__dict__
 
 
-class treeBase:
+class _treeBase:
     def __new__(cls, *args, **kwargs):
 
         self = super().__new__(cls)
@@ -164,7 +164,7 @@ class treeBase:
         return (dynamic, static)
 
 
-class implicitTreeBase:
+class _implicitSetter:
     """Register dataclass fields and treeclass instance variables"""
 
     def __setattr__(self, name: str, value: Any) -> None:

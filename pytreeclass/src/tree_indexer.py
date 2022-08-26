@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools as ft
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -352,23 +352,45 @@ class _pyTreeIndexer:
     #     )
 
 
+def _getter(item: Any, path: Sequence[str]):
+    """ "recursive getter"""
+    return (
+        _getter(getattr(item, path[0]), path[1:])
+        if len(path) > 1
+        else getattr(item, path[0])
+    )
+
+
+def _setter(item: Any, path: Sequence[str], value: Any):
+    """recursive setter"""
+
+    def _setter_getter(item, path):
+        return (
+            _setter_getter(getattr(item, path[0]), path[1:])
+            if len(path) > 1
+            else (item, path[0])
+        )
+
+    parent, attr = _setter_getter(item, path)
+
+    if hasattr(parent, attr):
+        object.__setattr__(parent, attr, value)
+    else:
+        raise AttributeError(f"{attr} is not a valid attribute of {parent}")
+
+    return _setter(item, path[:-1], parent) if len(path) > 1 else item
+
+
 @dataclass
 class _strIndexer:
     tree: PyTree
     where: str
 
     def get(self):
-        return getattr(self.tree, self.where)
+        return _getter(self.tree, self.where.split("."))
 
     def set(self, set_value):
-
-        if not hasattr(self.tree, self.where):
-            raise AttributeError(f"Cannot set {self.where} = {set_value}")
-
-        new_self = tree_copy(self.tree)
-        object.__setattr__(new_self, self.where, set_value)
-
-        return new_self
+        return _setter(tree_copy(self.tree), self.where.split("."), set_value)
 
     def apply(self, func, **kwargs):
         return self.tree.at[self.where].set(func(self.tree.at[self.where].get()))
@@ -384,12 +406,12 @@ class _strIndexer:
 
     def freeze(self):
         return self.tree.at[self.where].set(
-            _freeze_nodes(tree_copy(getattr(self.tree, self.where)))
+            _freeze_nodes(tree_copy(self.tree.at[self.where].get()))
         )
 
     def unfreeze(self):
         return self.tree.at[self.where].set(
-            _unfreeze_nodes(tree_copy(getattr(self.tree, self.where)))
+            _unfreeze_nodes(tree_copy(self.tree.at[self.where].get()))
         )
 
 
@@ -401,27 +423,45 @@ class _ellipsisIndexer(_pyTreeIndexer):
         return _unfreeze_nodes(tree_copy(self.tree))
 
 
-class treeIndexer:
+class _treeIndexer:
     @property
     def at(self):
+        @dataclass
         class indexer:
             @dispatch(argnum=1)
-            def __getitem__(mask_self, *args):
+            def __getitem__(_, *args):
                 raise NotImplementedError(
                     f"Indexing with type{tuple(type(arg) for arg in args)} is not implemented."
                 )
 
             @__getitem__.register(type(self))
-            def _(mask_self, where):
+            def _(_, where):
                 """indexing by boolean pytree"""
                 return _pyTreeIndexer(tree=self, where=where)
 
             @__getitem__.register(str)
-            def _(mask_self, where):
-                return _strIndexer(tree=self, where=where)
+            def _(_, where):
+                @dataclass
+                class _strNestedIndexer(_strIndexer):
+                    # subclass preserve the tree state(i.e. self)
+                    # during recursive calls
+                    def __getitem__(nested_self, nested_where):
+                        return _strNestedIndexer(
+                            tree=self, where=nested_self.where + "." + nested_where
+                        )
+
+                    def __getattr__(nested_self, name):
+                        if name == "at":
+                            return _strNestedIndexer(tree=self, where=nested_self.where)
+                        else:
+                            raise AttributeError(
+                                f"{name} is not a valid attribute of {nested_self}"
+                            )
+
+                return _strNestedIndexer(tree=self, where=where)
 
             @__getitem__.register(type(Ellipsis))
-            def _(mask_self, where):
+            def _(_, where):
                 """Ellipsis as an alias for all elements"""
                 return _ellipsisIndexer(tree=self, where=(self == self))
 

@@ -193,7 +193,7 @@ def _append_math_eq_ne(func):
     return wrapper
 
 
-class treeOpBase:
+class _treeOpBase:
 
     __abs__ = _append_math_op(op.abs)
     __add__ = _append_math_op(op.add)

@@ -25,3 +25,21 @@ def test_mutable_context():
     with pytest.raises(AssertionError):
         with mutableContext(1):
             pass
+
+    @pytc.treeclass
+    class l0:
+        a: int = 1
+
+    @pytc.treeclass
+    class l1:
+        b: l0 = l0()
+
+    model = l1()
+
+    with mutableContext(model):
+        model.b.a = 100
+
+    assert model.b.a == 100
+
+    with pytest.raises(ImmutableInstanceError):
+        model.b.a = 200

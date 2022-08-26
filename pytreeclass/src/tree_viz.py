@@ -8,7 +8,7 @@ from typing import Any
 import jax.numpy as jnp
 import requests
 
-import pytreeclass
+import pytreeclass.src as src
 from pytreeclass.src.decorator_util import dispatch
 
 # from pytreeclass.src.misc import static_value
@@ -46,7 +46,7 @@ PyTree = Any
 #     def recurse(tree, path=(), is_frozen=None):
 #         ...
 
-#     @recurse.register(pytreeclass.src.tree_base.treeBase)
+#     @recurse.register(src.tree_base._treeBase)
 #     def _(tree, path=(), is_frozen=None):
 #         assert is_treeclass(tree)
 
@@ -197,7 +197,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     type_path=type_path + (layer.__class__.__name__,),
                 )
 
-    @recurse_field.register(pytreeclass.src.tree_base.treeBase)
+    @recurse_field.register(src.tree_base._treeBase)
     def _(field_item, node_item, is_frozen, name_path, type_path):
         nonlocal ROWS, COUNT, SIZE
 
@@ -216,7 +216,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                         [
                             f"{k}={_format_node(v)}"
                             for k, v in node_item.__pytree_structure__[0].items()
-                            if not hasattr(v, "__static_pytree__")
+                            if not isinstance(v, src.misc.static)
                         ]
                     ),
                 ]
@@ -380,7 +380,7 @@ def tree_diagram(tree):
 
         recurse(node_item, parent_level_count, is_frozen)
 
-    @recurse_field.register(pytreeclass.src.tree_base.treeBase)
+    @recurse_field.register(src.tree_base._treeBase)
     def _(field_item, node_item, is_frozen, parent_level_count, node_index):
         nonlocal FMT
 
@@ -406,7 +406,7 @@ def tree_diagram(tree):
     def recurse(tree, parent_level_count, is_frozen):
         ...
 
-    @recurse.register(pytreeclass.src.tree_base.treeBase)
+    @recurse.register(src.tree_base._treeBase)
     def _(tree, parent_level_count, is_frozen):
         nonlocal FMT
 
@@ -461,7 +461,7 @@ def tree_repr(tree, width: int = 40) -> str:
 
         recurse(node_item, depth, is_frozen)
 
-    @recurse_field.register(pytreeclass.src.tree_base.treeBase)
+    @recurse_field.register(src.tree_base._treeBase)
     def _(field_item, node_item, depth, is_frozen, is_last_field):
         """format treeclass field"""
         nonlocal FMT
@@ -486,7 +486,7 @@ def tree_repr(tree, width: int = 40) -> str:
     def recurse(tree, depth, is_frozen):
         ...
 
-    @recurse.register(pytreeclass.src.tree_base.treeBase)
+    @recurse.register(src.tree_base._treeBase)
     def _(tree, depth, is_frozen):
         nonlocal FMT
         is_treeclass(tree)
@@ -541,7 +541,7 @@ def tree_str(tree, width: int = 40) -> str:
 
         recurse(node_item, depth, is_frozen)
 
-    @recurse_field.register(pytreeclass.src.tree_base.treeBase)
+    @recurse_field.register(src.tree_base._treeBase)
     def _(field_item, node_item, depth, is_frozen, is_last_field):
         """format treeclass field"""
         nonlocal FMT
@@ -566,7 +566,7 @@ def tree_str(tree, width: int = 40) -> str:
     def recurse(tree, depth, is_frozen):
         ...
 
-    @recurse.register(pytreeclass.src.tree_base.treeBase)
+    @recurse.register(src.tree_base._treeBase)
     def _(tree, depth, is_frozen):
         nonlocal FMT
 
@@ -613,7 +613,7 @@ def _tree_mermaid(tree):
 
         recurse(node_item, depth, prev_id, is_frozen)
 
-    @recurse_field.register(pytreeclass.src.tree_base.treeBase)
+    @recurse_field.register(src.tree_base._treeBase)
     def _(field_item, node_item, depth, prev_id, order, is_frozen):
         nonlocal FMT
 
@@ -627,7 +627,7 @@ def _tree_mermaid(tree):
     def recurse(tree, depth, prev_id, is_frozen):
         ...
 
-    @recurse.register(pytreeclass.src.tree_base.treeBase)
+    @recurse.register(src.tree_base._treeBase)
     def _(tree, depth, prev_id, is_frozen):
         nonlocal FMT
 
