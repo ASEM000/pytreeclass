@@ -32,6 +32,24 @@ def _func_repr(func):
     )
 
 
+def _jax_numpy_repr(node):
+    replace_tuple = (
+        ("int", "i"),
+        ("float", "f"),
+        ("complex", "c"),
+        (",)", ")"),
+        ("(", "["),
+        (")", "]"),
+        (" ", ""),
+    )
+
+    formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
+
+    for lhs, rhs in replace_tuple:
+        formatted_string = formatted_string.replace(lhs, rhs)
+    return formatted_string
+
+
 def _format_size(node_size, newline=False):
     """return formatted size from inexact(exact) complex number"""
     mark = "\n" if newline else ""
@@ -65,20 +83,7 @@ def _format_node_repr(node, depth):
     @__format_node_repr.register(jnp.ndarray)
     @__format_node_repr.register(jax.ShapeDtypeStruct)
     def _(node, *args, **kwargs):
-        replace_tuple = (
-            ("int", "i"),
-            ("float", "f"),
-            ("complex", "c"),
-            (",)", ")"),
-            ("(", "["),
-            (")", "]"),
-            (" ", ""),
-        )
-        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
-
-        for lhs, rhs in replace_tuple:
-            formatted_string = formatted_string.replace(lhs, rhs)
-        return formatted_string
+        return _jax_numpy_repr(node)
 
     @__format_node_repr.register(list)
     def _(node, depth):
@@ -164,21 +169,7 @@ def _format_node_diagram(node, *args, **kwargs):
     @__format_node_diagram.register(jnp.ndarray)
     @__format_node_diagram.register(jax.ShapeDtypeStruct)
     def _(node, *args, **kwargs):
-        replace_tuple = (
-            ("int", "i"),
-            ("float", "f"),
-            ("complex", "c"),
-            (",)", ")"),
-            ("(", "["),
-            (")", "]"),
-            (" ", ""),
-        )
-
-        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
-
-        for lhs, rhs in replace_tuple:
-            formatted_string = formatted_string.replace(lhs, rhs)
-        return formatted_string
+        return _jax_numpy_repr(node)
 
     return __format_node_diagram(node, *args, **kwargs)
 
