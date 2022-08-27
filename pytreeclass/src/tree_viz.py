@@ -462,6 +462,31 @@ def tree_repr(tree, width: int = 40) -> str:
 
         recurse(node_item, depth, is_frozen)
 
+    @recurse_field.register(dict)
+    def _(field_item, node_item, depth, is_frozen, is_last_field):
+        """format non-treeclass field"""
+        nonlocal FMT
+
+        if field_item.repr:
+            is_static_field = field_item.metadata.get("static", False)
+            mark = "*" if is_static_field else ("#" if is_frozen else "")
+
+            FMT += "\n" + "\t" * depth
+            FMT += f"{mark}{field_item.name}"
+            FMT += "="
+
+            temp = "\t" * (depth + 1)
+            temp += (",\n" + "\t" * (depth + 1)).join(
+                f"{k}:{format_width(_format_node_repr(v,depth))}"
+                for k, v in node_item.items()
+            )
+            temp = "{\n" + temp + "\n" + "\t" * depth + "}"
+
+            FMT += f"{format_width(temp)}"
+            FMT += "" if is_last_field else ","
+
+        recurse(node_item, depth, is_frozen)
+
     @recurse_field.register(src.tree_base._treeBase)
     def _(field_item, node_item, depth, is_frozen, is_last_field):
         """format treeclass field"""
@@ -550,6 +575,31 @@ def tree_str(tree, width: int = 40) -> str:
             else:
                 FMT += f"{format_width(_format_node_str(node_item,depth))}"
 
+            FMT += "" if is_last_field else ","
+
+        recurse(node_item, depth, is_frozen)
+
+    @recurse_field.register(dict)
+    def _(field_item, node_item, depth, is_frozen, is_last_field):
+        """format non-treeclass field"""
+        nonlocal FMT
+
+        if field_item.repr:
+            is_static_field = field_item.metadata.get("static", False)
+            mark = "*" if is_static_field else ("#" if is_frozen else "")
+
+            FMT += "\n" + "\t" * depth
+            FMT += f"{mark}{field_item.name}"
+            FMT += "="
+
+            temp = "\t" * (depth + 1)
+            temp += (",\n" + "\t" * (depth + 1)).join(
+                f"{k}:{format_width(_format_node_str(v,depth))}"
+                for k, v in node_item.items()
+            )
+            temp = "{\n" + temp + "\n" + "\t" * depth + "}"
+
+            FMT += f"{format_width(temp)}"
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, is_frozen)

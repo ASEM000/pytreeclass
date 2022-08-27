@@ -97,10 +97,7 @@ def _format_node_repr(node, depth):
     @__format_node_repr.register(dict)
     def _(node, depth):
         string = (",\n" + "\t" * (depth + 1)).join(
-            f"{k}:{_format_node_repr(v,depth=depth)}"
-            # if "\n" not in f"{v!r}"
-            # else f"{k}:" + "\n" + "\t" * (depth + 1) + f"{_format_node_repr(v,depth=depth+1)}"
-            for k, v in node.items()
+            f"{k}:{_format_node_repr(v,depth=depth)}" for k, v in node.items()
         )
         return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
 
