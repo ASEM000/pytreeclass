@@ -481,7 +481,9 @@ def tree_repr(tree, width: int = 40) -> str:
 
             recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
 
-            FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
+            FMT = FMT[:start_cursor] + format_width(
+                FMT[start_cursor:] + "\n" + "\t" * (depth) + ")"
+            )
             FMT += "" if is_last_field else ","
 
     @dispatch(argnum=0)
@@ -509,7 +511,8 @@ def tree_repr(tree, width: int = 40) -> str:
 
     FMT = ""
     recurse(tree, depth=1, is_frozen=tree.frozen)
-    FMT = f"{(tree.__class__.__name__)}({format_width(FMT,width)})"
+    FMT = f"{(tree.__class__.__name__)}(" + FMT + "\n)"
+    FMT = format_width(FMT, width)
 
     return FMT.expandtabs(2)
 
@@ -570,7 +573,9 @@ def tree_str(tree, width: int = 40) -> str:
 
             recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
 
-            FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
+            FMT = FMT[:start_cursor] + format_width(
+                FMT[start_cursor:] + "\n" + "\t" * (depth) + ")"
+            )
             FMT += "" if is_last_field else ","
 
     @dispatch(argnum=0)
@@ -597,7 +602,7 @@ def tree_str(tree, width: int = 40) -> str:
 
     FMT = ""
     recurse(tree, depth=1, is_frozen=tree.frozen)
-    FMT = f"{(tree.__class__.__name__)}({format_width(FMT,width)})"
+    FMT = f"{(tree.__class__.__name__)}(" + format_width(FMT + "\n)", width)
 
     return FMT.expandtabs(2)
 
