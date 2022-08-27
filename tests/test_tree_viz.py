@@ -186,14 +186,8 @@ def test_repr_str():
     str_string = f"{A!s}"
     repr_string = f"{A!r}"
 
-    assert (
-        str_string
-        == "Test(\n  a=10,\n  b=20,\n  c=[1 2 3 4 5],\n  name=static(*value=A)\n)"
-    )
-    assert (
-        repr_string
-        == "Test(\n  a=10,\n  b=20,\n  c=i32[5],\n  name=static(*value='A')\n)"
-    )
+    assert str_string == "Test(a=10,b=20,c=[1 2 3 4 5],name=static(*value=A))"
+    assert repr_string == "Test(a=10,b=20,c=i32[5],name=static(*value='A'))"
 
 
 def test_save_viz():
@@ -287,7 +281,7 @@ def test_tree_indent():
     assert (
         f"{A!r}"
         # trunk-ignore(flake8/E501)
-        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(\n    a='SomethingWrittenHereSomethingWrittenHere',\n    b=20,\n    c=i32[5]\n  ),\n  name=static(*value='SomethingWrittenHere')\n),)"
+        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(a='SomethingWrittenHereSomethingWrittenHere',b=20,c=i32[5]),\n  name=static(*value='SomethingWrittenHere')\n),)"
     )
     assert (
         f"{B!r}"
@@ -317,9 +311,7 @@ def test_repr_true_false():
 
     A = Test(10, 20, jnp.ones([10]), static_value("Test"))
 
-    assert (
-        A.__repr__() == "Test(\n  b=20,\n  c=f32[10],\n  name=static(*value='Test')\n)"
-    )
+    assert A.__repr__() == "Test(b=20,c=f32[10],name=static(*value='Test'))"
     assert (
         A.__str__()
         == "Test(\n  b=20,\n  c=[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.],\n  name=static(*value=Test)\n)"

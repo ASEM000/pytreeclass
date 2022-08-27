@@ -116,10 +116,10 @@ class _treeBase:
         return getattr(self, name)
 
     def __repr__(self):
-        return tree_repr(self, width=80)
+        return tree_repr(self, width=60)
 
     def __str__(self):
-        return tree_str(self, width=80)
+        return tree_str(self, width=60)
 
     def summary(self, array: jnp.ndarray = None) -> str:
         return tree_summary(self, array)

@@ -13,3 +13,4 @@ test.ipynb
 benchmarking.ipynb
 tests/nn_tests
 .vscode/settings.json
+docs/notebooks/getting_started.ipynb
