@@ -456,7 +456,8 @@ def tree_repr(tree, width: int = 40) -> str:
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
-            FMT += f"={format_width(_format_node_repr(node_item,depth))}"
+            FMT += "="
+            FMT += f"{format_width(_format_node_repr(node_item,depth))}"
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, is_frozen)
@@ -537,7 +538,15 @@ def tree_str(tree, width: int = 40) -> str:
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
-            FMT += f"={format_width(_format_node_str(node_item,depth))}"
+            FMT += "="
+
+            if "\n" in f"{node_item!s}":
+                FMT += "\n" + "\t" * (depth + 1)
+                FMT += f"{format_width(_format_node_str(node_item,depth+1))}"
+
+            else:
+                FMT += f"{format_width(_format_node_str(node_item,depth))}"
+
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, is_frozen)

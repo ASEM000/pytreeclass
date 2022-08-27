@@ -422,17 +422,17 @@ def test_tree_with_containers():
                 for ki, in_dim, out_dim in zip(keys, layers[:-1], layers[1:])
             ]
 
-    model = MLP((1, 2, 1))
+    model = MLP((1, 5, 1))
 
     assert (
         f"{model!r}"
-        == "MLP(\n  layers=[  \n    Linear(weight=f32[1,2],bias=f32[2]),\n    Linear(weight=f32[2,1],bias=f32[1])],)"
+        == "MLP(\n  layers=[\n    Linear(weight=f32[1,5],bias=f32[5]),\n    Linear(weight=f32[5,1],bias=f32[1])\n  ],)"
     )
 
     assert (
         f"{model!s}"
         # trunk-ignore(flake8/E501)
-        == "MLP(\n  layers=[  \n    Linear(\n      weight=[[-0.13426289 -0.12849723]],\n      bias=[1. 1.]),\n    Linear(\n      weight=[[ 1.2636864] [-0.0423024]],\n      bias=[1.])],)"
+        == "MLP(\n  layers=[\n    Linear(\n      weight=[[-1.6248673  -2.8383057   1.3969219   1.3169124  -0.40784812]],\n      bias=[1. 1. 1. 1. 1.]),\n    Linear(\n      weight=\n        [[-0.4072479 ]\n         [ 0.04485626]\n         [-0.15626007]\n         [-0.6685523 ]\n         [ 0.08574097]],\n      bias=[1.])\n  ],)"
     )
 
     @pytc.treeclass
@@ -486,7 +486,7 @@ def test_func_repr():
     assert f"{test([1,2,3])!r}" == "test(a=[1,2,3])"
     assert (
         (f"{test([jnp.ones([4,4]),2,3])}")
-        == "test(\n  a=[ \n    [[1. 1. 1. 1.]\n     [1. 1. 1. 1.]\n     [1. 1. 1. 1.]\n     [1. 1. 1. 1.]],2,3])"
+        == 'test(\n  a=\n    [\n      [[1. 1. 1. 1.]\n       [1. 1. 1. 1.]\n       [1. 1. 1. 1.]\n       [1. 1. 1. 1.]],\n      2,\n      3\n    ])'
     )
     assert (f"{test([jnp.ones([4,4]),2,3])!r}") == "test(a=[f32[4,4],2,3])"
     assert (f"{test((jnp.ones([4,4]),2,3))!r}") == "test(a=(f32[4,4],2,3))"

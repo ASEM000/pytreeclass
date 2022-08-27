@@ -32,24 +32,6 @@ def _func_repr(func):
     )
 
 
-def jax_numpy_repr(node, *args, **kwargs):
-    replace_tuple = (
-        ("int", "i"),
-        ("float", "f"),
-        ("complex", "c"),
-        (",)", ")"),
-        ("(", "["),
-        (")", "]"),
-        (" ", ""),
-    )
-
-    formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
-
-    for lhs, rhs in replace_tuple:
-        formatted_string = formatted_string.replace(lhs, rhs)
-    return formatted_string
-
-
 def _format_size(node_size, newline=False):
     """return formatted size from inexact(exact) complex number"""
     mark = "\n" if newline else ""
@@ -72,15 +54,26 @@ def _format_count(node_count, newline=False):
 def _format_node_repr(node, depth):
     @dispatch(argnum=0)
     def __format_node_repr(node, *args, **kwargs):
-        multiline = "\n" in f"{node!s}"
-        string = ("\n" + "\t" * (depth + 1)) if multiline else ""
-        string += ("\n" + "\t" * (depth + 1)).join(f"{node!r}".split("\n"))
-        return string
+        return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
 
     @__format_node_repr.register(jnp.ndarray)
     @__format_node_repr.register(jax.ShapeDtypeStruct)
     def _(node, *args, **kwargs):
-        return jax_numpy_repr(node)
+        replace_tuple = (
+            ("int", "i"),
+            ("float", "f"),
+            ("complex", "c"),
+            (",)", ")"),
+            ("(", "["),
+            (")", "]"),
+            (" ", ""),
+        )
+
+        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
+
+        for lhs, rhs in replace_tuple:
+            formatted_string = formatted_string.replace(lhs, rhs)
+        return formatted_string
 
     @__format_node_repr.register(jaxlib.xla_extension.CompiledFunction)
     @__format_node_repr.register(jax._src.custom_derivatives.custom_jvp)
@@ -90,23 +83,24 @@ def _format_node_repr(node, depth):
 
     @__format_node_repr.register(list)
     def _(node, depth):
-        string = ",".join(_format_node_repr(layer, depth=depth) for layer in node)
-        shifted = "\t" * (depth) + string
-        return "[" + shifted + "]"
+        string = (",\n" + "\t" * (depth + 1)).join(
+            f"{__format_node_repr(v,depth=depth+1)}" for v in node
+        )
+        return "[\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "]"
 
     @__format_node_repr.register(tuple)
     def _(node, depth):
-        string = ",".join(_format_node_repr(layer, depth=depth) for layer in node)
-        shifted = "\t" * (depth) + string
-        return "(" + shifted + ")"
+        string = (",\n" + "\t" * (depth + 1)).join(
+            f"{__format_node_repr(v,depth=depth+1)}" for v in node
+        )
+        return "(\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + ")"
 
     @__format_node_repr.register(dict)
     def _(node, depth):
-        string = ",".join(
-            f"{k}:{_format_node_repr(v,depth=depth)}" for k, v in node.items()
+        string = (",\n" + "\t" * (depth + 1)).join(
+            f"{k}:{__format_node_repr(v,depth=depth+1)}" for k, v in node.items()
         )
-        shifted = "\t" * (depth) + string
-        return "{" + shifted + "}"
+        return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
 
     return __format_node_repr(node, depth)
 
@@ -114,10 +108,9 @@ def _format_node_repr(node, depth):
 def _format_node_str(node, depth):
     @dispatch(argnum=0)
     def __format_node_str(node, depth):
-        multiline = "\n" in f"{node!s}"
-        string = ("\n" + "\t" * (depth + 1)) if multiline else ""
-        string += ("\n" + "\t" * (depth + 1)).join(f"{node!s}".split("\n"))
-        return string
+        # multiline = "\n" in f"{node!s}"
+        # string = ("\n" + "\t" * (depth + 1)) if multiline else ""
+        return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
 
     @__format_node_str.register(jaxlib.xla_extension.CompiledFunction)
     @__format_node_str.register(jax._src.custom_derivatives.custom_jvp)
@@ -127,23 +120,27 @@ def _format_node_str(node, depth):
 
     @__format_node_str.register(list)
     def _(node, depth):
-        string = ",".join(_format_node_str(layer, depth=depth) for layer in node)
-        shifted = "\t" * (depth) + string
-        return "[" + shifted + "]"
+        # string = ",".join(_format_node_str(layer, depth=depth) for layer in node)
+        # shifted = "\t" * (depth) + string
+        # return "[" + shifted + "]"
+        string = (",\n" + "\t" * (depth + 1)).join(
+            f"{_format_node_str(v,depth=depth+1)}" for v in node
+        )
+        return "[\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "]"
 
     @__format_node_str.register(tuple)
     def _(node, depth):
-        string = ",".join(_format_node_str(layer, depth=depth) for layer in node)
-        shifted = "\t" * (depth) + string
-        return "(" + shifted + ")"
+        string = (",\n" + "\t" * (depth + 1)).join(
+            f"{_format_node_str(v,depth=depth+1)}" for v in node
+        )
+        return "(\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + ")"
 
     @__format_node_str.register(dict)
     def _(node, depth):
-        string = ",".join(
-            f"{k}:{_format_node_str(v,depth=depth)}" for k, v in node.items()
+        string = (",\n" + "\t" * (depth + 1)).join(
+            f"{k}:{_format_node_str(v,depth=depth+1)}" for k, v in node.items()
         )
-        shifted = "\t" * (depth) + string
-        return "{" + shifted + "}"
+        return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
 
     return __format_node_str(node, depth)
 
@@ -162,7 +159,21 @@ def _format_node_diagram(node, *args, **kwargs):
     @__format_node_diagram.register(jnp.ndarray)
     @__format_node_diagram.register(jax.ShapeDtypeStruct)
     def _(node, *args, **kwargs):
-        return jax_numpy_repr(node)
+        replace_tuple = (
+            ("int", "i"),
+            ("float", "f"),
+            ("complex", "c"),
+            (",)", ")"),
+            ("(", "["),
+            (")", "]"),
+            (" ", ""),
+        )
+
+        formatted_string = f"{node.dtype}{jnp.shape(node)!r}"
+
+        for lhs, rhs in replace_tuple:
+            formatted_string = formatted_string.replace(lhs, rhs)
+        return formatted_string
 
     return __format_node_diagram(node, *args, **kwargs)
 
