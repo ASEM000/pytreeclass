@@ -98,7 +98,10 @@ def _format_node_repr(node, depth):
     @__format_node_repr.register(dict)
     def _(node, depth):
         string = (",\n" + "\t" * (depth + 1)).join(
-            f"{k}:{__format_node_repr(v,depth=depth+1)}" for k, v in node.items()
+            f"{k}:{_format_node_repr(v,depth=depth+1)}"
+            if "\n" not in f"{v!s}"
+            else f"{k}:" + "\n" + "\t" * (depth + 1) + f"{_format_node_repr(v,depth=depth+1)}"
+            for k, v in node.items()
         )
         return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
 
@@ -138,7 +141,10 @@ def _format_node_str(node, depth):
     @__format_node_str.register(dict)
     def _(node, depth):
         string = (",\n" + "\t" * (depth + 1)).join(
-            f"{k}:{_format_node_str(v,depth=depth+1)}" for k, v in node.items()
+            f"{k}:{_format_node_str(v,depth=depth+1)}"
+            if "\n" not in f"{v!s}"
+            else f"{k}:" + "\n" + "\t" * (depth + 1) + f"{_format_node_str(v,depth=depth+1)}"
+            for k, v in node.items()
         )
         return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
 
