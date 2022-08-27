@@ -432,19 +432,18 @@ def tree_diagram(tree):
     return FMT.expandtabs(4)
 
 
-def _format_width(string, width=40):
-    """strip newline/tab characters if less than max width"""
-    stripped_string = string.replace("\n", "").replace("\t", "")
-    children_length = len(stripped_string)
-    return string if children_length > width else stripped_string
-
-
 def tree_repr(tree, width: int = 40) -> str:
     """Prertty print `treeclass_leaves`
 
     Returns:
         str: indented tree leaves.
     """
+
+    def format_width(string, width=width):
+        """strip newline/tab characters if less than max width"""
+        stripped_string = string.replace("\n", "").replace("\t", "")
+        children_length = len(stripped_string)
+        return string if children_length > width else stripped_string
 
     @dispatch(argnum=1)
     def recurse_field(field_item, node_item, depth, is_frozen, is_last_field):
@@ -457,7 +456,7 @@ def tree_repr(tree, width: int = 40) -> str:
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
-            FMT += f"={_format_width(_format_node_repr(node_item,depth),width=width)}"
+            FMT += f"={format_width(_format_node_repr(node_item,depth))}"
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, is_frozen)
@@ -481,11 +480,7 @@ def tree_repr(tree, width: int = 40) -> str:
 
             recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
 
-            FMT = (
-                FMT[:start_cursor]
-                + _format_width(FMT[start_cursor:], width=width)
-                + ")"
-            )
+            FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
             FMT += "" if is_last_field else ","
 
     @dispatch(argnum=0)
@@ -513,7 +508,7 @@ def tree_repr(tree, width: int = 40) -> str:
 
     FMT = ""
     recurse(tree, depth=1, is_frozen=tree.frozen)
-    FMT = f"{(tree.__class__.__name__)}({_format_width(FMT,width=width)})"
+    FMT = f"{(tree.__class__.__name__)}({format_width(FMT,width)})"
 
     return FMT.expandtabs(2)
 
@@ -524,6 +519,12 @@ def tree_str(tree, width: int = 40) -> str:
     Returns:
         str: indented tree leaves.
     """
+
+    def format_width(string, width=width):
+        """strip newline/tab characters if less than max width"""
+        stripped_string = string.replace("\n", "").replace("\t", "")
+        children_length = len(stripped_string)
+        return string if children_length > width else stripped_string
 
     @dispatch(argnum=1)
     def recurse_field(field_item, node_item, depth, is_frozen, is_last_field):
@@ -536,7 +537,7 @@ def tree_str(tree, width: int = 40) -> str:
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
-            FMT += f"={_format_width(_format_node_str(node_item,depth),width=width)}"
+            FMT += f"={format_width(_format_node_str(node_item,depth))}"
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, is_frozen)
@@ -560,11 +561,7 @@ def tree_str(tree, width: int = 40) -> str:
 
             recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
 
-            FMT = (
-                FMT[:start_cursor]
-                + _format_width(FMT[start_cursor:], width=width)
-                + ")"
-            )
+            FMT = FMT[:start_cursor] + format_width(FMT[start_cursor:]) + ")"
             FMT += "" if is_last_field else ","
 
     @dispatch(argnum=0)
@@ -591,7 +588,7 @@ def tree_str(tree, width: int = 40) -> str:
 
     FMT = ""
     recurse(tree, depth=1, is_frozen=tree.frozen)
-    FMT = f"{(tree.__class__.__name__)}({_format_width(FMT,width=width)})"
+    FMT = f"{(tree.__class__.__name__)}({format_width(FMT,width)})"
 
     return FMT.expandtabs(2)
 

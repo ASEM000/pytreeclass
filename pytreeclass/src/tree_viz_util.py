@@ -72,16 +72,9 @@ def _format_count(node_count, newline=False):
 def _format_node_repr(node, depth):
     @dispatch(argnum=0)
     def __format_node_repr(node, *args, **kwargs):
-        multiline = "\n" in f"{node!r}"
+        multiline = "\n" in f"{node!s}"
         string = ("\n" + "\t" * (depth + 1)) if multiline else ""
         string += ("\n" + "\t" * (depth + 1)).join(f"{node!r}".split("\n"))
-        return string
-
-    @__format_node_repr.register(str)
-    def _(node, *args, **kwargs):
-        multiline = "\n" in node
-        string = ("\n" + "\t" * (depth + 1)) if multiline else ""
-        string += ("\n" + "\t" * (depth + 1)).join(node.split("\n"))
         return string
 
     @__format_node_repr.register(jnp.ndarray)
@@ -110,12 +103,8 @@ def _format_node_repr(node, depth):
     @__format_node_repr.register(dict)
     def _(node, depth):
         string = ",".join(
-            _format_node_repr(
-                ":".join([k, _format_node_repr(v, depth=depth - 1)]), depth=depth - 1
-            )
-            for k, v in node.items()
+            f"{k}:{_format_node_repr(v,depth=depth)}" for k, v in node.items()
         )
-
         shifted = "\t" * (depth) + string
         return "{" + shifted + "}"
 
@@ -128,13 +117,6 @@ def _format_node_str(node, depth):
         multiline = "\n" in f"{node!s}"
         string = ("\n" + "\t" * (depth + 1)) if multiline else ""
         string += ("\n" + "\t" * (depth + 1)).join(f"{node!s}".split("\n"))
-        return string
-
-    @__format_node_str.register(str)
-    def _(node, *args, **kwargs):
-        multiline = "\n" in node
-        string = ("\n" + "\t" * (depth + 1)) if multiline else ""
-        string += ("\n" + "\t" * (depth + 1)).join(node.split("\n"))
         return string
 
     @__format_node_str.register(jaxlib.xla_extension.CompiledFunction)
@@ -158,10 +140,10 @@ def _format_node_str(node, depth):
     @__format_node_str.register(dict)
     def _(node, depth):
         string = ",".join(
-            f"{k}:{_format_node_str(v,depth=depth-1)}" for k, v in node.items()
+            f"{k}:{_format_node_str(v,depth=depth)}" for k, v in node.items()
         )
         shifted = "\t" * (depth) + string
-        return "{" + (shifted) + "}"
+        return "{" + shifted + "}"
 
     return __format_node_str(node, depth)
 
