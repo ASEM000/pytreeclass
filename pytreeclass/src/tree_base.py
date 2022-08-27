@@ -106,12 +106,12 @@ class _treeBase:
         # create field
         field_value = field(repr=repr, metadata={"static": static})
 
-        setattr(field_value, "name", name)
-        setattr(field_value, "type", type(node))
+        object.__setattr__(field_value, "name", name)
+        object.__setattr__(field_value, "type", type(node))
 
         # register it to class
         self.__pytree_fields__.update({name: field_value})
-        setattr(self, name, node)
+        object.__setattr__(self, name, node)
 
         return getattr(self, name)
 
