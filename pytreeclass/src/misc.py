@@ -1,4 +1,6 @@
+import functools as ft
 from dataclasses import dataclass, field
+from types import FunctionType
 from typing import Any
 
 import jax.tree_util as jtu
@@ -58,3 +60,19 @@ class mutableContext:
 
     def __exit__(self, type_, value, traceback):
         _immutate_tree(self.instance)
+
+
+def _mutable(instance_method):
+    """decorator that allow mutable behvior"""
+    assert isinstance(
+        instance_method, FunctionType
+    ), f"mutable can only be applied to methods. Found{type(instance_method)}"
+
+    @ft.wraps(instance_method)
+    def mutable_method(self, *args, **kwargs):
+        with mutableContext(self):
+            # return before exiting the context
+            # will lead to mutable behavior
+            return instance_method(self, *args, **kwargs)
+
+    return mutable_method

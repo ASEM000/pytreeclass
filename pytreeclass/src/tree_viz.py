@@ -477,7 +477,7 @@ def tree_repr(tree, width: int = 40) -> str:
 
             temp = "\t" * (depth + 1)
             temp += (",\n" + "\t" * (depth + 1)).join(
-                f"{k}:{format_width(_format_node_repr(v,depth))}"
+                f"{k}:{format_width(_format_node_repr(v,depth+1))}"
                 for k, v in node_item.items()
             )
             temp = "{\n" + temp + "\n" + "\t" * depth + "}"
@@ -594,7 +594,7 @@ def tree_str(tree, width: int = 40) -> str:
 
             temp = "\t" * (depth + 1)
             temp += (",\n" + "\t" * (depth + 1)).join(
-                f"{k}:{format_width(_format_node_str(v,depth))}"
+                f"{k}:{format_width(_format_node_str(v,depth+1))}"
                 for k, v in node_item.items()
             )
             temp = "{\n" + temp + "\n" + "\t" * depth + "}"

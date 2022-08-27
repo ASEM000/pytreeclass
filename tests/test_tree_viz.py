@@ -476,6 +476,20 @@ def test_tree_with_containers():
         == "Test\n    ├── a=<class 'tuple'>\n    │   ├── a_0=1\n    │   ├── a_1=Test\n    │   │   ├── a=2\n    │   │   └── b=10    \n    │   └── a_2=<class 'tuple'>\n    │       ├── a_2_0=3\n    │       ├── a_2_1=4\n    │       └── a_2_2=<class 'tuple'>\n    │           ├── a_2_2_0=5\n    │           └── a_2_2_1=6\n    └── b=1 "
     )
 
+    @pytc.treeclass
+    class Test:
+        a: Any
+
+    assert (
+        f"{(Test({0: [1, 2, 3,jnp.ones([5,5])],1: ['test']}))!r}"
+        == "Test(a={0:[1,2,3,f32[5,5]],1:['test']})"
+    )
+    assert (
+        f"{(Test({0: [1, 2, 3,jnp.ones([5,5])],1: ['test']}))!s}"
+        # trunk-ignore(flake8/E501)
+        == "Test(\n  a={\n    0:[\n      1,\n      2,\n      3,\n      [[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]\n    ],\n    1:[test]\n  }\n)"
+    )
+
 
 def test_func_repr():
     @pytc.treeclass

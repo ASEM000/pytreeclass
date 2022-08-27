@@ -3,30 +3,13 @@ from __future__ import annotations
 import functools as ft
 import inspect
 from dataclasses import dataclass
-from types import FunctionType
 
 import jax
 
-from pytreeclass.src.misc import ImmutableInstanceError, mutableContext
+from pytreeclass.src.misc import ImmutableInstanceError, _mutable
 from pytreeclass.src.tree_base import _implicitSetter, _treeBase
 from pytreeclass.src.tree_indexer import _treeIndexer
 from pytreeclass.src.tree_op_base import _treeOpBase
-
-
-def mutable(instance_method):
-    """decorator that allow mutable behvior"""
-    assert isinstance(
-        instance_method, FunctionType
-    ), f"mutable can only be applied to methods. Found{type(instance_method)}"
-
-    @ft.wraps(instance_method)
-    def mutable_method(self, *args, **kwargs):
-        with mutableContext(self):
-            # return before exiting the context
-            # will lead to mutable behavior
-            return instance_method(self, *args, **kwargs)
-
-    return mutable_method
 
 
 def treeclass(*args, **kwargs):
@@ -52,7 +35,7 @@ def treeclass(*args, **kwargs):
         mutable_setattr = new_cls.__setattr__
         new_cls.__immutable_treeclass__ = True
         new_cls.__setattr__ = immutable_setattr(mutable_setattr)
-        new_cls.__init__ = mutable(new_cls.__init__)
+        new_cls.__init__ = _mutable(new_cls.__init__)
 
         return jax.tree_util.register_pytree_node_class(new_cls)
 
