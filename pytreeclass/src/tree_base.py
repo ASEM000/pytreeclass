@@ -19,13 +19,37 @@ from pytreeclass.src.tree_viz import (
 PyTree = Any
 
 
-class fieldDict(dict):
-    # dict will throw
+@jtu.register_pytree_node_class
+class _STATIC:
+    # exclude from JAX computations
+    def __init__(self, value):
+        self.value = value
+
+    def tree_flatten(self):
+        return (), (self.value)
+
+    @classmethod
+    def tree_unflatten(cls, treedef, leaves):
+        return treedef
+
+    def __repr__(self):
+        return f"{self.value!r}"
+
+    def __str__(self):
+        return f"{self.value!s}"
+
+
+class _nodeContainer(tuple):
+    # tuple will throw
     # `ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()``
     # while this implementation will not.
     # relevant issue : https://github.com/google/jax/issues/11089
+    def __init__(self, node_items):
+        super().__init__()
+        self.node_items = node_items
+
     def __eq__(self, other):
-        return self.__dict__ == other.__dict__
+        return self.node_items == other.node_items
 
 
 class _treeBase:
@@ -47,21 +71,21 @@ class _treeBase:
         Returns:
             Frozen state boolean.
         """
-        return True if hasattr(self, "__frozen_fields__") else False
+        return True if hasattr(self, "__frozen_structure__") else False
 
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
 
         Returns:
-            Tuple of dynamic values and (dynamic keys,static dict)
+            Tuple of dynamic values and (dynamic keys,static dict, cached values)
         """
-        dynamic, static = self.__pytree_structure__
+        node_items, pytree_fields = self.__pytree_structure__
 
         if self.frozen:
-            return (), ((), {"__frozen_fields__": (dynamic, static)})
+            return (), ((), (node_items, pytree_fields))
 
         else:
-            return dynamic.values(), (dynamic.keys(), static)
+            return node_items, (pytree_fields, ())
 
     @classmethod
     def tree_unflatten(cls, treedef, leaves):
@@ -79,17 +103,19 @@ class _treeBase:
         """
 
         new_cls = object.__new__(cls)
-        tree_fields = treedef[1].get("__frozen_fields__", None)
 
-        if tree_fields is not None:
-            object.__setattr__(new_cls, "__frozen_fields__", tree_fields)
-            dynamic, static = tree_fields
-            attrs = {**dynamic, **static}
-
+        if len(treedef[1]) > 0:
+            node_items, field_items = treedef[1]
+            # retrieve the cached frozen structure
+            object.__setattr__(
+                new_cls, "__frozen_structure__", (node_items, field_items)
+            )
         else:
-            attrs = {**dict(zip(treedef[0], leaves)), **treedef[1]}
+            node_items, field_items = leaves, treedef[0]
 
+        attrs = dict(zip(field_items.keys(), node_items))
         new_cls.__dict__.update(attrs)
+        new_cls.__dict__.update({"__pytree_fields__": (field_items)})
 
         return new_cls
 
@@ -132,33 +158,20 @@ class _treeBase:
 
     @property
     def __pytree_structure__(self):
-        """Computes the dynamic and static fields.
+        if self.__dict__.get("__frozen_structure__", None) is not None:
+            # check if frozen structure is cached
+            # Note: frozen strcture = None
+            # means that the tree is frozen, but not yet cached
+            return self.__frozen_structure__
 
-        Returns:
-            Pair of dynamic and static dictionaries.
-        """
-        if self.__dict__.get("__frozen_fields__", None) is not None:
-            return self.__frozen_fields__
+        node_items = _nodeContainer(
+            _STATIC(getattr(self, fi.name))
+            if fi.metadata.get("static", False)
+            else getattr(self, fi.name)
+            for fi in self.__pytree_fields__.values()
+        )
 
-        dynamic, static = fieldDict(), fieldDict()
-
-        for fi in self.__pytree_fields__.values():
-            # field value is defined in class dict
-            if hasattr(self, fi.name):
-                value = getattr(self, fi.name)
-            else:
-                # the user did not declare a variable defined in field
-                raise ValueError(f"field={fi.name} is not declared.")
-
-            if fi.metadata.get("static", False):
-                static[fi.name] = value
-
-            else:
-                dynamic[fi.name] = value
-
-        static["__pytree_fields__"] = self.__pytree_fields__
-
-        return (dynamic, static)
+        return (node_items, self.__pytree_fields__)
 
 
 class _implicitSetter:
