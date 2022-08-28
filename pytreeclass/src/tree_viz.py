@@ -204,7 +204,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
         if field_item.repr:
             is_frozen = node_item.frozen
             count, size = _reduce_count_and_size(node_item.at[...].unfreeze())
-            node_items, field_items = node_item.__pytree_structure__
+            dynamic, _, _ = node_item.__pytree_structure__
             ROWS.append(
                 [
                     "/".join(name_path)
@@ -215,7 +215,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     "\n".join(
                         [
                             f"{k}={_format_node(v)}"
-                            for k, v in zip(field_items.keys(), node_items)
+                            for k, v in dynamic.items()
                             if not isinstance(v, EXCLUDED_TYPES)
                         ]
                     ),

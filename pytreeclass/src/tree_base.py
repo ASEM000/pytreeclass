@@ -39,17 +39,9 @@ class _STATIC:
         return f"{self.value!s}"
 
 
-class _nodeContainer(tuple):
-    # tuple will throw
-    # `ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()``
-    # while this implementation will not.
-    # relevant issue : https://github.com/google/jax/issues/11089
-    def __init__(self, node_items):
-        super().__init__()
-        self.node_items = node_items
-
+class _fieldDict(dict):
     def __eq__(self, other):
-        return self.node_items == other.node_items
+        return self.__dict__ == other.__dict__
 
 
 class _treeBase:
@@ -79,13 +71,13 @@ class _treeBase:
         Returns:
             Tuple of dynamic values and (dynamic keys,static dict, cached values)
         """
-        node_items, pytree_fields = self.__pytree_structure__
+        dynamic, static, pytree_fields = self.__pytree_structure__
 
         if self.frozen:
-            return (), ((), (node_items, pytree_fields))
+            return (), ((), (), (dynamic, static, pytree_fields))
 
         else:
-            return node_items, (pytree_fields, ())
+            return dynamic.values(), (dynamic.keys(), (static, pytree_fields), ())
 
     @classmethod
     def tree_unflatten(cls, treedef, leaves):
@@ -104,17 +96,18 @@ class _treeBase:
 
         new_cls = object.__new__(cls)
 
-        if len(treedef[1]) > 0:
-            node_items, pytree_fields = treedef[1]
+        if len(treedef[2]) > 0:
+            dynamic, static, pytree_fields = treedef[2]
             # retrieve the cached frozen structure
             object.__setattr__(
-                new_cls, "__frozen_structure__", (node_items, pytree_fields)
+                new_cls, "__frozen_structure__", (dynamic, static, pytree_fields)
             )
         else:
-            node_items, pytree_fields = leaves, treedef[0]
+            dynamic = dict(zip(treedef[0], leaves))
+            static, pytree_fields = treedef[1]
 
-        attrs = dict(zip(pytree_fields.keys(), node_items))
-        new_cls.__dict__.update(attrs)
+        new_cls.__dict__.update(dynamic)
+        new_cls.__dict__.update(static)
         new_cls.__dict__.update({"__pytree_fields__": (pytree_fields)})
 
         return new_cls
@@ -164,14 +157,15 @@ class _treeBase:
             # means that the tree is frozen, but not yet cached
             return self.__frozen_structure__
 
-        node_items = _nodeContainer(
-            _STATIC(getattr(self, fi.name))
-            if fi.metadata.get("static", False)
-            else getattr(self, fi.name)
-            for fi in self.__pytree_fields__.values()
-        )
+        dynamic, static = _fieldDict(), _fieldDict()
 
-        return (node_items, self.__pytree_fields__)
+        for field_item in self.__pytree_fields__.values():
+            if field_item.metadata.get("static", False):
+                static[field_item.name] = getattr(self, field_item.name)
+            else:
+                dynamic[field_item.name] = getattr(self, field_item.name)
+
+        return (dynamic, static, self.__pytree_fields__)
 
 
 class _implicitSetter:
