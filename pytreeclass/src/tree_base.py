@@ -64,14 +64,14 @@ class _treeBase:
             return dynamic.values(), (dynamic.keys(), static)
 
     @classmethod
-    def tree_unflatten(cls, treedef, children):
+    def tree_unflatten(cls, treedef, leaves):
         """Unflatten rule for `jax.tree_unflatten`
 
         Args:
             treedef:
                 Pytree definition
                 includes Dynamic nodes keys , static dictionary and frozen state
-            children:
+            leaves:
                 Dynamic nodes values
 
         Returns:
@@ -87,7 +87,7 @@ class _treeBase:
             attrs = {**dynamic, **static}
 
         else:
-            attrs = {**dict(zip(treedef[0], children)), **treedef[1]}
+            attrs = {**dict(zip(treedef[0], leaves)), **treedef[1]}
 
         new_cls.__dict__.update(attrs)
 
