@@ -105,17 +105,17 @@ class _treeBase:
         new_cls = object.__new__(cls)
 
         if len(treedef[1]) > 0:
-            node_items, field_items = treedef[1]
+            node_items, pytree_fields = treedef[1]
             # retrieve the cached frozen structure
             object.__setattr__(
-                new_cls, "__frozen_structure__", (node_items, field_items)
+                new_cls, "__frozen_structure__", (node_items, pytree_fields)
             )
         else:
-            node_items, field_items = leaves, treedef[0]
+            node_items, pytree_fields = leaves, treedef[0]
 
-        attrs = dict(zip(field_items.keys(), node_items))
+        attrs = dict(zip(pytree_fields.keys(), node_items))
         new_cls.__dict__.update(attrs)
-        new_cls.__dict__.update({"__pytree_fields__": (field_items)})
+        new_cls.__dict__.update({"__pytree_fields__": (pytree_fields)})
 
         return new_cls
 
