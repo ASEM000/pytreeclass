@@ -81,13 +81,16 @@ class _treeBase:
 
     def __copy__(self):
         return tree_copy(self)
-    
+
     def __deepcopy__(self):
         return tree_copy(self)
 
     @property
     def __pytree_structure__(self):
-        if self.__dict__.get("__frozen_structure__", None) is not None:
+        if (
+            hasattr(self, "__frozen_structure__")
+            and getattr(self, "__frozen_structure__") is not None
+        ):
             # check if frozen structure is cached
             # Note: frozen strcture = None
             # means that the tree is frozen, but not yet cached
