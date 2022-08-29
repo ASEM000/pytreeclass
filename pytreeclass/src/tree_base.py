@@ -52,29 +52,11 @@ class _treeBase:
                 object.__setattr__(self, field_item.name, field_item.default)
         return self
 
-    @property
-    def frozen(self) -> bool:
-        """Show treeclass frozen status.
-
-        Returns:
-            Frozen state boolean.
-        """
-        return True if hasattr(self, "__frozen_structure__") else False
-
     def __repr__(self):
         return tree_repr(self, width=60)
 
     def __str__(self):
         return tree_str(self, width=60)
-
-    def summary(self, array: jnp.ndarray = None) -> str:
-        return tree_summary(self, array)
-
-    def tree_diagram(self) -> str:
-        return tree_diagram(self)
-
-    def tree_box(self, array: jnp.ndarray = None) -> str:
-        return tree_box(self, array)
 
     def __hash__(self):
         return hash(tuple(jtu.tree_leaves(self)))
@@ -84,6 +66,24 @@ class _treeBase:
 
     def __deepcopy__(self):
         return tree_copy(self)
+
+    @property
+    def frozen(self) -> bool:
+        """Show treeclass frozen status.
+
+        Returns:
+            Frozen state boolean.
+        """
+        return True if hasattr(self, "__frozen_structure__") else False
+
+    def summary(self, array: jnp.ndarray = None) -> str:
+        return tree_summary(self, array)
+
+    def tree_diagram(self) -> str:
+        return tree_diagram(self)
+
+    def tree_box(self, array: jnp.ndarray = None) -> str:
+        return tree_box(self, array)
 
     @property
     def __pytree_structure__(self):
