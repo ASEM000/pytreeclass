@@ -68,7 +68,7 @@ def test_field_only():
             self.l2 = Linear(key=keys[1], in_dim=hidden_dim, out_dim=hidden_dim)
             self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AttributeError):
         # l4 is not declared
         model = StackedLinear(
             key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2
@@ -83,7 +83,7 @@ def test_field_only():
         def __init__(self, key, in_dim, out_dim, hidden_dim):
             ...
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AttributeError):
         # l5 is not declared
         model = StackedLinear(
             key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2

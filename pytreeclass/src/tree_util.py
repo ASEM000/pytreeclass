@@ -73,12 +73,10 @@ def is_excluded(field_item: dataclasses.field, node_item: Any) -> bool:
 
 def sequential_tree_shape_eval(tree, array):
     """Evaluate shape propagation of assumed sequential modules"""
+    dyanmic, static = tree.__pytree_structure__
 
     # all dynamic/static leaves
-    all_leaves = (
-        *tree.__pytree_structure__[0].values(),
-        *tree.__pytree_structure__[1].values(),
-    )
+    all_leaves = (*dyanmic.values(), *static.values())
     leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
 
     shape = [jax.eval_shape(lambda x: x, array)]
@@ -146,7 +144,7 @@ def _reduce_count_and_size(leaf):
 def _freeze_nodes(tree):
     """inplace freezing"""
     if is_treeclass(tree):
-        object.__setattr__(tree, "__frozen_fields__", None)
+        object.__setattr__(tree, "__frozen_structure__", tree.__pytree_structure__)
         for kw in tree.__pytree_fields__:
             _freeze_nodes(tree.__dict__[kw])
     return tree
@@ -155,8 +153,8 @@ def _freeze_nodes(tree):
 def _unfreeze_nodes(tree):
     """inplace unfreezing"""
     if is_treeclass(tree):
-        if hasattr(tree, "__frozen_fields__"):
-            object.__delattr__(tree, "__frozen_fields__")
+        if hasattr(tree, "__frozen_structure__"):
+            object.__delattr__(tree, "__frozen_structure__")
         for kw in tree.__pytree_fields__:
             _unfreeze_nodes(tree.__dict__[kw])
     return tree

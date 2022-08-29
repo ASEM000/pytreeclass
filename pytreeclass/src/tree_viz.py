@@ -137,7 +137,7 @@ PyTree = Any
 
 
 def tree_summary(tree, array: jnp.ndarray = None) -> str:
-    EXCLUDED_TYPES = (src.misc.static,)
+    EXCLUDED_TYPES = (src.misc.static, src.tree_base._STATIC)
     _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
 
     if array is not None:
@@ -204,7 +204,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
         if field_item.repr:
             is_frozen = node_item.frozen
             count, size = _reduce_count_and_size(node_item.at[...].unfreeze())
-
+            dynamic, _ = node_item.__pytree_structure__
             ROWS.append(
                 [
                     "/".join(name_path)
@@ -215,7 +215,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     "\n".join(
                         [
                             f"{k}={_format_node(v)}"
-                            for k, v in node_item.__pytree_structure__[0].items()
+                            for k, v in dynamic.items()
                             if not isinstance(v, EXCLUDED_TYPES)
                         ]
                     ),
@@ -242,9 +242,9 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
             else:
 
-                is_static_field = field_item.metadata.get("static", False)
+                is_static = field_item.metadata.get("static", False)
 
-                if not (is_static_field):
+                if not (is_static):
                     recurse_field(
                         field_item=field_item,
                         node_item=node_item,
@@ -336,8 +336,8 @@ def tree_diagram(tree):
         nonlocal FMT
 
         if field_item.repr:
-            is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if is_frozen else "─")
+            is_static = field_item.metadata.get("static", False)
+            mark = "*" if is_static else ("#" if is_frozen else "─")
             is_last_field = node_index <= 1
 
             FMT += "\n"
@@ -386,8 +386,8 @@ def tree_diagram(tree):
 
         if field_item.repr:
             is_frozen = node_item.frozen
-            is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if is_frozen else "─")
+            is_static = field_item.metadata.get("static", False)
+            mark = "*" if is_static else ("#" if is_frozen else "─")
             layer_class_name = node_item.__class__.__name__
 
             is_last_field = node_index == 1
@@ -451,8 +451,8 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if is_frozen else "")
+            is_static = field_item.metadata.get("static", False)
+            mark = "*" if is_static else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
@@ -468,8 +468,8 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if is_frozen else "")
+            is_static = field_item.metadata.get("static", False)
+            mark = "*" if is_static else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
@@ -493,8 +493,8 @@ def tree_repr(tree, width: int = 40) -> str:
         nonlocal FMT
         if field_item.repr:
             is_frozen = node_item.frozen
-            is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if is_frozen else "")
+            is_static = field_item.metadata.get("static", False)
+            mark = "*" if is_static else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
@@ -561,8 +561,8 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if is_frozen else "")
+            is_static = field_item.metadata.get("static", False)
+            mark = "*" if is_static else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
@@ -585,8 +585,8 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if is_frozen else "")
+            is_static = field_item.metadata.get("static", False)
+            mark = "*" if is_static else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
@@ -611,8 +611,8 @@ def tree_str(tree, width: int = 40) -> str:
 
         if field_item.repr:
             is_frozen = node_item.frozen
-            is_static_field = field_item.metadata.get("static", False)
-            mark = "*" if is_static_field else ("#" if is_frozen else "")
+            is_static = field_item.metadata.get("static", False)
+            mark = "*" if is_static else ("#" if is_frozen else "")
 
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
