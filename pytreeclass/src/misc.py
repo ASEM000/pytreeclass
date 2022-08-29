@@ -6,7 +6,7 @@ from typing import Any
 import jax.tree_util as jtu
 
 import pytreeclass.src as src
-from pytreeclass.src.tree_base import _treeBase
+from pytreeclass.src.tree_base import _explicitTreeBase, _treeBase
 
 
 class ImmutableInstanceError(Exception):
@@ -15,7 +15,7 @@ class ImmutableInstanceError(Exception):
 
 @jtu.register_pytree_node_class
 @dataclass(repr=False, eq=True, frozen=True)
-class static(_treeBase):
+class static(_treeBase, _explicitTreeBase):
     value: Any = field(metadata={"static": True})
 
 
