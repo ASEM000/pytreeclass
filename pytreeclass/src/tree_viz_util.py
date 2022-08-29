@@ -69,6 +69,13 @@ def _format_count(node_count, newline=False):
     return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
 
 
+def _format_width(string, width=50):
+    """strip newline/tab characters if less than max width"""
+    stripped_string = string.replace("\n", "").replace("\t", "")
+    children_length = len(stripped_string)
+    return string if children_length > width else stripped_string
+
+
 def _format_node_repr(node, depth):
     @dispatch(argnum=0)
     def __format_node_repr(node, depth):
@@ -88,21 +95,27 @@ def _format_node_repr(node, depth):
     @__format_node_repr.register(list)
     def _(node, depth):
         string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_node_repr(v,depth=depth+1)}" for v in node
+            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
         )
         return "[\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "]"
 
     @__format_node_repr.register(tuple)
     def _(node, depth):
         string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_node_repr(v,depth=depth+1)}" for v in node
+            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
         )
         return "(\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + ")"
 
     @__format_node_repr.register(dict)
     def _(node, depth):
         string = (",\n" + "\t" * (depth + 1)).join(
-            f"{k}:{_format_node_repr(v,depth=depth)}" for k, v in node.items()
+            f"{k}:{_format_node_repr(v,depth=depth+1)}"
+            if "\n" not in f"{v!s}"
+            else f"{k}:"
+            + "\n"
+            + "\t" * (depth + 1)
+            + f"{_format_width(_format_node_repr(v,depth=depth+1))}"
+            for k, v in node.items()
         )
         return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
 
@@ -112,8 +125,6 @@ def _format_node_repr(node, depth):
 def _format_node_str(node, depth):
     @dispatch(argnum=0)
     def __format_node_str(node, depth):
-        # multiline = "\n" in f"{node!s}"
-        # string = ("\n" + "\t" * (depth + 1)) if multiline else ""
         return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
 
     @__format_node_str.register(jaxlib.xla_extension.CompiledFunction)
@@ -124,18 +135,15 @@ def _format_node_str(node, depth):
 
     @__format_node_str.register(list)
     def _(node, depth):
-        # string = ",".join(_format_node_str(layer, depth=depth) for layer in node)
-        # shifted = "\t" * (depth) + string
-        # return "[" + shifted + "]"
         string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_node_str(v,depth=depth+1)}" for v in node
+            f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
         )
         return "[\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "]"
 
     @__format_node_str.register(tuple)
     def _(node, depth):
         string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_node_str(v,depth=depth+1)}" for v in node
+            f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
         )
         return "(\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + ")"
 
@@ -147,12 +155,12 @@ def _format_node_str(node, depth):
             else f"{k}:"
             + "\n"
             + "\t" * (depth + 1)
-            + f"{_format_node_str(v,depth=depth+1)}"
+            + f"{_format_width(_format_node_str(v,depth=depth+1))}"
             for k, v in node.items()
         )
         return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
 
-    return __format_node_str(node, depth)
+    return _format_width(__format_node_str(node, depth))
 
 
 def _format_node_diagram(node, *args, **kwargs):

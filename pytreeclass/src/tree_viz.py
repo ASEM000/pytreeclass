@@ -25,6 +25,7 @@ from pytreeclass.src.tree_viz_util import (
     _format_node_repr,
     _format_node_str,
     _format_size,
+    _format_width,
     _layer_box,
     _table,
     _vbox,
@@ -432,18 +433,12 @@ def tree_diagram(tree):
     return FMT.expandtabs(4)
 
 
-def tree_repr(tree, width: int = 40) -> str:
+def tree_repr(tree, width: int = 60) -> str:
     """Prertty print `treeclass_leaves`
 
     Returns:
         str: indented tree leaves.
     """
-
-    def format_width(string, width=width):
-        """strip newline/tab characters if less than max width"""
-        stripped_string = string.replace("\n", "").replace("\t", "")
-        children_length = len(stripped_string)
-        return string if children_length > width else stripped_string
 
     @dispatch(argnum=1)
     def recurse_field(field_item, node_item, depth, is_frozen, is_last_field):
@@ -457,32 +452,8 @@ def tree_repr(tree, width: int = 40) -> str:
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
             FMT += "="
-            FMT += f"{format_width(_format_node_repr(node_item,depth))}"
-            FMT += "" if is_last_field else ","
+            FMT += f"{(_format_node_repr(node_item,depth))}"
 
-        recurse(node_item, depth, is_frozen)
-
-    @recurse_field.register(dict)
-    def _(field_item, node_item, depth, is_frozen, is_last_field):
-        """format non-treeclass field"""
-        nonlocal FMT
-
-        if field_item.repr:
-            is_static = field_item.metadata.get("static", False)
-            mark = "*" if is_static else ("#" if is_frozen else "")
-
-            FMT += "\n" + "\t" * depth
-            FMT += f"{mark}{field_item.name}"
-            FMT += "="
-
-            temp = "\t" * (depth + 1)
-            temp += (",\n" + "\t" * (depth + 1)).join(
-                f"{k}:{format_width(_format_node_repr(v,depth+1))}"
-                for k, v in node_item.items()
-            )
-            temp = "{\n" + temp + "\n" + "\t" * depth + "}"
-
-            FMT += f"{format_width(temp)}"
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, is_frozen)
@@ -491,6 +462,7 @@ def tree_repr(tree, width: int = 40) -> str:
     def _(field_item, node_item, depth, is_frozen, is_last_field):
         """format treeclass field"""
         nonlocal FMT
+
         if field_item.repr:
             is_frozen = node_item.frozen
             is_static = field_item.metadata.get("static", False)
@@ -501,12 +473,11 @@ def tree_repr(tree, width: int = 40) -> str:
 
             FMT += f"{mark}{field_item.name}"
             FMT += f"={layer_class_name}" + "("
-
             start_cursor = len(FMT)  # capture children repr
 
             recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
 
-            FMT = FMT[:start_cursor] + format_width(
+            FMT = FMT[:start_cursor] + _format_width(
                 FMT[start_cursor:] + "\n" + "\t" * (depth) + ")"
             )
             FMT += "" if is_last_field else ","
@@ -518,7 +489,6 @@ def tree_repr(tree, width: int = 40) -> str:
     @recurse.register(src.tree_base._treeBase)
     def _(tree, depth, is_frozen):
         nonlocal FMT
-        is_treeclass(tree)
 
         leaves_count = len(tree.__pytree_fields__)
         for i, fi in enumerate(tree.__pytree_fields__.values()):
@@ -536,8 +506,7 @@ def tree_repr(tree, width: int = 40) -> str:
 
     FMT = ""
     recurse(tree, depth=1, is_frozen=tree.frozen)
-    FMT = f"{(tree.__class__.__name__)}(" + FMT + "\n)"
-    FMT = format_width(FMT, width)
+    FMT = f"{(tree.__class__.__name__)}(" + _format_width(FMT + "\n)", width)
 
     return FMT.expandtabs(2)
 
@@ -548,12 +517,6 @@ def tree_str(tree, width: int = 40) -> str:
     Returns:
         str: indented tree leaves.
     """
-
-    def format_width(string, width=width):
-        """strip newline/tab characters if less than max width"""
-        stripped_string = string.replace("\n", "").replace("\t", "")
-        children_length = len(stripped_string)
-        return string if children_length > width else stripped_string
 
     @dispatch(argnum=1)
     def recurse_field(field_item, node_item, depth, is_frozen, is_last_field):
@@ -570,36 +533,10 @@ def tree_str(tree, width: int = 40) -> str:
 
             if "\n" in f"{node_item!s}":
                 FMT += "\n" + "\t" * (depth + 1)
-                FMT += f"{format_width(_format_node_str(node_item,depth+1))}"
-
+                FMT += f"{(_format_node_str(node_item,depth+1))}"
             else:
-                FMT += f"{format_width(_format_node_str(node_item,depth))}"
+                FMT += f"{(_format_node_str(node_item,depth))}"
 
-            FMT += "" if is_last_field else ","
-
-        recurse(node_item, depth, is_frozen)
-
-    @recurse_field.register(dict)
-    def _(field_item, node_item, depth, is_frozen, is_last_field):
-        """format non-treeclass field"""
-        nonlocal FMT
-
-        if field_item.repr:
-            is_static = field_item.metadata.get("static", False)
-            mark = "*" if is_static else ("#" if is_frozen else "")
-
-            FMT += "\n" + "\t" * depth
-            FMT += f"{mark}{field_item.name}"
-            FMT += "="
-
-            temp = "\t" * (depth + 1)
-            temp += (",\n" + "\t" * (depth + 1)).join(
-                f"{k}:{format_width(_format_node_str(v,depth+1))}"
-                for k, v in node_item.items()
-            )
-            temp = "{\n" + temp + "\n" + "\t" * depth + "}"
-
-            FMT += f"{format_width(temp)}"
             FMT += "" if is_last_field else ","
 
         recurse(node_item, depth, is_frozen)
@@ -623,7 +560,7 @@ def tree_str(tree, width: int = 40) -> str:
 
             recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
 
-            FMT = FMT[:start_cursor] + format_width(
+            FMT = FMT[:start_cursor] + _format_width(
                 FMT[start_cursor:] + "\n" + "\t" * (depth) + ")"
             )
             FMT += "" if is_last_field else ","
@@ -652,7 +589,7 @@ def tree_str(tree, width: int = 40) -> str:
 
     FMT = ""
     recurse(tree, depth=1, is_frozen=tree.frozen)
-    FMT = f"{(tree.__class__.__name__)}(" + format_width(FMT + "\n)", width)
+    FMT = f"{(tree.__class__.__name__)}(" + _format_width(FMT + "\n)", width)
 
     return FMT.expandtabs(2)
 

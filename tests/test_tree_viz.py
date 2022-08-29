@@ -281,7 +281,7 @@ def test_tree_indent():
     assert (
         f"{A!r}"
         # trunk-ignore(flake8/E501)
-        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(a='SomethingWrittenHereSomethingWrittenHere',b=20,c=i32[5]),\n  name=static(*value='SomethingWrittenHere')\n),)"
+        == "(level2(\n  d=level1(a=1,b=10,c=i32[5]),\n  e=level1(\n    a='SomethingWrittenHereSomethingWrittenHere',\n    b=20,\n    c=i32[5]\n  ),\n  name=static(*value='SomethingWrittenHere')\n),)"
     )
     assert (
         f"{B!r}"
@@ -479,7 +479,7 @@ def test_tree_with_containers():
     assert (
         f"{(Test({0: [1, 2, 3,jnp.ones([5,5])],1: ['test']}))!s}"
         # trunk-ignore(flake8/E501)
-        == "Test(\n  a={\n    0:[\n      1,\n      2,\n      3,\n      [[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]\n    ],\n    1:[test]\n  }\n)"
+        == "Test(\n  a=\n    {\n      0:\n      [\n        1,\n        2,\n        3,\n        [[1. 1. 1. 1. 1.]\n         [1. 1. 1. 1. 1.]\n         [1. 1. 1. 1. 1.]\n         [1. 1. 1. 1. 1.]\n         [1. 1. 1. 1. 1.]]\n      ],\n      1:[test]\n    }\n)"
     )
 
 
