@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 # from pytreeclass.src.decorator import static_value
-from pytreeclass.src.tree_util import is_treeclass, tree_copy
+from pytreeclass.src.tree_util import is_treeclass
 from pytreeclass.src.tree_viz import (
     tree_box,
     tree_diagram,
@@ -17,26 +17,6 @@ from pytreeclass.src.tree_viz import (
 )
 
 PyTree = Any
-
-
-@jtu.register_pytree_node_class
-class _STATIC:
-    # exclude from JAX computations
-    def __init__(self, value):
-        self.value = value
-
-    def tree_flatten(self):
-        return (), (self.value)
-
-    @classmethod
-    def tree_unflatten(cls, treedef, leaves):
-        return treedef
-
-    def __repr__(self):
-        return f"{self.value!r}"
-
-    def __str__(self):
-        return f"{self.value!s}"
 
 
 class _fieldDict(dict):
@@ -60,12 +40,6 @@ class _treeBase:
 
     def __hash__(self):
         return hash(tuple(jtu.tree_leaves(self)))
-
-    def __copy__(self):
-        return tree_copy(self)
-
-    def __deepcopy__(self):
-        return tree_copy(self)
 
     @property
     def frozen(self) -> bool:
