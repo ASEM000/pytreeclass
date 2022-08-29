@@ -71,13 +71,13 @@ class _treeBase:
         Returns:
             Tuple of dynamic values and (dynamic keys,static dict, cached values)
         """
-        dynamic, static, pytree_fields = self.__pytree_structure__
+        dynamic, static = self.__pytree_structure__
 
         if self.frozen:
-            return (), ((), (), (dynamic, static, pytree_fields))
+            return (), ((), (), (dynamic, static, self.__pytree_fields__))
 
         else:
-            return dynamic.values(), (dynamic.keys(), (static, pytree_fields), ())
+            return dynamic.values(), (dynamic.keys(), (static, self.__pytree_fields__), ())
 
     @classmethod
     def tree_unflatten(cls, treedef, leaves):
@@ -100,7 +100,7 @@ class _treeBase:
             dynamic, static, pytree_fields = treedef[2]
             # retrieve the cached frozen structure
             object.__setattr__(
-                new_cls, "__frozen_structure__", (dynamic, static, pytree_fields)
+                new_cls, "__frozen_structure__", (dynamic, static)
             )
         else:
             dynamic = dict(zip(treedef[0], leaves))
@@ -165,7 +165,7 @@ class _treeBase:
             else:
                 dynamic[field_item.name] = getattr(self, field_item.name)
 
-        return (dynamic, static, self.__pytree_fields__)
+        return (dynamic, static)
 
 
 class _implicitSetter:

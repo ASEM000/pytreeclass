@@ -73,7 +73,7 @@ def is_excluded(field_item: dataclasses.field, node_item: Any) -> bool:
 
 def sequential_tree_shape_eval(tree, array):
     """Evaluate shape propagation of assumed sequential modules"""
-    dyanmic, static, _ = tree.__pytree_structure__
+    dyanmic, static = tree.__pytree_structure__
 
     # all dynamic/static leaves
     all_leaves = (*dyanmic.values(), *static.values())
