@@ -6,6 +6,7 @@ import pytreeclass as pytc
 from pytreeclass.src.tree_mask_util import (
     is_inexact,
     is_inexact_array,
+    logical_all,
     logical_and,
     logical_not,
     logical_or,
@@ -77,4 +78,26 @@ def test_where():
     assert is_treeclass_equal(
         where(Test(1, jnp.array([1, 2, 3])) > 1, 100, 0),
         Test(0, jnp.array([0, 100, 100])),
+    )
+
+
+def test_all():
+    @pytc.treeclass
+    class Test:
+        a: int
+        b: jnp.ndarray
+        c: bool
+        d: bool
+
+    assert jnp.array_equal(
+        logical_all(Test(True, jnp.array([True, True, True]), True, True)), True
+    )
+    assert jnp.array_equal(
+        logical_all(Test(False, jnp.array([True, True, True]), True, True)), False
+    )
+    assert jnp.array_equal(
+        logical_all(Test(True, jnp.array([True, False, True]), True, True)), False
+    )
+    assert jnp.array_equal(
+        logical_all(Test(True, jnp.array([True, False, True]), True, False)), False
     )

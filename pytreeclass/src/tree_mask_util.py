@@ -68,3 +68,26 @@ def logical_and(lhs, rhs):
 
 def where(cond, x, y):
     return cond.at[cond].set(x).at[logical_not(cond)].set(y)
+
+
+def logical_all(tree):
+    @dispatch(argnum=0)
+    def _logical_all(tree):
+        ...
+
+    @_logical_all.register(bool)
+    def _(tree):
+        return tree is True
+
+    @_logical_all.register(tuple)
+    @_logical_all.register(list)
+    def _(tree):
+        return all(tree)
+
+    @_logical_all.register(jnp.ndarray)
+    def _(tree):
+        return jnp.all(tree)
+
+    return jtu.tree_reduce(
+        lambda acc, cur: logical_and(acc, _logical_all(cur)), tree, initializer=True
+    )

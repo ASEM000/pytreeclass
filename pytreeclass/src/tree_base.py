@@ -32,8 +32,8 @@ class _treeBase:
         self = object.__new__(cls)
 
         object.__setattr__(self, "__undeclared_fields__", {})
-        object.__setattr__(self, "__nondiff_keys__", [])
-        object.__setattr__(self, "__inexact_pytree__", False)
+        # object.__setattr__(self, "__nondiff_keys__", [])
+        # object.__setattr__(self, "__inexact_pytree__", False)
 
         for field_item in self.__dataclass_fields__.values():
             if field_item.default is not MISSING:

@@ -7,13 +7,7 @@ import jax
 import jax.tree_util as jtu
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import (
-    is_treeclass,
-    node_false,
-    node_not,
-    node_true,
-    tree_copy,
-)
+from pytreeclass.src.tree_util import node_false, node_not, node_true, tree_copy
 
 
 def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
@@ -39,6 +33,7 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
 
     @_tree_map.register(type(None))
     def _(lhs, rhs=None):
+        # unary operator
         return jtu.tree_map(func, lhs, is_leaf=is_leaf)
 
     return _tree_map(lhs, rhs)
@@ -52,8 +47,8 @@ def _dataclass_map(tree, cond, true_func=lambda x: x, false_func=lambda x: x):
         for field_item in tree.__pytree_fields__.values():
             field_value = getattr(tree, field_item.name)
 
-            if not field_item.metadata.get("static", False) and is_treeclass(
-                field_value
+            if not field_item.metadata.get("static", False) and hasattr(
+                field_value, "__dataclass_fields__"
             ):
                 if cond(field_item, field_value):
                     object.__setattr__(
