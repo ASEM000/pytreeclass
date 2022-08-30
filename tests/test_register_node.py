@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-import pytest
 
 import pytreeclass as pytc
 
@@ -62,15 +61,3 @@ def test_node():
         value, model = update(model, x, y)
 
     assert value < 1e-3
-
-
-def test_duplicate_node_registeration():
-    @pytc.treeclass
-    class testRegisterNode:
-        a: int = 0
-
-        def __init__(self):
-            self.register_node(1, name="a")
-
-    with pytest.raises(ValueError):
-        testRegisterNode()

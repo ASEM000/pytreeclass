@@ -18,6 +18,9 @@ from pytreeclass.src.tree_viz import (
 
 PyTree = Any
 
+# def _filter_static_field(field):
+# return field.metadata.get("static", False)
+
 
 class _fieldDict(dict):
     def __eq__(self, other):
@@ -26,10 +29,16 @@ class _fieldDict(dict):
 
 class _treeBase:
     def __new__(cls, *args, **kwargs):
-        self = super().__new__(cls)
+        self = object.__new__(cls)
+
+        object.__setattr__(self, "__undeclared_fields__", {})
+        object.__setattr__(self, "__nondiff_keys__", [])
+        object.__setattr__(self, "__inexact_pytree__", False)
+
         for field_item in self.__dataclass_fields__.values():
             if field_item.default is not MISSING:
                 object.__setattr__(self, field_item.name, field_item.default)
+
         return self
 
     def __repr__(self):
@@ -78,13 +87,9 @@ class _treeBase:
             else:
                 dynamic[field_item.name] = getattr(self, field_item.name)
 
+        static["__undeclared_fields__"] = self.__undeclared_fields__
+
         return (dynamic, static)
-
-
-class _explicitTreeBase:
-    @property
-    def __pytree_fields__(self):
-        return self.__dataclass_fields__
 
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
@@ -115,84 +120,53 @@ class _explicitTreeBase:
             New class instance
         """
 
-        new_cls = object.__new__(cls)
+        self = object.__new__(cls)
 
         if len(treedef[2]) > 0:
             dynamic, static = treedef[2]
             # retrieve the cached frozen structure
-            object.__setattr__(new_cls, "__frozen_structure__", (dynamic, static))
+            object.__setattr__(self, "__frozen_structure__", (dynamic, static))
         else:
             dynamic = dict(zip(treedef[0], leaves))
             static = treedef[1]
 
-        new_cls.__dict__.update(dynamic)
-        new_cls.__dict__.update(static)
+        self.__dict__.update(dynamic)
+        self.__dict__.update(static)
 
-        return new_cls
+        return self
+
+    def register_node(
+        self, node: Any, *, name: str, static: bool = False, repr: bool = True
+    ) -> Any:
+        """Add item to dataclass fields to bee seen by jax computations"""
+        if hasattr(self, name) and (name in self.__undeclared_fields__):
+            return getattr(self, name)
+
+        # create field
+        field_value = field(repr=repr, metadata={"static": static})
+
+        object.__setattr__(field_value, "name", name)
+        object.__setattr__(field_value, "type", type(node))
+
+        # register it to class
+        self.__undeclared_fields__.update({name: field_value})
+        object.__setattr__(self, name, node)
+
+        return getattr(self, name)
+
+    @property
+    def __pytree_fields__(self):
+        if len(self.__undeclared_fields__) == 0:
+            return self.__dataclass_fields__
+        else:
+            return {**self.__dataclass_fields__, **self.__undeclared_fields__}
 
 
 class _implicitTreeBase:
     """Register dataclass fields and treeclass instance variables"""
 
-    def __new__(self, *args, **kwargs):
-        self = super().__new__(self)
-        object.__setattr__(self, "__undeclared_fields__", {})
-        return self
-
-    @property
-    def __pytree_fields__(self):
-        return {**self.__dataclass_fields__, **self.__undeclared_fields__}
-
-    def tree_flatten(self):
-        """Flatten rule for `jax.tree_flatten`
-
-        Returns:
-            Tuple of dynamic values and (dynamic keys,static dict, cached values)
-        """
-        dynamic, static = self.__pytree_structure__
-
-        if self.frozen:
-            return (), ((), (), (dynamic, static, self.__undeclared_fields__))
-
-        else:
-            return dynamic.values(), (
-                dynamic.keys(),
-                (static, self.__undeclared_fields__),
-                (),
-            )
-
-    @classmethod
-    def tree_unflatten(cls, treedef, leaves):
-        """Unflatten rule for `jax.tree_unflatten`
-
-        Args:
-            treedef:
-                Pytree definition
-                includes Dynamic nodes keys , static dictionary and frozen state
-            leaves:
-                Dynamic nodes values
-
-        Returns:
-            New class instance
-        """
-
-        new_cls = object.__new__(cls)
-
-        if len(treedef[2]) > 0:
-            dynamic, static, undeclared_fields = treedef[2]
-            # retrieve the cached frozen structure
-            object.__setattr__(new_cls, "__frozen_structure__", (dynamic, static))
-        else:
-            dynamic = dict(zip(treedef[0], leaves))
-            static, undeclared_fields = treedef[1]
-
-        new_cls.__dict__.update(dynamic)
-        new_cls.__dict__.update(static)
-        new_cls.__dict__.update({"__undeclared_fields__": (undeclared_fields)})
-
-        return new_cls
-
     def __setattr__(self, name: str, value: Any) -> None:
+        object.__setattr__(self, name, value)
 
         if (is_treeclass(value)) and (name not in self.__pytree_fields__):
             # create field
@@ -203,28 +177,3 @@ class _implicitTreeBase:
 
             # register it to class
             self.__undeclared_fields__.update({name: field_value})
-
-        object.__setattr__(self, name, value)
-
-    def register_node(
-        self, node: Any, *, name: str, static: bool = False, repr: bool = True
-    ) -> Any:
-        """Add item to dataclass fields to bee seen by jax computations"""
-        if hasattr(self, name) and (name in self.__undeclared_fields__):
-            return getattr(self, name)
-
-        if name not in self.__dataclass_fields__:
-            # create field
-            field_value = field(repr=repr, metadata={"static": static})
-
-            object.__setattr__(field_value, "name", name)
-            object.__setattr__(field_value, "type", type(node))
-
-            # register it to class
-            self.__undeclared_fields__.update({name: field_value})
-            object.__setattr__(self, name, node)
-
-            return getattr(self, name)
-
-        else:
-            raise ValueError(f"{name} already exists in dataclass")

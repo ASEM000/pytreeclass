@@ -277,7 +277,7 @@ def _at_static(tree, where, **kwargs):
 PyTree = Any
 
 
-@dataclass
+@dataclass(eq=False)
 class _pyTreeIndexer:
     tree: PyTree
     where: PyTree
@@ -382,7 +382,7 @@ def _setter(item: Any, path: Sequence[str], value: Any):
     return _setter(item, path[:-1], parent) if len(path) > 1 else item
 
 
-@dataclass
+@dataclass(eq=False)
 class _strIndexer:
     tree: PyTree
     where: str
@@ -427,7 +427,6 @@ class _ellipsisIndexer(_pyTreeIndexer):
 class _treeIndexer:
     @property
     def at(self):
-        @dataclass
         class _atIndexer:
             @dispatch(argnum=1)
             def __getitem__(_, *args):
@@ -439,7 +438,6 @@ class _treeIndexer:
             def _(_, where):
                 """indexing by boolean pytree"""
 
-                @dataclass
                 class _pyTreeNestedIndexer(_pyTreeIndexer):
                     # subclass to preserve the tree state(i.e. self)
                     # during recursive calls
@@ -460,7 +458,6 @@ class _treeIndexer:
 
             @__getitem__.register(str)
             def _(_, where):
-                @dataclass
                 class _strNestedIndexer(_strIndexer):
                     # subclass to preserve the tree state(i.e. self)
                     # during recursive calls

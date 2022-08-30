@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import jax
 
 from pytreeclass.src.misc import ImmutableInstanceError, _mutable
-from pytreeclass.src.tree_base import _explicitTreeBase, _implicitTreeBase, _treeBase
+from pytreeclass.src.tree_base import _implicitTreeBase, _treeBase
 from pytreeclass.src.tree_indexer import _treeIndexer
 from pytreeclass.src.tree_op_base import _treeOpBase
 
@@ -25,11 +25,21 @@ def treeclass(*args, **kwargs):
         return wrapper
 
     def class_wrapper(cls, field_only: bool):
-        user_defined_init = "__init__" in cls.__dict__
-        dCls = dataclass(init=not user_defined_init, repr=False, eq=False)(cls)
 
-        base_classes = (dCls, _treeBase, _treeOpBase, _treeIndexer)
-        base_classes += (_implicitTreeBase,) if not field_only else (_explicitTreeBase,)
+        dCls = dataclass(
+            init="__init__" not in cls.__dict__,
+            repr=False,
+            eq=False,
+            match_args=False,
+            unsafe_hash=False,
+            order=False,
+        )(cls)
+
+        base_classes = (_implicitTreeBase,) if not field_only else ()
+        base_classes += (_treeBase,)
+        base_classes += (_treeIndexer, _treeOpBase)
+        base_classes += (dCls,)
+
         new_cls = type(cls.__name__, base_classes, {})
 
         mutable_setattr = new_cls.__setattr__
