@@ -1,7 +1,7 @@
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.misc import ImmutableInstanceError, mutableContext
+from pytreeclass.src.misc import ImmutableInstanceError, _mutableContext
 
 
 def test_mutable_context():
@@ -14,7 +14,7 @@ def test_mutable_context():
 
     t = Test(1)
 
-    with mutableContext(t):
+    with _mutableContext(t):
         t.a = 12
 
     assert getattr(t, "a") == 12
@@ -23,7 +23,7 @@ def test_mutable_context():
         t.a = 100
 
     with pytest.raises(AssertionError):
-        with mutableContext(1):
+        with _mutableContext(1):
             pass
 
     @pytc.treeclass
@@ -36,7 +36,7 @@ def test_mutable_context():
 
     model = l1()
 
-    with mutableContext(model):
+    with _mutableContext(model):
         model.b.a = 100
 
     assert model.b.a == 100
