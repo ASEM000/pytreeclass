@@ -4,11 +4,16 @@ import functools as ft
 import operator as op
 
 import jax
-import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import is_excluded, is_treeclass
+from pytreeclass.src.tree_util import (
+    is_treeclass,
+    node_false,
+    node_not,
+    node_true,
+    tree_copy,
+)
 
 
 def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
@@ -20,15 +25,7 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
 
     @_tree_map.register(type(lhs))
     def _(lhs, rhs):
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs, is_leaf=is_leaf)
-        rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs, is_leaf=is_leaf)
-
-        lhs_leaves = [
-            func(lhs_leaf, rhs_leaf) if rhs_leaf is not None else lhs_leaf
-            for (lhs_leaf, rhs_leaf) in zip(lhs_leaves, rhs_leaves)
-        ]
-
-        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+        return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
 
     @_tree_map.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
     @_tree_map.register(int)
@@ -37,17 +34,46 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
     @_tree_map.register(bool)
     @_tree_map.register(str)
     def _(lhs, rhs):
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs, is_leaf=is_leaf)
-        lhs_leaves = [func(leaf, rhs) for leaf in lhs_leaves]
-        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+        # broadcast the rhs to the lhs
+        return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
 
     @_tree_map.register(type(None))
     def _(lhs, rhs=None):
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs, is_leaf=is_leaf)
-        lhs_leaves = [func(lhs_node) for lhs_node in lhs_leaves]
-        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+        return jtu.tree_map(func, lhs, is_leaf=is_leaf)
 
     return _tree_map(lhs, rhs)
+
+
+def _dataclass_map(tree, cond, true_func=lambda x: x, false_func=lambda x: x):
+    # we traverse the dataclass fields in a depth first manner
+    # and apply true_func to field_value if condition is true and vice versa
+    # unlike using jtu.tree_map which will traverse only the children of field_values
+    def recurse(tree):
+        for field_item in tree.__pytree_fields__.values():
+            field_value = getattr(tree, field_item.name)
+
+            if not field_item.metadata.get("static", False) and is_treeclass(
+                field_value
+            ):
+                if cond(field_item, field_value):
+                    object.__setattr__(
+                        tree, field_item.name, jtu.tree_map(true_func, field_value)
+                    )
+                else:
+                    recurse(field_value)
+
+            else:
+                object.__setattr__(
+                    tree,
+                    field_item.name,
+                    true_func(field_value)
+                    if cond(field_item, field_value)
+                    else false_func(field_value),
+                )
+
+        return tree
+
+    return recurse(tree_copy(tree))
 
 
 def _append_math_op(func):
@@ -63,24 +89,6 @@ def _append_math_op(func):
 def _append_math_eq_ne(func):
     """Append eq/ne operations"""
     assert func in [op.eq, op.ne], f"func={func} is not implemented."
-
-    def node_not(node):
-        if isinstance(node, jnp.ndarray):
-            return jnp.logical_not(node)
-        else:
-            return not node
-
-    def set_true(node, array_as_leaves: bool = True):
-        if isinstance(node, jnp.ndarray):
-            return jnp.ones_like(node).astype(jnp.bool_) if array_as_leaves else True
-        else:
-            return True
-
-    def set_false(node, array_as_leaves: bool = True):
-        if isinstance(node, jnp.ndarray):
-            return jnp.zeros_like(node).astype(jnp.bool_) if array_as_leaves else False
-        else:
-            return False
 
     @ft.wraps(func)
     def wrapper(self, rhs):
@@ -100,60 +108,26 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(str)
         def _(tree, where, **kwargs):
             """Filter by field name"""
-            tree_copy = jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
-
-            def recurse(tree, where, **kwargs):
-
-                for i, fld in enumerate(tree.__pytree_fields__.values()):
-
-                    cur_node = tree.__dict__[fld.name]
-                    if not is_excluded(fld, cur_node) and is_treeclass(cur_node):
-                        if fld.name == where:
-                            # broadcast True to all subtrees
-                            tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
-                        else:
-                            recurse(cur_node, where, **kwargs)
-                    else:
-                        tree.__dict__[fld.name] = (
-                            set_true(cur_node)
-                            if ((fld.name == where))
-                            else set_false(cur_node)
-                        )
-                return tree
-
-            return recurse(tree_copy, where, **kwargs)
+            return _dataclass_map(
+                tree,
+                cond=lambda field_item, _: (field_item.name == where),
+                true_func=node_true,
+                false_func=node_false,
+            )
 
         @inner_wrapper.register(type)
         def _(tree, where, **kwargs):
             """Filter by type"""
-            tree_copy = jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
-
-            def recurse(tree, where, **kwargs):
-
-                for i, fld in enumerate(tree.__pytree_fields__.values()):
-
-                    cur_node = tree.__dict__[fld.name]
-
-                    if not is_excluded(fld, cur_node) and is_treeclass(cur_node):
-                        if isinstance(cur_node, where):
-                            tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
-                        else:
-                            recurse(cur_node, where, **kwargs)
-                    else:
-                        tree.__dict__[fld.name] = (
-                            set_true(cur_node)
-                            if (isinstance(cur_node, where))
-                            else set_false(cur_node)
-                        )
-
-                return tree
-
-            return recurse(tree_copy, where, **kwargs)
+            return _dataclass_map(
+                tree,
+                cond=lambda _, field_value: isinstance(field_value, where),
+                true_func=node_true,
+                false_func=node_false,
+            )
 
         @inner_wrapper.register(dict)
         def _(tree, where, **kwargs):
             """Filter by metadata"""
-            tree_copy = jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
             def in_metadata(fld):
                 kws, vals = zip(*where.items())
@@ -162,27 +136,12 @@ def _append_math_eq_ne(func):
                     for kw, val in zip(kws, vals)
                 )
 
-            def recurse(tree, where, **kwargs):
-
-                for i, fld in enumerate(tree.__pytree_fields__.values()):
-
-                    cur_node = tree.__dict__[fld.name]
-
-                    if not is_excluded(fld, cur_node) and is_treeclass(cur_node):
-                        if in_metadata(fld):
-                            tree.__dict__[fld.name] = jtu.tree_map(set_true, cur_node)
-                        else:
-                            recurse(cur_node, where, **kwargs)
-                    else:
-                        tree.__dict__[fld.name] = (
-                            set_true(cur_node)
-                            if in_metadata(fld)
-                            else set_false(cur_node)
-                        )
-
-                return tree
-
-            return recurse(tree_copy, where, **kwargs)
+            return _dataclass_map(
+                tree,
+                cond=lambda field_item, _: in_metadata(field_item),
+                true_func=node_true,
+                false_func=node_false,
+            )
 
         return (
             jtu.tree_map(node_not, inner_wrapper(self, rhs))

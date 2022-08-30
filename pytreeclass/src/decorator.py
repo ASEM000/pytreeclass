@@ -30,7 +30,6 @@ def treeclass(*args, **kwargs):
             init="__init__" not in cls.__dict__,
             repr=False,
             eq=False,
-            match_args=False,
             unsafe_hash=False,
             order=False,
         )(cls)

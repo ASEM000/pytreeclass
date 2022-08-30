@@ -7,7 +7,8 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-import numpy as np
+
+from pytreeclass.src.decorator_util import dispatch
 
 PyTree = Any
 
@@ -99,9 +100,14 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
         complex: Complex number of (inexact, non-exact) parameters for count/size
     """
 
-    # node = node.value if isinstance(node, static_value) else node
+    @dispatch(argnum=0)
+    def count_and_size(node):
+        count = complex(0, 0)
+        size = complex(0, 0)
+        return count, size
 
-    if isinstance(node, (jnp.ndarray, np.ndarray)):
+    @count_and_size.register(jnp.ndarray)
+    def _(node):
         # inexact(trainable) array
         if jnp.issubdtype(node, jnp.inexact):
             count = complex(int(jnp.array(node.shape).prod()), 0)
@@ -111,23 +117,24 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
         else:
             count = complex(0, int(jnp.array(node.shape).prod()))
             size = complex(0, int(node.nbytes))
+        return count, size
 
-    # inexact non-array (array_like)
-    elif isinstance(node, (float, complex)):
+    @count_and_size.register(float)
+    @count_and_size.register(complex)
+    def _(node):
+        # inexact non-array (array_like)
         count = complex(1, 0)
         size = complex(sys.getsizeof(node), 0)
+        return count, size
 
-    # exact non-array
-    elif isinstance(node, int):
+    @count_and_size.register(int)
+    def _(node):
+        # exact non-array
         count = complex(0, 1)
         size = complex(0, sys.getsizeof(node))
+        return count, size
 
-    # exclude others
-    else:
-        count = complex(0, 0)
-        size = complex(0, 0)
-
-    return (count, size)
+    return count_and_size(node)
 
 
 def _reduce_count_and_size(leaf):
@@ -158,3 +165,39 @@ def _unfreeze_nodes(tree):
         for kw in tree.__pytree_fields__:
             _unfreeze_nodes(tree.__dict__[kw])
     return tree
+
+
+def node_not(node: Any) -> bool:
+    @dispatch(argnum=0)
+    def _not(node):
+        return not node
+
+    @_not.register(jnp.ndarray)
+    def _(node):
+        return jnp.logical_not(node)
+
+    return _not(node)
+
+
+def node_true(node, array_as_leaves: bool = True):
+    @dispatch(argnum=0)
+    def _node_true(node):
+        return True
+
+    @_node_true.register(jnp.ndarray)
+    def _(node):
+        return jnp.ones_like(node).astype(jnp.bool_) if array_as_leaves else True
+
+    return _node_true(node)
+
+
+def node_false(node, array_as_leaves: bool = True):
+    @dispatch(argnum=0)
+    def _node_false(node):
+        return False
+
+    @_node_false.register(jnp.ndarray)
+    def _(node):
+        return jnp.zeros_like(node).astype(jnp.bool_) if array_as_leaves else True
+
+    return _node_false(node)
