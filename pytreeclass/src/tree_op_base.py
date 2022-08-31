@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 import operator as op
+from dataclasses import is_dataclass
 
 import jax
 import jax.tree_util as jtu
@@ -39,7 +40,9 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
     return _tree_map(lhs, rhs)
 
 
-def _dataclass_map(tree, cond, true_func=lambda x: x, false_func=lambda x: x):
+def _dataclass_map(
+    tree, cond, true_func=lambda x: x, false_func=lambda x: x, is_leaf=None
+):
     # we traverse the dataclass fields in a depth first manner
     # and apply true_func to field_value if condition is true and vice versa
     # unlike using jtu.tree_map which will traverse only the children of field_values
@@ -47,13 +50,17 @@ def _dataclass_map(tree, cond, true_func=lambda x: x, false_func=lambda x: x):
         for field_item in tree.__pytree_fields__.values():
             field_value = getattr(tree, field_item.name)
 
-            if not field_item.metadata.get("static", False) and hasattr(
-                field_value, "__dataclass_fields__"
+            if not field_item.metadata.get("static", False) and is_dataclass(
+                field_value
             ):
+
                 if cond(field_item, field_value):
                     object.__setattr__(
-                        tree, field_item.name, jtu.tree_map(true_func, field_value)
+                        tree,
+                        field_item.name,
+                        jtu.tree_map(true_func, field_value, is_leaf=is_leaf),
                     )
+
                 else:
                     recurse(field_value)
 

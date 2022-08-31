@@ -79,11 +79,6 @@ def logical_all(tree):
     def _(tree):
         return tree is True
 
-    @_logical_all.register(tuple)
-    @_logical_all.register(list)
-    def _(tree):
-        return all(tree)
-
     @_logical_all.register(jnp.ndarray)
     def _(tree):
         return jnp.all(tree)

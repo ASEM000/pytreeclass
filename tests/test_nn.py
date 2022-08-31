@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.misc import filter_nondiff
+from pytreeclass.src.misc import filter_nondiff, unfilter_nondiff
+from pytreeclass.src.tree_util import is_treeclass_equal
 
 
 def test_nn():
@@ -189,7 +190,7 @@ def test_compact_nn():
     np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
 
 
-def test_diffContex():
+def test_filter_nondiff():
     @pytc.treeclass
     class Linear:
 
@@ -250,13 +251,18 @@ def test_diffContex():
         for _ in range(1, 10_001):
             value, model = update(model, x, y)
 
-    @filter_nondiff
     @jax.jit
     def update(model, x, y):
         value, grads = jax.value_and_grad(loss_func)(model, x, y)
         return value, model - 1e-3 * grads
 
+    filtred_model = filter_nondiff(model)
+
     for _ in range(1, 10_001):
-        value, model = update(model, x, y)
+        value, filtred_model = update(filtred_model, x, y)
+
+    model = unfilter_nondiff(filtred_model)
 
     np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
+
+    assert is_treeclass_equal(model, unfilter_nondiff(filter_nondiff(model)))
