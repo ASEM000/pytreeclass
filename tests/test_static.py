@@ -20,28 +20,12 @@ def test_static():
 
     test = Test()
 
-    # assert jtu.tree_leaves(test.at[...].static()) == []
-    # assert jtu.tree_leaves(test.at[test > 1].static()) == [1]
-    # assert jtu.tree_leaves(test.at[test < 2].static()) == [2, 3]
-
-    # assert jtu.tree_leaves(test.at[test == int].static()) == []
-    # assert jtu.tree_leaves(test.at[test == "a"].static()) == [2, 3]
-    # assert jtu.tree_leaves(test.at[(test == "a") | (test == "b")].static()) == [3]
-
-    # assert jtu.tree_leaves(test.at[test == {"a": 1}].static()) == [1, 2, 3]
-
     @pytc.treeclass
     class Test:
         a: jnp.ndarray = jnp.array([1, 2, 3])
         b: jnp.ndarray = jnp.array([4, 5, 6])
 
     test = Test()
-
-    # assert jtu.tree_leaves(test.at[...].static()) == []
-    # npt.assert_allclose(
-    #     jtu.tree_leaves(test.at[test > 1].static())[0], jnp.array([1, 2, 3])
-    # )
-    # assert jtu.tree_leaves(test.at[test > 0].static()) == []
 
     @pytc.treeclass
     class Test:

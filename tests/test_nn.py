@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.misc import _filterNondiffContext, filter_nondiff
+from pytreeclass.src.misc import filter_nondiff
 
 
 def test_nn():
@@ -249,15 +249,6 @@ def test_diffContex():
     with pytest.raises(TypeError):
         for _ in range(1, 10_001):
             value, model = update(model, x, y)
-
-    with _filterNondiffContext(model):
-
-        for _ in range(1, 10_001):
-            value, model = update(model, x, y)
-
-        np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
-
-    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
 
     @filter_nondiff
     @jax.jit

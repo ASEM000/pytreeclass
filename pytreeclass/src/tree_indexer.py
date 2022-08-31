@@ -10,7 +10,7 @@ import jax.tree_util as jtu
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.misc import _mutableContext
+from pytreeclass.src.misc import _immutate_tree, _mutate_tree
 from pytreeclass.src.tree_mask_util import logical_and
 from pytreeclass.src.tree_util import (
     _freeze_nodes,
@@ -398,12 +398,10 @@ class _strIndexer:
         return self.tree.at[self.where].set(func(self.tree.at[self.where].get()))
 
     def __call__(self, *args, **kwargs):
-        new_self = tree_copy(self.tree)
+        new_self = _mutate_tree(tree_copy(self.tree))
         method = getattr(new_self, self.where)
-
-        with _mutableContext(new_self):
-            value = method(*args, **kwargs)
-
+        value = method(*args, **kwargs)
+        new_self = _immutate_tree(new_self)
         return value, new_self
 
     def freeze(self):

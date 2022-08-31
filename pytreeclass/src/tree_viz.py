@@ -212,12 +212,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     "/".join(type_path),
                     _format_count(count),
                     _format_size(size, True),
-                    "\n".join(
-                        [
-                            f"{k}={_format_node(v)}"
-                            for k, v in dynamic.items()
-                        ]
-                    ),
+                    "\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()]),
                 ]
             )
 
@@ -492,7 +487,7 @@ def tree_repr(tree, width: int = 60) -> str:
         for i, fi in enumerate(tree.__pytree_fields__.values()):
 
             # retrieve node item
-            cur_node = tree.__dict__[fi.name]
+            cur_node = getattr(tree, fi.name)
 
             recurse_field(
                 fi,

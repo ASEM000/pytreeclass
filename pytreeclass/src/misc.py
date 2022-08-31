@@ -1,29 +1,16 @@
 import functools as ft
-from dataclasses import dataclass, field
+from dataclasses import field
 from types import FunctionType
-from typing import Any
 
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import jaxlib
 
 import pytreeclass.src as src
-from pytreeclass.src.tree_base import _treeBase
 from pytreeclass.src.tree_util import tree_copy
 
 
 class ImmutableInstanceError(Exception):
     pass
-
-
-# @jtu.register_pytree_node_class
-# @dataclass(repr=False, eq=True, frozen=True)
-# class static(_treeBase):
-#     value: Any = field(metadata={"static": True})
-
-
-# def static_value(value):
-#     return static(value)
 
 
 def static_field(**kwargs):
@@ -37,6 +24,7 @@ def _mutate_tree(tree):
         for field_item in tree.__pytree_fields__.values():
             if hasattr(tree, field_item.name):
                 _mutate_tree(getattr(tree, field_item.name))
+    return tree
 
 
 def _immutate_tree(tree):
@@ -45,30 +33,7 @@ def _immutate_tree(tree):
         for field_item in tree.__pytree_fields__.values():
             if hasattr(tree, field_item.name):
                 _immutate_tree(getattr(tree, field_item.name))
-
-
-@dataclass(eq=False, frozen=True)
-class _mutableContext:
-    """Allow mutable behvior within this context
-    Note: __new__ will set immutable_treeclass to True (i.e. when used with jtu mutability will not persist )
-
-    Example:
-    >>> with mutable(instance):
-    ...     instance.value = 1
-    """
-
-    instance: Any
-
-    def __post_init__(self):
-        assert hasattr(
-            self.instance, "__immutable_treeclass__"
-        ), "instance must be immutable treeclass"
-
-    def __enter__(self):
-        _mutate_tree(self.instance)
-
-    def __exit__(self, type_, value, traceback):
-        _immutate_tree(self.instance)
+    return tree
 
 
 def _mutable(func):
@@ -89,15 +54,13 @@ def _mutable(func):
 
     @ft.wraps(func)
     def mutable_method(self, *args, **kwargs):
-        with _mutableContext(self):
-            # return before exiting the context
-            # will lead to mutable behavior
-            return func(self, *args, **kwargs)
+        self = _mutate_tree(tree=self)
+        return func(self, *args, **kwargs)
 
     return mutable_method
 
 
-def _unfilter_nondiff(tree):
+def _unfilter_nondiff_fields(tree):
     # unfilter nondiff nodes inplace
     # by removing nondiff_fields from the undeclared_fields variable
 
@@ -122,7 +85,7 @@ def _unfilter_nondiff(tree):
     return recurse(tree)
 
 
-def _filter_nondiff(tree):
+def _filter_nondiff_fields(tree):
     # filter nondiff nodes inplace
 
     def modify_field_static(field_item, static: bool = True):
@@ -176,22 +139,6 @@ def _filter_nondiff(tree):
     return recurse(tree)
 
 
-@dataclass(eq=False, frozen=True)
-class _filterNondiffContext:
-    instance: Any
-
-    def __post_init__(self):
-        assert hasattr(
-            self.instance, "__immutable_treeclass__"
-        ), "instance must be immutable treeclass"
-
-    def __enter__(self):
-        _filter_nondiff(self.instance)
-
-    def __exit__(self, *args):
-        _unfilter_nondiff(self.instance)
-
-
 def filter_nondiff(func):
     """decorator that sets nondiff fields to be static
     for class methods/ function with treeclass as first argument
@@ -210,8 +157,13 @@ def filter_nondiff(func):
 
     @ft.wraps(func)
     def filter_nondiff_method(self, *args, **kwargs):
+        assert hasattr(
+            self, "__immutable_treeclass__"
+        ), "instance must be immutable treeclass"
         new_self = tree_copy(self)
-        with _filterNondiffContext(new_self):
-            return func(new_self, *args, **kwargs)
+        _filter_nondiff_fields(new_self)
+        value = func(new_self, *args, **kwargs)
+        _unfilter_nondiff_fields(new_self)
+        return value
 
     return filter_nondiff_method
