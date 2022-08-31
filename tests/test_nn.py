@@ -2,12 +2,12 @@ from typing import Any, Callable, Sequence
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 import numpy as np
 import pytest
 
 import pytreeclass as pytc
 from pytreeclass.src.misc import filter_nondiff, unfilter_nondiff
-from pytreeclass.src.tree_util import is_treeclass_equal
 
 
 def test_nn():
@@ -261,8 +261,7 @@ def test_filter_nondiff():
     for _ in range(1, 10_001):
         value, filtred_model = update(filtred_model, x, y)
 
-    model = unfilter_nondiff(filtred_model)
-
     np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
 
-    assert is_treeclass_equal(model, unfilter_nondiff(filter_nondiff(model)))
+    X = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
+    assert jtu.tree_leaves(X) == jtu.tree_leaves(unfilter_nondiff(filter_nondiff(X)))
