@@ -138,7 +138,6 @@ PyTree = Any
 
 
 def tree_summary(tree, array: jnp.ndarray = None) -> str:
-    EXCLUDED_TYPES = (src.misc.static,)
     _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
 
     if array is not None:
@@ -217,7 +216,6 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                         [
                             f"{k}={_format_node(v)}"
                             for k, v in dynamic.items()
-                            if not isinstance(v, EXCLUDED_TYPES)
                         ]
                     ),
                 ]

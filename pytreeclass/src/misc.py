@@ -16,14 +16,14 @@ class ImmutableInstanceError(Exception):
     pass
 
 
-@jtu.register_pytree_node_class
-@dataclass(repr=False, eq=True, frozen=True)
-class static(_treeBase):
-    value: Any = field(metadata={"static": True})
+# @jtu.register_pytree_node_class
+# @dataclass(repr=False, eq=True, frozen=True)
+# class static(_treeBase):
+#     value: Any = field(metadata={"static": True})
 
 
-def static_value(value):
-    return static(value)
+# def static_value(value):
+#     return static(value)
 
 
 def static_field(**kwargs):

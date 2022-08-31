@@ -10,7 +10,7 @@ import jax.tree_util as jtu
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.misc import _mutableContext, static_value
+from pytreeclass.src.misc import _mutableContext
 from pytreeclass.src.tree_mask_util import logical_and
 from pytreeclass.src.tree_util import (
     _freeze_nodes,
@@ -267,11 +267,11 @@ def _at_reduce(tree, where, func, **kwargs):
 """ Static"""
 
 
-def _at_static(tree, where, **kwargs):
-    def __at_static(tree, where, **kwargs):
-        return tree.at[where].apply(static_value, array_as_leaves=False)
+# def _at_static(tree, where, **kwargs):
+#     def __at_static(tree, where, **kwargs):
+#         return tree.at[where].apply(static_value, array_as_leaves=False)
 
-    return __at_static(tree, where, **kwargs)
+#     return __at_static(tree, where, **kwargs)
 
 
 PyTree = Any
@@ -306,8 +306,8 @@ class _pyTreeIndexer:
         )
 
     # deprecate this in favor of str indexer version
-    def static(self, **kwargs):
-        return ft.partial(_at_static, where=self.where)(tree=self.tree, **kwargs)
+    # def static(self, **kwargs):
+    #     return ft.partial(_at_static, where=self.where)(tree=self.tree, **kwargs)
 
     # derived methods
 
