@@ -101,3 +101,9 @@ def test_all():
     assert jnp.array_equal(
         logical_all(Test(True, jnp.array([True, False, True]), True, False)), False
     )
+    assert jnp.array_equal(
+        logical_all(Test(True, ([True, False, True]), True, False)), False
+    )
+    assert jnp.array_equal(
+        logical_all(Test(True, (True, False, True), True, False)), False
+    )

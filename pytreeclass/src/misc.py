@@ -5,9 +5,11 @@ from typing import Any
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
+import jaxlib
 
 import pytreeclass.src as src
 from pytreeclass.src.tree_base import _treeBase
+from pytreeclass.src.tree_util import tree_copy
 
 
 class ImmutableInstanceError(Exception):
@@ -47,7 +49,13 @@ def _immutate_tree(tree):
 
 @dataclass(eq=False, frozen=True)
 class _mutableContext:
-    """Allow mutable behvior within this context"""
+    """Allow mutable behvior within this context
+    Note: __new__ will set immutable_treeclass to True (i.e. when used with jtu mutability will not persist )
+
+    Example:
+    >>> with mutable(instance):
+    ...     instance.value = 1
+    """
 
     instance: Any
 
@@ -63,34 +71,47 @@ class _mutableContext:
         _immutate_tree(self.instance)
 
 
-def _mutable(instance_method):
-    """decorator that allow mutable behvior"""
-    assert isinstance(
-        instance_method, FunctionType
-    ), f"mutable can only be applied to methods. Found{type(instance_method)}"
+def _mutable(func):
+    """decorator that allow mutable behvior
+    for class methods/ function with treeclass as first argument
 
-    @ft.wraps(instance_method)
+    Example:
+
+    class ... :
+
+    >>> @_mutable
+    ... def mutable_method(self):
+    ...    return self.value + 1
+    """
+    assert isinstance(
+        func, FunctionType
+    ), f"mutable can only be applied to methods. Found{type(func)}"
+
+    @ft.wraps(func)
     def mutable_method(self, *args, **kwargs):
         with _mutableContext(self):
             # return before exiting the context
             # will lead to mutable behavior
-            return instance_method(self, *args, **kwargs)
+            return func(self, *args, **kwargs)
 
     return mutable_method
 
 
 def _unfilter_nondiff(tree):
     # unfilter nondiff nodes inplace
-    # by removing aux_fields from undeclared_fields
+    # by removing nondiff_fields from the undeclared_fields variable
 
     def recurse(tree):
-        undeclared_fields = tree.__undeclared_fields__
-        undeclared_fields = {
-            field_name: field_value
-            for field_name, field_value in undeclared_fields.items()
-            if not field_value.metadata.get("nondiff", False)
-        }
-        object.__setattr__(tree, "__undeclared_fields__", undeclared_fields)
+
+        object.__setattr__(
+            tree,
+            "__undeclared_fields__",
+            {
+                field_name: field_value
+                for field_name, field_value in tree.__undeclared_fields__.items()
+                if not field_value.metadata.get("nondiff", False)
+            },
+        )
 
         for field_item in tree.__pytree_fields__.values():
             field_value = getattr(tree, field_item.name)
@@ -156,7 +177,7 @@ def _filter_nondiff(tree):
 
 
 @dataclass(eq=False, frozen=True)
-class diffContext:
+class _filterNondiffContext:
     instance: Any
 
     def __post_init__(self):
@@ -169,3 +190,28 @@ class diffContext:
 
     def __exit__(self, *args):
         _unfilter_nondiff(self.instance)
+
+
+def filter_nondiff(func):
+    """decorator that sets nondiff fields to be static
+    for class methods/ function with treeclass as first argument
+
+    Example:
+
+    @filter_nondiff
+    @jax.jit
+    @jax.value_and_grad
+    def update(model, *args, **kwargs):
+        ...
+    """
+    assert isinstance(
+        func, (FunctionType, jaxlib.xla_extension.CompiledFunction)
+    ), f"filter can only be applied to methods/Functions. Found{type(func)}"
+
+    @ft.wraps(func)
+    def filter_nondiff_method(self, *args, **kwargs):
+        new_self = tree_copy(self)
+        with _filterNondiffContext(new_self):
+            return func(new_self, *args, **kwargs)
+
+    return filter_nondiff_method

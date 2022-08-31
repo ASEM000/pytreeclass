@@ -305,6 +305,7 @@ class _pyTreeIndexer:
             tree=self.tree, func=func, **kwargs
         )
 
+    # deprecate this in favor of str indexer version
     def static(self, **kwargs):
         return ft.partial(_at_static, where=self.where)(tree=self.tree, **kwargs)
 
