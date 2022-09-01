@@ -5,10 +5,9 @@ from .src.misc import static_field
 __all__ = (
     "tree_viz",
     "treeclass",
-    # "static_value",
     "static_field",
     "tree_viz",
     "tree_util",
 )
 
-__version__ = "0.0.12b0"
+__version__ = "0.0.12"
