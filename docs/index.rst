@@ -19,6 +19,7 @@ Install from pip::
 
    notebooks/getting_started
    notebooks/stateful_computations
+   notebooks/filtering
 
 .. toctree::
     :caption: API Documentation
