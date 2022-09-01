@@ -85,7 +85,7 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
         node (Any): treeclass node
 
     Returns:
-        complex: Complex number of (inexact, non-exact) parameters for count/size
+        complex: Complex number of (inexact, exact) parameters for count/size
     """
 
     @dispatch(argnum=0)
@@ -138,7 +138,7 @@ def _reduce_count_and_size(leaf):
 
 def _freeze_nodes(tree):
     """inplace freezing"""
-    # cache the tree structure
+    # cache the tree structure (dynamic/static)
     if is_treeclass(tree):
         object.__setattr__(tree, "__frozen_structure__", tree.__pytree_structure__)
         for kw in tree.__pytree_fields__:
@@ -233,7 +233,6 @@ def _pytree_map(
     """
 
     def recurse_non_leaf(tree, field_item, node_item, state):
-        # skip static fields
         if is_dataclass(node_item):
             if cond(tree, field_item, node_item):
                 recurse(node_item, state=True)

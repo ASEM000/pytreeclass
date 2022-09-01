@@ -14,6 +14,9 @@ from pytreeclass.src.tree_op_base import _treeOpBase
 
 def treeclass(*args, **kwargs):
     def immutable_setattr(mutable_setattr):
+        # temporary disable mutable behavior
+        # to allow for instance attribute setting
+        # in __init__ method
         def wrapper(self, key, value):
             if self.__immutable_treeclass__:
                 raise ImmutableInstanceError(

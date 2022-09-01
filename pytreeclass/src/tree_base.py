@@ -19,6 +19,8 @@ PyTree = Any
 
 
 class _fieldDict(dict):
+    """A dict used for `__pytree_structure__` attribute of a treeclass instance"""
+
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
@@ -29,19 +31,25 @@ class _treeBase:
 
         object.__setattr__(self, "__undeclared_fields__", {})
 
+        # set default values to class instance
+        # Note: ideally this method should be called once to avoid multiple
+        # definition of `__undeclared_fields__` attribute
         for field_item in self.__dataclass_fields__.values():
             if field_item.default is not MISSING:
                 object.__setattr__(self, field_item.name, field_item.default)
 
         return self
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """pretty print pytree instance"""
         return tree_repr(self, width=60)
 
     def __str__(self):
+        """pretty print pytree instance"""
         return tree_str(self, width=60)
 
     def __hash__(self):
+        """hash rule for pytree instance"""
         return hash(tuple(jtu.tree_leaves(self)))
 
     @property
@@ -54,16 +62,61 @@ class _treeBase:
         return True if hasattr(self, "__frozen_structure__") else False
 
     def summary(self, array: jnp.ndarray = None) -> str:
+        """print a summary of the pytree instance
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> @pytc.treeclass
+            ... class A:
+            ...     a: int = 1
+            ...     b: float = 2.0
+            >>> a = A()
+            >>> print(a.summary())
+            ┌────┬─────┬───────┬────────┬──────┐
+            │Name│Type │Param #│Size    │Config│
+            ├────┼─────┼───────┼────────┼──────┤
+            │a   │int  │0(1)   │0.00B   │a=1   │
+            │    │     │       │(28.00B)│      │
+            ├────┼─────┼───────┼────────┼──────┤
+            │b   │float│1(0)   │24.00B  │b=2.0 │
+            │    │     │       │(0.00B) │      │
+            └────┴─────┴───────┴────────┴──────┘
+            Total count :   1(1)
+            Dynamic count : 1(1)
+            Frozen count :  0(0)
+            ----------------------------------------
+            Total size :    24.00B(28.00B)
+            Dynamic size :  24.00B(28.00B)
+            Frozen size :   0.00B(0.00B)
+            ========================================
+        """
+
         return tree_summary(self, array)
 
     def tree_diagram(self) -> str:
+        """Print a diagram of the pytree instance
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> @pytc.treeclass
+            ... class A:
+            ...     a: int = 1
+            ...     b: float = 2.0
+            >>> a = A()
+            >>> print(a.tree_diagram())
+            A
+                ├── a=1
+                └── b=2.0
+        """
         return tree_diagram(self)
 
     def tree_box(self, array: jnp.ndarray = None) -> str:
+        """keras-like `plot_model` subclassing paradigm"""
         return tree_box(self, array)
 
     @property
-    def __pytree_structure__(self):
+    def __pytree_structure__(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        """return dynamic and static fields of the pytree instance"""
         if hasattr(self, "__frozen_structure__"):
             # check if pytree_structure is cached
             # ** another approach is to append {static:True} to the metadata using `_pytree_map`,
@@ -117,7 +170,7 @@ class _treeBase:
         # moreover , in _treeBase.__new__ we declare `__undeclared_fields__`
         # however, using obejct we will not have this attribute,
         # so we need to add these attributes in the static, that updates the `self.__dict__``
-        # since we already have to pass `__undeclared_fields__` through flatten/unflatten 
+        # since we already have to pass `__undeclared_fields__` through flatten/unflatten
         # this approach creates the attribute once.
         self = object.__new__(cls)
 
@@ -155,6 +208,9 @@ class _treeBase:
 
     @property
     def __pytree_fields__(self):
+        """Return a dictionary of all fields in the dataclass"""
+        # in case of explicit treebase with no `param` then
+        # its preferable to create a new dict and just point to `__dataclass_fields__`
         return (
             self.__dataclass_fields__
             if len(self.__undeclared_fields__) == 0

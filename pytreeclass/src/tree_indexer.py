@@ -37,8 +37,6 @@ def _at_get(tree, where, **kwargs):
         Raises:
             NotImplementedError:
         """
-        # not jittable as size can changes
-        # does not change pytreestructure ,
         raise NotImplementedError(f"Get node type ={type(lhs)} is not implemented.")
 
     @_lhs_get.register(DynamicJaxprTracer)
@@ -205,6 +203,7 @@ def _at_apply(tree, where, func, **kwargs):
         func: Any,
         array_as_leaves: bool = True,
     ):
+        # array_as_leaves defins whether the condition/where is applied to each array element
         return (
             jnp.where(where, func(lhs), lhs)
             if array_as_leaves
@@ -264,20 +263,10 @@ def _at_reduce(tree, where, func, **kwargs):
     return _where_reduce(tree=tree, where=where, func=func, **kwargs)
 
 
-""" Static"""
-
-
-# def _at_static(tree, where, **kwargs):
-#     def __at_static(tree, where, **kwargs):
-#         return tree.at[where].apply(static_value, array_as_leaves=False)
-
-#     return __at_static(tree, where, **kwargs)
-
-
 PyTree = Any
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, frozen=True)
 class _pyTreeIndexer:
     tree: PyTree
     where: PyTree
@@ -304,10 +293,6 @@ class _pyTreeIndexer:
         return ft.partial(_at_reduce, where=self.where)(
             tree=self.tree, func=func, **kwargs
         )
-
-    # deprecate this in favor of str indexer version
-    # def static(self, **kwargs):
-    #     return ft.partial(_at_static, where=self.where)(tree=self.tree, **kwargs)
 
     # derived methods
 
@@ -347,12 +332,6 @@ class _pyTreeIndexer:
             initializer=+jnp.inf,
         )
 
-    # def reduce_and(self):
-    #     return self.reduce(
-    #         lambda acc, cur : jnp.logical_and(jnp.all(cur),acc),
-    #         initializer=True
-    #     )
-
 
 def _getter(item: Any, path: Sequence[str]):
     """ "recursive getter"""
@@ -383,7 +362,7 @@ def _setter(item: Any, path: Sequence[str], value: Any):
     return _setter(item, path[:-1], parent) if len(path) > 1 else item
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, frozen=True)
 class _strIndexer:
     tree: PyTree
     where: str
@@ -447,6 +426,9 @@ class _treeIndexer:
                         )
 
                     def __getattr__(nested_self, name):
+                        # support of nested `.at`
+                        # e.g. `tree.at[tree>0].at[tree == str ]
+                        # corrsponds to (tree>0 and tree == str`)
                         if name != "at":
                             raise AttributeError(
                                 f"{name} is not a valid attribute of {nested_self}"
@@ -466,6 +448,8 @@ class _treeIndexer:
                         )
 
                     def __getattr__(nested_self, name):
+                        # support nested `.at``
+                        # for example `.at[A].at[B]` represents model.A.B
                         if name != "at":
                             raise AttributeError(
                                 f"{name} is not a valid attribute of {nested_self}"
@@ -477,6 +461,7 @@ class _treeIndexer:
             @__getitem__.register(type(Ellipsis))
             def _(_, where):
                 """Ellipsis as an alias for all elements"""
+                # model.at[model == model ] <==> model.at[...]
                 return _ellipsisIndexer(tree=self, where=(self == self))
 
         return _atIndexer()

@@ -19,6 +19,7 @@ def static_field(**kwargs):
 
 
 def _mutate_tree(tree):
+    """Enable mutable behavior for a treeclass instance"""
     if src.tree_util.is_treeclass(tree):
         object.__setattr__(tree, "__immutable_treeclass__", False)
         for field_item in tree.__pytree_fields__.values():
@@ -28,6 +29,7 @@ def _mutate_tree(tree):
 
 
 def _immutate_tree(tree):
+    """Enable immutable behavior for a treeclass instance"""
     if src.tree_util.is_treeclass(tree):
         object.__setattr__(tree, "__immutable_treeclass__", True)
         for field_item in tree.__pytree_fields__.values():
@@ -71,10 +73,11 @@ def _copy_field(
     hash: Callable = None,
     init: bool = None,
     repr: bool = None,
-    metadata: dict = None,
-    aux_metadata: dict = None,
+    metadata: dict[str, Any] = None,
+    aux_metadata: dict[str, Any] = None,
 ):
-
+    """copy a field with new values"""
+    # creation of a new field avoid mutating the original field
     aux_metadata = aux_metadata or {}
 
     new_field = field(
@@ -98,27 +101,17 @@ def _copy_field(
 
 
 def _is_nondiff(node):
+    """check if node is non-differentiable"""
     return isinstance(node, (int, bool, str)) or (
         isinstance(node, (jnp.ndarray)) and not jnp.issubdtype(node.dtype, jnp.inexact)
     )
 
 
-def unfilter_nondiff(tree):
-    return _pytree_map(
-        tree,
-        cond=lambda _, __, ___: True,
-        true_func=lambda tree, field_item, node_item: {
-            field_name: field_value
-            for field_name, field_value in tree.__undeclared_fields__.items()
-            if not field_value.metadata.get("nondiff", False)
-        },
-        false_func=lambda _, __, ___: {},
-        attr_func=lambda _, __, ___: "__undeclared_fields__",
-        is_leaf=lambda _, __, ___: False,
-    )
-
-
 def filter_nondiff(tree):
+    """filter non-differentiable fields from a treeclass instance"""
+    # we use _pytree_map to add {nondiff:True} to a non-differentiable field metadata
+    # this operation is done in-place and changes the tree structure
+    # thus its not bundled with `.at[..]` as it will break composability
     return _pytree_map(
         tree,
         cond=lambda _, __, node_item: _is_nondiff(node_item),
@@ -133,4 +126,20 @@ def filter_nondiff(tree):
         false_func=lambda tree, field_item, node_item: tree.__undeclared_fields__,
         attr_func=lambda _, __, ___: "__undeclared_fields__",
         is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),
+    )
+
+
+def unfilter_nondiff(tree):
+    """remove fields added by `filter_nondiff"""
+    return _pytree_map(
+        tree,
+        cond=lambda _, __, ___: True,
+        true_func=lambda tree, field_item, node_item: {
+            field_name: field_value
+            for field_name, field_value in tree.__undeclared_fields__.items()
+            if not field_value.metadata.get("nondiff", False)
+        },
+        false_func=lambda _, __, ___: {},
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        is_leaf=lambda _, __, ___: False,
     )
