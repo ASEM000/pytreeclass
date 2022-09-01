@@ -153,16 +153,16 @@ def test_compact_nn():
 
         def __call__(self, x):
             k1, k2, k3 = jax.random.split(self.key, 3)
-            x = self.register_node(
+            x = self.param(
                 Linear(key=k1, in_dim=self.in_dim, out_dim=self.hidden_dim), name="l1"
             )(x)
             x = jax.nn.tanh(x)
-            x = self.register_node(
+            x = self.param(
                 Linear(key=k2, in_dim=self.hidden_dim, out_dim=self.hidden_dim),
                 name="l2",
             )(x)
             x = jax.nn.tanh(x)
-            x = self.register_node(
+            x = self.param(
                 Linear(key=k3, in_dim=self.hidden_dim, out_dim=self.out_dim), name="l3"
             )(x)
 

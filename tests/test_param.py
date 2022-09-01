@@ -29,7 +29,7 @@ def test_node():
             for i, (ki, in_dim, out_dim) in enumerate(
                 zip(keys, layers[:-1], layers[1:])
             ):
-                self.register_node(
+                self.param(
                     Linear(key=ki, in_dim=in_dim, out_dim=out_dim), name=f"l{i}"
                 )
 

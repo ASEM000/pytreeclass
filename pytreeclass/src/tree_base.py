@@ -134,7 +134,7 @@ class _treeBase:
 
         return self
 
-    def register_node(
+    def param(
         self, node: Any, *, name: str, static: bool = False, repr: bool = True
     ) -> Any:
         """Add item to dataclass fields to bee seen by jax computations"""

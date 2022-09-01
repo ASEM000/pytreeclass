@@ -756,10 +756,10 @@ class StackedLinear:
         x = self.l3(x)
         return x
 ```
-Using `register_node`:
+Using `param`:
 - More compact definition with node definition at runtime call
 - The Linear layers are defined on the first call and retrieved on the subsequent calls
-- This pattern is useful if module definition depends runtime data.
+- This pattern is useful if the module definition depends on runtime data.
 ```python
 @pytc.treeclass
 class StackedLinear:
@@ -767,11 +767,11 @@ class StackedLinear:
         self.keys = jax.random.split(key,3)
 
     def __call__(self,x):
-        x = self.register_node(Linear(self.keys[0],x.shape[-1],10),name="l1")(x)
+        x = self.param(Linear(self.keys[0],x.shape[-1],10),name="l1")(x)
         x = jax.nn.tanh(x)
-        x = self.register_node(Linear(self.keys[1],10,10),name="l2")(x)
+        x = self.param(Linear(self.keys[1],10,10),name="l2")(x)
         x = jax.nn.tanh(x)
-        x = self.register_node(Linear(self.keys[2],10,x.shape[-1]),name="l3")(x)
+        x = self.param(Linear(self.keys[2],10,x.shape[-1]),name="l3")(x)
         return x
 ```
 </details>
