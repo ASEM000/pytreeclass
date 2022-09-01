@@ -144,7 +144,14 @@ def filter_nondiff(tree):
                         aux_metadata={"nondiff": True, "static": True},
                     )
 
-                    tree.__undeclared_fields__.update({field_item.name: new_field})
+                    object.__setattr__(
+                        tree,
+                        "__undeclared_fields__",
+                        {
+                            **tree.__undeclared_fields__,
+                            **{new_field.name: new_field},
+                        },
+                    )
         return tree
 
     return recurse(tree_copy(tree)) if is_treeclass(tree) else tree

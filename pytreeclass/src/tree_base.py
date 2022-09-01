@@ -7,7 +7,6 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 # from pytreeclass.src.decorator import static_value
-from pytreeclass.src.tree_util import is_treeclass
 from pytreeclass.src.tree_viz import (
     tree_box,
     tree_diagram,
@@ -151,10 +150,11 @@ class _treeBase:
 
     @property
     def __pytree_fields__(self):
-        if len(self.__undeclared_fields__) == 0:
-            return self.__dataclass_fields__
-        else:
-            return {**self.__dataclass_fields__, **self.__undeclared_fields__}
+        return (
+            self.__dataclass_fields__
+            if len(self.__undeclared_fields__) == 0
+            else {**self.__dataclass_fields__, **self.__undeclared_fields__}
+        )
 
 
 class _implicitTreeBase:
@@ -163,7 +163,7 @@ class _implicitTreeBase:
     def __setattr__(self, name: str, value: Any) -> None:
         object.__setattr__(self, name, value)
 
-        if (is_treeclass(value)) and (name not in self.__pytree_fields__):
+        if (isinstance(value, _treeBase)) and (name not in self.__pytree_fields__):
             # create field
             field_value = field()
 
