@@ -64,13 +64,11 @@ class _treeBase:
 
     @property
     def __pytree_structure__(self):
-        if (
-            hasattr(self, "__frozen_structure__")
-            and getattr(self, "__frozen_structure__") is not None
-        ):
-            # check if frozen structure is cached
-            # Note: frozen strcture = None
-            # means that the tree is frozen, but not yet cached
+        if hasattr(self, "__frozen_structure__"):
+            # check if pytree_structure is cached
+            # ** another approach is to append {static:True} to the metadata using `_pytree_map`,
+            # however this will be a bit slower as the tree_flatten has to traverse all fields
+            # while here, no traversal is needed
             return self.__frozen_structure__
 
         dynamic, static = _fieldDict(), _fieldDict()
@@ -114,6 +112,13 @@ class _treeBase:
             New class instance
         """
 
+        # using `object.__new__`` here is faster than using `cls.__new__`
+        # as it avoids calling bases __new__ methods
+        # moreover , in _treeBase.__new__ we declare `__undeclared_fields__`
+        # however, using obejct we will not have this attribute,
+        # so we need to add these attributes in the static, that updates the `self.__dict__``
+        # since we already have to pass `__undeclared_fields__` through flatten/unflatten 
+        # this approach creates the attribute once.
         self = object.__new__(cls)
 
         if len(treedef[2]) > 0:

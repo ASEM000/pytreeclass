@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import sys
 from dataclasses import is_dataclass
 from typing import Any, Callable
@@ -59,18 +58,6 @@ def is_treeclass_equal(lhs, rhs):
     return (lhs_treedef == rhs_treedef) and all(
         [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
     )
-
-
-def is_excluded(field_item: dataclasses.field, node_item: Any) -> bool:
-    """Check if a field is excluded
-
-    Returns:
-        bool: boolean if the field should be excluded or not.
-    """
-    excluded_by_meta = field_item.metadata.get("static", False)
-    # excluded_by_type = isinstance(node_item, class_or_tuple)
-    # excluded_by_type = isinstance(node_item, static_value)
-    return excluded_by_meta  # or excluded_by_type
 
 
 def sequential_tree_shape_eval(tree, array):
@@ -151,6 +138,7 @@ def _reduce_count_and_size(leaf):
 
 def _freeze_nodes(tree):
     """inplace freezing"""
+    # cache the tree structure
     if is_treeclass(tree):
         object.__setattr__(tree, "__frozen_structure__", tree.__pytree_structure__)
         for kw in tree.__pytree_fields__:
@@ -160,6 +148,7 @@ def _freeze_nodes(tree):
 
 def _unfreeze_nodes(tree):
     """inplace unfreezing"""
+    # remove the cached frozen structure
     if is_treeclass(tree):
         if hasattr(tree, "__frozen_structure__"):
             object.__delattr__(tree, "__frozen_structure__")
@@ -216,7 +205,7 @@ def _pytree_map(
     """traverse the dataclass fields in a depth first manner
 
     Here, we apply true_func to node_item if condition is true and vice versa
-    we use attr_func to select the attribute to be updated in the dataclass and 
+    we use attr_func to select the attribute to be updated in the dataclass and
     is_leaf to decide whether to continue the traversal or not.
 
 
@@ -225,24 +214,25 @@ def _pytree_map(
             dataclass to be traversed
 
         cond (Callable[[Any, Any,Any], bool]):
-            condition to be applied on each (tree,fild_item,node_item)
+            condition to be applied on each (tree,field_item,node_item)
 
         true_func (Callable[[Any, Any,Any], Any]):
-            function applied if cond is true, accepts (tree,fild_item,node_item)
+            function applied if cond is true, accepts (tree,field_item,node_item)
 
         false_func (Callable[[Any, Any,Any], Any]):
-            function applied if cond is false, accepts (tree,fild_item,node_item)
+            function applied if cond is false, accepts (tree,field_item,node_item)
 
         attr_func (Callable[[Any, Any,Any], str]):
-            function that returns the attribute to be updated, accepts (tree,fild_item,node_item)
+            function that returns the attribute to be updated, accepts (tree,field_item,node_item)
 
         is_leaf (Callable[[Any,Any,Any], bool]):
-            stops recursion if false on (tree,fild_item,node_item)
+            stops recursion if false on (tree,field_item,node_item)
 
     Returns:
         PyTree or dataclass : new dataclass with updated attributes
     """
-    def recurse_non_leaf(tree, field_item, node_item,state):
+
+    def recurse_non_leaf(tree, field_item, node_item, state):
         # skip static fields
         if is_dataclass(node_item):
             if cond(tree, field_item, node_item):
@@ -264,7 +254,7 @@ def _pytree_map(
             node_item = getattr(tree, field_item.name)
 
             if not is_leaf(tree, field_item, node_item):
-                recurse_non_leaf(tree, field_item, node_item,state)
+                recurse_non_leaf(tree, field_item, node_item, state)
         return tree
 
     return recurse(tree_copy(tree), state=None)
