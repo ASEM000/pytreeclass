@@ -17,7 +17,7 @@ Install from pip::
    :caption: Getting Started
    :maxdepth: 1
 
-   notebooks/introduction
+   notebooks/getting_started
    notebooks/stateful_computations
    notebooks/out-of-place indexing
 

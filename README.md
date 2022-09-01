@@ -90,10 +90,10 @@ class StackedLinear:
 
         return x
         
->>> model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
+model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 
->>> x = jnp.linspace(0,1,100)[:,None]
->>> y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
+x = jnp.linspace(0,1,100)[:,None]
+y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 ```
 
 ### 🎨 Visualize<a id="Viz">
@@ -109,9 +109,7 @@ class StackedLinear:
 <td>
 
 ```python
-
-
->>> print(model.summary())
+print(model.summary())
 ┌────┬──────┬───────┬───────┬─────────────────┐
 │Name│Type  │Param #│Size   │Config           │
 ├────┼──────┼───────┼───────┼─────────────────┤
@@ -137,13 +135,13 @@ Frozen size :	0.00B(0.00B)
 </td>
 
  <td>
- 
+
+using jax.eval_shape (no-flops operation)
+
+_note_ : the created modules in `__init__` should be in the same order where they are called in `__call__`
+
 ```python
->>> print(model.tree_box(array=x))
-# using jax.eval_shape (no-flops operation)
-# ** note ** : the created modules 
-# in __init__ should be in the same order
-# where they are called in __call__
+print(model.tree_box(array=x))
 ┌──────────────────────────────────────┐
 │StackedLinear[Parent]                 │
 ├──────────────────────────────────────┤
@@ -169,7 +167,7 @@ Frozen size :	0.00B(0.00B)
 <td>
 
 ```python
->>> print(model.tree_diagram())
+print(model.tree_diagram())
 StackedLinear
     ├── l1=Linear
     │   ├── weight=f32[1,10]
@@ -252,7 +250,7 @@ filtered_l3 = model.l3.at[...].apply(jnp.sin)
 model  = model.at["l3"].set(filtered_l3)
 
 # frozen nodes are marked with #
->>> print(model.tree_diagram())
+print(model.tree_diagram())
 StackedLinear
     ├#─ l1=Linear
     │   ├#─ weight=f32[1,10]
