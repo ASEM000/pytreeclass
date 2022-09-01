@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import functools as ft
 import operator as op
-from dataclasses import is_dataclass
+from typing import Any
 
 import jax
 import jax.tree_util as jtu
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.tree_util import node_false, node_not, node_true, tree_copy
+from pytreeclass.src.tree_util import _pytree_map, node_false, node_not, node_true
+
+PyTree = Any
 
 
 def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
@@ -38,44 +40,6 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
         return jtu.tree_map(func, lhs, is_leaf=is_leaf)
 
     return _tree_map(lhs, rhs)
-
-
-def _dataclass_map(
-    tree, cond, true_func=lambda x: x, false_func=lambda x: x, is_leaf=None
-):
-    # we traverse the dataclass fields in a depth first manner
-    # and apply true_func to field_value if condition is true and vice versa
-    # unlike using jtu.tree_map which will traverse only the children of field_values
-    def recurse(tree):
-        for field_item in tree.__pytree_fields__.values():
-            field_value = getattr(tree, field_item.name)
-
-            if not field_item.metadata.get("static", False) and is_dataclass(
-                field_value
-            ):
-
-                if cond(field_item, field_value):
-                    object.__setattr__(
-                        tree,
-                        field_item.name,
-                        jtu.tree_map(true_func, field_value, is_leaf=is_leaf),
-                    )
-
-                else:
-                    recurse(field_value)
-
-            else:
-                object.__setattr__(
-                    tree,
-                    field_item.name,
-                    true_func(field_value)
-                    if cond(field_item, field_value)
-                    else false_func(field_value),
-                )
-
-        return tree
-
-    return recurse(tree_copy(tree))
 
 
 def _append_math_op(func):
@@ -110,21 +74,24 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(str)
         def _(tree, where, **kwargs):
             """Filter by field name"""
-            return _dataclass_map(
+            return _pytree_map(
                 tree,
-                cond=lambda field_item, _: (field_item.name == where),
-                true_func=node_true,
-                false_func=node_false,
+                cond=lambda _, field_item, __: (field_item.name == where),
+                true_func=lambda _, field_item, node_item: node_true(node_item),
+                false_func=lambda _, field_item, node_item: node_false(node_item),
+                attr_func=lambda _, field_item, __: field_item.name,
+                is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
 
         @inner_wrapper.register(type)
         def _(tree, where, **kwargs):
-            """Filter by type"""
-            return _dataclass_map(
+            return _pytree_map(
                 tree,
-                cond=lambda _, field_value: isinstance(field_value, where),
-                true_func=node_true,
-                false_func=node_false,
+                cond=lambda _, __, node_item: isinstance(node_item, where),
+                true_func=lambda _, field_item, node_item: node_true(node_item),
+                false_func=lambda _, field_item, node_item: node_false(node_item),
+                attr_func=lambda _, field_item, __: field_item.name,
+                is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
 
         @inner_wrapper.register(dict)
@@ -138,11 +105,13 @@ def _append_math_eq_ne(func):
                     for kw, val in zip(kws, vals)
                 )
 
-            return _dataclass_map(
+            return _pytree_map(
                 tree,
-                cond=lambda field_item, _: in_metadata(field_item),
-                true_func=node_true,
-                false_func=node_false,
+                cond=lambda _, field_item, __: in_metadata(field_item),
+                true_func=lambda _, field_item, node_item: node_true(node_item),
+                false_func=lambda _, field_item, node_item: node_false(node_item),
+                attr_func=lambda _, field_item, __: field_item.name,
+                is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
 
         return (

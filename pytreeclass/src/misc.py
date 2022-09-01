@@ -6,7 +6,7 @@ from typing import Any, Callable
 import jax.numpy as jnp
 
 import pytreeclass.src as src
-from pytreeclass.src.tree_util import is_treeclass, tree_copy
+from pytreeclass.src.tree_util import _pytree_map
 
 
 class ImmutableInstanceError(Exception):
@@ -104,54 +104,33 @@ def _is_nondiff(node):
 
 
 def unfilter_nondiff(tree):
-    # unfilter nondiff nodes inplace
-    # by removing nondiff_fields from the undeclared_fields variable
-
-    def recurse(tree):
-        object.__setattr__(
-            tree,
-            "__undeclared_fields__",
-            {
-                field_name: field_value
-                for field_name, field_value in tree.__undeclared_fields__.items()
-                if not field_value.metadata.get("nondiff", False)
-            },
-        )
-
-        for field_item in tree.__pytree_fields__.values():
-            field_value = getattr(tree, field_item.name)
-            if is_treeclass(field_value):
-                recurse(field_value)
-        return tree
-
-    return recurse(tree_copy(tree)) if is_treeclass(tree) else tree
+    return _pytree_map(
+        tree,
+        cond=lambda _, __, ___: True,
+        true_func=lambda tree, field_item, node_item: {
+            field_name: field_value
+            for field_name, field_value in tree.__undeclared_fields__.items()
+            if not field_value.metadata.get("nondiff", False)
+        },
+        false_func=lambda _, __, ___: {},
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        is_leaf=lambda _, __, ___: False,
+    )
 
 
 def filter_nondiff(tree):
-    # filter nondiff nodes inplace
-    # to be used under jax.grad transformation
-    def recurse(tree):
-        for field_item in tree.__pytree_fields__.values():
-            field_value = getattr(tree, field_item.name)
-
-            if not field_item.metadata.get("static", False):
-                if is_treeclass(field_value):
-                    recurse(field_value)
-
-                elif _is_nondiff(field_value):
-                    new_field = _copy_field(
-                        field_item=field_item,
-                        aux_metadata={"nondiff": True, "static": True},
-                    )
-
-                    object.__setattr__(
-                        tree,
-                        "__undeclared_fields__",
-                        {
-                            **tree.__undeclared_fields__,
-                            **{new_field.name: new_field},
-                        },
-                    )
-        return tree
-
-    return recurse(tree_copy(tree)) if is_treeclass(tree) else tree
+    return _pytree_map(
+        tree,
+        cond=lambda _, __, node_item: _is_nondiff(node_item),
+        true_func=lambda tree, field_item, node_item: {
+            **tree.__undeclared_fields__,
+            **{
+                field_item.name: _copy_field(
+                    field_item, aux_metadata={"static": True, "nondiff": True}
+                )
+            },
+        },
+        false_func=lambda tree, field_item, node_item: tree.__undeclared_fields__,
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),
+    )

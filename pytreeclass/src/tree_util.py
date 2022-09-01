@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import dataclasses
 import sys
-from typing import Any
+from dataclasses import is_dataclass
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
@@ -201,3 +202,69 @@ def node_false(node, array_as_leaves: bool = True):
         return jnp.zeros_like(node).astype(jnp.bool_) if array_as_leaves else True
 
     return _node_false(node)
+
+
+def _pytree_map(
+    tree: PyTree,
+    *,
+    cond: Callable[[Any, Any, Any], bool],
+    true_func: Callable[[Any, Any, Any], Any],
+    false_func: Callable[[Any, Any, Any], Any],
+    attr_func: Callable[[Any, Any, Any], str],
+    is_leaf: Callable[[Any, Any, Any], bool],
+) -> PyTree:
+    """traverse the dataclass fields in a depth first manner
+
+    Here, we apply true_func to node_item if condition is true and vice versa
+    we use attr_func to select the attribute to be updated in the dataclass and 
+    is_leaf to decide whether to continue the traversal or not.
+
+
+    Args:
+        tree (Any):
+            dataclass to be traversed
+
+        cond (Callable[[Any, Any,Any], bool]):
+            condition to be applied on each (tree,fild_item,node_item)
+
+        true_func (Callable[[Any, Any,Any], Any]):
+            function applied if cond is true, accepts (tree,fild_item,node_item)
+
+        false_func (Callable[[Any, Any,Any], Any]):
+            function applied if cond is false, accepts (tree,fild_item,node_item)
+
+        attr_func (Callable[[Any, Any,Any], str]):
+            function that returns the attribute to be updated, accepts (tree,fild_item,node_item)
+
+        is_leaf (Callable[[Any,Any,Any], bool]):
+            stops recursion if false on (tree,fild_item,node_item)
+
+    Returns:
+        PyTree or dataclass : new dataclass with updated attributes
+    """
+    def recurse_non_leaf(tree, field_item, node_item,state):
+        # skip static fields
+        if is_dataclass(node_item):
+            if cond(tree, field_item, node_item):
+                recurse(node_item, state=True)
+            else:
+                recurse(node_item, state)
+
+        else:
+            object.__setattr__(
+                tree,
+                attr_func(tree, field_item, node_item),
+                true_func(tree, field_item, node_item)
+                if (state or cond(tree, field_item, node_item))
+                else false_func(tree, field_item, node_item),
+            )
+
+    def recurse(tree, state):
+        for field_item in tree.__pytree_fields__.values():
+            node_item = getattr(tree, field_item.name)
+
+            if not is_leaf(tree, field_item, node_item):
+                recurse_non_leaf(tree, field_item, node_item,state)
+        return tree
+
+    return recurse(tree_copy(tree), state=None)
