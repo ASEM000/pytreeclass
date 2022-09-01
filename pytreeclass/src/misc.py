@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools as ft
 from dataclasses import field
 from types import FunctionType
