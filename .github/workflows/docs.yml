@@ -6,7 +6,7 @@ on:
       - main
   push:
     branches:
-      - docs
+      - main
 
 jobs:
   test-ubuntu:
