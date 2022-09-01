@@ -19,7 +19,6 @@ Install from pip::
 
    notebooks/getting_started
    notebooks/stateful_computations
-   notebooks/out-of-place indexing
 
 .. toctree::
     :caption: API Documentation
