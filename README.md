@@ -502,8 +502,9 @@ print(counter.calls) # 10.0
 ```
 
 ## 📝 Applications<a id="Applications"></a>
+- [**Kernex** : Differentialble stencil computations](https://github.com/ASEM000/kernex)
+- [**Serket** : Neural network library](https://github.com/ASEM000/serket)
 - [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
-
 
 
 ## 🔢 More<a id="More"></a>
