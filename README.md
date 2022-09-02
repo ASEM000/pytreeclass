@@ -469,8 +469,41 @@ StackedLinear(
 )
 ```
 
+
+# 📜 Stateful computations<a id="StatefulComputation"></a>
+
+First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
+
+Using the following pattern,Updating state **functionally** can be achieved under `jax.jit`
+```python
+import jax
+import pytreeclass as pytc
+
+@pytc.treeclass
+class Counter:
+    calls : int = 0.
+    
+    def increment(self):
+        self.calls += 1 
+counter = Counter() # Counter(calls=0.0)
+```
+
+Here, we define the update function. Since the increment method mutate the internal state, thus we need to use the functional approach to update the state by using `.at`. To achieve this we can use `.at[method_name].__call__(*args,**kwargs)`, this functional call will return the value of this call and a _new_ model instance with the update state.  
+```python
+@jax.jit
+def update(counter):
+    value, new_counter = counter.at["increment"]()
+    return new_counter
+
+for i in range(10):
+    counter = update(counter)
+
+print(counter.calls) # 10.0
+```
+
 ## 📝 Applications<a id="Applications"></a>
 - [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
+
 
 
 ## 🔢 More<a id="More"></a>
