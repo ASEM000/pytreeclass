@@ -40,9 +40,9 @@ The package aims to achieve _two goals_:
 
 1) 🔒 To maintain safe and correct behaviour by using _immutable_ modules with _functional_ API.
 2) To achieve the **most intuitive** user experience in the `JAX` ecosystem by :
-   1) 🏗️ Defining layers similar to `PyTorch` or `TensorFlow` sublcassing style.
-   2) ☝️ Filtering\Indexing layer values by using boolean masking similar to `jax.numpy.at[].{get,set,apply,...}`
-   3) 🎨 Visualize defined layers in plethora of ways for better debugging and sharing of information
+   - 🏗️ Defining layers similar to `PyTorch` or `TensorFlow` sublcassing style.
+   - ☝️ Filtering\Indexing layer values by using boolean masking similar to `jax.numpy.at[].{get,set,apply,...}`
+   - 🎨 Visualize defined layers in plethora of ways for better debugging and sharing of information
 
 
 ## ⏩ Quick Example <a id="QuickExample">
@@ -515,8 +515,6 @@ print(f"{model!r}")
 ```
 
 ```
-StackedLinear(keys=ui32[3,2])
-
 StackedLinear(
   keys=ui32[3,2],
   l1=Linear(weight=f32[10,10],bias=f32[1,10]),
