@@ -1,7 +1,7 @@
 <!-- <h1 align="center" style="font-family:Monospace" >Py🌲Class</h1> -->
 <div align="center">
 <img width="350px" src="assets/pytc%20logo.svg"></div>
-<h2 align="center">Write pytorch-like layers with rich visualizations in JAX.</h2>
+<!-- <h2 align="center">Write pytorch-like layers with rich visualizations in JAX.</h2> -->
 
 [**Installation**](#Installation)
 |[**Description**](#Description)
@@ -35,7 +35,8 @@ pip install git+https://github.com/ASEM000/PyTreeClass
 ## 📖 Description<a id="Description"></a>
 
 `PyTreeClass` is a JAX-compatible `dataclass`-like decorator to create and operate on stateful JAX PyTrees.
-The package aims to achieve two goals:
+
+The package aims to achieve _two goals_:
 
 1) 🔒 To maintain safe and correct behaviour by using _immutable_ modules with _functional_ API.
 2) To achieve the **most intuitive** user experience in the `JAX` ecosystem by :
