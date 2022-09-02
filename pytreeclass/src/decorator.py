@@ -21,11 +21,11 @@ def treeclass(*args, **kwargs):
             eq=False,
             unsafe_hash=False,
             order=False,
-            frozen=True,
+            frozen=False,
         )(cls)
 
-        base_classes = (_explicitSetter,) if field_only else (_implicitSetter,)
-        base_classes += (dCls,)
+        base_classes = (dCls,)
+        base_classes += (_explicitSetter,) if field_only else (_implicitSetter,)
         base_classes += (_treeIndexer, _treeOpBase)
         base_classes += (_treeBase,)
 
