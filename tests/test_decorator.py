@@ -1,6 +1,7 @@
 from dataclasses import field
 
 import jax
+import jax.tree_util as jtu
 import pytest
 from jax import numpy as jnp
 
@@ -114,3 +115,34 @@ def test_post_init():
     t = Test()
 
     assert t.a == 2
+
+
+def test_subclassing():
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+        b: int = 3
+        c: int = 5
+
+        def inc(self, x):
+            return x
+
+        def sub(self, x):
+            return x - 10
+
+    @pytc.treeclass
+    class L1(L0):
+        a: int = 2
+        b: int = 4
+
+        def __setattr__(self, name, value):
+            super().__setattr__(name, value)
+
+        def inc(self, x):
+            return x + 10
+
+    l1 = L1()
+
+    assert jtu.tree_leaves(l1) == [2, 4, 5]
+    assert l1.inc(10) == 20
+    assert l1.sub(10) == 0
