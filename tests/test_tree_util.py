@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.misc import ImmutableInstanceError
+from pytreeclass.src.tree_base import ImmutableInstanceError
 from pytreeclass.src.tree_util import (
     _node_count_and_size,
     is_treeclass,

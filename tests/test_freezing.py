@@ -5,7 +5,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.misc import ImmutableInstanceError
+from pytreeclass.src.tree_base import ImmutableInstanceError
 from pytreeclass.src.tree_util import is_treeclass_equal
 
 

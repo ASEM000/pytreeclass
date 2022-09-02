@@ -125,6 +125,7 @@ def _append_math_eq_ne(func):
 
 class _treeOpBase:
 
+    __hash__ = lambda self: hash(tuple(jtu.tree_leaves(self)))
     __abs__ = _append_math_op(op.abs)
     __add__ = _append_math_op(op.add)
     __radd__ = _append_math_op(op.add)

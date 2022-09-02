@@ -114,3 +114,17 @@ def test_post_init():
     t = Test()
 
     assert t.a == 2
+
+
+def test_overriding_setattr():
+
+    with pytest.raises(TypeError):
+
+        @pytc.treeclass
+        class Test:
+            a: int = 1
+
+            def __setattr__(self, k, v):
+                object.__setattr__(self, k, v)
+
+        Test()

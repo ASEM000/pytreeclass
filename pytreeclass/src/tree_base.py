@@ -218,18 +218,44 @@ class _treeBase:
         )
 
 
-class _implicitTreeBase:
+class _implicitSetter:
     """Register dataclass fields and treeclass instance variables"""
 
-    def __setattr__(self, name: str, value: Any) -> None:
-        object.__setattr__(self, name, value)
+    __immutable_treeclass__ = True
 
-        if (isinstance(value, _treeBase)) and (name not in self.__pytree_fields__):
+    def __setattr__(self, key: str, value: Any) -> None:
+
+        if self.__immutable_treeclass__:
+            raise ImmutableInstanceError(
+                f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
+            )
+
+        object.__setattr__(self, key, value)
+
+        if (isinstance(value, _treeBase)) and (key not in self.__pytree_fields__):
             # create field
             field_value = field()
 
-            object.__setattr__(field_value, "name", name)
+            object.__setattr__(field_value, "name", key)
             object.__setattr__(field_value, "type", type(value))
 
             # register it to class
-            self.__undeclared_fields__.update({name: field_value})
+            self.__undeclared_fields__.update({key: field_value})
+
+
+class ImmutableInstanceError(Exception):
+    pass
+
+
+class _explicitSetter:
+    """Register dataclass fields"""
+
+    __immutable_treeclass__ = True
+
+    def __setattr__(self, key, value):
+        if self.__immutable_treeclass__:
+            raise ImmutableInstanceError(
+                f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
+            )
+
+        object.__setattr__(self, key, value)

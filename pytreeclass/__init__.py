@@ -9,4 +9,4 @@ __all__ = (
     "tree_util",
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

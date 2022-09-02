@@ -59,7 +59,9 @@ def _mutable(func):
     @ft.wraps(func)
     def mutable_method(self, *args, **kwargs):
         self = _mutate_tree(tree=self)
-        return func(self, *args, **kwargs)
+        output = func(self, *args, **kwargs)
+        self = _immutate_tree(tree=self)
+        return output
 
     return mutable_method
 
