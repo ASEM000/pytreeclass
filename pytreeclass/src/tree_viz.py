@@ -11,7 +11,6 @@ import requests
 import pytreeclass.src as src
 from pytreeclass.src.decorator_util import dispatch
 
-# from pytreeclass.src.misc import static_value
 from pytreeclass.src.tree_util import (
     _reduce_count_and_size,
     is_treeclass,
@@ -32,109 +31,6 @@ from pytreeclass.src.tree_viz_util import (
 )
 
 PyTree = Any
-
-
-# def tree_summary_md(tree: PyTree, array: jnp.ndarray | None = None) -> str:
-
-#     if array is not None:
-#         shape = sequential_tree_shape_eval(tree, array)
-#         indim_shape, outdim_shape = shape[:-1], shape[1:]
-
-#     def _cell(text):
-#         return f"<td align = 'center'> {text} </td>"
-
-#     @dispatch(argnum=0)
-#     def recurse(tree, path=(), is_frozen=None):
-#         ...
-
-#     @recurse.register(src.tree_base._treeBase)
-#     def _(tree, path=(), is_frozen=None):
-#         assert is_treeclass(tree)
-
-#         nonlocal FMT, COUNT, SIZE
-#         all_fields = {
-#             **tree.__dataclass_fields__,
-#             **tree.__dict__.get("__pytree_fields__", {}),
-#         }
-
-#         for i, fi in enumerate(all_fields.values()):
-
-#             cur_node = tree.__dict__[fi.name]
-
-#             if is_treeclass_non_leaf(cur_node):
-#                 class_name = cur_node.__class__.__name__
-#                 recurse(cur_node, path + (class_name,), cur_node.frozen)
-
-#             elif fi.repr:
-#                 # Leaf node (treeclass or non-treeclass)
-#                 count, size = _leaf_info(cur_node)
-#                 frozen_str = "<br>(frozen)" if is_frozen else ""
-#                 name_str = f"{fi.name}{frozen_str}"
-#                 type_str = "/".join(path + (cur_node.__class__.__name__,))
-#                 count_str = _format_count(count, True)
-#                 size_str = _format_size(size, True)
-#                 config_str = (
-#                     "<br>".join(
-#                         [
-#                             f"{k}={_format_node_repr(v,0)}"
-#                             for k, v in cur_node.__tree_fields__[0].items()
-#                         ]
-#                     )
-#                     if is_treeclass(cur_node)
-#                     else f"{fi.name}={_format_node_repr(cur_node,0)}"
-#                 )
-
-#                 shape_str = (
-#                     f"{_format_node_repr(indim_shape[i],0)}\n{_format_node_repr(outdim_shape[i],0)}"
-#                     if array is not None
-#                     else ""
-#                 )
-
-#                 COUNT[1 if is_frozen else 0] += count
-#                 SIZE[1 if is_frozen else 0] += size
-
-#                 FMT += (
-#                     "<tr>"
-#                     + _cell(name_str)
-#                     + _cell(type_str)
-#                     + _cell(count_str)
-#                     + _cell(size_str)
-#                     + _cell(config_str)
-#                     + _cell(shape_str)
-#                     + "</tr>"
-#                 )
-
-#     FMT = (
-#         "<table>\n"
-#         "<tr>\n"
-#         "<td align = 'center'> Name </td>\n"
-#         "<td align = 'center'> Type </td>\n"
-#         "<td align = 'center'> Param #</td>\n"
-#         "<td align = 'center'> Size </td>\n"
-#         "<td align = 'center'> Config </td>\n"
-#         "<td align = 'center'> Input/Output </td>\n"
-#         "</tr>\n"
-#     )
-
-#     COUNT = [0, 0]
-#     SIZE = [0, 0]
-
-#     recurse(tree, path=(), is_frozen=tree.frozen)
-
-#     FMT += "</table>"
-
-#     SUMMARY = (
-#         "<table>"
-#         f"<tr><td>Total #</td><td>{_format_count(sum(COUNT))}</td></tr>"
-#         f"<tr><td>Dynamic #</td><td>{_format_count(COUNT[0])}</td></tr>"
-#         f"<tr><td>Static/Frozen #</td><td>{_format_count(COUNT[1])}</td></tr>"
-#         f"<tr><td>Total size</td><td>{_format_size(sum(SIZE))}</td></tr>"
-#         f"<tr><td>Dynamic size</td><td>{_format_size(SIZE[0])}</td></tr>"
-#         f"<tr><td>Static/Frozen size</td><td>{_format_size(SIZE[1])}</td></tr>"
-#         "</table>"
-#     )
-
-#     return FMT + "\n\n#### Summary\n" + SUMMARY
 
 
 def tree_summary(tree, array: jnp.ndarray = None) -> str:
@@ -744,7 +640,3 @@ def save_viz(tree, filename, method="tree_mermaid_md"):
     elif method == "summary":
         with open(f"{filename}.txt", "w") as f:
             f.write(tree_summary(tree))
-
-    # elif method == "summary_md":
-    #     with open(f"{filename}.md", "w") as f:
-    #         f.write(tree_summary_md(tree))

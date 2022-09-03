@@ -193,10 +193,44 @@ class _treeBase:
 
         return self
 
+    @property
+    def __pytree_fields__(self):
+        """Return a dictionary of all fields in the dataclass"""
+        # in case of explicit treebase with no `param` then
+        # its preferable to create a new dict and just point to `__dataclass_fields__`
+        return (
+            self.__dataclass_fields__
+            if len(self.__undeclared_fields__) == 0
+            else {**self.__dataclass_fields__, **self.__undeclared_fields__}
+        )
+
     def param(
         self, node: Any, *, name: str, static: bool = False, repr: bool = True
     ) -> Any:
-        """Add item to dataclass fields to bee seen by jax computations"""
+        """Add and return a parameter to the treeclass in a compact way.
+
+        Note:
+            If the node is already defined (checks by name) then it will be returned
+            Useful if node definition
+
+        Args:
+            node (Any): Any node to be added to the treeclass
+            name (str): Name of the node
+            static (bool, optional): Whether to exclude from tree leaves. Defaults to False.
+            repr (bool, optional): whether to show in repr/str/tree_viz . Defaults to True.
+
+
+        Example:
+            @pytc.treeclass
+            class StackedLinear:
+
+            def __init__(self,key):
+                self.keys = jax.random.split(key,3)
+
+            def __call__(self,x):
+                x = self.param(... ,name="l1")(x)
+                return x
+        """
         if hasattr(self, name) and (name in self.__undeclared_fields__):
             return getattr(self, name)
 
@@ -211,17 +245,6 @@ class _treeBase:
         object.__setattr__(self, name, node)
 
         return getattr(self, name)
-
-    @property
-    def __pytree_fields__(self):
-        """Return a dictionary of all fields in the dataclass"""
-        # in case of explicit treebase with no `param` then
-        # its preferable to create a new dict and just point to `__dataclass_fields__`
-        return (
-            self.__dataclass_fields__
-            if len(self.__undeclared_fields__) == 0
-            else {**self.__dataclass_fields__, **self.__undeclared_fields__}
-        )
 
 
 class ImmutableInstanceError(Exception):
