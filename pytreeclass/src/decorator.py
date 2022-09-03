@@ -34,6 +34,9 @@ def treeclass(*args, **kwargs):
         # temporarily mutate the function to execute the __init__ method
         # without raising __immutable_treeclass__ error
         # then restore the tree original immutable behavior after the function is called
+        # _mutable can be applied to any class method that is decorated with @treeclass
+        # to temporarily make the class mutable
+        # however, it is not recommended to use it outside of __init__ method
         new_cls.__init__ = _mutable(new_cls.__init__)
 
         return jax.tree_util.register_pytree_node_class(new_cls)

@@ -159,22 +159,6 @@ def test_model_viz_frozen_field():
     )
 
 
-# def test_repr_str():
-#     @pytc.treeclass
-#     class Test:
-#         a: float
-#         b: float
-#         c: float
-#         name: str
-
-#     A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), static_value("A"))
-#     str_string = f"{A!s}"
-#     repr_string = f"{A!r}"
-
-#     assert str_string == "Test(a=10,b=20,c=[1 2 3 4 5],name=static(*value=A))"
-#     assert repr_string == "Test(a=10,b=20,c=i32[5],name=static(*value='A'))"
-
-
 def test_save_viz():
     @pytc.treeclass
     class level0:
@@ -226,12 +210,10 @@ def test_save_viz():
     assert pytc.tree_viz.tree_mermaid(model, link=True).startswith(
         "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="
     )
-    # assert (
-    #     tree_viz.save_viz(
-    #         model, os.path.join("tests", "test_summary_md"), method="summary_md"
-    #     )
-    #     is None
-    # )
+
+    assert pytc.tree_viz.tree_diagram(model, link=True).startswith(
+        "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="
+    )
 
 
 def test_tree_repr():
@@ -457,6 +439,10 @@ def test_tree_with_containers():
         # trunk-ignore(flake8/E501)
         == "Test(\n  a=\n    {\n      0:\n      [\n        1,\n        2,\n        3,\n        [[1. 1. 1. 1. 1.]\n         [1. 1. 1. 1. 1.]\n         [1. 1. 1. 1. 1.]\n         [1. 1. 1. 1. 1.]\n         [1. 1. 1. 1. 1.]]\n      ],\n      1:[test]\n    }\n)"
     )
+
+    assert f"{(Test({1,2,3,4,5,5,6,6,6,6,6,6,6,}))!r}" == "Test(a={1,2,3,4,5,6})"
+
+    assert f"{(Test({1,2,3,4,5,5,6,6,6,6,6,6,6,}))!s}" == "Test(a={1,2,3,4,5,6})"
 
 
 def test_func_repr():

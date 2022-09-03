@@ -88,7 +88,6 @@ class _treeBase:
             Frozen size :   0.00B(0.00B)
             ========================================
         """
-
         return tree_summary(self, array)
 
     def tree_diagram(self) -> str:
