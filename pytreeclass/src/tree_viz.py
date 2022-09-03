@@ -10,7 +10,6 @@ import requests
 
 import pytreeclass.src as src
 from pytreeclass.src.decorator_util import dispatch
-
 from pytreeclass.src.tree_util import (
     _reduce_count_and_size,
     is_treeclass,
@@ -26,6 +25,8 @@ from pytreeclass.src.tree_viz_util import (
     _format_size,
     _format_width,
     _layer_box,
+    _mermaid_table,
+    _mermaid_table_row,
     _table,
     _vbox,
 )
@@ -267,7 +268,7 @@ def tree_box(tree, array=None):
     return recurse(tree, "Parent")
 
 
-def tree_diagram(tree):
+def _tree_diagram(tree):
     """
     === Explanation
         pretty print treeclass tree with tree structure diagram
@@ -375,6 +376,19 @@ def tree_diagram(tree):
     recurse(tree, [1], tree.frozen)
 
     return FMT.expandtabs(4)
+
+
+def tree_diagram(tree, link=False):
+    string = _tree_diagram(tree)
+
+    if link:
+        string = string.replace("   ", "&emsp;&emsp;")
+        string = "".join(map(_mermaid_table_row, string.split("\n")))
+        string = "flowchart TD\n" + "A[" + '"' + _mermaid_table(string) + '"' + "]"
+        return _generate_mermaid_link(string)
+
+    else:
+        return string
 
 
 def tree_repr(tree, width: int = 60) -> str:

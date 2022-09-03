@@ -380,3 +380,11 @@ def _layer_box(name, indim=None, outdim=None):
             _table([[" Input ", " Output "], [f" {indim} ", f" {outdim} "]]),
         ]
     )
+
+
+def _mermaid_table_row(node):
+    return "<tr>" "<td>" f"{node}" "</td>" "<tr>"
+
+
+def _mermaid_table(node):
+    return "<div align=" "left" ">" "<table>" f"{node}" "</table>" "</div>"

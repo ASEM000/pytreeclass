@@ -55,6 +55,7 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
 
 def _append_math_op(func):
     """binary and unary magic operations"""
+    # make `func` work on pytree
 
     @ft.wraps(func)
     def wrapper(self, rhs=None):

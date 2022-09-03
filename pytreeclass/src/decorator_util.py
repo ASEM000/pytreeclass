@@ -38,7 +38,7 @@ def dispatch(*args, **kwargs):
     """
 
     def dispatch_wrapper(func, argnum: int | str = 0):
-        """singledispatch by arg position/kw arg name"""
+        """singledispatch by arg position/kwarg name"""
         dispatcher = ft.singledispatch(func)
 
         def wrapper(*ar, **kw):
