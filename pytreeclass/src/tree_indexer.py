@@ -19,7 +19,7 @@ from pytreeclass.src.tree_util import (
     tree_copy,
 )
 
-""" Getter """
+""" .at[...].get() """
 
 
 def _at_get(tree, where, **kwargs):
@@ -78,7 +78,7 @@ def _at_get(tree, where, **kwargs):
     return _where_get(tree=tree, where=where, **kwargs)
 
 
-""" Setter """
+""" .at[...].set() """
 
 
 def _at_set(tree, where, set_value, **kwargs):
@@ -174,7 +174,7 @@ def _at_set(tree, where, set_value, **kwargs):
     return _where_set(tree=tree, where=where, set_value=set_value, **kwargs)
 
 
-""" Apply """
+""" .at[...].apply() """
 
 
 def _at_apply(tree, where, func, **kwargs):
@@ -246,7 +246,7 @@ def _at_apply(tree, where, func, **kwargs):
     return _where_apply(tree=tree, where=where, func=func, **kwargs)
 
 
-""" Reduce """
+""" .at[...].reduce() """
 
 
 def _at_reduce(tree, where, func, **kwargs):
@@ -335,6 +335,9 @@ class _pyTreeIndexer:
 
 def _getter(item: Any, path: Sequence[str]):
     """ "recursive getter"""
+    # this function gets a certain attribute value based on a
+    # sequence of strings.
+    # for example _getter(item , ["a", "b", "c"]) is equivalent to item.a.b.c
     return (
         _getter(getattr(item, path[0]), path[1:])
         if len(path) > 1
@@ -344,6 +347,9 @@ def _getter(item: Any, path: Sequence[str]):
 
 def _setter(item: Any, path: Sequence[str], value: Any):
     """recursive setter"""
+    # this function sets a certain attribute value based on a
+    # sequence of strings.
+    # for example _setter(item , ["a", "b", "c"], value) is equivalent to item.a.b.c = value
 
     def _setter_getter(item, path):
         return (
@@ -368,15 +374,18 @@ class _strIndexer:
     where: str
 
     def get(self):
+        # x.at["a"].get() returns x.a
         return _getter(self.tree, self.where.split("."))
 
     def set(self, set_value):
+        # x.at["a"].set(value) returns a new tree with x.a = value
         return _setter(tree_copy(self.tree), self.where.split("."), set_value)
 
     def apply(self, func, **kwargs):
         return self.tree.at[self.where].set(func(self.tree.at[self.where].get()))
 
     def __call__(self, *args, **kwargs):
+        # x.at[method_name]() -> returns value and new_tree
         new_self = _mutate_tree(tree_copy(self.tree))
         method = getattr(new_self, self.where)
         value = method(*args, **kwargs)
@@ -420,13 +429,14 @@ class _treeIndexer:
                     # subclass to preserve the tree state(i.e. self)
                     # during recursive calls
                     def __getitem__(nested_self, nested_where):
+                        # here the case is .at[cond1].at[cond2] <-> .at[ cond1 and cond2 ]
                         return _pyTreeNestedIndexer(
                             tree=self,
                             where=logical_and(nested_self.where, nested_where),
                         )
 
                     def __getattr__(nested_self, name):
-                        # support of nested `.at`
+                        # support for nested `.at`
                         # e.g. `tree.at[tree>0].at[tree == str ]
                         # corrsponds to (tree>0 and tree == str`)
                         if name != "at":

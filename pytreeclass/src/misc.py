@@ -11,10 +11,6 @@ import pytreeclass.src as src
 from pytreeclass.src.tree_util import _pytree_map
 
 
-class ImmutableInstanceError(Exception):
-    pass
-
-
 def static_field(**kwargs):
     """ignore from pytree computations"""
     return field(**{**kwargs, **{"metadata": {"static": True}}})
@@ -45,12 +41,11 @@ def _mutable(func):
     for class methods/ function with treeclass as first argument
 
     Example:
+        class ... :
 
-    class ... :
-
-    >>> @_mutable
-    ... def mutable_method(self):
-    ...    return self.value + 1
+        >>> @_mutable
+        ... def mutable_method(self):
+        ...    return self.value + 1
     """
     assert isinstance(
         func, FunctionType

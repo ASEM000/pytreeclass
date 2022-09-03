@@ -1,10 +1,12 @@
+# This script defines the base class for the tree classes.
+# the base class handles visualization and flatten/unflatten rules for the tree classes
+
 from __future__ import annotations
 
 from dataclasses import MISSING, field
 from typing import Any
 
 import jax.numpy as jnp
-import jax.tree_util as jtu
 
 # from pytreeclass.src.decorator import static_value
 from pytreeclass.src.tree_viz import (
@@ -47,10 +49,6 @@ class _treeBase:
     def __str__(self):
         """pretty print pytree instance"""
         return tree_str(self, width=60)
-
-    def __hash__(self):
-        """hash rule for pytree instance"""
-        return hash(tuple(jtu.tree_leaves(self)))
 
     @property
     def frozen(self) -> bool:
@@ -116,7 +114,12 @@ class _treeBase:
 
     @property
     def __pytree_structure__(self) -> tuple[dict[str, Any], dict[str, Any]]:
-        """return dynamic and static fields of the pytree instance"""
+        """Return dynamic and static fields of the pytree instance"""
+        # this property scans the class fields and returns a tuple of two dicts (dynamic, static)
+        # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
+        # not seen by JAX computations. the scanning is done if the instance is not frozen.
+        # otherwise the cached values are returned.
+
         if hasattr(self, "__frozen_structure__"):
             # check if pytree_structure is cached
             # ** another approach is to append {static:True} to the metadata using `_pytree_map`,
@@ -132,6 +135,7 @@ class _treeBase:
             else:
                 dynamic[field_item.name] = getattr(self, field_item.name)
 
+        # undeclared fields are the fields that are not defined in the class fields
         static["__undeclared_fields__"] = self.__undeclared_fields__
 
         return (dynamic, static)
@@ -145,6 +149,7 @@ class _treeBase:
         dynamic, static = self.__pytree_structure__
 
         if self.frozen:
+            # return the cache pytree_structure
             return (), ((), (), (dynamic, static))
 
         else:
@@ -182,6 +187,7 @@ class _treeBase:
             dynamic = dict(zip(treedef[0], leaves))
             static = treedef[1]
 
+        # update the instance values with the retrieved dynamic and static values
         self.__dict__.update(dynamic)
         self.__dict__.update(static)
 
@@ -195,7 +201,7 @@ class _treeBase:
             return getattr(self, name)
 
         # create field
-        field_value = field(repr=repr, metadata={"static": static})
+        field_value = field(repr=repr, metadata={"static": static, "param": True})
 
         object.__setattr__(field_value, "name", name)
         object.__setattr__(field_value, "type", type(node))
@@ -216,6 +222,10 @@ class _treeBase:
             if len(self.__undeclared_fields__) == 0
             else {**self.__dataclass_fields__, **self.__undeclared_fields__}
         )
+
+
+class ImmutableInstanceError(Exception):
+    pass
 
 
 class _implicitSetter:
@@ -241,10 +251,6 @@ class _implicitSetter:
 
             # register it to class
             self.__undeclared_fields__.update({key: field_value})
-
-
-class ImmutableInstanceError(Exception):
-    pass
 
 
 class _explicitSetter:

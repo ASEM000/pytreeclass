@@ -12,7 +12,6 @@
 |[**More**](#More)
 |[**Acknowledgements**](#Acknowledgements)
 
-
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.7%203.8%203.9%203.10-red)
 ![codestyle](https://img.shields.io/badge/codestyle-black-lightgrey)
@@ -27,7 +26,9 @@
 ```python
 pip install pytreeclass
 ```
+
 **Install development version**
+
 ```python
 pip install git+https://github.com/ASEM000/PyTreeClass
 ```
@@ -38,17 +39,15 @@ pip install git+https://github.com/ASEM000/PyTreeClass
 
 The package aims to achieve _two goals_:
 
-1) 🔒 To maintain safe and correct behaviour by using _immutable_ modules with _functional_ API.
-2) To achieve the **most intuitive** user experience in the `JAX` ecosystem by :
+1. 🔒 To maintain safe and correct behaviour by using _immutable_ modules with _functional_ API.
+2. To achieve the **most intuitive** user experience in the `JAX` ecosystem by :
    - 🏗️ Defining layers similar to `PyTorch` or `TensorFlow` sublcassing style.
    - ☝️ Filtering\Indexing layer values by using boolean masking similar to `jax.numpy.at[].{get,set,apply,...}`
    - 🎨 Visualize defined layers in plethora of ways for better debugging and sharing of information
 
-
 ## ⏩ Quick Example <a id="QuickExample">
 
 ### 🏗️ Create simple MLP <a id="Pytorch">
-
 
 ```python
 import jax
@@ -78,7 +77,7 @@ class StackedLinear:
 
         # Declaring l1,l2,l3 as dataclass_fields is optional
         # as l1,l2,l3 are Linear class that is wrapped with @pytc.treeclass
-        # To strictly include nodes defined in dataclass fields 
+        # To strictly include nodes defined in dataclass fields
         # use `@pytc.treeclass(field_only=True)`
         self.l1 = Linear(key=keys[0],in_dim=in_dim,out_dim=hidden_dim)
         self.l2 = Linear(key=keys[1],in_dim=hidden_dim,out_dim=hidden_dim)
@@ -92,7 +91,7 @@ class StackedLinear:
         x = self.l3(x)
 
         return x
-        
+
 model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 
 x = jnp.linspace(0,1,100)[:,None]
@@ -100,6 +99,7 @@ y = x**3 + jax.random.uniform(jax.random.PRNGKey(0),(100,1))*0.01
 ```
 
 ### 🎨 Visualize<a id="Viz">
+
 <details>
 
 <div align="center">
@@ -165,6 +165,7 @@ print(model.tree_box(array=x))
 │└────────────┴────────┴──────────────┘│
 └──────────────────────────────────────┘
 ```
+
 </td>
  
 <td>
@@ -219,13 +220,13 @@ flowchart LR
     id7572222925824649475 --- id4749243995442935477["weight\nf32[10,1]"]
     id7572222925824649475 --- id8042761346510512486["bias\nf32[1,1]"]
 ```
+
 <div align="center",font-weight="bold">✨ Generate shareable vizualization links ✨</div>
 
 ```python
 >>> pytc.tree_viz.tree_mermaid(model,link=True)
 'Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id=*********'
 ```
-
 
 </td>
 
@@ -245,7 +246,7 @@ flowchart LR
 model = model.at["l1"].freeze()
 
 # Set negative_values in l2 to 0
-filtered_l2 =  model.l2.at[model.l2<0].set(0) 
+filtered_l2 =  model.l2.at[model.l2<0].set(0)
 model = model.at["l2"].set( filtered_l2 )
 
 # apply sin(x) to all values in l3
@@ -257,29 +258,32 @@ print(model.tree_diagram())
 StackedLinear
     ├#─ l1=Linear
     │   ├#─ weight=f32[1,10]
-    │   └#─ bias=f32[1,10]  
+    │   └#─ bias=f32[1,10]
     ├── l2=Linear
     │   ├── weight=f32[10,10]
-    │   └── bias=f32[1,10]  
+    │   └── bias=f32[1,10]
     └── l3=Linear
         ├── weight=f32[10,1]
-        └── bias=f32[1,1] 
+        └── bias=f32[1,1]
 ```
 
 </details>
 
 ## ☝️ Filtering with `.at[]` <a id="Filtering">
-`PyTreeClass` offers four means of filtering: 
+
+`PyTreeClass` offers four means of filtering:
+
 1. Filter by value
 2. Filter by field name
 3. Filter by field type
 4. Filter by field metadata.
 
 The following example demonstrates the usage the filtering.
-Suppose you have the following (Multilayer perceptron) MLP class  
+Suppose you have the following (Multilayer perceptron) MLP class
+
 - **Note** in `StackedLinear` `l1` and `l2` has a description in `field` metadata.
 
-<details> 
+<details>
 
 <summary>Model definition</summary>
 
@@ -288,7 +292,7 @@ import jax
 from jax import numpy as jnp
 import pytreeclass as pytc
 import matplotlib.pyplot as plt
-from dataclasses import  field 
+from dataclasses import  field
 
 @pytc.treeclass
 class Linear :
@@ -319,13 +323,14 @@ class StackedLinear:
         x = self.l2(x)
 
         return x
-        
+
 model = StackedLinear(in_dim=1,out_dim=1,hidden_dim=5,key=jax.random.PRNGKey(0))
 ```
+
 </details>
 
+- Raw model values before any filtering.
 
-* Raw model values before any filtering.
 ```python
 print(model)
 StackedLinear(
@@ -347,7 +352,8 @@ StackedLinear(
 
 #### Filter by value
 
-* Get all negative values
+- Get all negative values
+
 ```python
 print(model.at[model<0].get())
 
@@ -363,7 +369,8 @@ StackedLinear(
 )
 ```
 
-*  Set negative values to 0
+- Set negative values to 0
+
 ```python
 print(model.at[model<0].set(0))
 
@@ -384,7 +391,8 @@ StackedLinear(
 )
 ```
 
-* Apply f(x)=x^2 to negative values
+- Apply f(x)=x^2 to negative values
+
 ```python
 print(model.at[model<0].apply(lambda x:x**2))
 
@@ -404,7 +412,9 @@ StackedLinear(
   )
 )
 ```
-* Sum all negative values
+
+- Sum all negative values
+
 ```python
 print(model.at[model<0].reduce(lambda acc,cur: acc+jnp.sum(cur)))
 -7.3432307
@@ -412,7 +422,8 @@ print(model.at[model<0].reduce(lambda acc,cur: acc+jnp.sum(cur)))
 
 #### Filter by field name
 
-* Get all fields named `l1`
+- Get all fields named `l1`
+
 ```python
 print(model.at[model == "l1"].get())
 
@@ -426,7 +437,9 @@ StackedLinear(
 ```
 
 #### Filter by field type
-* Get all fields of `Linear` type
+
+- Get all fields of `Linear` type
+
 ```python
 print(model.at[model == Linear].get())
 
@@ -443,7 +456,9 @@ StackedLinear(
 ```
 
 #### Filter by field metadata
-* Get all fields of with `{"description": "First layer"}` in their metadata
+
+- Get all fields of with `{"description": "First layer"}` in their metadata
+
 ```python
 print(model.at[model == {"description": "First layer"}].get())
 
@@ -458,7 +473,8 @@ StackedLinear(
 
 #### Mix and match different filtering methods.
 
-* Get only fields named `weight` positive values.
+- Get only fields named `weight` of positive values.
+
 ```python
 mask = (model == "weight") & (model>0)
 print(model.at[mask].get())
@@ -469,12 +485,12 @@ StackedLinear(
 )
 ```
 
-
 # 📜 Stateful computations<a id="StatefulComputation"></a>
 
 First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
 
 Using the following pattern,Updating state **functionally** can be achieved under `jax.jit`
+
 ```python
 import jax
 import pytreeclass as pytc
@@ -482,13 +498,14 @@ import pytreeclass as pytc
 @pytc.treeclass
 class Counter:
     calls : int = 0.
-    
+
     def increment(self):
-        self.calls += 1 
+        self.calls += 1
 counter = Counter() # Counter(calls=0.0)
 ```
 
-Here, we define the update function. Since the increment method mutate the internal state, thus we need to use the functional approach to update the state by using `.at`. To achieve this we can use `.at[method_name].__call__(*args,**kwargs)`, this functional call will return the value of this call and a _new_ model instance with the update state.  
+Here, we define the update function. Since the increment method mutate the internal state, thus we need to use the functional approach to update the state by using `.at`. To achieve this we can use `.at[method_name].__call__(*args,**kwargs)`, this functional call will return the value of this call and a _new_ model instance with the update state.
+
 ```python
 @jax.jit
 def update(counter):
@@ -502,16 +519,17 @@ print(counter.calls) # 10.0
 ```
 
 ## 📝 Applications<a id="Applications"></a>
+
 - [**Kernex** : Differentialble stencil computations](https://github.com/ASEM000/kernex)
 - [**Serket** : Neural network library](https://github.com/ASEM000/serket)
-- [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX) 
-
+- [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX)
 
 ## 🔢 More<a id="More"></a>
 
 <details><summary><mark>More compact boilerplate</mark></summary>
 
 Using `param`:
+
 - More compact definition can be done with node defined at runtime call.
 - The Linear layers are defined on the first call and retrieved on the subsequent calls
 - This pattern is useful if the module definition depends on runtime data.
@@ -539,6 +557,7 @@ class StackedLinear:
 model = StackedLinear(jax.random.PRNGKey(0))
 print(model)
 ```
+
 ```
 StackedLinear(keys=ui32[3,2])
 ```
@@ -560,8 +579,8 @@ StackedLinear(
 
 </details>
 
-
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
+
 - [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
 - [Equinox](https://github.com/patrick-kidger/equinox)
 - [Treex](https://github.com/cgarciae/treex)

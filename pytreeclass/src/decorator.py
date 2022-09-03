@@ -31,15 +31,18 @@ def treeclass(*args, **kwargs):
 
         new_cls = type(cls.__name__, base_classes, {})
 
+        # temporarily mutate the function to execute the __init__ method
+        # without raising __immutable_treeclass__ error
+        # then restore the tree original immutable behavior after the function is called
         new_cls.__init__ = _mutable(new_cls.__init__)
 
         return jax.tree_util.register_pytree_node_class(new_cls)
 
     if len(args) == 1 and inspect.isclass(args[0]):
-        # @treeclass
+        # no args are passed to the decorator (i.e. @treeclass)
         return class_wrapper(args[0], field_only=False)
 
     elif len(args) == 0 and len(kwargs) > 0:
-        # @treeclass(...)
+        # args are passed to the decorator (i.e. @treeclass(field_only=True))
         field_only = kwargs.get("field_only", False)
         return ft.partial(class_wrapper, field_only=field_only)

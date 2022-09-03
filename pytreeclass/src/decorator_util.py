@@ -21,18 +21,20 @@ def dispatch(*args, **kwargs):
     """ft.singledispatch with option of choosing the position of the dispatched argument
     or keyword argument.
 
-    For multiple dispatch use the following pattern
+    Note:
+        For multiple dispatch use the following pattern
 
-    >>> @dispatch(argnum=0)
-    ... def a(x,y): ...
+    Example:
+        >>> @dispatch(argnum=0)
+        ... def a(x,y): ...
 
-    >>> @a.register(int)
-    ... @dispatch(argnum=1)
-    ... def b(x,y) : ...
+        >>> @a.register(int)
+        ... @dispatch(argnum=1)
+        ... def b(x,y) : ...
 
-    >>> @b.register(int)
-    ... def _(x,y):
-    ...     return "int,int"
+        >>> @b.register(int)
+        ... def _(x,y):
+        ...     return "int,int"
     """
 
     def dispatch_wrapper(func, argnum: int | str = 0):

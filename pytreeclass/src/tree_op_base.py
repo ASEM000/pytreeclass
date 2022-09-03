@@ -1,3 +1,11 @@
+# this script is used to generate the magic methods for the tree classes
+# the main idea is to use the jax.tree_map function to apply the operator to the tree
+# possible lhs/rhs are scalar or tree of the same type/structure
+
+# Techincal note: the following code uses function dispatch heavily, to navigate
+# through diffeent data types and how to handle each type.
+# @dispatch is defined in decorator_util.py and is based on functools.singledispatch
+
 from __future__ import annotations
 
 import functools as ft
@@ -22,6 +30,8 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
 
     @_tree_map.register(type(lhs))
     def _(lhs, rhs):
+        # if rhs is a tree, then apply the operator to the tree
+        # the rhs tree here must be of the same type as lhs tree
         return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
 
     @_tree_map.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
@@ -30,13 +40,14 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
     @_tree_map.register(complex)
     @_tree_map.register(bool)
     @_tree_map.register(str)
-    def _(lhs, rhs):
-        # broadcast the rhs to the lhs
+    def _(lhs, rhs: int | float | complex | bool | str):
+        # broadcast the scalar rhs to the lhs
         return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
 
     @_tree_map.register(type(None))
     def _(lhs, rhs=None):
-        # unary operator
+        # if rhs is None, then apply the operator to the tree
+        # i.e. this defines the unary operator
         return jtu.tree_map(func, lhs, is_leaf=is_leaf)
 
     return _tree_map(lhs, rhs)
@@ -68,48 +79,71 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(bool)
         @inner_wrapper.register(type(self))
         @inner_wrapper.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
-        def _(self, rhs):
+        def _(
+            self,
+            rhs: int
+            | float
+            | complex
+            | bool
+            | type(self)
+            | jax.interpreters.partial_eval.DynamicJaxprTracer,
+        ):
+            # this function is handling all the numeric types
             return _dispatched_op_tree_map(func, self, rhs)
 
         @inner_wrapper.register(str)
-        def _(tree, where, **kwargs):
+        def _(tree, where: str, **kwargs):
             """Filter by field name"""
+            # here _pytree_map is used to traverse the tree depth first
+            # and broadcast True/False to the children values
+            # if the field name matches the where `string``
             return _pytree_map(
                 tree,
                 cond=lambda _, field_item, __: (field_item.name == where),
-                true_func=lambda _, field_item, node_item: node_true(node_item),
-                false_func=lambda _, field_item, node_item: node_false(node_item),
+                true_func=lambda _, __, node_item: node_true(node_item),
+                false_func=lambda _, __, node_item: node_false(node_item),
                 attr_func=lambda _, field_item, __: field_item.name,
                 is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
 
         @inner_wrapper.register(type)
-        def _(tree, where, **kwargs):
+        def _(tree, where: type, **kwargs):
+            """Filter by field type"""
+            # here _pytree_map is used to traverse the tree depth first
+            # and broadcast True/False to the children values
+            # if the field type matches the where `type`
             return _pytree_map(
                 tree,
                 cond=lambda _, __, node_item: isinstance(node_item, where),
-                true_func=lambda _, field_item, node_item: node_true(node_item),
-                false_func=lambda _, field_item, node_item: node_false(node_item),
+                true_func=lambda _, __, node_item: node_true(node_item),
+                false_func=lambda _, __, node_item: node_false(node_item),
                 attr_func=lambda _, field_item, __: field_item.name,
                 is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
 
         @inner_wrapper.register(dict)
-        def _(tree, where, **kwargs):
+        def _(tree, where: dict, **kwargs):
             """Filter by metadata"""
+            # here _pytree_map is used to traverse the tree depth first
+            # and broadcast True/False to the children values
+            # if the field metadata contains the where `dict`
+            # this mechanism could filter by multiple metadata, however possible drawbacks
+            # are that some data structures might have the same metadata for all of it's elements (list/dict/tuple)
+            # and this would filter out all the elements without distinction
 
-            def in_metadata(fld):
+            def in_metadata(field_item):
                 kws, vals = zip(*where.items())
                 return all(
-                    fld.metadata.get(kw, False) and (fld.metadata[kw] == val)
+                    field_item.metadata.get(kw, False)
+                    and (field_item.metadata[kw] == val)
                     for kw, val in zip(kws, vals)
                 )
 
             return _pytree_map(
                 tree,
                 cond=lambda _, field_item, __: in_metadata(field_item),
-                true_func=lambda _, field_item, node_item: node_true(node_item),
-                false_func=lambda _, field_item, node_item: node_false(node_item),
+                true_func=lambda _, __, node_item: node_true(node_item),
+                false_func=lambda _, __, node_item: node_false(node_item),
                 attr_func=lambda _, field_item, __: field_item.name,
                 is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
