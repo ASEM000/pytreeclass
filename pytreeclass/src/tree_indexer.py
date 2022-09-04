@@ -1,3 +1,5 @@
+# this script defines the tree_indexer class e.g. `.at` method for pytree
+
 from __future__ import annotations
 
 import functools as ft

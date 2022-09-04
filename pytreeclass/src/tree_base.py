@@ -1,5 +1,6 @@
 # This script defines the base class for the tree classes.
-# the base class handles visualization and flatten/unflatten rules for the tree classes
+# the base class handles visualization and
+# flatten/unflatten rules for the tree classes
 
 from __future__ import annotations
 

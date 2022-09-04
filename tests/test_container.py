@@ -1,6 +1,6 @@
 import pytest
 
-from pytreeclass.src.container import Container
+from pytreeclass.container import Container
 
 
 def test_container():
