@@ -10,6 +10,7 @@ from pytreeclass.src.misc import _mutable
 from pytreeclass.src.tree_base import _explicitSetter, _implicitSetter, _treeBase
 from pytreeclass.src.tree_indexer import _treeIndexer
 from pytreeclass.src.tree_op import _treeOp
+from pytreeclass.src.tree_pretty import _treePretty
 
 
 def treeclass(*args, **kwargs):
@@ -17,16 +18,16 @@ def treeclass(*args, **kwargs):
 
         dCls = dataclass(
             init="__init__" not in cls.__dict__,
-            repr=False,  # repr is handled by _treeBase
+            repr=False,  # repr is handled by _treePretty
             eq=False,  # eq is handled by _treeOpBase
             unsafe_hash=False,  # hash is handled by _treeOpBase
             order=False,  # order is handled by _treeOpBase
-            frozen=False,  # frozen is handled by _treeBase
+            frozen=False,  # frozen is handled by _explicitSetter/_implicitSetter
         )(cls)
 
         base_classes = (dCls,)
         base_classes += (_explicitSetter,) if field_only else (_implicitSetter,)
-        base_classes += (_treeIndexer, _treeOp)
+        base_classes += (_treeIndexer, _treeOp, _treePretty)
         base_classes += (_treeBase,)
 
         new_cls = type(cls.__name__, base_classes, {})

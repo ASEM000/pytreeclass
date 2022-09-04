@@ -1,6 +1,6 @@
 # this script is used to generate the magic methods for the tree classes
 # the main idea is to use the jax.tree_map function to apply the operator to the tree
-# possible lhs/rhs are scalar or tree of the same type/structure
+# possible lhs/rhs are scalar/jnp.ndarray or tree of the same type/structure
 
 # Techincal note: the following code uses function dispatch heavily, to navigate
 # through diffeent data types and how to handle each type.
