@@ -29,9 +29,7 @@ def test_node():
             for i, (ki, in_dim, out_dim) in enumerate(
                 zip(keys, layers[:-1], layers[1:])
             ):
-                self.param(
-                    Linear(key=ki, in_dim=in_dim, out_dim=out_dim), name=f"l{i}"
-                )
+                self.param(Linear(key=ki, in_dim=in_dim, out_dim=out_dim), name=f"l{i}")
 
         def __call__(self, x):
             x = self.l0(x)
@@ -44,7 +42,6 @@ def test_node():
     model = MLP(layers=[1, 128, 128, 1])
     x = jnp.linspace(0, 1, 100)[:, None]
     y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
-    print(pytc.tree_viz.tree_diagram(model))
 
     # leaves,treedef=jax.tree_flatten(model)
     def loss_func(model, x, y):

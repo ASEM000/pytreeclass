@@ -3,7 +3,7 @@ import numpy.testing as npt
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.tree_mask_util import (
+from pytreeclass.src.mask_util import (
     is_inexact,
     is_inexact_array,
     logical_all,

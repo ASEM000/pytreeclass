@@ -9,7 +9,7 @@ import jax
 from pytreeclass.src.misc import _mutable
 from pytreeclass.src.tree_base import _explicitSetter, _implicitSetter, _treeBase
 from pytreeclass.src.tree_indexer import _treeIndexer
-from pytreeclass.src.tree_op_base import _treeOpBase
+from pytreeclass.src.tree_op import _treeOp
 
 
 def treeclass(*args, **kwargs):
@@ -26,7 +26,7 @@ def treeclass(*args, **kwargs):
 
         base_classes = (dCls,)
         base_classes += (_explicitSetter,) if field_only else (_implicitSetter,)
-        base_classes += (_treeIndexer, _treeOpBase)
+        base_classes += (_treeIndexer, _treeOp)
         base_classes += (_treeBase,)
 
         new_cls = type(cls.__name__, base_classes, {})

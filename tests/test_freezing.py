@@ -7,6 +7,7 @@ import pytest
 import pytreeclass as pytc
 from pytreeclass.src.tree_base import ImmutableInstanceError
 from pytreeclass.src.tree_util import is_treeclass_equal
+from pytreeclass.tree_viz.tree_pprint import tree_diagram
 
 
 def test_freezing_unfreezing():
@@ -195,7 +196,7 @@ def test_freeze_diagram():
     a = a.at["d"].freeze()
     assert a.d.frozen is True
     assert (
-        pytc.tree_viz.tree_diagram(a)
+        tree_diagram(a)
     ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
     assert (
         a.tree_diagram()
@@ -205,5 +206,5 @@ def test_freeze_diagram():
     a = a.at["d"].freeze()  # = a.d.freeze()
     assert a.d.frozen is True
     assert (
-        pytc.tree_viz.tree_diagram(a)
+        tree_diagram(a)
     ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "

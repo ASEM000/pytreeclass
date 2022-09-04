@@ -1,4 +1,5 @@
-from .src import tree_util, tree_viz
+from . import tree_viz
+from .src import tree_util
 from .src.decorator import treeclass
 from .src.misc import static_field
 

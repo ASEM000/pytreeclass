@@ -10,14 +10,14 @@ import jax.tree_util as jtu
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.misc import _immutate_tree, _mutate_tree
-from pytreeclass.src.tree_mask_util import logical_and
-from pytreeclass.src.tree_util import (
+from pytreeclass.src.mask_util import logical_and
+from pytreeclass.src.misc import (
     _freeze_nodes,
+    _immutate_tree,
+    _mutate_tree,
     _unfreeze_nodes,
-    is_treeclass_leaf_bool,
-    tree_copy,
 )
+from pytreeclass.src.tree_util import is_treeclass_leaf_bool, tree_copy
 
 """ .at[...].get() """
 

@@ -8,14 +8,9 @@ from typing import Any
 
 import jax.numpy as jnp
 
-# from pytreeclass.src.decorator import static_value
-from pytreeclass.src.tree_viz import (
-    tree_box,
-    tree_diagram,
-    tree_repr,
-    tree_str,
-    tree_summary,
-)
+from pytreeclass.tree_viz.tree_box import tree_box
+from pytreeclass.tree_viz.tree_pprint import tree_diagram, tree_repr, tree_str
+from pytreeclass.tree_viz.tree_summary import tree_summary
 
 PyTree = Any
 

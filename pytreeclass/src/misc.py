@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import functools as ft
+import sys
 from dataclasses import field
 from types import FunctionType
 from typing import Any, Callable
 
 import jax.numpy as jnp
+import jax.tree_util as jtu
 
 import pytreeclass.src as src
-from pytreeclass.src.tree_util import _pytree_map
+from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.tree_util import _pytree_map, is_treeclass
 
 
 def static_field(**kwargs):
@@ -59,6 +62,85 @@ def _mutable(func):
         return output
 
     return mutable_method
+
+
+def _freeze_nodes(tree):
+    """inplace freezing"""
+    # cache the tree structure (dynamic/static)
+    if is_treeclass(tree):
+        object.__setattr__(tree, "__frozen_structure__", tree.__pytree_structure__)
+        for kw in tree.__pytree_fields__:
+            _freeze_nodes(tree.__dict__[kw])
+    return tree
+
+
+def _unfreeze_nodes(tree):
+    """inplace unfreezing"""
+    # remove the cached frozen structure
+    if is_treeclass(tree):
+        if hasattr(tree, "__frozen_structure__"):
+            object.__delattr__(tree, "__frozen_structure__")
+        for kw in tree.__pytree_fields__:
+            _unfreeze_nodes(tree.__dict__[kw])
+    return tree
+
+
+def _reduce_count_and_size(leaf):
+    """reduce params count and params size of a tree of leaves"""
+
+    def reduce_func(acc, node):
+        lhs_count, lhs_size = acc
+        rhs_count, rhs_size = _node_count_and_size(node)
+        return (lhs_count + rhs_count, lhs_size + rhs_size)
+
+    return jtu.tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
+
+
+def _node_count_and_size(node: Any) -> tuple[complex, complex]:
+    """Calculate number and size of `trainable` and `non-trainable` parameters
+
+    Args:
+        node (Any): treeclass node
+
+    Returns:
+        complex: Complex number of (inexact, exact) parameters for count/size
+    """
+
+    @dispatch(argnum=0)
+    def count_and_size(node):
+        count = complex(0, 0)
+        size = complex(0, 0)
+        return count, size
+
+    @count_and_size.register(jnp.ndarray)
+    def _(node):
+        # inexact(trainable) array
+        if jnp.issubdtype(node, jnp.inexact):
+            count = complex(int(jnp.array(node.shape).prod()), 0)
+            size = complex(int(node.nbytes), 0)
+
+        # exact paramter
+        else:
+            count = complex(0, int(jnp.array(node.shape).prod()))
+            size = complex(0, int(node.nbytes))
+        return count, size
+
+    @count_and_size.register(float)
+    @count_and_size.register(complex)
+    def _(node):
+        # inexact non-array (array_like)
+        count = complex(1, 0)
+        size = complex(sys.getsizeof(node), 0)
+        return count, size
+
+    @count_and_size.register(int)
+    def _(node):
+        # exact non-array
+        count = complex(0, 1)
+        size = complex(0, sys.getsizeof(node))
+        return count, size
+
+    return count_and_size(node)
 
 
 def _copy_field(
