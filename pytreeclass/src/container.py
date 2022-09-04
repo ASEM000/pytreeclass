@@ -24,7 +24,7 @@ class Container:
     """
 
     keys: tuple[str] = pytc.static_field(repr=False)
-    # container_type: type = pytc.static_field(repr=False)
+    container_type: type = pytc.static_field(repr=False)
 
     # the motivation for this class definition is to expose
     # the items of a list/tuple/dict/set as dataclass fields
@@ -64,7 +64,7 @@ class Container:
             raise TypeError("keys argument is not understood.")
 
         self.keys = keys
-        # self.container_type = type(values)
+        self.container_type = type(values)
         for i, (key, value) in enumerate(zip(keys, values)):
             self.param(value, name=key)
 
@@ -75,7 +75,7 @@ class Container:
         Args:
             values (dict[str, Any]): dict items to be registered as dataclass fields
         """
-        # self.container_type = dict
+        self.container_type = dict
         for key, value in values.items():
             self.param(value, name=key)
 
@@ -95,26 +95,13 @@ class Container:
         # return the item with the given index
         return getattr(self, self.keys[index])
 
-    # def items(self):
-    #     """ return the items of the container in its input form"""
-    #     @dispatch(argnum=0)
-    #     def _items(x):
-    #         return getattr(self, self.keys[0])
-
-    #     @_items.register(list)
-    #     def _(x):
-    #         return [getattr(self, key) for key in self.keys]
-
-    #     @_items.register(tuple)
-    #     def _(x):
-    #         return tuple([getattr(self, key) for key in self.keys])
-
-    #     @_items.register(set)
-    #     def _(x):
-    #         return set([getattr(self, key) for key in self.keys])
-
-    #     @_items.register(dict)
-    #     def _(x):
-    #         return {key: getattr(self, key) for key in self.keys}
-
-    #     return _items(self.container_type)
+    def items(self):
+        """return the items of the container in its input form"""
+        if self.container_type is dict:
+            return {key: getattr(self, key) for key in self.keys}
+        elif self.container_type is list:
+            return [getattr(self, key) for key in self.keys]
+        elif self.container_type is tuple:
+            return tuple([getattr(self, key) for key in self.keys])
+        elif self.container_type is set:
+            return set([getattr(self, key) for key in self.keys])

@@ -74,3 +74,18 @@ def test_name_arg():
 
     with pytest.raises(TypeError):
         Container([1, 2, 3], keys=1)
+
+
+def test_items():
+
+    a = Container([1, 2, 3])
+    assert a.items() == [1, 2, 3]
+
+    b = Container({"a": 1, "b": 2, "c": 3})
+    assert b.items() == {"a": 1, "b": 2, "c": 3}
+
+    c = Container({1, 2, 3})
+    assert c.items() == {1, 2, 3}
+
+    d = Container((1, 2, 3))
+    assert d.items() == (1, 2, 3)
