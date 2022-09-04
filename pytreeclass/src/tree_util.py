@@ -15,7 +15,7 @@ PyTree = Any
 
 def is_treeclass(tree):
     """check if a class is treeclass"""
-    return hasattr(tree, "__immutable_treeclass__")
+    return hasattr(tree, "__immutable_pytree__")
 
 
 def is_treeclass_leaf_bool(node):

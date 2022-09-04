@@ -19,7 +19,7 @@ def static_field(**kwargs):
 def _mutate_tree(tree):
     """Enable mutable behavior for a treeclass instance"""
     if src.tree_util.is_treeclass(tree):
-        object.__setattr__(tree, "__immutable_treeclass__", False)
+        object.__setattr__(tree, "__immutable_pytree__", False)
         for field_item in tree.__pytree_fields__.values():
             if hasattr(tree, field_item.name):
                 _mutate_tree(getattr(tree, field_item.name))
@@ -29,7 +29,7 @@ def _mutate_tree(tree):
 def _immutate_tree(tree):
     """Enable immutable behavior for a treeclass instance"""
     if src.tree_util.is_treeclass(tree):
-        object.__setattr__(tree, "__immutable_treeclass__", True)
+        object.__setattr__(tree, "__immutable_pytree__", True)
         for field_item in tree.__pytree_fields__.values():
             if hasattr(tree, field_item.name):
                 _immutate_tree(getattr(tree, field_item.name))

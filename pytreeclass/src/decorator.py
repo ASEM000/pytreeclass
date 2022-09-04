@@ -17,11 +17,11 @@ def treeclass(*args, **kwargs):
 
         dCls = dataclass(
             init="__init__" not in cls.__dict__,
-            repr=False,
-            eq=False,
-            unsafe_hash=False,
-            order=False,
-            frozen=False,
+            repr=False,  # repr is handled by _treeBase
+            eq=False,  # eq is handled by _treeOpBase
+            unsafe_hash=False,  # hash is handled by _treeOpBase
+            order=False,  # order is handled by _treeOpBase
+            frozen=False,  # frozen is handled by _treeBase
         )(cls)
 
         base_classes = (dCls,)

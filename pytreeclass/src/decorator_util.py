@@ -24,7 +24,6 @@ def dispatch(*args, **kwargs):
     Note:
         For multiple dispatch use the following pattern
 
-    Example:
         >>> @dispatch(argnum=0)
         ... def a(x,y): ...
 

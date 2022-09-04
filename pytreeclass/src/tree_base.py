@@ -124,6 +124,9 @@ class _treeBase:
             # ** another approach is to append {static:True} to the metadata using `_pytree_map`,
             # however this will be a bit slower as the tree_flatten has to traverse all fields
             # while here, no traversal is needed
+            # ** another approach is to wrap the all tree values with a class
+            # similar to the approach of the now deprecated `static_value`,
+            # however this will be a bit slower.
             return self.__frozen_structure__
 
         dynamic, static = _fieldDict(), _fieldDict()
@@ -134,7 +137,7 @@ class _treeBase:
             else:
                 dynamic[field_item.name] = getattr(self, field_item.name)
 
-        # undeclared fields are the fields that are not defined in the class fields
+        # undeclared fields are the fields that are not defined in the dataclass fields
         static["__undeclared_fields__"] = self.__undeclared_fields__
 
         return (dynamic, static)
@@ -253,11 +256,11 @@ class ImmutableInstanceError(Exception):
 class _implicitSetter:
     """Register dataclass fields and treeclass instance variables"""
 
-    __immutable_treeclass__ = True
+    __immutable_pytree__ = True
 
     def __setattr__(self, key: str, value: Any) -> None:
 
-        if self.__immutable_treeclass__:
+        if self.__immutable_pytree__:
             raise ImmutableInstanceError(
                 f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
             )
@@ -278,10 +281,10 @@ class _implicitSetter:
 class _explicitSetter:
     """Register dataclass fields"""
 
-    __immutable_treeclass__ = True
+    __immutable_pytree__ = True
 
     def __setattr__(self, key, value):
-        if self.__immutable_treeclass__:
+        if self.__immutable_pytree__:
             raise ImmutableInstanceError(
                 f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
             )
