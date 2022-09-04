@@ -539,7 +539,7 @@ Differentiable stencil computations
 Physics-based Neural network library
 </a>
 
-<img src="assets/serketLogo.svg" width="750px">
+<img src="assets/serketLogo.svg" width="400px">
 </td>
 </tr>
 
