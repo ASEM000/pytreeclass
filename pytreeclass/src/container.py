@@ -42,32 +42,31 @@ class Container:
         self,
         values: list[Any] | tuple[Any] | set[Any],
         *,
-        names: str | tuple[str] = None,
+        keys: str | tuple[str] = None,
     ):
         """flatten the list/tuple/set and register each item as a dataclass field
 
         Args:
             values (list[Any] | tuple[Any] | set[Any]): _description_
-            names (str | tuple[str], optional): Name tuple for each value. Defaults to None.
+            keys (str | tuple[str], optional): Name tuple for each value. Defaults to None.
 
         Returns:
             TypeError: treeclass wrapped class.
         """
         # this dispatch offers a name argument for the container children
-        if names is None:
-            names = ("node",) * len(values)
-        elif isinstance(names, str):
-            names = (names,) * len(values)
-        elif isinstance(names, (tuple, list)):
-            assert len(names) == len(values), "name must have the same length as values"
+        if keys is None:
+            keys = tuple(f"node_{i}" for i, _ in enumerate(values))
+        elif isinstance(keys, str):
+            keys = tuple(f"{keys}_{i}" for i, _ in enumerate(values))
+        elif isinstance(keys, (tuple, list)):
+            assert len(keys) == len(values), "name must have the same length as values"
         else:
-            raise TypeError("names argument is not understood.")
+            raise TypeError("keys argument is not understood.")
 
-        self.keys = ()
+        self.keys = keys
         # self.container_type = type(values)
-        for i, (key, value) in enumerate(zip(names, values)):
-            self.keys += (f"{key}_{i}",)
-            self.param(value, name=self.keys[-1])
+        for i, (key, value) in enumerate(zip(keys, values)):
+            self.param(value, name=key)
 
     @__init__.register(dict)
     def _(self, values: dict[str, Any]):
