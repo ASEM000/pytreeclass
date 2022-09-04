@@ -174,7 +174,7 @@ def test_save_viz():
         e: level1 = level1()
         f: level0 = level0(100, (200))
 
-    # model = level2()
+    model = level2()
 
     # assert (
     #     tree_viz.save_viz(
@@ -207,9 +207,9 @@ def test_save_viz():
     #     is None
     # )
 
-    # assert pytc.tree_viz.tree_mermaid(model, link=True).startswith(
-    #     "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="
-    # )
+    assert pytc.tree_viz.tree_mermaid(model, link=True).startswith(
+        "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="
+    )
 
     # assert pytc.tree_viz.tree_diagram(model, link=True).startswith(
     #     "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="

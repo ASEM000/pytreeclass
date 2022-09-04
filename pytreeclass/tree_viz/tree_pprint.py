@@ -10,11 +10,11 @@ from pytreeclass.tree_viz.node_pprint import (
     _format_node_str,
     _format_width,
 )
-from pytreeclass.tree_viz.tree_export import (
-    _generate_mermaid_link,
-    _mermaid_table,
-    _mermaid_table_row,
-)
+# from pytreeclass.tree_viz.tree_export import (
+#     _generate_mermaid_link,
+#     _mermaid_table,
+#     _mermaid_table_row,
+# )
 
 
 def tree_repr(tree, width: int = 60) -> str:
@@ -291,11 +291,11 @@ def _tree_diagram(tree):
 def tree_diagram(tree, link=False):
     string = _tree_diagram(tree)
 
-    if link:
-        string = string.replace("   ", "&emsp;&emsp;")
-        string = "".join(map(_mermaid_table_row, string.split("\n")))
-        string = "flowchart TD\n" + "A[" + '"' + _mermaid_table(string) + '"' + "]"
-        return _generate_mermaid_link(string)
+    # if link:
+    #     string = string.replace("   ", "&emsp;&emsp;")
+    #     string = "".join(map(_mermaid_table_row, string.split("\n")))
+    #     string = "flowchart TD\n" + "A[" + '"' + _mermaid_table(string) + '"' + "]"
+    #     return _generate_mermaid_link(string)
 
-    else:
-        return string
+    # else:
+    return string

@@ -41,9 +41,9 @@ def _generate_mermaid_link(mermaid_string: str) -> str:
     return f"Open URL in browser: {generated_html}"
 
 
-def _mermaid_table_row(node):
-    return "<tr>" "<td>" f"{node}" "</td>" "<tr>"
+# def _mermaid_table_row(node):
+#     return "<tr>" "<td>" f"{node}" "</td>" "<tr>"
 
 
-def _mermaid_table(node):
-    return "<div align=" "left" ">" "<table>" f"{node}" "</table>" "</div>"
+# def _mermaid_table(node):
+#     return "<div align=" "left" ">" "<table>" f"{node}" "</table>" "</div>"
