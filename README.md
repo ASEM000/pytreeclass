@@ -520,9 +520,31 @@ print(counter.calls) # 10.0
 
 ## 📝 Applications<a id="Applications"></a>
 
-- [**Kernex** : Differentialble stencil computations](https://github.com/ASEM000/kernex)
-- [**Serket** : Neural network library](https://github.com/ASEM000/serket)
-- [Physics informed neural network (PINN)](https://github.com/ASEM000/Physics-informed-neural-network-in-JAX)
+Check other packages built on top of `PyTreeClass`
+
+<div align ="center">
+<table>
+
+<tr>
+<td>
+
+<a href="https://github.com/ASEM000/kernex">
+Differentiable stencil computations
+</a>
+<img src="assets/kernexlogo.svg" width="400px">
+</td>
+<td>
+
+<a href = "https://github.com/ASEM000/serket">
+Physics-based Neural network library
+</a>
+
+<img src="assets/serketLogo.svg" width="750px">
+</td>
+</tr>
+
+</table>
+</div>
 
 ## 🔢 More<a id="More"></a>
 
