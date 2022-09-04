@@ -35,6 +35,7 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
         return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
 
     @_tree_map.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
+    @_tree_map.register(jax.numpy.ndarray)
     @_tree_map.register(int)
     @_tree_map.register(float)
     @_tree_map.register(complex)
