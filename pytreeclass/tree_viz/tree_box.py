@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from pytreeclass.src.tree_util import (
-    is_treeclass,
-    is_treeclass_leaf,
-    sequential_tree_shape_eval,
-)
+from pytreeclass.src.tree_util import is_treeclass, is_treeclass_leaf
 from pytreeclass.tree_viz.box_drawing import _layer_box, _vbox
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
+from pytreeclass.tree_viz.tree_viz_util import _sequential_tree_shape_eval
 
 
 def tree_box(tree, array=None):
@@ -69,5 +66,5 @@ def tree_box(tree, array=None):
                 f"{tree.__class__.__name__}[{parent_name}]", "\n".join(level_nodes)
             )
 
-    shapes = sequential_tree_shape_eval(tree, array) if array is not None else None
+    shapes = _sequential_tree_shape_eval(tree, array) if array is not None else None
     return recurse(tree, "Parent")

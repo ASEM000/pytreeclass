@@ -8,10 +8,13 @@ import jax.numpy as jnp
 
 import pytreeclass.src as src
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.misc import _reduce_count_and_size
-from pytreeclass.src.tree_util import is_treeclass_non_leaf, sequential_tree_shape_eval
+from pytreeclass.src.tree_util import is_treeclass_non_leaf
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
+from pytreeclass.tree_viz.tree_viz_util import (
+    _reduce_count_and_size,
+    _sequential_tree_shape_eval,
+)
 
 
 def _format_size(node_size, newline=False):
@@ -80,7 +83,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
     _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
 
     if array is not None:
-        shape = sequential_tree_shape_eval(tree, array)
+        shape = _sequential_tree_shape_eval(tree, array)
         indim_shape, outdim_shape = shape[:-1], shape[1:]
 
         shape_str = ["Input/Output"] + [

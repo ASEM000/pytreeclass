@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import is_dataclass
 from typing import Any, Callable
 
-import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
@@ -57,20 +56,6 @@ def is_treeclass_equal(lhs, rhs):
     return (lhs_treedef == rhs_treedef) and all(
         [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
     )
-
-
-def sequential_tree_shape_eval(tree, array):
-    """Evaluate shape propagation of assumed sequential modules"""
-    dyanmic, static = tree.__pytree_structure__
-
-    # all dynamic/static leaves
-    all_leaves = (*dyanmic.values(), *static.values())
-    leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
-
-    shape = [jax.eval_shape(lambda x: x, array)]
-    for leave in leaves:
-        shape += [jax.eval_shape(leave, shape[-1])]
-    return shape
 
 
 def tree_copy(tree):

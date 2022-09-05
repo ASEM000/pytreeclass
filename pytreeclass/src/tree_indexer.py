@@ -12,7 +12,6 @@ import jax.tree_util as jtu
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
 from pytreeclass.src.decorator_util import dispatch
-from pytreeclass.src.mask_util import logical_and
 from pytreeclass.src.misc import (
     _freeze_nodes,
     _immutate_tree,
@@ -85,24 +84,24 @@ def _at_get(tree, where, **kwargs):
 def _at_set(tree, where, set_value, **kwargs):
     # Dispatch table
     # ----------------------------------------------------------------#
-    # lhs           | where(rhs)    | set_value     | operation
+    # lhs           | where(rhs)    | set_value     | operation       #
     # ----------------------------------------------------------------#
-    # jnp.ndarray,  |               |               | set_value
+    # jnp.ndarray,  |               |               | set_value       #
     # JaxprTracer   | bool          | bool          | if jnp.all(where)
-    #               |               |               | else set_value
+    #               |               |               | else set_value  #
     # ----------------------------------------------------------------#
-    # jnp.ndarray,  |               |               | set_value
+    # jnp.ndarray,  |               |               | set_value       #
     # JaxprTracer   | bool          | bool          | if jnp.all(where)
-    #               |               |               | else set_value
+    #               |               |               | else set_value  #
     # ----------------------------------------------------------------#
-    #               |               |               | [array_as_leaves]
-    #               |               |               | jnp.where(where,
+    #               |               |               |[array_as_leaves]#
+    #               |               |               | jnp.where(where,#
     #               |               |int, float,    |   set_value, lhs)
-    # jnp.ndarray   | bool          |jnp.ndarray    | [not array_as_leaves]
-    # JaxprTracer   |               |complex,       | set_value
+    # jnp.ndarray   | bool          |jnp.ndarray    | [otherwise]     #
+    # JaxprTracer   |               |complex,       | set_value       #
     #               |               |               | if jnp.all(where)
-    #               |               |               | else set_value
-    #               |               |               |
+    #               |               |               | else set_value  #
+    #               |               |               |                 #
     # ----------------------------------------------------------------#
 
     PyTree = type(tree)
@@ -454,7 +453,7 @@ class _treeIndexer:
                         # here the case is .at[cond1].at[cond2] <-> .at[ cond1 and cond2 ]
                         return _pyTreeNestedIndexer(
                             tree=self,
-                            where=logical_and(nested_self.where, nested_where),
+                            where=(nested_self.where & nested_where),
                         )
 
                     def __getattr__(nested_self, name):
