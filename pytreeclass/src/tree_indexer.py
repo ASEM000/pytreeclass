@@ -25,7 +25,6 @@ from pytreeclass.src.tree_util import is_treeclass_leaf_bool, tree_copy
 
 
 def _at_get(tree, where, **kwargs):
-
     PyTree = type(tree)
 
     @dispatch(argnum="lhs")
@@ -84,6 +83,27 @@ def _at_get(tree, where, **kwargs):
 
 
 def _at_set(tree, where, set_value, **kwargs):
+    # Dispatch table
+    # ----------------------------------------------------------------#
+    # lhs           | where(rhs)    | set_value     | operation
+    # ----------------------------------------------------------------#
+    # jnp.ndarray,  |               |               | set_value
+    # JaxprTracer   | bool          | bool          | if jnp.all(where)
+    #               |               |               | else set_value
+    # ----------------------------------------------------------------#
+    # jnp.ndarray,  |               |               | set_value
+    # JaxprTracer   | bool          | bool          | if jnp.all(where)
+    #               |               |               | else set_value
+    # ----------------------------------------------------------------#
+    #               |               |               | [array_as_leaves]
+    #               |               |               | jnp.where(where,
+    #               |               |int, float,    |   set_value, lhs)
+    # jnp.ndarray   | bool          |jnp.ndarray    | [not array_as_leaves]
+    # JaxprTracer   |               |complex,       | set_value
+    #               |               |               | if jnp.all(where)
+    #               |               |               | else set_value
+    #               |               |               |
+    # ----------------------------------------------------------------#
 
     PyTree = type(tree)
 

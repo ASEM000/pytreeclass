@@ -17,7 +17,8 @@ def _format_width(string, width=50):
     return string if children_length > width else stripped_string
 
 
-def _jax_numpy_repr(node):
+def _jax_numpy_repr(node: jnp.ndarray) -> str:
+    """Replace jnp.ndarray repr with short hand notation for type and shape"""
     replace_tuple = (
         ("int", "i"),
         ("float", "f"),
@@ -67,6 +68,8 @@ def _format_node_repr(node, depth):
 
     @__format_node_repr.register(list)
     def _(node, depth):
+        # increase depth for each item in list
+        # moreover, '_format_width' is done on each item repr
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
         )
@@ -74,6 +77,8 @@ def _format_node_repr(node, depth):
 
     @__format_node_repr.register(tuple)
     def _(node, depth):
+        # increase depth by 1 for each item in the tuple
+        # moreover, `_format_width` is done on each item repr
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
         )
@@ -81,6 +86,8 @@ def _format_node_repr(node, depth):
 
     @__format_node_repr.register(set)
     def _(node, depth):
+        # increase depth by 1 for each item in the set
+        # moreover, `_format_width` is done on each item repr
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
         )
@@ -88,6 +95,8 @@ def _format_node_repr(node, depth):
 
     @__format_node_repr.register(dict)
     def _(node, depth):
+        # increase depth by 1 for each item in the dict
+        # moreover, `_format_width` is done on each item repr
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{k}:{_format_node_repr(v,depth=depth+1)}"
             if "\n" not in f"{v!s}"

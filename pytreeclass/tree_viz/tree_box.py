@@ -10,8 +10,32 @@ from pytreeclass.tree_viz.node_pprint import _format_node_repr
 
 
 def tree_box(tree, array=None):
-    """
-    === plot tree classes
+    """Return subclass relations in a boxed style.
+
+    Example:
+        @pytc.treeclass
+        class L0:
+            a: int = 1
+            b: int = 2
+
+        @pytc.treeclass
+        class L1:
+            c: L0 = L0()
+            d: int = 4
+
+        >>> print(L1().tree_box())
+        ┌─────────────────────────┐
+        │L1[Parent]               │
+        ├─────────────────────────┤
+        │┌───────┬────────┬──────┐│
+        ││       │ Input  │ None ││
+        ││ L0[c] │────────┼──────┤│
+        ││       │ Output │ None ││
+        │└───────┴────────┴──────┘│
+        │┌───┐                    │
+        ││d=4│                    │
+        │└───┘                    │
+        └─────────────────────────┘
     """
 
     def recurse(tree, parent_name):
@@ -33,14 +57,13 @@ def tree_box(tree, array=None):
         else:
             level_nodes = []
 
-            for fi in tree.__pytree_fields__.values():
-                cur_node = tree.__dict__[fi.name]
-
-                if is_treeclass(cur_node):
-                    level_nodes += [f"{recurse(cur_node,fi.name)}"]
-
-                else:
-                    level_nodes += [_vbox(f"{fi.name}={_format_node_repr(cur_node,0)}")]
+            for field_item in tree.__pytree_fields__.values():
+                cur_node = getattr(tree, field_item.name)
+                level_nodes += (
+                    [f"{recurse(cur_node,field_item.name)}"]
+                    if is_treeclass(cur_node)
+                    else [_vbox(f"{field_item.name}={_format_node_repr(cur_node,0)}")]
+                )
 
             return _vbox(
                 f"{tree.__class__.__name__}[{parent_name}]", "\n".join(level_nodes)
