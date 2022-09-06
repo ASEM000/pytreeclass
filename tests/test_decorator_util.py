@@ -1,27 +1,6 @@
 import pytest
 
-from pytreeclass.src.decorator_util import cached_property, dispatch
-
-
-def test_cached_property():
-    class test:
-        def __init__(self, counter):
-            self.counter = counter
-
-        @cached_property
-        def counter_cached_property(self):
-            return self.counter
-
-        @property
-        def counter_property(self):
-            return self.counter
-
-    a = test(counter=10)
-    assert a.counter_property == 10
-    assert a.counter_cached_property == 10
-    a.counter += 1
-    assert a.counter_property == 11
-    assert a.counter_cached_property == 10
+from pytreeclass.src.dispatch import dispatch
 
 
 def test_dispatch():
@@ -109,7 +88,8 @@ def test_singledispatchmethod():
 
         class test:
             @dispatch(argnum=1.0)
-            def plus(self, x): ...
+            def plus(self, x):
+                ...
 
         t = test()
         t.plus("s")

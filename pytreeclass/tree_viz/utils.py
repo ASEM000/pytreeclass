@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.dispatch import dispatch
 from pytreeclass.src.tree_util import is_treeclass
 
 

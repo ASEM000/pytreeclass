@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import jaxlib
 
-from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.dispatch import dispatch
 
 
 def _format_width(string, width=50):

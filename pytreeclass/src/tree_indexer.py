@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
-from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.dispatch import dispatch
 from pytreeclass.src.misc import (
     _freeze_nodes,
     _immutate_tree,

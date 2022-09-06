@@ -3,19 +3,6 @@ from __future__ import annotations
 import functools as ft
 import inspect
 
-""" Porting utils """
-
-
-class cached_property:
-    def __init__(self, func):
-        self.name = func.__name__
-        self.func = func
-
-    def __get__(self, instance, owner):
-        attr = self.func(instance)
-        object.__setattr__(instance, self.name, attr)
-        return attr
-
 
 def dispatch(*args, **kwargs):
     """ft.singledispatch with option of choosing the position of the dispatched argument

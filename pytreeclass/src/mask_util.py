@@ -10,7 +10,7 @@ from typing import Any
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.dispatch import dispatch
 
 
 @ft.partial(ft.partial, jtu.tree_map)

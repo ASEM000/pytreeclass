@@ -3,13 +3,14 @@ from __future__ import annotations
 from dataclasses import field
 
 import pytreeclass.src as src
-from pytreeclass.src.decorator_util import dispatch
+from pytreeclass.src.dispatch import dispatch
 from pytreeclass.tree_viz.node_pprint import (
     _format_node_diagram,
     _format_node_repr,
     _format_node_str,
     _format_width,
 )
+
 # from pytreeclass.tree_viz.tree_export import (
 #     _generate_mermaid_link,
 #     _mermaid_table,
