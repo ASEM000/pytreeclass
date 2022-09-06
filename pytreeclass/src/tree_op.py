@@ -22,7 +22,7 @@ PyTree = Any
 
 
 def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
-    """Slightly different implementation to jtu.tree_map for unary/binary operators broadcasting"""
+    """`jtu.tree_map` for unary/binary operators broadcasting"""
 
     @dispatch(argnum=1)
     def _tree_map(lhs, rhs):
@@ -41,7 +41,16 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
     @_tree_map.register(complex)
     @_tree_map.register(bool)
     @_tree_map.register(str)
-    def _(lhs, rhs: int | float | complex | bool | str):
+    def _(
+        lhs,
+        rhs: int
+        | float
+        | complex
+        | bool
+        | str
+        | jax.numpy.ndarray
+        | jax.interpreters.partial_eval.DynamicJaxprTracer,
+    ):
         # broadcast the scalar rhs to the lhs
         return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
 
@@ -116,10 +125,15 @@ def _append_math_eq_ne(func):
             # if the field type matches the where `type`
             return _pytree_map(
                 tree,
+                # condition to check for each node
                 cond=lambda _, __, node_item: isinstance(node_item, where),
+                # if the condition is True, then broadcast True to the children
                 true_func=lambda _, __, node_item: node_true(node_item),
+                # if the condition is False, then broadcast False to the children
                 false_func=lambda _, __, node_item: node_false(node_item),
+                # which attribute to use in the object.__setattr__ function
                 attr_func=lambda _, field_item, __: field_item.name,
+                # if the node is a leaf, then do not traverse the children
                 is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
 
@@ -143,10 +157,15 @@ def _append_math_eq_ne(func):
 
             return _pytree_map(
                 tree,
+                # condition to check for each dataclass field
                 cond=lambda _, field_item, __: in_metadata(field_item),
+                # if the condition is True, then broadcast True to the children
                 true_func=lambda _, __, node_item: node_true(node_item),
+                # if the condition is False, then broadcast False to the children
                 false_func=lambda _, __, node_item: node_false(node_item),
+                # which attribute to use in the object.__setattr__ function
                 attr_func=lambda _, field_item, __: field_item.name,
+                # if the node is a leaf, then do not traverse the children
                 is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
 

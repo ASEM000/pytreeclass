@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import pytest
 
 import pytreeclass as pytc
 
@@ -58,3 +59,24 @@ def test_node():
         value, model = update(model, x, y)
 
     assert value < 1e-3
+
+
+def test_param_context():
+
+    with pytest.raises(AttributeError):
+
+        @pytc.treeclass
+        class Test:
+            def inc(self):
+                self.param(1, name="a")
+
+        Test().inc()
+
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+
+        def __post_init__(self):
+            self.param(1, name="b")
+
+    assert Test().b == 1

@@ -133,48 +133,6 @@ class _treeBase:
             else {**self.__dataclass_fields__, **self.__undeclared_fields__}
         )
 
-    def param(
-        self, node: Any, *, name: str, static: bool = False, repr: bool = True
-    ) -> Any:
-        """Add and return a parameter to the treeclass in a compact way.
-
-        Note:
-            If the node is already defined (checks by name) then it will be returned
-            Useful if node definition
-
-        Args:
-            node (Any): Any node to be added to the treeclass
-            name (str): Name of the node
-            static (bool, optional): Whether to exclude from tree leaves. Defaults to False.
-            repr (bool, optional): whether to show in repr/str/tree_viz . Defaults to True.
-
-
-        Example:
-            @pytc.treeclass
-            class StackedLinear:
-
-            def __init__(self,key):
-                self.keys = jax.random.split(key,3)
-
-            def __call__(self,x):
-                x = self.param(... ,name="l1")(x)
-                return x
-        """
-        if hasattr(self, name) and (name in self.__undeclared_fields__):
-            return getattr(self, name)
-
-        # create field
-        field_value = field(repr=repr, metadata={"static": static, "param": True})
-
-        object.__setattr__(field_value, "name", name)
-        object.__setattr__(field_value, "type", type(node))
-
-        # register it to class
-        self.__undeclared_fields__.update({name: field_value})
-        object.__setattr__(self, name, node)
-
-        return getattr(self, name)
-
 
 class ImmutableInstanceError(Exception):
     pass

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import jax
 
-from pytreeclass.src.misc import _mutable
+from pytreeclass.src.misc import _add_temp_method, _mutable, param
 from pytreeclass.src.tree_base import _explicitSetter, _implicitSetter, _treeBase
 from pytreeclass.src.tree_indexer import _treeIndexer
 from pytreeclass.src.tree_op import _treeOp
@@ -31,6 +31,12 @@ def treeclass(*args, **kwargs):
         base_classes += (_treeBase,)
 
         new_cls = type(cls.__name__, base_classes, {})
+
+        # add `param` to `__init__` and `__call__` only
+        new_cls.__init__ = _add_temp_method(new_cls.__init__, "param", param)
+
+        if "__call__" in cls.__dict__:
+            new_cls.__call__ = _add_temp_method(new_cls.__call__, "param", param)
 
         # temporarily mutate the function to execute the __init__ method
         # without raising __immutable_treeclass__ error
