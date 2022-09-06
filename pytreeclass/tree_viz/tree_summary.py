@@ -11,7 +11,7 @@ from pytreeclass.src.decorator_util import dispatch
 from pytreeclass.src.tree_util import is_treeclass_non_leaf
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
-from pytreeclass.tree_viz.tree_viz_util import (
+from pytreeclass.tree_viz.viz_util import (
     _reduce_count_and_size,
     _sequential_tree_shape_eval,
 )

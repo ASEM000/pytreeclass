@@ -4,7 +4,7 @@ import pytest
 import pytreeclass as pytc
 from pytreeclass.src.tree_base import ImmutableInstanceError
 from pytreeclass.src.tree_util import is_treeclass, is_treeclass_leaf
-from pytreeclass.tree_viz.tree_viz_util import _node_count_and_size
+from pytreeclass.tree_viz.viz_util import _node_count_and_size
 
 
 @pytc.treeclass
