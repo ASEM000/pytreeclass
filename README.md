@@ -41,9 +41,9 @@ The package aims to achieve _two goals_:
 
 1. 🔒 To maintain safe and correct behaviour by using _immutable_ modules with _functional_ API.
 2. To achieve the **most intuitive** user experience in the `JAX` ecosystem by :
-   - 🏗️ Defining layers similar to `PyTorch` or `TensorFlow` sublcassing style.
+   - 🏗️ Defining layers similar to `PyTorch` or `TensorFlow` subclassing style.
    - ☝️ Filtering\Indexing layer values by using boolean masking similar to `jax.numpy.at[].{get,set,apply,...}`
-   - 🎨 Visualize defined layers in plethora of ways for better debugging and sharing of information
+   - 🎨 Visualize defined layers in plethora of ways for better debugging and [sharing](mermaid) of information
 
 ## ⏩ Quick Example <a id="QuickExample">
 
@@ -221,7 +221,7 @@ flowchart LR
     id7572222925824649475 --- id8042761346510512486["bias\nf32[1,1]"]
 ```
 
-<div align="center",font-weight="bold">✨ Generate shareable vizualization links ✨</div>
+<div align="center",font-weight="bold id="mermaid">✨ Generate shareable vizualization links ✨</div>
 
 ```python
 >>> pytc.tree_viz.tree_mermaid(model,link=True)
