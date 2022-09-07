@@ -106,7 +106,7 @@ def logical_all(tree):
 
     @dispatch(argnum=0)
     def _logical_all(tree):
-        ...
+        return bool(tree) is True
 
     @_logical_all.register(bool)
     def _(tree):

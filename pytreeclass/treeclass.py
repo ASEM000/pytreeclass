@@ -38,8 +38,8 @@ def treeclass(*args, **kwargs):
         if "__call__" in cls.__dict__:
             new_cls.__call__ = _add_temp_method(new_cls.__call__, "param", param)
 
-        # temporarily mutate the function to execute the __init__ method
-        # without raising __immutable_treeclass__ error
+        # temporarily mutate the tree instance to execute the __init__ method
+        # without raising `__immutable_treeclass__` error
         # then restore the tree original immutable behavior after the function is called
         # _mutable can be applied to any class method that is decorated with @treeclass
         # to temporarily make the class mutable

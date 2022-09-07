@@ -19,7 +19,6 @@ class _treeBase:
         self = object.__new__(cls)
 
         object.__setattr__(self, "__undeclared_fields__", {})
-
         # set default values to class instance
         # Note: ideally this method should be called once to avoid multiple
         # definition of `__undeclared_fields__` attribute
@@ -124,6 +123,13 @@ class _treeBase:
         """Return a dictionary of all fields in the dataclass"""
         # in case of explicit treebase with no `param` then
         # its preferable not to create a new dict and just point to `__dataclass_fields__`
+        # ** another feature of using an instance variable to store extra fields is that:
+        # we can shadow the fields in the dataclass by creating a similarly named field in
+        # the `undeclared_fields` instance variable, this avoids mutating the class fields.
+        # For example in {**a,**b},  b keys will override a keys if they exist in both dicts.
+        # this feature is used in functions that can set the `static` metadata
+        # to specific instance fields (e.g. `filter_non_diff`)
+
         return (
             self.__dataclass_fields__
             if len(self.__undeclared_fields__) == 0

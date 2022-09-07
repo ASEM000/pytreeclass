@@ -897,3 +897,23 @@ def test_composed_at():
     assert is_treeclass_equal(
         t.at[t > 0].at[t == "a"].get(), Test(jnp.array([1, 2, 3, 4, 5]))
     )
+
+    with pytest.raises(AttributeError):
+        t.at[t > 0].bet
+
+    with pytest.raises(AttributeError):
+        t.at["a"].bet
+
+
+def test_repr_str():
+    @pytc.treeclass
+    class Test:
+        a: jnp.ndarray = jnp.array([1, 2, 3, 4, 5])
+
+    t = Test()
+
+    assert f"{t.at[...]!r}" == "where=Test(a=bool[5])"
+    assert f"{t.at[...]!s}" == "where=Test(a=[ True  True  True  True  True])"
+
+    assert f"{t.at['a']!r}" == "where='a'"
+    assert f"{t.at['a']!s}" == "where=a"
