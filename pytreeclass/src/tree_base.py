@@ -31,11 +31,7 @@ class _treeBase:
 
     @property
     def frozen(self) -> bool:
-        """Show treeclass frozen status.
-
-        Returns:
-            Frozen state boolean.
-        """
+        """Show treeclass frozen status"""
         return True if hasattr(self, "__frozen_structure__") else False
 
     @property

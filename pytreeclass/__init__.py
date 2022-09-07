@@ -1,5 +1,5 @@
 from . import tree_viz
-from .decorator import treeclass
+from .treeclass import treeclass
 from .src.misc import static_field
 
 __all__ = (

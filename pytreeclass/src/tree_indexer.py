@@ -352,6 +352,12 @@ class _pyTreeIndexer:
             lambda x, y: jnp.minimum(x, jnp.min(y)),
             initializer=+jnp.inf,
         )
+    
+    def __repr__(self):
+        return f"where={self.where!r}"
+    
+    def __str__(self):
+        return f"where={self.where!s}"
 
 
 def _getter(item: Any, path: Sequence[str]):
@@ -422,6 +428,12 @@ class _strIndexer:
         return self.tree.at[self.where].set(
             _unfreeze_nodes(tree_copy(self.tree.at[self.where].get()))
         )
+    
+    def __repr__(self):
+        return f"where={self.where!r}"
+    
+    def __str__(self):
+        return f"where={self.where!s}"
 
 
 class _ellipsisIndexer(_pyTreeIndexer):
