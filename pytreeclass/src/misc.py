@@ -65,7 +65,7 @@ def _freeze_nodes(tree):
     """inplace freezing"""
     # cache the tree structure (dynamic/static)
     if is_treeclass(tree):
-        object.__setattr__(tree, "__frozen_structure__", tree.__pytree_structure__)
+        object.__setattr__(tree, "__pytree_structure_cache__", tree.__pytree_structure__)
         for kw in tree.__pytree_fields__:
             _freeze_nodes(tree.__dict__[kw])
     return tree
@@ -75,8 +75,8 @@ def _unfreeze_nodes(tree):
     """inplace unfreezing"""
     # remove the cached frozen structure
     if is_treeclass(tree):
-        if hasattr(tree, "__frozen_structure__"):
-            object.__delattr__(tree, "__frozen_structure__")
+        if hasattr(tree, "__pytree_structure_cache__"):
+            object.__delattr__(tree, "__pytree_structure_cache__")
         for kw in tree.__pytree_fields__:
             _unfreeze_nodes(tree.__dict__[kw])
     return tree

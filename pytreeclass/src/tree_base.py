@@ -32,7 +32,7 @@ class _treeBase:
     @property
     def frozen(self) -> bool:
         """Show treeclass frozen status"""
-        return True if hasattr(self, "__frozen_structure__") else False
+        return True if hasattr(self, "__pytree_structure_cache__") else False
 
     @property
     def __pytree_structure__(self) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -42,7 +42,7 @@ class _treeBase:
         # not seen by JAX computations. the scanning is done if the instance is not frozen.
         # otherwise the cached values are returned.
 
-        if hasattr(self, "__frozen_structure__"):
+        if hasattr(self, "__pytree_structure_cache__"):
             # check if pytree_structure is cached
             # ** another approach is to append {static:True} to the metadata using `_pytree_map`,
             # however this will be a bit slower as the tree_flatten has to traverse all fields
@@ -50,7 +50,7 @@ class _treeBase:
             # ** another approach is to wrap the all tree values with a class
             # similar to the approach of the now deprecated `static_value`,
             # however this will be a bit slower.
-            return self.__frozen_structure__
+            return self.__pytree_structure_cache__
 
         dynamic, static = _fieldDict(), _fieldDict()
 
@@ -74,7 +74,7 @@ class _treeBase:
         dynamic, static = self.__pytree_structure__
 
         if self.frozen:
-            # return the cache pytree_structure
+            # return the cached pytree_structure
             return (), ((), (), (dynamic, static))
 
         else:
@@ -105,9 +105,10 @@ class _treeBase:
         self = object.__new__(cls)
 
         if len(treedef[2]) > 0:
+            # retrieve the cached structure
             dynamic, static = treedef[2]
-            # retrieve the cached frozen structure
-            object.__setattr__(self, "__frozen_structure__", (dynamic, static))
+            # pass the cached structure to the new instance
+            object.__setattr__(self, "__pytree_structure_cache__", (dynamic, static))
         else:
             dynamic = dict(zip(treedef[0], leaves))
             static = treedef[1]
@@ -122,7 +123,7 @@ class _treeBase:
     def __pytree_fields__(self):
         """Return a dictionary of all fields in the dataclass"""
         # in case of explicit treebase with no `param` then
-        # its preferable to create a new dict and just point to `__dataclass_fields__`
+        # its preferable not to create a new dict and just point to `__dataclass_fields__`
         return (
             self.__dataclass_fields__
             if len(self.__undeclared_fields__) == 0
