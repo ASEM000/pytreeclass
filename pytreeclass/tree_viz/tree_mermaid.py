@@ -4,6 +4,7 @@ import ctypes
 
 import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
+from pytreeclass._src.tree_util import is_treeclass_frozen
 from pytreeclass.tree_viz.node_pprint import _format_node_diagram
 from pytreeclass.tree_viz.tree_export import _generate_mermaid_link
 
@@ -38,7 +39,7 @@ def _tree_mermaid(tree):
             layer_class_name = node_item.__class__.__name__
             cur_id = node_id((depth, order, prev_id))
             FMT += f"\n\tid{prev_id} --> id{cur_id}({field_item.name}\\n{layer_class_name})"
-            recurse(node_item, depth + 1, cur_id, node_item.frozen)
+            recurse(node_item, depth + 1, cur_id, is_treeclass_frozen(node_item))
 
     @dispatch(argnum=0)
     def recurse(tree, depth, prev_id, is_frozen):
@@ -64,7 +65,7 @@ def _tree_mermaid(tree):
 
     cur_id = node_id((0, 0, -1, 0))
     FMT = f"flowchart LR\n\tid{cur_id}[{tree.__class__.__name__}]"
-    recurse(tree, 1, cur_id, tree.frozen)
+    recurse(tree, 1, cur_id, is_treeclass_frozen(tree))
     return FMT.expandtabs(4)
 
 

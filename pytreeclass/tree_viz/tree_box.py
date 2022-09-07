@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from pytreeclass._src.tree_util import is_treeclass, is_treeclass_leaf
+from pytreeclass._src.tree_util import (
+    is_treeclass,
+    is_treeclass_frozen,
+    is_treeclass_leaf,
+)
 from pytreeclass.tree_viz.box_drawing import _layer_box, _vbox
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import _sequential_tree_shape_eval
@@ -40,7 +44,7 @@ def tree_box(tree, array=None):
         nonlocal shapes
 
         if is_treeclass_leaf(tree):
-            frozen_stmt = "(Frozen)" if tree.frozen else ""
+            frozen_stmt = "(Frozen)" if is_treeclass_frozen(tree) else ""
             box = _layer_box(
                 f"{tree.__class__.__name__}[{parent_name}]{frozen_stmt}",
                 _format_node_repr(shapes[0], 0) if array is not None else None,

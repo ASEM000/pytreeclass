@@ -58,6 +58,14 @@ def is_treeclass_equal(lhs, rhs):
     )
 
 
+def is_treeclass_frozen(tree):
+    """assert if a treeclass is frozen"""
+    if is_treeclass(tree):
+        return hasattr(tree, "__pytree_structure_cache__")
+    else:
+        return False
+
+
 def tree_copy(tree):
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 

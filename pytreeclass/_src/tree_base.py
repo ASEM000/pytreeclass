@@ -29,39 +29,22 @@ class _treeBase:
         return self
 
     @property
-    def frozen(self) -> bool:
-        """Show treeclass frozen status"""
-        return True if hasattr(self, "__pytree_structure_cache__") else False
-
-    @property
     def __pytree_structure__(self) -> tuple[dict[str, Any], dict[str, Any]]:
         """Return dynamic and static fields of the pytree instance"""
         # this property scans the class fields and returns a tuple of two dicts (dynamic, static)
         # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
         # not seen by JAX computations. the scanning is done if the instance is not frozen.
         # otherwise the cached values are returned.
+        dynamic = _fieldDict()
 
-        if hasattr(self, "__pytree_structure_cache__"):
-            # check if pytree_structure is cached
-            # ** another approach is to append {static:True} to the metadata using `_pytree_map`,
-            # however this will be a bit slower as the tree_flatten has to traverse all fields
-            # while here, no traversal is needed
-            # ** another approach is to wrap the all tree values with a class
-            # similar to the approach of the now deprecated `static_value`,
-            # however this will be a bit slower.
-            return self.__pytree_structure_cache__
-
-        dynamic, static = _fieldDict(), _fieldDict()
+        # undeclared fields are the fields that are not defined in the dataclass fields
+        static = _fieldDict(__undeclared_fields__=self.__undeclared_fields__)
 
         for field_item in self.__pytree_fields__.values():
             if field_item.metadata.get("static", False):
                 static[field_item.name] = getattr(self, field_item.name)
             else:
                 dynamic[field_item.name] = getattr(self, field_item.name)
-
-        # undeclared fields are the fields that are not defined in the dataclass fields
-        static["__undeclared_fields__"] = self.__undeclared_fields__
-
         return (dynamic, static)
 
     def tree_flatten(self):
@@ -70,13 +53,12 @@ class _treeBase:
         Returns:
             Tuple of dynamic values and (dynamic keys,static dict, cached values)
         """
-        dynamic, static = self.__pytree_structure__
-
-        if self.frozen:
+        if hasattr(self, "__pytree_structure_cache__"):
             # return the cached pytree_structure
-            return (), ((), (), (dynamic, static))
+            return (), ((), (), (self.__pytree_structure_cache__))
 
         else:
+            dynamic, static = self.__pytree_structure__
             return dynamic.values(), (dynamic.keys(), (static), ())
 
     @classmethod

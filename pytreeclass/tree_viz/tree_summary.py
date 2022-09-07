@@ -8,7 +8,11 @@ import jax.numpy as jnp
 
 import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import is_treeclass_non_leaf, tree_unfreeze
+from pytreeclass._src.tree_util import (
+    is_treeclass_frozen,
+    is_treeclass_non_leaf,
+    tree_unfreeze,
+)
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
@@ -148,7 +152,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
         nonlocal ROWS, COUNT, SIZE
 
         if field_item.repr:
-            is_frozen = node_item.frozen
+            is_frozen = is_treeclass_frozen(node_item)
             count, size = _reduce_count_and_size(tree_unfreeze(node_item))
             dynamic, _ = node_item.__pytree_structure__
             ROWS.append(
@@ -180,7 +184,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                 # for instance a path "L1/L0" defines a class L0 with L1 parent
                 recurse(
                     tree=node_item,
-                    is_frozen=node_item.frozen,
+                    is_frozen=is_treeclass_frozen(node_item),
                     name_path=name_path + (field_item.name,),
                     type_path=type_path + (node_item.__class__.__name__,),
                 )
@@ -203,7 +207,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
     COUNT = [0, 0]
     SIZE = [0, 0]
 
-    recurse(tree, is_frozen=tree.frozen, name_path=(), type_path=())
+    recurse(tree, is_frozen=is_treeclass_frozen(tree), name_path=(), type_path=())
 
     # we need to transform rows to cols
     # as `_table` concatenates columns together

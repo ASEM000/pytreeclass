@@ -4,6 +4,7 @@ from dataclasses import field
 
 import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
+from pytreeclass._src.tree_util import is_treeclass_frozen
 from pytreeclass.tree_viz.node_pprint import (
     _format_node_diagram,
     _format_node_repr,
@@ -49,7 +50,7 @@ def tree_repr(tree, width: int = 60) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            is_frozen = node_item.frozen
+            is_frozen = is_treeclass_frozen(node_item)
             is_static = field_item.metadata.get("static", False)
             mark = "*" if is_static else ("#" if is_frozen else "")
 
@@ -60,7 +61,9 @@ def tree_repr(tree, width: int = 60) -> str:
             FMT += f"={layer_class_name}" + "("
             start_cursor = len(FMT)  # capture children repr
 
-            recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
+            recurse(
+                node_item, depth=depth + 1, is_frozen=is_treeclass_frozen(node_item)
+            )
 
             FMT = FMT[:start_cursor] + _format_width(
                 FMT[start_cursor:] + "\n" + "\t" * (depth) + ")"
@@ -90,7 +93,7 @@ def tree_repr(tree, width: int = 60) -> str:
             )
 
     FMT = ""
-    recurse(tree, depth=1, is_frozen=tree.frozen)
+    recurse(tree, depth=1, is_frozen=is_treeclass_frozen(tree))
     FMT = f"{(tree.__class__.__name__)}(" + _format_width(FMT + "\n)", width)
 
     return FMT.expandtabs(2)
@@ -132,7 +135,7 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            is_frozen = node_item.frozen
+            is_frozen = is_treeclass_frozen(node_item)
             is_static = field_item.metadata.get("static", False)
             mark = "*" if is_static else ("#" if is_frozen else "")
 
@@ -143,7 +146,9 @@ def tree_str(tree, width: int = 40) -> str:
             FMT += f"={layer_class_name}" + "("
             start_cursor = len(FMT)  # capture children repr
 
-            recurse(node_item, depth=depth + 1, is_frozen=node_item.frozen)
+            recurse(
+                node_item, depth=depth + 1, is_frozen=is_treeclass_frozen(node_item)
+            )
 
             FMT = FMT[:start_cursor] + _format_width(
                 FMT[start_cursor:] + "\n" + "\t" * (depth) + ")"
@@ -173,7 +178,7 @@ def tree_str(tree, width: int = 40) -> str:
             )
 
     FMT = ""
-    recurse(tree, depth=1, is_frozen=tree.frozen)
+    recurse(tree, depth=1, is_frozen=is_treeclass_frozen(tree))
     FMT = f"{(tree.__class__.__name__)}(" + _format_width(FMT + "\n)", width)
 
     return FMT.expandtabs(2)
@@ -242,7 +247,7 @@ def _tree_diagram(tree):
         nonlocal FMT
 
         if field_item.repr:
-            is_frozen = node_item.frozen
+            is_frozen = is_treeclass_frozen(node_item)
             is_static = field_item.metadata.get("static", False)
             mark = "*" if is_static else ("#" if is_frozen else "─")
             layer_class_name = node_item.__class__.__name__
@@ -284,7 +289,7 @@ def _tree_diagram(tree):
 
     FMT = f"{(tree.__class__.__name__)}"
 
-    recurse(tree, [1], tree.frozen)
+    recurse(tree, [1], is_treeclass_frozen(tree))
 
     return FMT.expandtabs(4)
 
