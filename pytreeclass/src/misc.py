@@ -7,33 +7,17 @@ from typing import Any, Callable
 
 import jax.numpy as jnp
 
-import pytreeclass.src as src
-from pytreeclass.src.tree_util import _pytree_map, is_treeclass
+from pytreeclass.src.tree_util import (
+    _pytree_map,
+    _tree_immutate,
+    _tree_mutate,
+    is_treeclass,
+)
 
 
 def static_field(**kwargs):
     """ignore from pytree computations"""
     return field(**{**kwargs, **{"metadata": {"static": True}}})
-
-
-def _mutate_tree(tree):
-    """Enable mutable behavior for a treeclass instance"""
-    if src.tree_util.is_treeclass(tree):
-        object.__setattr__(tree, "__immutable_pytree__", False)
-        for field_item in tree.__pytree_fields__.values():
-            if hasattr(tree, field_item.name):
-                _mutate_tree(getattr(tree, field_item.name))
-    return tree
-
-
-def _immutate_tree(tree):
-    """Enable immutable behavior for a treeclass instance"""
-    if src.tree_util.is_treeclass(tree):
-        object.__setattr__(tree, "__immutable_pytree__", True)
-        for field_item in tree.__pytree_fields__.values():
-            if hasattr(tree, field_item.name):
-                _immutate_tree(getattr(tree, field_item.name))
-    return tree
 
 
 def _mutable(func):
@@ -53,33 +37,12 @@ def _mutable(func):
 
     @ft.wraps(func)
     def mutable_method(self, *args, **kwargs):
-        self = _mutate_tree(tree=self)
+        self = _tree_mutate(tree=self)
         output = func(self, *args, **kwargs)
-        self = _immutate_tree(tree=self)
+        self = _tree_immutate(tree=self)
         return output
 
     return mutable_method
-
-
-def _freeze_nodes(tree):
-    """inplace freezing"""
-    # cache the tree structure (dynamic/static)
-    if is_treeclass(tree):
-        object.__setattr__(tree, "__pytree_structure_cache__", tree.__pytree_structure__)
-        for kw in tree.__pytree_fields__:
-            _freeze_nodes(tree.__dict__[kw])
-    return tree
-
-
-def _unfreeze_nodes(tree):
-    """inplace unfreezing"""
-    # remove the cached frozen structure
-    if is_treeclass(tree):
-        if hasattr(tree, "__pytree_structure_cache__"):
-            object.__delattr__(tree, "__pytree_structure_cache__")
-        for kw in tree.__pytree_fields__:
-            _unfreeze_nodes(tree.__dict__[kw])
-    return tree
 
 
 def _add_temp_method(func, name: str, method: Callable[[Any]]):

@@ -3,7 +3,7 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass.src.tree_base import ImmutableInstanceError
-from pytreeclass.src.tree_util import is_treeclass, is_treeclass_leaf
+from pytreeclass.src.tree_util import is_treeclass, is_treeclass_leaf, tree_freeze
 from pytreeclass.tree_viz.utils import _node_count_and_size
 
 
@@ -60,7 +60,7 @@ def test__node_count_and_size():
     xx = x()
     # xx.cc = 1
     # assert xx.cc == 1
-    xx = xx.at[...].freeze()
+    xx = tree_freeze(xx)
 
     with pytest.raises(ImmutableInstanceError):
         xx.test = 1

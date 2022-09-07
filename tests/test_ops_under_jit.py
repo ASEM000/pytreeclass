@@ -1,5 +1,3 @@
-from dataclasses import field
-
 import jax
 import jax.tree_util as jtu
 import numpy.testing as npt
@@ -7,6 +5,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
+from pytreeclass.src.tree_util import tree_freeze
 
 
 def test_jit_freeze():
@@ -63,7 +62,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.at["l1"].freeze()
+        model = model.at["l1"].set(tree_freeze(model.l1))
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
@@ -78,7 +77,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.at["l2"].freeze()
+        model = model.at["l2"].set(tree_freeze(model.l2))
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
@@ -93,7 +92,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.at[...].freeze()
+        model = tree_freeze(model)
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 

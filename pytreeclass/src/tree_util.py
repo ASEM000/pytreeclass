@@ -62,6 +62,53 @@ def tree_copy(tree):
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
 
+def _tree_mutate(tree):
+    """Enable mutable behavior for a treeclass instance"""
+    if is_treeclass(tree):
+        object.__setattr__(tree, "__immutable_pytree__", False)
+        for field_item in tree.__pytree_fields__.values():
+            if hasattr(tree, field_item.name):
+                _tree_mutate(getattr(tree, field_item.name))
+    return tree
+
+
+def _tree_immutate(tree):
+    """Enable immutable behavior for a treeclass instance"""
+    if is_treeclass(tree):
+        object.__setattr__(tree, "__immutable_pytree__", True)
+        for field_item in tree.__pytree_fields__.values():
+            if hasattr(tree, field_item.name):
+                _tree_immutate(getattr(tree, field_item.name))
+    return tree
+
+
+def tree_freeze(tree):
+    def recursive_freeze(tree):
+        # cache the tree structure (dynamic/static)
+        if is_treeclass(tree):
+            object.__setattr__(
+                tree, "__pytree_structure_cache__", tree.__pytree_structure__
+            )
+            for kw in tree.__pytree_fields__:
+                recursive_freeze(tree.__dict__[kw])
+        return tree
+
+    return recursive_freeze(tree_copy(tree))
+
+
+def tree_unfreeze(tree):
+    # remove the cached frozen structure
+    def recursive_unfreeze(tree):
+        if is_treeclass(tree):
+            if hasattr(tree, "__pytree_structure_cache__"):
+                object.__delattr__(tree, "__pytree_structure_cache__")
+            for kw in tree.__pytree_fields__:
+                recursive_unfreeze(tree.__dict__[kw])
+        return tree
+
+    return recursive_unfreeze(tree_copy(tree))
+
+
 def node_not(node: Any) -> bool:
     @dispatch(argnum=0)
     def _not(node):
