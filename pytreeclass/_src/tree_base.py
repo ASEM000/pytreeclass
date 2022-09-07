@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import MISSING, field
 from typing import Any
 
-from pytreeclass._src.tree_util import _tree_structure
+from pytreeclass._src.tree_util import _tree_fields, _tree_structure
 
 
 class _treeBase:
@@ -75,23 +75,6 @@ class _treeBase:
 
         return self
 
-    @property
-    def __pytree_fields__(self):
-        """Return a dictionary of all fields in the dataclass"""
-        # in case of explicit treebase with no `param` then
-        # its preferable not to create a new dict and just point to `__dataclass_fields__`
-        # ** another feature of using an instance variable to store extra fields is that:
-        # we can shadow the fields in the dataclass by creating a similarly named field in
-        # the `undeclared_fields` instance variable, this avoids mutating the class fields.
-        # For example in {**a,**b},  b keys will override a keys if they exist in both dicts.
-        # this feature is used in functions that can set the `static` metadata
-        # to specific instance fields (e.g. `filter_non_diff`)
-
-        return (
-            self.__dataclass_fields__
-            if len(self.__undeclared_fields__) == 0
-            else {**self.__dataclass_fields__, **self.__undeclared_fields__}
-        )
 
 class ImmutableInstanceError(Exception):
     pass
@@ -111,7 +94,7 @@ class _implicitSetter:
 
         object.__setattr__(self, key, value)
 
-        if (isinstance(value, _treeBase)) and (key not in self.__pytree_fields__):
+        if (isinstance(value, _treeBase)) and (key not in _tree_fields(self)):
             # create field
             field_value = field()
 

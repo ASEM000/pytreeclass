@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pytreeclass._src.tree_util import (
+    _tree_fields,
     is_treeclass,
     is_treeclass_frozen,
     is_treeclass_leaf,
@@ -58,7 +59,7 @@ def tree_box(tree, array=None):
         else:
             level_nodes = []
 
-            for field_item in tree.__pytree_fields__.values():
+            for field_item in _tree_fields(tree).values():
                 cur_node = getattr(tree, field_item.name)
                 level_nodes += (
                     [f"{recurse(cur_node,field_item.name)}"]

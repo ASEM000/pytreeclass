@@ -29,10 +29,7 @@ def is_treeclass_leaf(tree):
     if is_treeclass(tree):
 
         return is_treeclass(tree) and not any(
-            [
-                is_treeclass(tree.__dict__[fi.name])
-                for fi in tree.__pytree_fields__.values()
-            ]
+            [is_treeclass(tree.__dict__[fi.name]) for fi in _tree_fields(tree).values()]
         )
     else:
         return False
@@ -74,7 +71,7 @@ def _tree_mutate(tree):
     """Enable mutable behavior for a treeclass instance"""
     if is_treeclass(tree):
         object.__setattr__(tree, "__immutable_pytree__", False)
-        for field_item in tree.__pytree_fields__.values():
+        for field_item in _tree_fields(tree).values():
             if hasattr(tree, field_item.name):
                 _tree_mutate(getattr(tree, field_item.name))
     return tree
@@ -98,7 +95,7 @@ def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
     # undeclared fields are the fields that are not defined in the dataclass fields
     static = _fieldDict(__undeclared_fields__=tree.__undeclared_fields__)
 
-    for field_item in tree.__pytree_fields__.values():
+    for field_item in _tree_fields(tree).values():
         if field_item.metadata.get("static", False):
             static[field_item.name] = getattr(tree, field_item.name)
         else:
@@ -110,10 +107,28 @@ def _tree_immutate(tree):
     """Enable immutable behavior for a treeclass instance"""
     if is_treeclass(tree):
         object.__setattr__(tree, "__immutable_pytree__", True)
-        for field_item in tree.__pytree_fields__.values():
+        for field_item in _tree_fields(tree).values():
             if hasattr(tree, field_item.name):
                 _tree_immutate(getattr(tree, field_item.name))
     return tree
+
+
+def _tree_fields(tree):
+    """Return a dictionary of all fields in the dataclass"""
+    # in case of explicit treebase with no `param` then
+    # its preferable not to create a new dict and just point to `__dataclass_fields__`
+    # ** another feature of using an instance variable to store extra fields is that:
+    # we can shadow the fields in the dataclass by creating a similarly named field in
+    # the `undeclared_fields` instance variable, this avoids mutating the class fields.
+    # For example in {**a,**b},  b keys will override a keys if they exist in both dicts.
+    # this feature is used in functions that can set the `static` metadata
+    # to specific instance fields (e.g. `filter_non_diff`)
+
+    return (
+        tree.__dataclass_fields__
+        if len(tree.__undeclared_fields__) == 0
+        else {**tree.__dataclass_fields__, **tree.__undeclared_fields__}
+    )
 
 
 def tree_freeze(tree):
@@ -123,7 +138,7 @@ def tree_freeze(tree):
             object.__setattr__(
                 tree, "__pytree_structure_cache__", _tree_structure(tree)
             )
-            for kw in tree.__pytree_fields__:
+            for kw in _tree_fields(tree):
                 recursive_freeze(tree.__dict__[kw])
         return tree
 
@@ -136,7 +151,7 @@ def tree_unfreeze(tree):
         if is_treeclass(tree):
             if hasattr(tree, "__pytree_structure_cache__"):
                 object.__delattr__(tree, "__pytree_structure_cache__")
-            for kw in tree.__pytree_fields__:
+            for kw in _tree_fields(tree):
                 recursive_unfreeze(tree.__dict__[kw])
         return tree
 
@@ -235,7 +250,7 @@ def _pytree_map(
             )
 
     def recurse(tree, state):
-        for field_item in tree.__pytree_fields__.values():
+        for field_item in _tree_fields(tree).values():
             node_item = getattr(tree, field_item.name)
 
             if not is_leaf(tree, field_item, node_item):

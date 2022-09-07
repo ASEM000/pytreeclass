@@ -6,7 +6,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import _tree_structure
+from pytreeclass._src.tree_util import _tree_fields, _tree_structure
 
 
 def test_true_field_only():
@@ -73,7 +73,7 @@ def test_false_field_only():
 
     model = StackedLinear(key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2)
 
-    assert "l1" in model.__pytree_fields__
+    assert "l1" in _tree_fields(model)
 
     @pytc.treeclass(field_only=False)
     class StackedLinear:

@@ -9,10 +9,11 @@ import jax.numpy as jnp
 import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
+    _tree_fields,
+    _tree_structure,
     is_treeclass_frozen,
     is_treeclass_non_leaf,
     tree_unfreeze,
-    _tree_structure
 )
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
@@ -174,7 +175,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
         nonlocal ROWS, COUNT, SIZE
 
-        for field_item in tree.__pytree_fields__.values():
+        for field_item in _tree_fields(tree).values():
 
             node_item = tree.__dict__[field_item.name]
 

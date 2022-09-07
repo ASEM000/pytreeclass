@@ -4,7 +4,7 @@ import ctypes
 
 import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import is_treeclass_frozen
+from pytreeclass._src.tree_util import _tree_fields, is_treeclass_frozen
 from pytreeclass.tree_viz.node_pprint import _format_node_diagram
 from pytreeclass.tree_viz.tree_export import _generate_mermaid_link
 
@@ -49,7 +49,7 @@ def _tree_mermaid(tree):
     def _(tree, depth, prev_id, is_frozen):
         nonlocal FMT
 
-        for i, fi in enumerate(tree.__pytree_fields__.values()):
+        for i, fi in enumerate(_tree_fields(tree).values()):
 
             # retrieve node item
             cur_node = tree.__dict__[fi.name]
