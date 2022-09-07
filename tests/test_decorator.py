@@ -6,6 +6,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
+from pytreeclass._src.tree_util import _tree_structure
 
 
 def test_true_field_only():
@@ -29,7 +30,7 @@ def test_true_field_only():
             self.l3 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
 
     model = StackedLinear(key=jax.random.PRNGKey(0), in_dim=2, out_dim=2, hidden_dim=2)
-    model.__pytree_structure__
+    _tree_structure(model)
 
     assert "l1" not in model.__dataclass_fields__
     assert "l1" not in model.__undeclared_fields__

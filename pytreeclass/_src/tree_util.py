@@ -80,6 +80,32 @@ def _tree_mutate(tree):
     return tree
 
 
+class _fieldDict(dict):
+    """A dict used for `__pytree_structure__` attribute of a treeclass instance"""
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+
+def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return dynamic and static fields of the pytree instance"""
+    # this property scans the class fields and returns a tuple of two dicts (dynamic, static)
+    # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
+    # not seen by JAX computations. the scanning is done if the instance is not frozen.
+    # otherwise the cached values are returned.
+    dynamic = _fieldDict()
+
+    # undeclared fields are the fields that are not defined in the dataclass fields
+    static = _fieldDict(__undeclared_fields__=tree.__undeclared_fields__)
+
+    for field_item in tree.__pytree_fields__.values():
+        if field_item.metadata.get("static", False):
+            static[field_item.name] = getattr(tree, field_item.name)
+        else:
+            dynamic[field_item.name] = getattr(tree, field_item.name)
+    return (dynamic, static)
+
+
 def _tree_immutate(tree):
     """Enable immutable behavior for a treeclass instance"""
     if is_treeclass(tree):
@@ -95,7 +121,7 @@ def tree_freeze(tree):
         # cache the tree structure (dynamic/static)
         if is_treeclass(tree):
             object.__setattr__(
-                tree, "__pytree_structure_cache__", tree.__pytree_structure__
+                tree, "__pytree_structure_cache__", _tree_structure(tree)
             )
             for kw in tree.__pytree_fields__:
                 recursive_freeze(tree.__dict__[kw])

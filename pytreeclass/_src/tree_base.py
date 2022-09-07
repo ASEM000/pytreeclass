@@ -6,12 +6,7 @@ from __future__ import annotations
 from dataclasses import MISSING, field
 from typing import Any
 
-
-class _fieldDict(dict):
-    """A dict used for `__pytree_structure__` attribute of a treeclass instance"""
-
-    def __eq__(self, other):
-        return self.__dict__ == other.__dict__
+from pytreeclass._src.tree_util import _tree_structure
 
 
 class _treeBase:
@@ -28,25 +23,6 @@ class _treeBase:
 
         return self
 
-    @property
-    def __pytree_structure__(self) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Return dynamic and static fields of the pytree instance"""
-        # this property scans the class fields and returns a tuple of two dicts (dynamic, static)
-        # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
-        # not seen by JAX computations. the scanning is done if the instance is not frozen.
-        # otherwise the cached values are returned.
-        dynamic = _fieldDict()
-
-        # undeclared fields are the fields that are not defined in the dataclass fields
-        static = _fieldDict(__undeclared_fields__=self.__undeclared_fields__)
-
-        for field_item in self.__pytree_fields__.values():
-            if field_item.metadata.get("static", False):
-                static[field_item.name] = getattr(self, field_item.name)
-            else:
-                dynamic[field_item.name] = getattr(self, field_item.name)
-        return (dynamic, static)
-
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
 
@@ -58,7 +34,7 @@ class _treeBase:
             return (), ((), (), (self.__pytree_structure_cache__))
 
         else:
-            dynamic, static = self.__pytree_structure__
+            dynamic, static = _tree_structure(self)
             return dynamic.values(), (dynamic.keys(), (static), ())
 
     @classmethod
@@ -75,7 +51,6 @@ class _treeBase:
         Returns:
             New class instance
         """
-
         # using `object.__new__`` here is faster than using `cls.__new__`
         # as it avoids calling bases __new__ methods
         # moreover , in _treeBase.__new__ we declare `__undeclared_fields__`
@@ -117,7 +92,6 @@ class _treeBase:
             if len(self.__undeclared_fields__) == 0
             else {**self.__dataclass_fields__, **self.__undeclared_fields__}
         )
-
 
 class ImmutableInstanceError(Exception):
     pass

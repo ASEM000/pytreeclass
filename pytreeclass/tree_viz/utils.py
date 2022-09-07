@@ -8,12 +8,12 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import is_treeclass
+from pytreeclass._src.tree_util import is_treeclass, _tree_structure
 
 
 def _sequential_tree_shape_eval(tree, array):
     """Evaluate shape propagation of assumed sequential modules"""
-    dyanmic, static = tree.__pytree_structure__
+    dyanmic, static = _tree_structure(tree)
 
     # all dynamic/static leaves
     all_leaves = (*dyanmic.values(), *static.values())

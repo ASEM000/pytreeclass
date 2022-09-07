@@ -12,6 +12,7 @@ from pytreeclass._src.tree_util import (
     is_treeclass_frozen,
     is_treeclass_non_leaf,
     tree_unfreeze,
+    _tree_structure
 )
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
@@ -154,7 +155,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
         if field_item.repr:
             is_frozen = is_treeclass_frozen(node_item)
             count, size = _reduce_count_and_size(tree_unfreeze(node_item))
-            dynamic, _ = node_item.__pytree_structure__
+            dynamic, _ = _tree_structure(node_item)
             ROWS.append(
                 [
                     "/".join(name_path)
