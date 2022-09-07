@@ -2,9 +2,7 @@ import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
-
-# from pytreeclass.src.misc import
-from pytreeclass.src.tree_op import _dispatched_op_tree_map
+from pytreeclass._src.tree_op import _dispatched_op_tree_map
 
 # @pytc.treeclass
 # class Test:

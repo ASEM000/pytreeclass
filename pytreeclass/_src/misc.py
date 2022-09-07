@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 import jax.numpy as jnp
 
-from pytreeclass.src.tree_util import (
+from pytreeclass._src.tree_util import (
     _pytree_map,
     _tree_immutate,
     _tree_mutate,

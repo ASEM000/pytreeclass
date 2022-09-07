@@ -5,7 +5,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass.src.tree_util import tree_freeze
+from pytreeclass._src.tree_util import tree_freeze
 
 
 def test_jit_freeze():
@@ -132,17 +132,17 @@ def test_ops_with_jit():
     with pytest.raises(jax.errors.ConcretizationTypeError):
         getter(T0())
 
-    assert pytc.src.tree_util.is_treeclass_equal(T0(0, 0, 0), setter(T0()))
+    assert pytc._src.tree_util.is_treeclass_equal(T0(0, 0, 0), setter(T0()))
 
-    assert pytc.src.tree_util.is_treeclass_equal(T0(0, 0, 0), applier(T0()))
+    assert pytc._src.tree_util.is_treeclass_equal(T0(0, 0, 0), applier(T0()))
 
     with pytest.raises(jax.errors.ConcretizationTypeError):
         getter(T1())
 
-    assert pytc.src.tree_util.is_treeclass_equal(
+    assert pytc._src.tree_util.is_treeclass_equal(
         T1(0, 0, 0, jnp.array([0, 0, 0])), setter(T1())
     )
 
-    assert pytc.src.tree_util.is_treeclass_equal(
+    assert pytc._src.tree_util.is_treeclass_equal(
         T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1())
     )

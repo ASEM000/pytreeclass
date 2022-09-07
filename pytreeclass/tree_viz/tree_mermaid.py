@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import ctypes
 
-import pytreeclass.src as src
-from pytreeclass.src.dispatch import dispatch
+import pytreeclass._src as src
+from pytreeclass._src.dispatch import dispatch
 from pytreeclass.tree_viz.node_pprint import _format_node_diagram
 from pytreeclass.tree_viz.tree_export import _generate_mermaid_link
 

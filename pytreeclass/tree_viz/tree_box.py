@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pytreeclass.src.tree_util import is_treeclass, is_treeclass_leaf
+from pytreeclass._src.tree_util import is_treeclass, is_treeclass_leaf
 from pytreeclass.tree_viz.box_drawing import _layer_box, _vbox
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import _sequential_tree_shape_eval

@@ -1,7 +1,6 @@
-from . import tree_viz
-from .src import tree_util
-from .src.misc import static_field
-from .treeclass import treeclass
+from pytreeclass import tree_util, tree_viz
+from pytreeclass._src.misc import static_field
+from pytreeclass.treeclass import treeclass
 
 __all__ = ("treeclass", "static_field", "tree_viz", "tree_util")
 

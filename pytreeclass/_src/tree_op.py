@@ -15,8 +15,8 @@ from typing import Any
 import jax
 import jax.tree_util as jtu
 
-from pytreeclass.src.dispatch import dispatch
-from pytreeclass.src.tree_util import _pytree_map, node_false, node_not, node_true
+from pytreeclass._src.dispatch import dispatch
+from pytreeclass._src.tree_util import _pytree_map, node_false, node_not, node_true
 
 PyTree = Any
 

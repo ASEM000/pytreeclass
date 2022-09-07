@@ -1,8 +1,8 @@
 import jax.tree_util as jtu
 
 import pytreeclass as pytc
-from pytreeclass.src.misc import filter_nondiff, unfilter_nondiff
-from pytreeclass.src.tree_util import is_treeclass_equal
+from pytreeclass._src.misc import filter_nondiff, unfilter_nondiff
+from pytreeclass._src.tree_util import is_treeclass_equal
 
 
 def test_filter_nondiff():

@@ -11,8 +11,8 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
-from pytreeclass.src.dispatch import dispatch
-from pytreeclass.src.tree_util import (
+from pytreeclass._src.dispatch import dispatch
+from pytreeclass._src.tree_util import (
     _tree_immutate,
     _tree_mutate,
     is_treeclass_leaf_bool,

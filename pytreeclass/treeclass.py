@@ -6,11 +6,11 @@ from dataclasses import dataclass
 
 import jax
 
-from pytreeclass.src.misc import _add_temp_method, _mutable, param
-from pytreeclass.src.tree_base import _explicitSetter, _implicitSetter, _treeBase
-from pytreeclass.src.tree_indexer import _treeIndexer
-from pytreeclass.src.tree_op import _treeOp
-from pytreeclass.src.tree_pretty import _treePretty
+from pytreeclass._src.misc import _add_temp_method, _mutable, param
+from pytreeclass._src.tree_base import _explicitSetter, _implicitSetter, _treeBase
+from pytreeclass._src.tree_indexer import _treeIndexer
+from pytreeclass._src.tree_op import _treeOp
+from pytreeclass._src.tree_pretty import _treePretty
 
 
 def treeclass(*args, **kwargs):

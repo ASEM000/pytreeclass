@@ -3,7 +3,7 @@ import numpy.testing as npt
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.mask_util import (
+from pytreeclass._src.mask_util import (
     is_inexact,
     is_inexact_array,
     logical_all,
@@ -12,7 +12,7 @@ from pytreeclass.src.mask_util import (
     logical_or,
     where,
 )
-from pytreeclass.src.tree_util import is_treeclass_equal
+from pytreeclass._src.tree_util import is_treeclass_equal
 
 
 def test_is_inexact_array():

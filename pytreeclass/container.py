@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytreeclass as pytc
-from pytreeclass.src.dispatch import dispatch
+from pytreeclass._src.dispatch import dispatch
 
 
 @pytc.treeclass

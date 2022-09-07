@@ -5,8 +5,8 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.tree_base import ImmutableInstanceError
-from pytreeclass.src.tree_util import is_treeclass_equal, tree_freeze, tree_unfreeze
+from pytreeclass._src.tree_base import ImmutableInstanceError
+from pytreeclass._src.tree_util import is_treeclass_equal, tree_freeze, tree_unfreeze
 from pytreeclass.tree_viz.tree_pprint import tree_diagram
 
 

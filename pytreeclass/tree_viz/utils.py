@@ -7,8 +7,8 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass.src.dispatch import dispatch
-from pytreeclass.src.tree_util import is_treeclass
+from pytreeclass._src.dispatch import dispatch
+from pytreeclass._src.tree_util import is_treeclass
 
 
 def _sequential_tree_shape_eval(tree, array):

@@ -1,6 +1,6 @@
 import pytest
 
-from pytreeclass.src.dispatch import dispatch
+from pytreeclass._src.dispatch import dispatch
 
 
 def test_dispatch():

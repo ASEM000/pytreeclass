@@ -6,7 +6,7 @@ from typing import Any, Callable
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass.src.dispatch import dispatch
+from pytreeclass._src.dispatch import dispatch
 
 PyTree = Any
 

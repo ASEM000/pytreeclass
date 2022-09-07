@@ -8,8 +8,8 @@ import jax.random as jr
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass.src.misc import static_field
-from pytreeclass.src.tree_util import tree_freeze
+from pytreeclass._src.misc import static_field
+from pytreeclass._src.tree_util import tree_freeze
 from pytreeclass.tree_viz.box_drawing import _resolve_line
 from pytreeclass.tree_viz.tree_box import tree_box
 from pytreeclass.tree_viz.tree_pprint import tree_diagram

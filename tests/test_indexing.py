@@ -11,8 +11,8 @@ import numpy.testing as npt
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass.src.tree_indexer import _at_apply, _at_get, _at_reduce, _at_set
-from pytreeclass.src.tree_util import is_treeclass_equal
+from pytreeclass._src.tree_indexer import _at_apply, _at_get, _at_reduce, _at_set
+from pytreeclass._src.tree_util import is_treeclass_equal
 
 
 @pytc.treeclass

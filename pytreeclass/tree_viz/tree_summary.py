@@ -6,9 +6,9 @@ from dataclasses import field
 
 import jax.numpy as jnp
 
-import pytreeclass.src as src
-from pytreeclass.src.dispatch import dispatch
-from pytreeclass.src.tree_util import is_treeclass_non_leaf, tree_unfreeze
+import pytreeclass._src as src
+from pytreeclass._src.dispatch import dispatch
+from pytreeclass._src.tree_util import is_treeclass_non_leaf, tree_unfreeze
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (

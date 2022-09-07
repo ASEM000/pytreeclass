@@ -43,7 +43,7 @@ The package aims to achieve _two goals_:
 2. To achieve the **most intuitive** user experience in the `JAX` ecosystem by :
    - 🏗️ Defining layers similar to `PyTorch` or `TensorFlow` subclassing style.
    - ☝️ Filtering\Indexing layer values by using boolean masking similar to `jax.numpy.at[].{get,set,apply,...}`
-   - 🎨 Visualize defined layers in plethora of ways for better debugging and sharing of information.    
+   - 🎨 Visualize defined layers in plethora of ways for better debugging and sharing of information.
 
 ## ⏩ Quick Example <a id="QuickExample">
 
@@ -243,6 +243,8 @@ flowchart LR
 
 ```python
 # freeze l1
+from
+
 model = model.at["l1"].freeze()
 
 # Set negative_values in l2 to 0
