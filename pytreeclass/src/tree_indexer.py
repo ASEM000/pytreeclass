@@ -12,13 +12,12 @@ import jax.tree_util as jtu
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
 from pytreeclass.src.dispatch import dispatch
-from pytreeclass.src.misc import (
-    _freeze_nodes,
-    _immutate_tree,
-    _mutate_tree,
-    _unfreeze_nodes,
+from pytreeclass.src.tree_util import (
+    _tree_immutate,
+    _tree_mutate,
+    is_treeclass_leaf_bool,
+    tree_copy,
 )
-from pytreeclass.src.tree_util import is_treeclass_leaf_bool, tree_copy
 
 """ .at[...].get() """
 
@@ -352,10 +351,10 @@ class _pyTreeIndexer:
             lambda x, y: jnp.minimum(x, jnp.min(y)),
             initializer=+jnp.inf,
         )
-    
+
     def __repr__(self):
         return f"where={self.where!r}"
-    
+
     def __str__(self):
         return f"where={self.where!s}"
 
@@ -413,35 +412,17 @@ class _strIndexer:
 
     def __call__(self, *args, **kwargs):
         # x.at[method_name]() -> returns value and new_tree
-        new_self = _mutate_tree(tree_copy(self.tree))
+        new_self = _tree_mutate(tree_copy(self.tree))
         method = getattr(new_self, self.where)
         value = method(*args, **kwargs)
-        new_self = _immutate_tree(new_self)
+        new_self = _tree_immutate(new_self)
         return value, new_self
 
-    def freeze(self):
-        return self.tree.at[self.where].set(
-            _freeze_nodes(tree_copy(self.tree.at[self.where].get()))
-        )
-
-    def unfreeze(self):
-        return self.tree.at[self.where].set(
-            _unfreeze_nodes(tree_copy(self.tree.at[self.where].get()))
-        )
-    
     def __repr__(self):
         return f"where={self.where!r}"
-    
+
     def __str__(self):
         return f"where={self.where!s}"
-
-
-class _ellipsisIndexer(_pyTreeIndexer):
-    def freeze(self):
-        return _freeze_nodes(tree_copy(self.tree))
-
-    def unfreeze(self):
-        return _unfreeze_nodes(tree_copy(self.tree))
 
 
 class _treeIndexer:
@@ -505,6 +486,6 @@ class _treeIndexer:
             def _(_, where):
                 """Ellipsis as an alias for all elements"""
                 # model.at[model == model ] <==> model.at[...]
-                return _ellipsisIndexer(tree=self, where=(self == self))
+                return self.at[self == self]
 
         return _atIndexer()

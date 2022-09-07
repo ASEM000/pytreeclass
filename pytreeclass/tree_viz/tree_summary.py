@@ -8,7 +8,7 @@ import jax.numpy as jnp
 
 import pytreeclass.src as src
 from pytreeclass.src.dispatch import dispatch
-from pytreeclass.src.tree_util import is_treeclass_non_leaf
+from pytreeclass.src.tree_util import is_treeclass_non_leaf, tree_unfreeze
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
@@ -149,7 +149,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
         if field_item.repr:
             is_frozen = node_item.frozen
-            count, size = _reduce_count_and_size(node_item.at[...].unfreeze())
+            count, size = _reduce_count_and_size(tree_unfreeze(node_item))
             dynamic, _ = node_item.__pytree_structure__
             ROWS.append(
                 [

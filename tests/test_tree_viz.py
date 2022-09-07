@@ -9,6 +9,7 @@ from jax import numpy as jnp
 
 import pytreeclass as pytc
 from pytreeclass.src.misc import static_field
+from pytreeclass.src.tree_util import tree_freeze
 from pytreeclass.tree_viz.box_drawing import _resolve_line
 from pytreeclass.tree_viz.tree_box import tree_box
 from pytreeclass.tree_viz.tree_pprint import tree_diagram
@@ -71,10 +72,10 @@ def test_model_viz_frozen_value():
     assert (
         model.summary(),
         model.summary(array=x),
-        model.at[...].freeze().summary(),
-        model.at[...].freeze().summary(array=x),
+        tree_freeze(model).summary(),
+        tree_freeze(model).summary(array=x),
         model.tree_diagram(),
-        model.at[...].freeze().tree_diagram(),
+        tree_freeze(model).tree_diagram(),
     ) == (
         # trunk-ignore(flake8/E501)
         "┌────┬──────┬─────────┬───────┬───────────────────┐\n│Name│Type  │Param #  │Size   │Config             │\n├────┼──────┼─────────┼───────┼───────────────────┤\n│l1  │Linear│256(0)   │1.00KB │weight=f32[1,128]  │\n│    │      │         │(0.00B)│bias=f32[1,128]    │\n├────┼──────┼─────────┼───────┼───────────────────┤\n│l2  │Linear│16,512(0)│64.50KB│weight=f32[128,128]│\n│    │      │         │(0.00B)│bias=f32[1,128]    │\n├────┼──────┼─────────┼───────┼───────────────────┤\n│l3  │Linear│129(0)   │516.00B│weight=f32[128,1]  │\n│    │      │         │(0.00B)│bias=f32[1,1]      │\n└────┴──────┴─────────┴───────┴───────────────────┘\nTotal count :\t16,897(0)\nDynamic count :\t16,897(0)\nFrozen count :\t0(0)\n---------------------------------------------------\nTotal size :\t66.00KB(0.00B)\nDynamic size :\t66.00KB(0.00B)\nFrozen size :\t0.00B(0.00B)\n===================================================",
@@ -126,7 +127,7 @@ def test_model_viz_frozen_field():
     x = jnp.linspace(0, 1, 100)[:, None]
 
     assert (
-        (model.at[...].freeze().summary())
+        (tree_freeze(model).summary())
         # trunk-ignore(flake8/E501)
         == "┌────────┬──────┬─────────┬───────┬───────────────────┐\n│Name    │Type  │Param #  │Size   │Config             │\n├────────┼──────┼─────────┼───────┼───────────────────┤\n│l1      │Linear│256(0)   │1.00KB │weight=f32[1,128]  │\n│(frozen)│      │         │(0.00B)│bias=f32[1,128]    │\n├────────┼──────┼─────────┼───────┼───────────────────┤\n│l2      │Linear│16,512(0)│64.50KB│weight=f32[128,128]│\n│(frozen)│      │         │(0.00B)│bias=f32[1,128]    │\n├────────┼──────┼─────────┼───────┼───────────────────┤\n│l3      │Linear│129(0)   │516.00B│weight=f32[128,1]  │\n│(frozen)│      │         │(0.00B)│bias=f32[1,1]      │\n└────────┴──────┴─────────┴───────┴───────────────────┘\nTotal count :\t16,897(0)\nDynamic count :\t0(0)\nFrozen count :\t16,897(0)\n-------------------------------------------------------\nTotal size :\t66.00KB(0.00B)\nDynamic size :\t0.00B(0.00B)\nFrozen size :\t66.00KB(0.00B)\n======================================================="
     )
@@ -142,7 +143,7 @@ def test_model_viz_frozen_field():
     )
 
     assert (
-        (model.at[...].freeze().tree_diagram())
+        (tree_freeze(model).tree_diagram())
         # trunk-ignore(flake8/E501)
         == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └*─ notes='string'      "
     )
@@ -546,7 +547,7 @@ def test_summary():
         == "Test\n    └── a=<class 'list'>\n        ├── a_0=1\n        ├── a_1=2\n        └── a_2=3   "
     )
     assert (
-        t.at[...].freeze().tree_diagram()
+        tree_freeze(t).tree_diagram()
         == "Test\n    └#─ a=<class 'list'>\n        ├#─ a_0=1\n        ├#─ a_1=2\n        └#─ a_2=3   "
     )
 
@@ -556,6 +557,6 @@ def test_summary():
         == "Test\n    └── a=<class 'tuple'>\n        ├── a_0=1\n        ├── a_1=2\n        └── a_2=3   "
     )
     assert (
-        t.at[...].freeze().tree_diagram()
+        tree_freeze(t).tree_diagram()
         == "Test\n    └#─ a=<class 'tuple'>\n        ├#─ a_0=1\n        ├#─ a_1=2\n        └#─ a_2=3   "
     )

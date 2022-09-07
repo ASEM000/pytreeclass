@@ -6,7 +6,7 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass.src.tree_base import ImmutableInstanceError
-from pytreeclass.src.tree_util import is_treeclass_equal
+from pytreeclass.src.tree_util import is_treeclass_equal, tree_freeze, tree_unfreeze
 from pytreeclass.tree_viz.tree_pprint import tree_diagram
 
 
@@ -17,8 +17,8 @@ def test_freezing_unfreezing():
         b: int
 
     a = A(1, 2)
-    b = a.at[...].freeze()
-    c = a.at[...].unfreeze()
+    b = tree_freeze(a)
+    c = tree_unfreeze(a)
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
@@ -40,8 +40,8 @@ def test_freezing_unfreezing():
         b: int
 
     a = A(1, 2)
-    b = a.at[...].freeze()
-    c = a.at[...].unfreeze()
+    b = tree_freeze(a)
+    c = tree_unfreeze(a)
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
@@ -59,13 +59,13 @@ def test_freezing_unfreezing():
     class l2:
         c: l1 = l1()
 
-    t = l2().at[...].freeze()
+    t = tree_freeze(l2())
 
     assert jtu.tree_leaves(t) == []
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
 
-    tt = t.at[...].unfreeze()
+    tt = tree_unfreeze(t)
     assert jtu.tree_leaves(tt) != []
     assert jtu.tree_leaves(tt.c) != []
     assert jtu.tree_leaves(tt.c.b) != []
@@ -80,7 +80,7 @@ def test_freezing_unfreezing():
         def __init__(self):
             self.c = l1()
 
-    t = l2().at[...].freeze()
+    t = tree_freeze(l2())
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
 
@@ -125,7 +125,7 @@ def test_freezing_with_ops():
     t = Test()
 
     with pytest.raises(ImmutableInstanceError):
-        t.at[...].freeze().a = 1
+        tree_freeze(t).a = 1
 
     @pytc.treeclass(field_only=True)
     class Test:
@@ -137,23 +137,23 @@ def test_freezing_with_ops():
     assert jtu.tree_leaves(t) == [1]
 
     with pytest.raises(ImmutableInstanceError):
-        t.at[...].freeze().a = 1
+        tree_freeze(t).a = 1
 
     with pytest.raises(ImmutableInstanceError):
-        t.at[...].unfreeze().a = 1
+        tree_unfreeze(t).a = 1
 
     hash(t)
 
     t = Test()
-    t.at[...].unfreeze()
-    t.at[...].freeze()
+    tree_unfreeze(t)
+    tree_freeze(t)
     assert t.frozen is False
 
     @pytc.treeclass
     class Test:
         a: int
 
-    t = Test(100).at[...].freeze()
+    t = tree_freeze(Test(100))
 
     assert is_treeclass_equal(t.at[...].set(0), t)
     assert is_treeclass_equal(t.at[...].apply(lambda x: x + 1), t)
@@ -178,7 +178,7 @@ def test_freezing_with_ops():
         a: int = t0()
 
     t = t1()
-    assert is_treeclass_equal(t.at["a"].freeze().at["a"].unfreeze(), t)
+    assert is_treeclass_equal(tree_unfreeze(tree_freeze(t)), t)
 
 
 def test_freeze_diagram():
@@ -193,7 +193,7 @@ def test_freeze_diagram():
         d: A = A(1, 2)
 
     a = B()
-    a = a.at["d"].freeze()
+    a = a.at["d"].set(tree_freeze(a.d))
     assert a.d.frozen is True
     assert (
         tree_diagram(a)
@@ -203,7 +203,8 @@ def test_freeze_diagram():
     ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
 
     a = B()
-    a = a.at["d"].freeze()  # = a.d.freeze()
+
+    a = a.at["d"].set(tree_freeze(a.d))  # = a.d.freeze()
     assert a.d.frozen is True
     assert (
         tree_diagram(a)
