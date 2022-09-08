@@ -90,6 +90,7 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(bool)
         @inner_wrapper.register(type(self))
         @inner_wrapper.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
+        @inner_wrapper.register(jax.numpy.ndarray)
         def _(
             self,
             rhs: int
@@ -97,7 +98,8 @@ def _append_math_eq_ne(func):
             | complex
             | bool
             | type(self)
-            | jax.interpreters.partial_eval.DynamicJaxprTracer,
+            | jax.interpreters.partial_eval.DynamicJaxprTracer
+            | jax.numpy.ndarray,
         ):
             # this function is handling all the numeric types
             return _dispatched_op_tree_map(func, self, rhs)
