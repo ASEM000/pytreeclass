@@ -1,7 +1,9 @@
 <!-- <h1 align="center" style="font-family:Monospace" >Py🌲Class</h1> -->
 <div align="center">
-<img width="350px" src="assets/pytc%20logo.svg"></div>
-<!-- <h2 align="center">Write pytorch-like layers with rich visualizations in JAX.</h2> -->
+<img width="350px" src="assets/pytc%20logo.svg"> <br>
+“Everything should be made as simple as possible, but no simpler”
+</div>
+<br>
 
 [**Installation**](#Installation)
 |[**Description**](#Description)
