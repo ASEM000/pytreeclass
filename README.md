@@ -461,7 +461,7 @@ StackedLinear(
 
 #### Filter by field metadata
 
-- Get all fields of with `{"description": "First layer"}` in their metadata
+- Get all fields of with their metadata equal to `{"description": "First layer"}`
 
 ```python
 print(model.at[model == {"description": "First layer"}].get())

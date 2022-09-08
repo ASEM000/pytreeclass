@@ -150,12 +150,7 @@ def _append_math_eq_ne(func):
             # and this would filter out all the elements without distinction
 
             def in_metadata(field_item):
-                kws, vals = zip(*where.items())
-                return all(
-                    field_item.metadata.get(kw, False)
-                    and (field_item.metadata[kw] == val)
-                    for kw, val in zip(kws, vals)
-                )
+                return where == field_item.metadata
 
             return _pytree_map(
                 tree,

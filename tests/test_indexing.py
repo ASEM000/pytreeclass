@@ -128,10 +128,10 @@ def test_getter_by_param():
 def test_getter_by_metadata():
     @pytc.treeclass
     class Test:
-        a: float = field(metadata={"name": "a", "unit": "m"})
-        b: float = field(metadata={"name": "b", "unit": "m"})
-        c: float = field(metadata={"name": "c", "unit": "m"})
-        d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
+        a: float = field(metadata={"name": "a"})
+        b: float = field(metadata={"name": "b"})
+        c: float = field(metadata={"name": "c"})
+        d: jnp.ndarray = field(metadata={"name": "d"})
         name: str = pytc.static_field()
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
@@ -160,20 +160,20 @@ def test_getter_by_metadata():
 
     @pytc.treeclass
     class L0:
-        a: int = field(default=1, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=1, metadata={"name": "a"})
         b: int = 2
         c: int = 3
 
     @pytc.treeclass
     class L1:
-        a: int = field(default=1, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=1, metadata={"name": "a"})
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
     @pytc.treeclass
     class L2:
-        a: int = field(default=10, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=10, metadata={"name": "a"})
         b: int = 20
         c: int = 30
         d: L1 = L1()
@@ -259,10 +259,10 @@ def test_setter_by_param():
 def test_setter_by_metadata():
     @pytc.treeclass
     class Test:
-        a: float = field(metadata={"name": "a", "unit": "m"})
-        b: float = field(metadata={"name": "b", "unit": "m"})
-        c: float = field(metadata={"name": "c", "unit": "m"})
-        d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
+        a: float = field(metadata={"name": "a"})
+        b: float = field(metadata={"name": "b"})
+        c: float = field(metadata={"name": "c"})
+        d: jnp.ndarray = field(metadata={"name": "d"})
         name: str
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
@@ -293,20 +293,20 @@ def test_setter_by_metadata():
 
     @pytc.treeclass
     class L0:
-        a: int = field(default=1, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=1, metadata={"name": "a"})
         b: int = 2
         c: int = 3
 
     @pytc.treeclass
     class L1:
-        a: int = field(default=1, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=1, metadata={"name": "a"})
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
     @pytc.treeclass
     class L2:
-        a: int = field(default=10, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=10, metadata={"name": "a"})
         b: int = 20
         c: int = 30
         d: L1 = L1()
@@ -499,10 +499,10 @@ def test_apply_and_its_derivatives():
 
     @pytc.treeclass
     class Test:
-        a: float = field(metadata={"name": "a", "unit": "m"})
-        b: float = field(metadata={"name": "b", "unit": "m"})
-        c: float = field(metadata={"name": "c", "unit": "m"})
-        d: jnp.ndarray = field(metadata={"name": "d", "unit": "m"})
+        a: float = field(metadata={"name": "a"})
+        b: float = field(metadata={"name": "b"})
+        c: float = field(metadata={"name": "c"})
+        d: jnp.ndarray = field(metadata={"name": "d"})
         name: str = pytc.static_field()
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
@@ -538,20 +538,20 @@ def test_apply_and_its_derivatives():
 
     @pytc.treeclass
     class L0:
-        a: int = field(default=1, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=1, metadata={"name": "a"})
         b: int = 2
         c: int = 3
 
     @pytc.treeclass
     class L1:
-        a: int = field(default=1, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=1, metadata={"name": "a"})
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
     @pytc.treeclass
     class L2:
-        a: int = field(default=10, metadata={"name": "a", "unit": "m"})
+        a: int = field(default=10, metadata={"name": "a"})
         b: int = 20
         c: int = 30
         d: L1 = L1()
@@ -585,7 +585,7 @@ def test_apply_and_its_derivatives():
         a: int = 10
         b: int = 20
         c: int = 30
-        d: L1 = field(default=L1(), metadata={"name": "d", "unit": "m"})
+        d: L1 = field(default=L1(), metadata={"name": "d"})
 
     t = L2()
     lhs = t.at[t == {"name": "d"}].apply(lambda _: 100)
