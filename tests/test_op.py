@@ -26,7 +26,7 @@ def test_ops():
     assert (A + A) == Test(20, 40, 60, ("A"))
     assert (A - A) == Test(0, 0, 0, ("A"))
     # assert ((A["a"] + A) | A) == Test(20, 20, 30, ("A"))
-    assert A.at[...].reduce_sum() == jnp.array(60)
+    assert A.at[...].reduce(lambda x, y: x + jnp.sum(y)) == jnp.array(60)
     assert abs(A) == A
 
     @pytc.treeclass

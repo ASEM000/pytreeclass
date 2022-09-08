@@ -384,39 +384,39 @@ def test_apply_and_its_derivatives():
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
-    rhs = init.at[init == init].add(1)
+    rhs = init.at[init == init].apply(lambda x: x + 1)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
-    rhs = init.at[...].add(1)
+    rhs = init.at[...].apply(lambda x: x + 1)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(0.5, 1.0, jnp.array([0.5, 1.0, 1.5, 2.0, 2.5]))
-    rhs = init.at[init == init].divide(2.0)
+    rhs = init.at[init == init].apply(lambda x: x / 2.0)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(0.5, 1.0, jnp.array([0.5, 1.0, 1.5, 2.0, 2.5]))
-    rhs = init.at[...].divide(2.0)
+    rhs = init.at[...].apply(lambda x: x / 2.0)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 1, jnp.array([1, 1, 1, 1, 1]))
-    rhs = init.at[init == init].min(1)
+    rhs = init.at[init == init].apply(lambda x: jnp.minimum(x, 1))
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(4, 4, jnp.array([4, 4, 4, 4, 5]))
-    rhs = init.at[init == init].max(4)
+    rhs = init.at[init == init].apply(lambda x: jnp.maximum(x, 4))
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(4, 4, jnp.array([4, 4, 4, 4, 5]))
-    rhs = init.at[...].max(4)
+    rhs = init.at[...].apply(lambda x: jnp.maximum(x, 4))
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
-    rhs = init.at[init == init].power(2)
+    rhs = init.at[init == init].apply(lambda x: x**2)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
-    rhs = init.at[...].power(2)
+    rhs = init.at[...].apply(lambda x: x**2)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 2, jnp.array([1, 2, 3, 16, 25]))
@@ -431,11 +431,11 @@ def test_apply_and_its_derivatives():
     assert is_treeclass_equal(init, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
-    rhs = init.at[init > 0].add(1)
+    rhs = init.at[init > 0].apply(lambda x: x + 1)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 4, jnp.array([1, 4, 3, 4, 5]))
-    rhs = init.at[init == 2].multiply(2)
+    rhs = init.at[init == 2].apply(lambda x: x * 2)
     assert is_treeclass_equal(lhs, rhs)
 
     # by param
@@ -453,27 +453,27 @@ def test_apply_and_its_derivatives():
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].add(1)
+    rhs = init.at[init == "a"].apply(lambda x: x + 1)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(0.5, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].divide(2.0)
+    rhs = init.at[init == "a"].apply(lambda x: x / 2.0)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].min(1)
+    rhs = init.at[init == "a"].apply(lambda x: jnp.minimum(x, 1))
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(4, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].max(4)
+    rhs = init.at[init == "a"].apply(lambda x: jnp.maximum(x, 4))
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].power(2)
+    rhs = init.at[init == "a"].apply(lambda x: x**2)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].multiply(2)
+    rhs = init.at[init == "a"].apply(lambda x: x * 2)
     assert is_treeclass_equal(lhs, rhs)
 
     #
@@ -490,11 +490,11 @@ def test_apply_and_its_derivatives():
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 3, jnp.array([2, 3, 4, 5, 6]))
-    rhs = init.at[init != "a"].add(1)
+    rhs = init.at[init != "a"].apply(lambda x: x + 1)
     assert is_treeclass_equal(lhs, rhs)
 
     lhs = A(1, 1, jnp.array([0.5, 1, 1.5, 2, 2.5]))
-    rhs = init.at[init != "a"].divide(2.0)
+    rhs = init.at[init != "a"].apply(lambda x: x / 2.0)
     assert is_treeclass_equal(lhs, rhs)
 
     @pytc.treeclass
@@ -666,23 +666,59 @@ def test_reduce_and_its_derivatives():
 
     model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=5, key=jax.random.PRNGKey(0))
 
-    assert (model.at[model > 0].reduce_min()) == 0.98507565
-    assert (model.at[model > 0].reduce_max()) == 1.3969219
-    assert (model.at[model > 0].reduce_sum()) == 10.6970625
-    assert (model.at[model > 0].reduce_product()) == 1.8088213
+    assert (
+        model.at[model > 0].reduce(
+            lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=jnp.inf
+        )
+    ) == 0.98507565
+    assert (
+        model.at[model > 0].reduce(
+            lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
+        )
+    ) == 1.3969219
+    assert (model.at[model > 0].reduce(lambda x, y: x + jnp.sum(y))) == 10.6970625
+    assert (
+        model.at[model > 0].reduce(lambda x, y: x * jnp.product(y), initializer=1)
+    ) == 1.8088213
 
-    assert (model.at[model == "l1"].reduce_sum()) == 2.8428133
-    assert (model.at[model == "l1"].reduce_product()) == -3.4602268
+    assert (model.at[model == "l1"].reduce(lambda x, y: x + jnp.sum(y))) == 2.8428133
+    assert (
+        model.at[model == "l1"].reduce(lambda x, y: x * jnp.product(y), initializer=1)
+    ) == -3.4602268
 
-    assert (model.at[model == Linear].reduce_min()) == -2.8383057
-    assert (model.at[model == Linear].reduce_max()) == 1.3969219
-    assert (model.at[model == Linear].reduce_sum()) == 3.3538322
-    assert (model.at[model == Linear].reduce_product()) == 0.84782064
+    assert (
+        model.at[model == Linear].reduce(
+            lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=jnp.inf
+        )
+    ) == -2.8383057
+    assert (
+        model.at[model == Linear].reduce(
+            lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
+        )
+    ) == 1.3969219
+    assert (model.at[model == Linear].reduce(lambda x, y: x + jnp.sum(y))) == 3.3538322
+    assert (
+        model.at[model == Linear].reduce(lambda x, y: x * jnp.product(y), initializer=1)
+    ) == 0.84782064
 
-    assert (model.at[model == jnp.ndarray].reduce_min()) == -2.8383057
-    assert (model.at[model == jnp.ndarray].reduce_max()) == 1.3969219
-    assert (model.at[model == jnp.ndarray].reduce_sum()) == 3.3538322
-    assert (model.at[model == jnp.ndarray].reduce_product()) == 0.84782064
+    assert (
+        model.at[model == jnp.ndarray].reduce(
+            lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=jnp.inf
+        )
+    ) == -2.8383057
+    assert (
+        model.at[model == jnp.ndarray].reduce(
+            lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
+        )
+    ) == 1.3969219
+    assert (
+        model.at[model == jnp.ndarray].reduce(lambda x, y: x + jnp.sum(y))
+    ) == 3.3538322
+    assert (
+        model.at[model == jnp.ndarray].reduce(
+            lambda x, y: x * jnp.product(y), initializer=1
+        )
+    ) == 0.84782064
 
 
 def test_not_implemented():

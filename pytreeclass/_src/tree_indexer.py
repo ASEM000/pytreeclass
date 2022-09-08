@@ -314,44 +314,6 @@ class _pyTreeIndexer:
             tree=self.tree, func=func, **kwargs
         )
 
-    # derived methods
-
-    def add(self, set_value):
-        return self.apply(lambda x: x + set_value)
-
-    def multiply(self, set_value):
-        return self.apply(lambda x: x * set_value)
-
-    def divide(self, set_value):
-        return self.apply(lambda x: x / set_value)
-
-    def power(self, set_value):
-        return self.apply(lambda x: x**set_value)
-
-    def min(self, set_value):
-        return self.apply(lambda x: jnp.minimum(x, set_value))
-
-    def max(self, set_value):
-        return self.apply(lambda x: jnp.maximum(x, set_value))
-
-    def reduce_sum(self):
-        return self.reduce(lambda x, y: x + jnp.sum(y))
-
-    def reduce_product(self):
-        return self.reduce(lambda x, y: x * jnp.prod(y), initializer=1)
-
-    def reduce_max(self):
-        return self.reduce(
-            lambda x, y: jnp.maximum(x, jnp.max(y)),
-            initializer=-jnp.inf,
-        )
-
-    def reduce_min(self):
-        return self.reduce(
-            lambda x, y: jnp.minimum(x, jnp.min(y)),
-            initializer=+jnp.inf,
-        )
-
     def __repr__(self):
         return f"where={self.where!r}"
 
