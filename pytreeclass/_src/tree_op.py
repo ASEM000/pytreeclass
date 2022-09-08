@@ -148,14 +148,10 @@ def _append_math_eq_ne(func):
             # this mechanism could filter by multiple metadata, however possible drawbacks
             # are that some data structures might have the same metadata for all of it's elements (list/dict/tuple)
             # and this would filter out all the elements without distinction
-
-            def in_metadata(field_item):
-                return where == field_item.metadata
-
             return _pytree_map(
                 tree,
                 # condition to check for each dataclass field
-                cond=lambda _, field_item, __: in_metadata(field_item),
+                cond=lambda _, field_item, __: (where == field_item.metadata),
                 # if the condition is True, then broadcast True to the children
                 true_func=lambda _, __, node_item: node_true(node_item),
                 # if the condition is False, then broadcast False to the children
