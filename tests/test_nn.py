@@ -1,4 +1,4 @@
-from typing import Any, Callable, Sequence
+from typing import Callable, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -138,51 +138,6 @@ def test_compact_nn():
         # no need to use `jax.tree_map` to update the model
         #  as it model is wrapped by @pytc.treeclass
         return value, model - 1e-3 * grads
-
-    for _ in range(1, 10_001):
-        value, model = update(model, x, y)
-
-    np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
-
-    @pytc.treeclass
-    class StackedLinear:
-        key: Any = pytc.static_field()
-        in_dim: int = pytc.static_field()
-        out_dim: int = pytc.static_field()
-        hidden_dim: int = pytc.static_field()
-
-        def __call__(self, x):
-            k1, k2, k3 = jax.random.split(self.key, 3)
-            x = self.param(
-                Linear(key=k1, in_dim=self.in_dim, out_dim=self.hidden_dim), name="l1"
-            )(x)
-            x = jax.nn.tanh(x)
-            x = self.param(
-                Linear(key=k2, in_dim=self.hidden_dim, out_dim=self.hidden_dim),
-                name="l2",
-            )(x)
-            x = jax.nn.tanh(x)
-            x = self.param(
-                Linear(key=k3, in_dim=self.hidden_dim, out_dim=self.out_dim), name="l3"
-            )(x)
-
-            return x
-
-    x = jnp.linspace(0, 1, 100)[:, None]
-    y = x**3 + jax.random.uniform(jax.random.PRNGKey(0), (100, 1)) * 0.01
-
-    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
-
-    @jax.jit
-    def update(model, x, y):
-        value, grads = jax.value_and_grad(loss_func)(model, x, y)
-
-        # no need to use `jax.tree_map` to update the model
-        #  as it model is wrapped by @pytc.treeclass
-        return value, model - 1e-3 * grads
-
-    # initialize the model
-    _, model = model.at["__call__"](x)
 
     for _ in range(1, 10_001):
         value, model = update(model, x, y)

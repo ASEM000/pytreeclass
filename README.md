@@ -550,58 +550,11 @@ Physics-based Neural network library
 
 ## 🔢 More<a id="More"></a>
 
-<details><summary><mark>More compact boilerplate</mark></summary>
+<!-- ### 🤔 Why to use `PyTreeClass` ? 
 
-Using `param`:
 
-- More compact definition can be done with node defined at runtime call.
-- The Linear layers are defined on the first call and retrieved on the subsequent calls
-- This pattern is useful if the module definition depends on runtime data.
+### 🤔 Why not to use `PyTreeClass` ? -->
 
-```python
-@pytc.treeclass
-class StackedLinear:
-    keys: Any
-
-    def __init__(self,key):
-        self.keys = jax.random.split(key,3)
-
-    def __call__(self,x):
-        x = self.param(Linear(self.keys[0],x.shape[-1],10),name="l1")(x)
-        x = jax.nn.tanh(x)
-        x = self.param(Linear(self.keys[1],10,10),name="l2")(x)
-        x = jax.nn.tanh(x)
-        x = self.param(Linear(self.keys[2],10,x.shape[-1]),name="l3")(x)
-        return x
-```
-
-```python
-# Upon defining the layer the modules are not instantiated
-# However, after first call , the nodes are defined.
-model = StackedLinear(jax.random.PRNGKey(0))
-print(model)
-```
-
-```
-StackedLinear(keys=ui32[3,2])
-```
-
-```python
-model((jnp.ones((10,10)))) # first call
-print(f"{model!r}")
-```
-
-```
-StackedLinear(
-  keys=ui32[3,2],
-  l1=Linear(weight=f32[10,10],bias=f32[1,10]),
-  l2=Linear(weight=f32[10,10],bias=f32[1,10]),
-  l3=Linear(weight=f32[10,10],bias=f32[1,10])
-)
-
-```
-
-</details>
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 
