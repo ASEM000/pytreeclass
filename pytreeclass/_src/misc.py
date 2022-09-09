@@ -40,6 +40,18 @@ def _mutable(func):
     return mutable_method
 
 
+class cached_method:
+    def __init__(self, func):
+        self.name = func.__name__
+        self.func = func
+
+    def __get__(self, instance, owner):
+        output = self.func(instance)
+        cached_func = ft.wraps(self.func)(lambda *args, **kwargs: output)
+        object.__setattr__(instance, self.name, cached_func)
+        return cached_func
+
+
 def _copy_field(
     field_item,
     *,

@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
+import numpy as np
 
 from pytreeclass._src.dispatch import dispatch
 
@@ -129,6 +130,23 @@ def _tree_fields(tree):
         if len(tree.__undeclared_fields__) == 0
         else {**tree.__dataclass_fields__, **tree.__undeclared_fields__}
     )
+
+
+def _tree_hash(tree):
+    """Return a hash of the tree"""
+
+    def _hash_node(node):
+        """hash the leaves of the tree"""
+        if isinstance(node, dict):
+            return frozenset(node.items())
+        elif isinstance(node, list):
+            return tuple((node,))
+        elif isinstance(node, jnp.ndarray):
+            return np.array(node).tobytes()
+        else:
+            return node
+
+    return hash(tuple(jtu.tree_map(_hash_node, jtu.tree_leaves(tree))))
 
 
 def tree_freeze(tree):

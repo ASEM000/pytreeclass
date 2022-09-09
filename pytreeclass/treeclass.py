@@ -16,6 +16,11 @@ from pytreeclass._src.tree_pretty import _treePretty
 def treeclass(*args, **kwargs):
     def class_wrapper(cls, field_only: bool):
 
+        if "__setattr__" in cls.__dict__:
+            raise AttributeError(
+                "`treeclass` cannot be applied to class with `__setattr__` method."
+            )
+
         dCls = dataclass(
             init="__init__" not in cls.__dict__,
             repr=False,  # repr is handled by _treePretty

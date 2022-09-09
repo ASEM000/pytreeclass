@@ -12,12 +12,6 @@ from pytreeclass.tree_viz.node_pprint import (
     _format_width,
 )
 
-# from pytreeclass.tree_viz.tree_export import (
-#     _generate_mermaid_link,
-#     _mermaid_table,
-#     _mermaid_table_row,
-# )
-
 
 def tree_repr(tree, width: int = 60) -> str:
     """Prertty print `treeclass_leaves`

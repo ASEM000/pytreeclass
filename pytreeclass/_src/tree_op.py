@@ -16,7 +16,13 @@ import jax
 import jax.tree_util as jtu
 
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import _pytree_map, node_false, node_not, node_true
+from pytreeclass._src.tree_util import (
+    _pytree_map,
+    _tree_hash,
+    node_false,
+    node_not,
+    node_true,
+)
 
 PyTree = Any
 
@@ -173,7 +179,7 @@ def _append_math_eq_ne(func):
 
 class _treeOp:
 
-    __hash__ = lambda self: hash(tuple(jtu.tree_leaves(self)))
+    __hash__ = _tree_hash
     __abs__ = _append_math_op(op.abs)
     __add__ = _append_math_op(op.add)
     __radd__ = _append_math_op(op.add)
