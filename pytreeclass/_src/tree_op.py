@@ -17,11 +17,11 @@ import jax.tree_util as jtu
 
 from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
+    _node_false,
+    _node_not,
+    _node_true,
     _pytree_map,
     _tree_hash,
-    node_false,
-    node_not,
-    node_true,
 )
 
 PyTree = Any
@@ -119,8 +119,8 @@ def _append_math_eq_ne(func):
             return _pytree_map(
                 tree,
                 cond=lambda _, field_item, __: (field_item.name == where),
-                true_func=lambda _, __, node_item: node_true(node_item),
-                false_func=lambda _, __, node_item: node_false(node_item),
+                true_func=lambda _, __, node_item: _node_true(node_item),
+                false_func=lambda _, __, node_item: _node_false(node_item),
                 attr_func=lambda _, field_item, __: field_item.name,
                 is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
             )
@@ -136,9 +136,9 @@ def _append_math_eq_ne(func):
                 # condition to check for each node
                 cond=lambda _, __, node_item: isinstance(node_item, where),
                 # if the condition is True, then broadcast True to the children
-                true_func=lambda _, __, node_item: node_true(node_item),
+                true_func=lambda _, __, node_item: _node_true(node_item),
                 # if the condition is False, then broadcast False to the children
-                false_func=lambda _, __, node_item: node_false(node_item),
+                false_func=lambda _, __, node_item: _node_false(node_item),
                 # which attribute to use in the object.__setattr__ function
                 attr_func=lambda _, field_item, __: field_item.name,
                 # if the node is a leaf, then do not traverse the children
@@ -159,9 +159,9 @@ def _append_math_eq_ne(func):
                 # condition to check for each dataclass field
                 cond=lambda _, field_item, __: (where == field_item.metadata),
                 # if the condition is True, then broadcast True to the children
-                true_func=lambda _, __, node_item: node_true(node_item),
+                true_func=lambda _, __, node_item: _node_true(node_item),
                 # if the condition is False, then broadcast False to the children
-                false_func=lambda _, __, node_item: node_false(node_item),
+                false_func=lambda _, __, node_item: _node_false(node_item),
                 # which attribute to use in the object.__setattr__ function
                 attr_func=lambda _, field_item, __: field_item.name,
                 # if the node is a leaf, then do not traverse the children
@@ -169,7 +169,7 @@ def _append_math_eq_ne(func):
             )
 
         return (
-            jtu.tree_map(node_not, inner_wrapper(self, rhs))
+            jtu.tree_map(_node_not, inner_wrapper(self, rhs))
             if func == op.ne
             else inner_wrapper(self, rhs)
         )

@@ -176,7 +176,7 @@ def tree_unfreeze(tree):
     return recursive_unfreeze(tree_copy(tree))
 
 
-def node_not(node: Any) -> bool:
+def _node_not(node: Any) -> bool:
     @dispatch(argnum=0)
     def _not(node):
         return not node
@@ -188,7 +188,7 @@ def node_not(node: Any) -> bool:
     return _not(node)
 
 
-def node_true(node, array_as_leaves: bool = True):
+def _node_true(node, array_as_leaves: bool = True):
     @dispatch(argnum=0)
     def _node_true(node):
         return True
@@ -200,7 +200,7 @@ def node_true(node, array_as_leaves: bool = True):
     return _node_true(node)
 
 
-def node_false(node, array_as_leaves: bool = True):
+def _node_false(node, array_as_leaves: bool = True):
     @dispatch(argnum=0)
     def _node_false(node):
         return False
