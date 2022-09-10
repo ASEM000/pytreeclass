@@ -5,16 +5,18 @@ from types import FunctionType
 
 import jax
 import jax.numpy as jnp
-import jaxlib
-
-from pytreeclass._src.dispatch import dispatch
+from jax._src.custom_derivatives import custom_jvp
+from jaxlib.xla_extension import CompiledFunction
 
 
 def _format_width(string, width=50):
     """strip newline/tab characters if less than max width"""
-    stripped_string = string.replace("\n", "").replace("\t", "")
-    children_length = len(stripped_string)
-    return string if children_length > width else stripped_string
+    children_length = len(string) - string.count("\n") - string.count("\t")
+    return (
+        string
+        if children_length > width
+        else string.replace("\n", "").replace("\t", "")
+    )
 
 
 def _jax_numpy_repr(node: jnp.ndarray) -> str:
@@ -51,50 +53,43 @@ def _func_repr(func):
 
 
 def _format_node_repr(node, depth):
-    @dispatch(argnum=0)
-    def __format_node_repr(node, depth):
-        return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
-
-    @__format_node_repr.register(jaxlib.xla_extension.CompiledFunction)
-    @__format_node_repr.register(jax._src.custom_derivatives.custom_jvp)
-    @__format_node_repr.register(FunctionType)
-    def _(node, *args, **kwargs):
+    if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
 
-    @__format_node_repr.register(jnp.ndarray)
-    @__format_node_repr.register(jax.ShapeDtypeStruct)
-    def _(node, *args, **kwargs):
+    elif isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
         return _jax_numpy_repr(node)
 
-    @__format_node_repr.register(list)
-    def _(node, depth):
+    elif isinstance(node, list):
         # increase depth for each item in list
         # moreover, '_format_width' is done on each item repr
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
         )
-        return "[\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "]"
+        return _format_width(
+            "[\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "]"
+        )
 
-    @__format_node_repr.register(tuple)
-    def _(node, depth):
+    elif isinstance(node, tuple):
         # increase depth by 1 for each item in the tuple
         # moreover, `_format_width` is done on each item repr
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
         )
-        return "(\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + ")"
+        return _format_width(
+            "(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
+        )
 
-    @__format_node_repr.register(set)
-    def _(node, depth):
+    elif isinstance(node, set):
         # increase depth by 1 for each item in the set
         # moreover, `_format_width` is done on each item repr
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
         )
-        return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
+        return _format_width(
+            "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+        )
 
-    @__format_node_repr.register(dict)
-    def _(node, depth):
+    elif isinstance(node, dict):
         # increase depth by 1 for each item in the dict
         # moreover, `_format_width` is done on each item repr
         string = (",\n" + "\t" * (depth + 1)).join(
@@ -106,45 +101,43 @@ def _format_node_repr(node, depth):
             + f"{_format_width(_format_node_repr(v,depth=depth+1))}"
             for k, v in node.items()
         )
-        return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
+        return _format_width(
+            "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+        )
 
-    return __format_node_repr(node, depth)
+    else:
+        return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
 
 
 def _format_node_str(node, depth):
-    @dispatch(argnum=0)
-    def __format_node_str(node, depth):
-        return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
-
-    @__format_node_str.register(jaxlib.xla_extension.CompiledFunction)
-    @__format_node_str.register(jax._src.custom_derivatives.custom_jvp)
-    @__format_node_str.register(FunctionType)
-    def _(node, *args, **kwargs):
+    if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
 
-    @__format_node_str.register(list)
-    def _(node, depth):
+    elif isinstance(node, list):
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
         )
-        return "[\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "]"
+        return _format_width(
+            "[\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "]"
+        )
 
-    @__format_node_str.register(tuple)
-    def _(node, depth):
+    elif isinstance(node, tuple):
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
         )
-        return "(\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + ")"
+        return _format_width(
+            "(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
+        )
 
-    @__format_node_str.register(set)
-    def _(node, depth):
+    elif isinstance(node, set):
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
         )
-        return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
+        return _format_width(
+            "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+        )
 
-    @__format_node_str.register(dict)
-    def _(node, depth):
+    elif isinstance(node, dict):
         string = (",\n" + "\t" * (depth + 1)).join(
             f"{k}:{_format_node_str(v,depth=depth+1)}"
             if "\n" not in f"{v!s}"
@@ -154,25 +147,20 @@ def _format_node_str(node, depth):
             + f"{_format_width(_format_node_str(v,depth=depth+1))}"
             for k, v in node.items()
         )
-        return "{\n" + "\t" * (depth + 1) + string + "\n" + "\t" * (depth) + "}"
+        return _format_width(
+            "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+        )
 
-    return _format_width(__format_node_str(node, depth))
+    else:
+        return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
 
 
 def _format_node_diagram(node, *args, **kwargs):
-    @dispatch(argnum=0)
-    def __format_node_diagram(node, *args, **kwargs):
-        return f"{node!r}"
-
-    @__format_node_diagram.register(jaxlib.xla_extension.CompiledFunction)
-    @__format_node_diagram.register(jax._src.custom_derivatives.custom_jvp)
-    @__format_node_diagram.register(FunctionType)
-    def _(node, *args, **kwargs):
+    if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
 
-    @__format_node_diagram.register(jnp.ndarray)
-    @__format_node_diagram.register(jax.ShapeDtypeStruct)
-    def _(node, *args, **kwargs):
+    elif isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
         return _jax_numpy_repr(node)
 
-    return __format_node_diagram(node, *args, **kwargs)
+    else:
+        return f"{node!r}"

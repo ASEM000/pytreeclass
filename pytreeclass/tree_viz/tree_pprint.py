@@ -28,14 +28,11 @@ def tree_repr(tree, width: int = 60) -> str:
         if field_item.repr:
             is_static = field_item.metadata.get("static", False)
             mark = "*" if is_static else ("#" if is_frozen else "")
-
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
             FMT += "="
             FMT += f"{(_format_node_repr(node_item,depth))}"
-
             FMT += "" if is_last_field else ","
-
         recurse(node_item, depth, is_frozen)
 
     @recurse_field.register(src.tree_base._treeBase)
@@ -72,13 +69,9 @@ def tree_repr(tree, width: int = 60) -> str:
 
         leaves_count = len(_tree_fields(tree))
         for i, fi in enumerate(_tree_fields(tree).values()):
-
-            # retrieve node item
-            cur_node = getattr(tree, fi.name)
-
             recurse_field(
                 fi,
-                cur_node,
+                getattr(tree, fi.name),
                 depth,
                 is_frozen,
                 True if i == (leaves_count - 1) else False,
@@ -150,18 +143,12 @@ def tree_str(tree, width: int = 40) -> str:
     def recurse(tree, depth, is_frozen):
         if not is_treeclass(tree):
             return
-
         nonlocal FMT
-
         leaves_count = len(_tree_fields(tree))
         for i, fi in enumerate(_tree_fields(tree).values()):
-
-            # retrieve node item
-            cur_node = tree.__dict__[fi.name]
-
             recurse_field(
                 fi,
-                cur_node,
+                getattr(tree, fi.name),
                 depth,
                 is_frozen,
                 True if i == (leaves_count - 1) else False,
@@ -183,7 +170,7 @@ def _tree_diagram(tree):
         tree : boolean to create tree-structure
     """
 
-    @dispatch(argnum="node_item")
+    @dispatch(argnum=1)
     def recurse_field(field_item, node_item, is_frozen, parent_level_count, node_index):
         nonlocal FMT
 
@@ -210,11 +197,11 @@ def _tree_diagram(tree):
 
         if field_item.repr:
             recurse_field(
-                field_item=field_item,
-                node_item=node_item.__class__,
-                is_frozen=is_frozen,
-                parent_level_count=parent_level_count,
-                node_index=node_index,
+                field_item,
+                node_item.__class__,
+                is_frozen,
+                parent_level_count,
+                node_index,
             )
 
             for i, layer in enumerate(node_item):
@@ -223,11 +210,11 @@ def _tree_diagram(tree):
                 object.__setattr__(new_field, "type", type(layer))
 
                 recurse_field(
-                    field_item=new_field,
-                    node_item=layer,
-                    is_frozen=is_frozen,
-                    parent_level_count=parent_level_count + [node_index],
-                    node_index=len(node_item) - i,
+                    new_field,
+                    layer,
+                    is_frozen,
+                    parent_level_count + [node_index],
+                    len(node_item) - i,
                 )
 
         recurse(node_item, parent_level_count, is_frozen)
@@ -263,14 +250,12 @@ def _tree_diagram(tree):
         leaves_count = len(_tree_fields(tree))
 
         for i, fi in enumerate(_tree_fields(tree).values()):
-            cur_node = tree.__dict__[fi.name]
-
             recurse_field(
-                field_item=fi,
-                node_item=cur_node,
-                is_frozen=is_frozen,
-                parent_level_count=parent_level_count,
-                node_index=leaves_count - i,
+                fi,
+                getattr(tree, fi.name),
+                is_frozen,
+                parent_level_count,
+                leaves_count - i,
             )
 
         FMT += "\t"
