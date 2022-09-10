@@ -12,12 +12,9 @@ from pytreeclass._src.tree_util import _tree_fields, _tree_structure
 class _treeBase:
     def __new__(cls, *args, **kwargs):
         self = object.__new__(cls)
-        
-        # definition of `__undeclared_fields__` attribute
         object.__setattr__(self, "__undeclared_fields__", {})
-
         # set default values to class instance
-        # Note: ideally this method should be called once to avoid multiple
+        # Note: ideally this method should be called once
         for field_item in self.__dataclass_fields__.values():
             if field_item.default is not MISSING:
                 object.__setattr__(self, field_item.name, field_item.default)

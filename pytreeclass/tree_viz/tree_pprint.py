@@ -4,7 +4,7 @@ from dataclasses import field
 
 import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import _tree_fields, is_treeclass_frozen
+from pytreeclass._src.tree_util import _tree_fields, is_treeclass, is_treeclass_frozen
 from pytreeclass.tree_viz.node_pprint import (
     _format_node_diagram,
     _format_node_repr,
@@ -64,12 +64,10 @@ def tree_repr(tree, width: int = 60) -> str:
             )
             FMT += "" if is_last_field else ","
 
-    @dispatch(argnum=0)
     def recurse(tree, depth, is_frozen):
-        ...
+        if not is_treeclass(tree):
+            return
 
-    @recurse.register(src.tree_base._treeBase)
-    def _(tree, depth, is_frozen):
         nonlocal FMT
 
         leaves_count = len(_tree_fields(tree))
@@ -149,12 +147,10 @@ def tree_str(tree, width: int = 40) -> str:
             )
             FMT += "" if is_last_field else ","
 
-    @dispatch(argnum=0)
     def recurse(tree, depth, is_frozen):
-        ...
+        if not is_treeclass(tree):
+            return
 
-    @recurse.register(src.tree_base._treeBase)
-    def _(tree, depth, is_frozen):
         nonlocal FMT
 
         leaves_count = len(_tree_fields(tree))
@@ -258,12 +254,10 @@ def _tree_diagram(tree):
 
             recurse(node_item, parent_level_count + [node_index], is_frozen)
 
-    @dispatch(argnum=0)
     def recurse(tree, parent_level_count, is_frozen):
-        ...
+        if not is_treeclass(tree):
+            return
 
-    @recurse.register(src.tree_base._treeBase)
-    def _(tree, parent_level_count, is_frozen):
         nonlocal FMT
 
         leaves_count = len(_tree_fields(tree))
