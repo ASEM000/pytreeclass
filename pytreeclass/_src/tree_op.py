@@ -4,7 +4,7 @@
 
 # Techincal note: the following code uses function dispatch heavily, to navigate
 # through diffeent data types and how to handle each type.
-# @dispatch is defined in decorator_util.py and is based on functools.singledispatch
+# @dispatch is defined in dispatch.py and is based on functools.singledispatch
 
 from __future__ import annotations
 
