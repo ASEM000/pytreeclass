@@ -1,9 +1,16 @@
+from dataclasses import field
+
 import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_base import ImmutableInstanceError
-from pytreeclass._src.tree_util import is_treeclass, is_treeclass_leaf, tree_freeze
+from pytreeclass._src.tree_util import (
+    is_treeclass,
+    is_treeclass_frozen,
+    is_treeclass_leaf,
+    tree_freeze,
+)
 from pytreeclass.tree_viz.utils import _node_count_and_size
 
 
@@ -34,6 +41,17 @@ def test_is_treeclass_leaf():
     assert is_treeclass_leaf(Test2().b) is True
 
 
+def test_is_treeclass_frozen():
+    @pytc.treeclass
+    class Test:
+        a: jnp.ndarray = jnp.array([1.0, 2.0, 3.0])
+        b: int = 1
+
+    assert is_treeclass_frozen(Test()) is False
+    assert is_treeclass_frozen(tree_freeze(Test())) is True
+    assert is_treeclass_frozen([1]) is False
+
+
 def test__node_count_and_size():
     @pytc.treeclass
     class Test:
@@ -52,17 +70,21 @@ def test__node_count_and_size():
 
     @pytc.treeclass
     class x:
-        a: int = 1
-        b: int = 2
+        a: int
+        b: float
+        c: complex
+        d: tuple
+        e: list = field(default_factory=list)
+        f: dict = field(default_factory=dict)
+        g: set = field(default_factory=set)
 
-    assert hash(x())
+    test = x(1, 1.0, complex(1, 1), (1, 2), [1, 2], {"a": 1}, {1})
 
-    xx = x()
-    # xx.cc = 1
-    # assert xx.cc == 1
-    xx = tree_freeze(xx)
+    assert hash(test)
+
+    xx = tree_freeze(test)
 
     with pytest.raises(ImmutableInstanceError):
-        xx.test = 1
+        xx.a = 1
 
     assert _node_count_and_size("string") == (complex(0, 0), complex(0, 0))
