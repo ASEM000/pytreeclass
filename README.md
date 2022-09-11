@@ -22,6 +22,7 @@
 [![codecov](https://codecov.io/gh/ASEM000/pytreeclass/branch/main/graph/badge.svg?token=TZBRMO0UQH)](https://codecov.io/gh/ASEM000/pytreeclass)
 [![Documentation Status](https://readthedocs.org/projects/pytreeclass/badge/?version=latest)](https://pytreeclass.readthedocs.io/en/latest/?badge=latest)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ASEM000/pytreeclass)
+[![DOI](https://zenodo.org/badge/512717921.svg)](https://zenodo.org/badge/latestdoi/512717921)
 
 ## 🛠️ Installation<a id="Installation"></a>
 
