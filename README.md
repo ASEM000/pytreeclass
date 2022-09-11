@@ -11,7 +11,7 @@
 |[**Filtering**](#Filtering)
 |[**StatefulComputation**](#StatefulComputation)
 |[**Applications**](#Applications)
-|[**More**](#More)
+|[**Benchmarking**](#Benchmarking)
 |[**Acknowledgements**](#Acknowledgements)
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
@@ -551,13 +551,28 @@ Physics-based Neural network library
 </table>
 </div>
 
-## 🔢 More<a id="More"></a>
-
-<!-- ### 🤔 Why to use `PyTreeClass` ? 
+## ⌛ Benchmarking<a id="Benchmarking"></a><a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/PyTreeClass_benchmarks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 
-### 🤔 Why not to use `PyTreeClass` ? -->
+`tree_flatten`/ `tree_unflatten` are integral steps in any training / or `jax` operation.
+The following is a comparison of `PyTreeClass`, `Treex`, and `Equinox` for an identical model with 9 `Linear` layers for the `tree_flatten`/ `tree_unflatten` process.
 
+
+<table>
+<tr>
+<td>
+<img src = "assets/tree_copy_colab_cpu.svg" >
+<td>
+
+<tr>
+<td>
+<img src = "assets/tree_copy_colab_gpu.svg" >
+<td>
+</tr>
+
+</tr>
+
+</table>
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 
