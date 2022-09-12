@@ -137,12 +137,8 @@ def _tree_hash(tree):
 
     def _hash_node(node):
         """hash the leaves of the tree"""
-        if isinstance(node, dict):
-            return frozenset(node.items())
-        elif isinstance(node, set):
+        if isinstance(node, set):
             return frozenset(node)
-        elif isinstance(node, list):
-            return tuple(node)
         elif isinstance(node, jnp.ndarray):
             return np.array(node).tobytes()
         else:
