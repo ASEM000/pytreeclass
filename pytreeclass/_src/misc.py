@@ -7,7 +7,12 @@ from typing import Any, Callable
 
 import jax.numpy as jnp
 
-from pytreeclass._src.tree_util import _pytree_map, _tree_immutate, _tree_mutate
+from pytreeclass._src.tree_util import (
+    _pytree_map,
+    _tree_immutate,
+    _tree_mutate,
+    is_treeclass,
+)
 
 
 def static_field(**kwargs):
@@ -92,13 +97,70 @@ def _copy_field(
 
 def _is_nondiff(node):
     """check if node is non-differentiable"""
-    return isinstance(node, (int, bool, str)) or (
-        isinstance(node, (jnp.ndarray)) and not jnp.issubdtype(node.dtype, jnp.inexact)
-    )
+    if isinstance(node, (int, bool, str)):
+        # non-differentiable types
+        return True
+    elif isinstance(node, jnp.ndarray) and not jnp.issubdtype(node.dtype, jnp.inexact):
+        # non-differentiable array
+        return True
+
+    elif isinstance(node, Callable) and not is_treeclass(node):
+        # non-differentiable type
+        return True
+
+    return False
 
 
 def filter_nondiff(tree):
-    """filter non-differentiable fields from a treeclass instance"""
+    """filter non-differentiable fields from a treeclass instance
+
+    Note:
+        Mark fields as non-differentiable with adding metadata `dict(static=True,nondiff=True)`
+        the way it is done is by adding a field `__undeclared_fields__` to the treeclass instance
+        that contains the non-differentiable fields.
+        This is done to avoid mutating the original treeclass class or copying .
+
+        during the `tree_flatten`, tree_fields are the combination of
+        {__dataclass_fields__, __undeclared_fields__} this means that a field defined
+        in `__undeclared_fields__` with the same name as in __dataclass_fields__
+        will override its properties, this is useful if you want to change the metadata
+        of a field but don't want to change the original field definition.
+
+    Example:
+        @pytc.treeclass
+        class Test:
+            a: int = 1.
+            b: int = 2
+            c: int = 3
+            act: Callable = jax.nn.tanh
+
+            def __call__(self,x):
+                return self.act(x + self.a)
+
+        @jax.value_and_grad
+        def loss_func(model):
+            return jnp.mean((model(1.)-0.5)**2)
+
+        @jax.jit
+        def update(model):
+            value,grad = loss_func(model)
+            return value,model-1e-3*grad
+
+        model = Test()
+        print(model)
+        # Test(a=1.0,b=2,c=3,act=tanh(x))
+
+        model = filter_nondiff(model)
+        print(f"{model!r}")
+        # Test(a=1.0,*b=2,*c=3,*act=tanh(x))
+
+        for _ in range(1,10001):
+            value,model = update(model)
+
+        print(model)
+        # Test(a=-0.36423424,*b=2,*c=3,*act=tanh(x))
+
+    """
     # we use _pytree_map to add {nondiff:True} to a non-differentiable field metadata
     # this operation is done in-place and changes the tree structure
     # thus its not bundled with `.at[..]` as it will break composability

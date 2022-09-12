@@ -1,4 +1,9 @@
+from typing import Callable
+
+import jax
+import jax.numpy as jnp
 import jax.tree_util as jtu
+import pytest
 
 import pytreeclass as pytc
 from pytreeclass._src.misc import cached_method, filter_nondiff, unfilter_nondiff
@@ -37,3 +42,39 @@ def test_cached_method():
     t = Test()
     assert t.a() == 2
     assert t.a() == 2
+
+
+def test_filter_nondiff_func():
+    @pytc.treeclass
+    class Test:
+        a: int = 1.0
+        b: int = 2
+        c: int = 3
+        act: Callable = jax.nn.tanh
+
+        def __call__(self, x):
+            return self.act(x + self.a)
+
+    @jax.value_and_grad
+    def loss_func(model):
+        return jnp.mean((model(1.0) - 0.5) ** 2)
+
+    @jax.jit
+    def update(model):
+        value, grad = loss_func(model)
+        return value, model - 1e-3 * grad
+
+    model = Test()
+    print(model)
+    # Test(a=1.0,b=2,c=3,act=tanh(x))
+
+    model = filter_nondiff(model)
+    # print(f"{model!r}")
+    # Test(a=1.0,*b=2,*c=3,*act=tanh(x))
+
+    for _ in range(1, 20001):
+        value, model = update(model)
+
+    # print(model)
+    # Test(a=-0.45068058,*b=2,*c=3,*act=tanh(x))
+    assert model.a == pytest.approx(-0.45068058, 1e-5)
