@@ -490,7 +490,7 @@ StackedLinear(
 )
 ```
 
-# 📜 Stateful computations<a id="StatefulComputation"></a>
+## 📜 Stateful computations<a id="StatefulComputation"></a>
 
 First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
 
@@ -553,10 +553,8 @@ Physics-based Neural network library
 
 ## ⌛ Benchmarking<a id="Benchmarking"></a><a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/PyTreeClass_benchmarks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-
 `tree_flatten`/ `tree_unflatten` are integral steps in any training / or `jax` operation.
 The following is a comparison of `PyTreeClass`, `Treex`, and `Equinox` for an identical model with 9 `Linear` layers for the `tree_flatten`/ `tree_unflatten` process.
-
 
 <table>
 <tr>
