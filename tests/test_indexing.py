@@ -563,7 +563,7 @@ def test_apply_and_its_derivatives():
 
     t = L2()
     lhs = t.at[t != {"name": "a"}].apply(lambda _: 100)
-    rhs = L2(10, 100, 100, L1(1, 100, 100, L0(1, 100, 100)))
+    rhs = L2(10, 100, 100, L1(100, 100, 100, L0(100, 100, 100)))
 
     assert is_treeclass_equal(lhs, rhs)
 
