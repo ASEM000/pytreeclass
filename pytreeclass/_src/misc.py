@@ -182,7 +182,7 @@ def filter_nondiff(tree, where: PyTree | None = None):
                 },
             },
             # keep the field as is
-            false_func=lambda tree, field_item, node_item: tree.__undeclared_fields__,
+            false_func=None,
             attr_func=lambda _, __, ___: "__undeclared_fields__",
             # do not recurse if the field is `static`
             is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),
@@ -267,7 +267,7 @@ def filter_nondiff(tree, where: PyTree | None = None):
                 },
             },
             # keep the field as is
-            false_func=lambda tree, field_item, node_item: tree.__undeclared_fields__,
+            false_func=None,
             # the attribute to update is `__undeclared_fields__`
             attr_func=lambda _, __, ___: "__undeclared_fields__",
             # do not recurse if the field is `static`

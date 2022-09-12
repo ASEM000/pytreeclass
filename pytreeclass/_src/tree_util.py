@@ -180,18 +180,6 @@ def tree_unfreeze(tree):
     return recursive_unfreeze(tree_copy(tree))
 
 
-def _node_not(node: Any) -> bool:
-    @dispatch(argnum=0)
-    def _not(node):
-        return not node
-
-    @_not.register(jnp.ndarray)
-    def _(node):
-        return jnp.logical_not(node)
-
-    return _not(node)
-
-
 def _node_true(node, array_as_leaves: bool = True):
     @dispatch(argnum=0)
     def _node_true(node):
@@ -221,11 +209,10 @@ def _pytree_map(
     *,
     cond: Callable[[Any, Any, Any], bool] | PyTree,
     true_func: Callable[[Any, Any, Any], Any],
-    false_func: Callable[[Any, Any, Any], Any],
     attr_func: Callable[[Any, Any, Any], str],
     is_leaf: Callable[[Any, Any, Any], bool],
+    false_func: Callable[[Any, Any, Any], Any] | None = None,
 ) -> PyTree:
-
     """traverse the dataclass fields in a depth first manner
 
     Here, we apply true_func to node_item if condition is true and vice versa
@@ -247,14 +234,14 @@ def _pytree_map(
         true_func (Callable[[Any, Any,Any], Any]):
             function applied if cond is true, accepts (tree,field_item,node_item)
 
-        false_func (Callable[[Any, Any,Any], Any]):
-            function applied if cond is false, accepts (tree,field_item,node_item)
-
         attr_func (Callable[[Any, Any,Any], str]):
             function that returns the attribute to be updated, accepts (tree,field_item,node_item)
 
         is_leaf (Callable[[Any,Any,Any], bool]):
             stops recursion if false on (tree,field_item,node_item)
+
+        false_func (Callable[[Any, Any,Any], Any]):  Defaults to None.
+            function applied if cond is false, accepts (tree,field_item,node_item)
 
     Returns:
         PyTree or dataclass : new dataclass with updated attributes
@@ -272,13 +259,22 @@ def _pytree_map(
             if is_treeclass(node_item):
                 recurse(node_item)
             else:
-                object.__setattr__(
-                    tree,
-                    attr_func(tree, field_item, node_item),
-                    true_func(tree, field_item, node_item)
-                    if (cond_item)
-                    else false_func(tree, field_item, node_item),
-                )
+                if false_func is None:
+                    if cond_item:
+                        object.__setattr__(
+                            tree,
+                            attr_func(tree, field_item, node_item),
+                            true_func(tree, field_item, node_item),
+                        )
+
+                else:
+                    object.__setattr__(
+                        tree,
+                        attr_func(tree, field_item, node_item),
+                        true_func(tree, field_item, node_item)
+                        if (cond_item)
+                        else false_func(tree, field_item, node_item),
+                    )
 
         def recurse(tree):
             for field_item, cond_item in zip(
@@ -302,13 +298,21 @@ def _pytree_map(
                 )
 
             else:
-                object.__setattr__(
-                    tree,
-                    attr_func(tree, field_item, node_item),
-                    true_func(tree, field_item, node_item)
-                    if (state or cond(tree, field_item, node_item))
-                    else false_func(tree, field_item, node_item),
-                )
+                if false_func is None:
+                    if state or cond(tree, field_item, node_item):
+                        object.__setattr__(
+                            tree,
+                            attr_func(tree, field_item, node_item),
+                            true_func(tree, field_item, node_item),
+                        )
+                else:
+                    object.__setattr__(
+                        tree,
+                        attr_func(tree, field_item, node_item),
+                        true_func(tree, field_item, node_item)
+                        if (state or cond(tree, field_item, node_item))
+                        else false_func(tree, field_item, node_item),
+                    )
 
         def recurse(tree, state):
             for field_item in _tree_fields(tree).values():
