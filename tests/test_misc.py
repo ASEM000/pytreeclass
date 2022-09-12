@@ -78,3 +78,33 @@ def test_filter_nondiff_func():
     # print(model)
     # Test(a=-0.45068058,*b=2,*c=3,*act=tanh(x))
     assert model.a == pytest.approx(-0.45068058, 1e-5)
+
+
+def test_filter_nondiff_with_mask():
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @pytc.treeclass
+    class L1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @pytc.treeclass
+    class L2:
+        a: int = 10
+        b: int = 20
+        c: int = 30
+        d: L1 = L1()
+
+    t = L2()
+
+    t = t.at["d"].at["d"].set(filter_nondiff(t.d.d, where=L0(a=True, b=True, c=False)))
+    assert jtu.tree_leaves(t) == [10, 20, 30, 1, 2, 3, 3]
+
+    with pytest.raises(TypeError):
+        filter_nondiff(t, where=t.d)
