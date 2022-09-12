@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools as ft
-from dataclasses import field
+from dataclasses import Field, field
 from types import FunctionType
 from typing import Any, Callable
 
@@ -55,44 +55,6 @@ class cached_method:
         cached_func = ft.wraps(self.func)(lambda *args, **kwargs: output)
         object.__setattr__(instance, self.name, cached_func)
         return cached_func
-
-
-def _copy_field(
-    field_item,
-    *,
-    field_name: str = None,
-    field_type: type = None,
-    compare: bool = None,
-    default: Any = None,
-    default_factory: Callable = None,
-    hash: Callable = None,
-    init: bool = None,
-    repr: bool = None,
-    metadata: dict[str, Any] = None,
-    aux_metadata: dict[str, Any] = None,
-):
-    """copy a field with new values"""
-    # creation of a new field avoid mutating the original field
-    aux_metadata = aux_metadata or {}
-
-    new_field = field(
-        compare=compare or getattr(field_item, "compare"),
-        default=default or getattr(field_item, "default"),
-        default_factory=default_factory or getattr(field_item, "default_factory"),
-        hash=hash or getattr(field_item, "hash"),
-        init=init or getattr(field_item, "init"),
-        metadata=metadata
-        or {
-            **getattr(field_item, "metadata"),
-            **aux_metadata,
-        },
-        repr=repr or getattr(field_item, "repr"),
-    )
-
-    object.__setattr__(new_field, "name", field_name or getattr(field_item, "name"))
-    object.__setattr__(new_field, "type", field_type or getattr(field_item, "type"))
-
-    return new_field
 
 
 def _is_nondiff(node):
@@ -171,7 +133,7 @@ def filter_nondiff(tree):
             **tree.__undeclared_fields__,
             **{
                 field_item.name: _copy_field(
-                    field_item, aux_metadata={"static": True, "nondiff": True}
+                    field_item, field_aux_metadata={"static": True, "nondiff": True}
                 )
             },
         },
@@ -195,3 +157,43 @@ def unfilter_nondiff(tree):
         attr_func=lambda _, __, ___: "__undeclared_fields__",
         is_leaf=lambda _, __, ___: False,
     )
+
+
+def _copy_field(
+    field_item,
+    *,
+    field_name: str = None,
+    field_type: type = None,
+    field_compare: bool = None,
+    field_default: Any = None,
+    field_default_factory: Callable = None,
+    field_hash: Callable = None,
+    field_init: bool = None,
+    field_repr: bool = None,
+    field_metadata: dict[str, Any] = None,
+    field_aux_metadata: dict[str, Any] = None,
+):
+    assert isinstance(
+        field_item, Field
+    ), f"field_item must be a dataclass field. Found {field_item}"
+    """copy a field with new values"""
+    # creation of a new field avoid mutating the original field
+    field_aux_metadata = field_aux_metadata or {}
+    new_field = field(
+        compare=field_compare or getattr(field_item, "compare"),
+        default=field_default or getattr(field_item, "default"),
+        default_factory=field_default_factory or getattr(field_item, "default_factory"),
+        hash=field_hash or getattr(field_item, "hash"),
+        init=field_init or getattr(field_item, "init"),
+        metadata=field_metadata
+        or {
+            **getattr(field_item, "metadata"),
+            **field_aux_metadata,
+        },
+        repr=field_repr or getattr(field_item, "repr"),
+    )
+
+    object.__setattr__(new_field, "name", field_name or getattr(field_item, "name"))
+    object.__setattr__(new_field, "type", field_type or getattr(field_item, "type"))
+
+    return new_field

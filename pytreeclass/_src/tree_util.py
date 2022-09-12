@@ -144,7 +144,12 @@ def _tree_hash(tree):
         else:
             return node
 
-    return hash(tuple(jtu.tree_map(_hash_node, jtu.tree_leaves(tree))))
+    return hash(
+        (
+            tuple(jtu.tree_map(_hash_node, jtu.tree_leaves(tree))),
+            jtu.tree_structure(tree),
+        )
+    )
 
 
 def tree_freeze(tree):
