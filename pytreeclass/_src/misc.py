@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import functools as ft
+from collections.abc import Iterable
 from dataclasses import Field, field
 from types import FunctionType
 from typing import Any, Callable
 
 import jax.numpy as jnp
+import jax.tree_util as jtu
 
 from pytreeclass._src.tree_util import (
     _pytree_map,
@@ -57,20 +59,32 @@ class cached_method:
         return cached_func
 
 
-def _is_nondiff(node):
-    """check if node is non-differentiable"""
-    if isinstance(node, (int, bool, str)):
+def _is_nondiff(item):
+    """check if tree is non-differentiable"""
+
+    def _is_nondiff_item(node):
+        """check if node is non-differentiable"""
         # non-differentiable types
-        return True
-    elif isinstance(node, jnp.ndarray) and not jnp.issubdtype(node.dtype, jnp.inexact):
+        if isinstance(node, (int, bool, str)):
+            return True
+
         # non-differentiable array
-        return True
+        elif isinstance(node, jnp.ndarray) and not jnp.issubdtype(
+            node.dtype, jnp.inexact
+        ):
+            return True
 
-    elif isinstance(node, Callable) and not is_treeclass(node):
         # non-differentiable type
-        return True
+        elif isinstance(node, Callable) and not is_treeclass(node):
+            return True
 
-    return False
+        return False
+
+    if isinstance(item, Iterable):
+        # if an iterable has at least one non-differentiable item
+        # then the whole iterable is non-differentiable
+        return jtu.tree_all(jtu.tree_map(_is_nondiff_item, item))
+    return _is_nondiff_item(item)
 
 
 def filter_nondiff(tree):
