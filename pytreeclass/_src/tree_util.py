@@ -213,7 +213,9 @@ def _pytree_map(
     is_leaf: Callable[[Any, Any, Any], bool],
     false_func: Callable[[Any, Any, Any], Any] | None = None,
 ) -> PyTree:
-    """traverse the dataclass fields in a depth first manner
+
+    """
+    traverse the dataclass fields in a depth first manner
 
     Here, we apply true_func to node_item if condition is true and vice versa
     we use attr_func to select the attribute to be updated in the dataclass and
@@ -255,27 +257,6 @@ def _pytree_map(
 
     @_map.register(src.tree_base._treeBase)
     def _(tree, cond: PyTree, true_func, false_func, attr_func, is_leaf):
-        def recurse_non_leaf(tree, field_item, node_item, cond_item):
-            if is_treeclass(node_item):
-                recurse(node_item)
-            else:
-                if false_func is None:
-                    if cond_item:
-                        object.__setattr__(
-                            tree,
-                            attr_func(tree, field_item, node_item),
-                            true_func(tree, field_item, node_item),
-                        )
-
-                else:
-                    object.__setattr__(
-                        tree,
-                        attr_func(tree, field_item, node_item),
-                        true_func(tree, field_item, node_item)
-                        if (cond_item)
-                        else false_func(tree, field_item, node_item),
-                    )
-
         def recurse(tree):
             for field_item, cond_item in zip(
                 _tree_fields(tree).values(), _tree_fields(cond).values()
@@ -283,28 +264,40 @@ def _pytree_map(
                 node_item = getattr(tree, field_item.name)
                 cond_item = getattr(cond, cond_item.name)
 
-                if not is_leaf(tree, field_item, node_item):
-                    recurse_non_leaf(tree, field_item, node_item, cond_item)
+                if is_leaf(tree, field_item, node_item):
+                    continue
+
+                if is_treeclass(node_item):
+                    recurse(node_item)
+
+                else:
+                    object.__setattr__(
+                        tree,
+                        attr_func(tree, field_item, node_item),
+                        true_func(tree, field_item, node_item)
+                        if cond_item
+                        else false_func(tree, field_item, node_item),
+                    )
+
             return tree
 
-        return recurse(tree_copy(tree))
+        return recurse((tree))
 
     @_map.register(FunctionType)
     def _(tree, cond: Callable, true_func, false_func, attr_func, is_leaf):
-        def recurse_non_leaf(tree, field_item, node_item, state):
-            if is_treeclass(node_item):
-                recurse(
-                    node_item, jtu.tree_all(cond(tree, field_item, node_item)) or state
-                )
+        def recurse(tree, state):
+            for field_item in _tree_fields(tree).values():
+                node_item = getattr(tree, field_item.name)
 
-            else:
-                if false_func is None:
-                    if state or cond(tree, field_item, node_item):
-                        object.__setattr__(
-                            tree,
-                            attr_func(tree, field_item, node_item),
-                            true_func(tree, field_item, node_item),
-                        )
+                if is_leaf(tree, field_item, node_item):
+                    continue
+
+                if is_treeclass(node_item):
+                    recurse(
+                        node_item,
+                        jtu.tree_all(cond(tree, field_item, node_item)) or state,
+                    )
+
                 else:
                     object.__setattr__(
                         tree,
@@ -314,13 +307,8 @@ def _pytree_map(
                         else false_func(tree, field_item, node_item),
                     )
 
-        def recurse(tree, state):
-            for field_item in _tree_fields(tree).values():
-                node_item = getattr(tree, field_item.name)
-                if not is_leaf(tree, field_item, node_item):
-                    recurse_non_leaf(tree, field_item, node_item, state)
             return tree
 
-        return recurse(tree_copy(tree), state=None)
+        return recurse((tree), state=None)
 
-    return _map(tree, cond, true_func, false_func, attr_func, is_leaf)
+    return _map(tree_copy(tree), cond, true_func, false_func, attr_func, is_leaf)

@@ -233,13 +233,16 @@ def filter_nondiff(tree, where: PyTree | None = None):
         true_func=lambda tree, field_item, node_item: {
             **tree.__undeclared_fields__,
             **{
-                field_item.name: _copy_field(
-                    field_item, field_aux_metadata={"static": True, "nondiff": True}
+                field_item.name: _field(
+                    name=field_item.name,
+                    type=field_item.type,
+                    metadata={"static": True, "nondiff": True},
+                    repr=field_item.repr,
                 )
             },
         },
         # keep the field as is
-        false_func=None,
+        false_func=lambda tree, __, ___: tree.__undeclared_fields__,
         attr_func=lambda _, __, ___: "__undeclared_fields__",
         # do not recurse if the field is `static`
         is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),
@@ -262,41 +265,9 @@ def unfilter_nondiff(tree):
     )
 
 
-def _copy_field(
-    field_item,
-    *,
-    field_name: str = None,
-    field_type: type = None,
-    field_compare: bool = None,
-    field_default: Any = None,
-    field_default_factory: Callable = None,
-    field_hash: Callable = None,
-    field_init: bool = None,
-    field_repr: bool = None,
-    field_metadata: dict[str, Any] = None,
-    field_aux_metadata: dict[str, Any] = None,
-):
-    assert isinstance(
-        field_item, Field
-    ), f"field_item must be a dataclass field. Found {field_item}"
-    """copy a field with new values"""
-    # creation of a new field avoid mutating the original field
-    field_aux_metadata = field_aux_metadata or {}
-    new_field = field(
-        compare=field_compare or getattr(field_item, "compare"),
-        default=field_default or getattr(field_item, "default"),
-        default_factory=field_default_factory or getattr(field_item, "default_factory"),
-        hash=field_hash or getattr(field_item, "hash"),
-        init=field_init or getattr(field_item, "init"),
-        metadata=field_metadata
-        or {
-            **getattr(field_item, "metadata"),
-            **field_aux_metadata,
-        },
-        repr=field_repr or getattr(field_item, "repr"),
-    )
-
-    object.__setattr__(new_field, "name", field_name or getattr(field_item, "name"))
-    object.__setattr__(new_field, "type", field_type or getattr(field_item, "type"))
-
-    return new_field
+def _field(name: str, type: type, metadata: dict[str, Any], repr: bool) -> Field:
+    """field factory with option to add name, and type"""
+    field_item = field(metadata=metadata, repr=repr)
+    object.__setattr__(field_item, "name", name)
+    object.__setattr__(field_item, "type", type)
+    return field_item
