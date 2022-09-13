@@ -248,6 +248,11 @@ def _pytree_map(
         PyTree or dataclass : new dataclass with updated attributes
     """
 
+    @dispatch(argnum="cond")
+    def _recurse(tree, *, cond, true_func, attr_func, is_leaf, false_func):
+        raise TypeError("_pytree only supports treeclass instances")
+
+    @_recurse.register(type(tree))
     def _recurse_treeclass_mask(
         tree: PyTree,
         *,
@@ -288,10 +293,11 @@ def _pytree_map(
 
         return tree
 
+    @_recurse.register(FunctionType)
     def _recurse_callable_mask(
         tree: PyTree,
         *,
-        cond: PyTree,
+        cond: Callable[[Any, Any, Any], bool],
         true_func: Callable[[Any, Any, Any], Any],
         attr_func: Callable[[Any, Any, Any], str],
         is_leaf: Callable[[Any, Any, Any], bool],
@@ -326,27 +332,11 @@ def _pytree_map(
 
         return tree
 
-    if isinstance(cond, FunctionType):
-        return _recurse_callable_mask(
-            tree=tree_copy(tree),
-            cond=cond,
-            true_func=true_func,
-            false_func=false_func,
-            attr_func=attr_func,
-            is_leaf=is_leaf,
-            state=None,
-        )
-    elif isinstance(cond, type(tree)):
-        return _recurse_treeclass_mask(
-            tree=tree_copy(tree),
-            cond=cond,
-            true_func=true_func,
-            false_func=false_func,
-            attr_func=attr_func,
-            is_leaf=is_leaf,
-        )
-
-    else:
-        raise TypeError(
-            f"cond must be Callable, or PyTree of same structure. Found {cond}"
-        )
+    return _recurse(
+        tree=tree_copy(tree),
+        cond=cond,
+        true_func=true_func,
+        false_func=false_func,
+        attr_func=attr_func,
+        is_leaf=is_leaf,
+    )
