@@ -8,7 +8,7 @@ import jax.random as jr
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.misc import static_field
+from pytreeclass._src.misc import filter_nondiff, static_field
 from pytreeclass._src.tree_util import tree_freeze
 from pytreeclass.tree_viz.box_drawing import _resolve_line
 from pytreeclass.tree_viz.tree_box import tree_box
@@ -575,3 +575,37 @@ def test_mark():
 
     assert tree_freeze(t).__repr__() == "Test(#a=1,#b=2)"
     assert tree_freeze(t).__str__() == "Test(#a=1,#b=2)"
+
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @pytc.treeclass
+    class L1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @pytc.treeclass
+    class L2:
+        a: int = 10
+        b: int = 20
+        c: int = 30
+        d: L1 = L1()
+
+    t = L2()
+
+    tt = t.at["d"].set(tree_freeze(t.d))
+    ttt = t.at["d"].set(filter_nondiff(t.d))
+
+    ttt.__repr__() == tt.__str__() == "L2(a=10,b=20,c=30,d=L1(*a=1,*b=2,*c=3,*d=L0(*a=1,*b=2,*c=3)))"
+    tt.__repr__() == tt.__str__() == "L2(a=10,b=20,c=30,d=L1(#a=1,#b=2,#c=3,#d=L0(#a=1,#b=2,#c=3)))"
+
+    # trunk-ignore(flake8/E501)
+    tt.tree_diagram() == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├#─ a=1\n        ├#─ b=2\n        ├#─ c=3\n        └#─ d=L0\n            ├#─ a=1\n            ├#─ b=2\n            └#─ c=3         "
+
+    # trunk-ignore(flake8/E501)
+    ttt.tree_diagram() == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├*─ a=1\n        ├*─ b=2\n        ├*─ c=3\n        └*─ d=L0\n            ├*─ a=1\n            ├*─ b=2\n            └*─ c=3         "

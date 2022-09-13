@@ -70,6 +70,7 @@ def test_is_treeclass_static():
         b: int = 1
 
     assert is_treeclass_static(Test()) is False
+    assert is_treeclass_static(1) is False
 
 
 def test__node_count_and_size():
