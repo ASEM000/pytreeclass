@@ -222,27 +222,25 @@ def filter_nondiff(tree, where: PyTree | None = None):
     # on the node value.
     # in essence any field with non-differentiable value is filtered out.
 
-    # using a mask is faster than using a callable _is_nondiff function
-    mask = jtu.tree_map(_is_nondiff, tree, is_leaf=lambda x: isinstance(x, Iterable))
+    def true_func(tree, field_item, node_item):
+        new_field = _field(
+            name=field_item.name,
+            type=field_item.type,
+            metadata={"static": True, "nondiff": True},
+            repr=field_item.repr,
+        )
 
-    assert isinstance(mask, type(tree)), "mask must be of the same type as tree."
+        return {
+            **tree.__undeclared_fields__,
+            **{field_item.name: new_field},
+        }
 
     return _pytree_map(
         tree,
         # condition is a lambda function that returns True if the field is non-differentiable
-        cond=where or mask,
+        cond=where or (lambda _, __, node_item: _is_nondiff(node_item)),
         # Extends the field metadata to add {nondiff:True}
-        true_func=lambda tree, field_item, _: {
-            **tree.__undeclared_fields__,
-            **{
-                field_item.name: _field(
-                    name=field_item.name,
-                    type=field_item.type,
-                    metadata={"static": True, "nondiff": True},
-                    repr=field_item.repr,
-                )
-            },
-        },
+        true_func=true_func,
         # keep the field as is if its differentiable
         false_func=lambda tree, __, ___: tree.__undeclared_fields__,
         attr_func=lambda _, __, ___: "__undeclared_fields__",
@@ -253,14 +251,18 @@ def filter_nondiff(tree, where: PyTree | None = None):
 
 def unfilter_nondiff(tree):
     """remove fields added by `filter_nondiff"""
-    return _pytree_map(
-        tree,
-        cond=lambda _, __, ___: True,
-        true_func=lambda tree, field_item, node_item: {
+
+    def true_func(tree, field_item, node_item):
+        return {
             field_name: field_value
             for field_name, field_value in tree.__undeclared_fields__.items()
             if not field_value.metadata.get("nondiff", False)
-        },
+        }
+
+    return _pytree_map(
+        tree,
+        cond=lambda _, __, ___: True,
+        true_func=true_func,
         false_func=lambda _, __, ___: {},
         attr_func=lambda _, __, ___: "__undeclared_fields__",
         is_leaf=lambda _, __, ___: False,

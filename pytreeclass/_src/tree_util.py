@@ -180,22 +180,25 @@ def _field(name: str, type: type, metadata: dict[str, Any], repr: bool) -> Field
 
 
 def tree_freeze(tree):
+    def true_func(tree, field_item, _):
+        new_field = _field(
+            name=field_item.name,
+            type=field_item.type,
+            metadata={"static": True, "frozen": True},
+            repr=field_item.repr,
+        )
+
+        return {
+            **tree.__undeclared_fields__,
+            **{field_item.name: new_field},
+        }
+
     return _pytree_map(
         tree,
         # traverse all nodes
         cond=lambda _, __, ___: True,
         # Extends the field metadata to add {nondiff:True}
-        true_func=lambda tree, field_item, _: {
-            **tree.__undeclared_fields__,
-            **{
-                field_item.name: _field(
-                    name=field_item.name,
-                    type=field_item.type,
-                    metadata={"static": True, "frozen": True},
-                    repr=field_item.repr,
-                )
-            },
-        },
+        true_func=true_func,
         # keep the field as is if its differentiable
         false_func=lambda tree, __, ___: tree.__undeclared_fields__,
         attr_func=lambda _, __, ___: "__undeclared_fields__",
@@ -206,14 +209,18 @@ def tree_freeze(tree):
 
 def tree_unfreeze(tree):
     """remove fields added by `tree_freeze"""
-    return _pytree_map(
-        tree,
-        cond=lambda _, __, ___: True,
-        true_func=lambda tree, field_item, node_item: {
+
+    def true_func(tree, field_item, _):
+        return {
             field_name: field_value
             for field_name, field_value in tree.__undeclared_fields__.items()
             if not is_frozen_field(field_item)
-        },
+        }
+
+    return _pytree_map(
+        tree,
+        cond=lambda _, __, ___: True,
+        true_func=true_func,
         false_func=lambda _, __, ___: {},
         attr_func=lambda _, __, ___: "__undeclared_fields__",
         is_leaf=lambda _, __, ___: False,
@@ -310,7 +317,6 @@ def _pytree_map(
             cond_item = getattr(cond, cond_item.name)
 
             if is_leaf(tree, field_item, node_item):
-                # skip if the node is a leaf
                 continue
 
             if is_treeclass(node_item):
@@ -329,7 +335,7 @@ def _pytree_map(
                     tree,
                     attr_func(tree, field_item, node_item),
                     true_func(tree, field_item, node_item)
-                    if cond_item
+                    if jnp.all(cond_item)
                     else false_func(tree, field_item, node_item),
                 )
 
