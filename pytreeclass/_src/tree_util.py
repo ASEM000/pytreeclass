@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import Field, field
+from dataclasses import Field
 from types import FunctionType
 from typing import Any, Callable
 
@@ -8,19 +8,20 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
+import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
 
 PyTree = Any
 
 
-def is_frozen_field(field: Field) -> bool:
+def is_frozen_field(field_item: Field) -> bool:
     """check if field is frozen"""
-    return field.metadata.get("frozen", False)
+    return field_item.metadata.get("frozen", False)
 
 
-def is_static_field(field: Field) -> bool:
+def is_static_field(field_item: Field) -> bool:
     """check if field is strictly static"""
-    return field.metadata.get("static", False) and not is_frozen_field(field)
+    return field_item.metadata.get("static", False) and not is_frozen_field(field_item)
 
 
 def is_treeclass_frozen(tree):
@@ -171,17 +172,9 @@ def _tree_hash(tree):
     )
 
 
-def _field(name: str, type: type, metadata: dict[str, Any], repr: bool) -> Field:
-    """field factory with option to add name, and type"""
-    field_item = field(metadata=metadata, repr=repr)
-    object.__setattr__(field_item, "name", name)
-    object.__setattr__(field_item, "type", type)
-    return field_item
-
-
 def tree_freeze(tree):
     def true_func(tree, field_item, _):
-        new_field = _field(
+        new_field = src.misc._field(
             name=field_item.name,
             type=field_item.type,
             metadata={"static": True, "frozen": True},
