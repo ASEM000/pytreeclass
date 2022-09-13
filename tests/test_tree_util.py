@@ -14,6 +14,16 @@ from pytreeclass._src.tree_util import (
 from pytreeclass.tree_viz.utils import _node_count_and_size
 
 
+def test_is_frozen():
+    @pytc.treeclass
+    class Test:
+        a: jnp.ndarray = jnp.array([1.0, 2.0, 3.0])
+        b: int = 1
+
+    assert is_treeclass_frozen(tree_freeze(Test())) is True
+    assert is_treeclass_frozen(1) is False
+
+
 @pytc.treeclass
 class Test:
     a: int = 10

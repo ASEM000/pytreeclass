@@ -953,3 +953,16 @@ def test_repr_str():
 
     assert f"{t.at['a']!r}" == "where='a'"
     assert f"{t.at['a']!s}" == "where=a"
+
+
+def test_not_equal():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: float = 1.0
+
+    t = Test()
+
+    assert is_treeclass_equal(t.at[t == int].set(10), Test(a=10, b=1.0))
+
+    assert is_treeclass_equal(t.at[t != int].set(10.0), Test(a=1, b=10.0))
