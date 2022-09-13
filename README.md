@@ -23,6 +23,7 @@
 [![Documentation Status](https://readthedocs.org/projects/pytreeclass/badge/?version=latest)](https://pytreeclass.readthedocs.io/en/latest/?badge=latest)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ASEM000/pytreeclass)
 [![DOI](https://zenodo.org/badge/512717921.svg)](https://zenodo.org/badge/latestdoi/512717921)
+![PyPI](https://img.shields.io/pypi/v/pytreeclass)
 
 ## 🛠️ Installation<a id="Installation"></a>
 

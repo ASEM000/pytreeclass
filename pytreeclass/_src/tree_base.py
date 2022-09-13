@@ -27,13 +27,8 @@ class _treeBase:
         Returns:
             Tuple of dynamic values and (dynamic keys,static dict, cached values)
         """
-        if hasattr(self, "__pytree_structure_cache__"):
-            # return the cached pytree_structure
-            return (), ((), (), (self.__pytree_structure_cache__))
-
-        else:
-            dynamic, static = _tree_structure(self)
-            return dynamic.values(), (dynamic.keys(), (static), ())
+        dynamic, static = _tree_structure(self)
+        return dynamic.values(), (dynamic.keys(), static)
 
     @classmethod
     def tree_unflatten(cls, treedef, leaves):
@@ -58,14 +53,8 @@ class _treeBase:
         # this approach creates the attribute once.
         self = object.__new__(cls)
 
-        if len(treedef[2]) == 2:
-            # retrieve the cached structure
-            dynamic, static = treedef[2]
-            # pass the cached structure to the new instance
-            object.__setattr__(self, "__pytree_structure_cache__", (dynamic, static))
-        else:
-            dynamic = dict(zip(treedef[0], leaves))
-            static = treedef[1]
+        dynamic = dict(zip(treedef[0], leaves))
+        static = treedef[1]
 
         # update the instance values with the retrieved dynamic and static values
         self.__dict__.update(dynamic)

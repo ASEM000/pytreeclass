@@ -98,7 +98,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
         ]
 
     @dispatch(argnum="node_item")
-    def recurse_field(field_item, node_item, is_frozen, name_path, type_path):
+    def recurse_field(field_item, node_item, name_path, type_path):
         ...
 
     @recurse_field.register(int)
@@ -107,11 +107,12 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
     @recurse_field.register(str)
     @recurse_field.register(bool)
     @recurse_field.register(jnp.ndarray)
-    def _(field_item, node_item, is_frozen, name_path, type_path):
+    def _(field_item, node_item, name_path, type_path):
 
         nonlocal ROWS, COUNT, SIZE
 
         if field_item.repr:
+            is_frozen = field_item.metadata.get("frozen", False)
             count, size = _reduce_count_and_size(node_item)
             ROWS.append(
                 [
@@ -129,34 +130,35 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
     @recurse_field.register(list)
     @recurse_field.register(tuple)
-    def _(field_item, node_item, is_frozen, name_path, type_path):
+    def _(field_item, node_item, name_path, type_path):
         # handles containers
         # here what we do is we just add the name/type of the container to the path by passing
         # a created field_item with the name/type for each item in the container
         if field_item.repr:
-
+            is_frozen = field_item.metadata.get("frozen", False)
             for i, layer in enumerate(node_item):
-                new_field = field()
+                new_field = field(metadata={"frozen": is_frozen})
                 object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
                 object.__setattr__(new_field, "type", type(layer))
 
                 recurse_field(
                     field_item=new_field,
                     node_item=layer,
-                    is_frozen=is_frozen,
                     name_path=name_path + (f"{field_item.name}_{i}",),
                     type_path=type_path + (layer.__class__.__name__,),
                 )
 
     @recurse_field.register(src.tree_base._treeBase)
-    def _(field_item, node_item, is_frozen, name_path, type_path):
+    def _(field_item, node_item, name_path, type_path):
         # handles treeclass
         nonlocal ROWS, COUNT, SIZE
 
         if field_item.repr:
-            is_frozen = is_treeclass_frozen(node_item)
+            # a module is considred frozen if all it's parameters are frozen
+            is_frozen = field_item.metadata.get("frozen", False)
+            is_frozen = is_frozen or is_treeclass_frozen(node_item)
             count, size = _reduce_count_and_size(tree_unfreeze(node_item))
-            dynamic, _ = _tree_structure(node_item)
+            dynamic, _ = _tree_structure(tree_unfreeze(node_item))
             ROWS.append(
                 [
                     "/".join(name_path)
@@ -171,13 +173,13 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
             COUNT[1 if is_frozen else 0] += count
             SIZE[1 if is_frozen else 0] += size
 
-    def recurse(tree, is_frozen, name_path, type_path):
+    def recurse(tree, name_path, type_path):
 
         nonlocal ROWS, COUNT, SIZE
 
         for field_item in _tree_fields(tree).values():
 
-            node_item = tree.__dict__[field_item.name]
+            node_item = getattr(tree, field_item.name)
 
             if is_treeclass_non_leaf(node_item):
                 # recurse if the field is a treeclass
@@ -186,7 +188,6 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                 # for instance a path "L1/L0" defines a class L0 with L1 parent
                 recurse(
                     tree=node_item,
-                    is_frozen=is_treeclass_frozen(node_item),
                     name_path=name_path + (field_item.name,),
                     type_path=type_path + (node_item.__class__.__name__,),
                 )
@@ -194,13 +195,13 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
             else:
 
                 is_static = field_item.metadata.get("static", False)
-                # skip if the field is static
+                is_static = is_static and not field_item.metadata.get("frozen", False)
 
+                # skip if the field is static and not frozen
                 if not (is_static):
                     recurse_field(
                         field_item=field_item,
                         node_item=node_item,
-                        is_frozen=is_frozen,
                         name_path=name_path + (field_item.name,),
                         type_path=type_path + (node_item.__class__.__name__,),
                     )
@@ -209,7 +210,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
     COUNT = [0, 0]
     SIZE = [0, 0]
 
-    recurse(tree, is_frozen=is_treeclass_frozen(tree), name_path=(), type_path=())
+    recurse(tree, name_path=(), type_path=())
 
     # we need to transform rows to cols
     # as `_table` concatenates columns together
