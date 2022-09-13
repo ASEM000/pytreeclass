@@ -601,11 +601,11 @@ def test_mark():
     tt = t.at["d"].set(tree_freeze(t.d))
     ttt = t.at["d"].set(filter_nondiff(t.d))
 
-    ttt.__repr__() == tt.__str__() == "L2(a=10,b=20,c=30,d=L1(*a=1,*b=2,*c=3,*d=L0(*a=1,*b=2,*c=3)))"
-    tt.__repr__() == tt.__str__() == "L2(a=10,b=20,c=30,d=L1(#a=1,#b=2,#c=3,#d=L0(#a=1,#b=2,#c=3)))"
+    assert ttt.__repr__() == ttt.__str__() == "L2(a=10,b=20,c=30,d=L1(*a=1,*b=2,*c=3,*d=L0(*a=1,*b=2,*c=3)))"
+    assert tt.__repr__() == tt.__str__() == "L2(a=10,b=20,c=30,d=L1(#a=1,#b=2,#c=3,#d=L0(#a=1,#b=2,#c=3)))"
 
     # trunk-ignore(flake8/E501)
-    tt.tree_diagram() == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├#─ a=1\n        ├#─ b=2\n        ├#─ c=3\n        └#─ d=L0\n            ├#─ a=1\n            ├#─ b=2\n            └#─ c=3         "
+    assert tt.tree_diagram() == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├#─ a=1\n        ├#─ b=2\n        ├#─ c=3\n        └#─ d=L0\n            ├#─ a=1\n            ├#─ b=2\n            └#─ c=3         "
 
     # trunk-ignore(flake8/E501)
-    ttt.tree_diagram() == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├*─ a=1\n        ├*─ b=2\n        ├*─ c=3\n        └*─ d=L0\n            ├*─ a=1\n            ├*─ b=2\n            └*─ c=3         "
+    assert ttt.tree_diagram() == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├*─ a=1\n        ├*─ b=2\n        ├*─ c=3\n        └*─ d=L0\n            ├*─ a=1\n            ├*─ b=2\n            └*─ c=3         "
