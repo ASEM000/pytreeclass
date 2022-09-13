@@ -560,3 +560,18 @@ def test_summary():
         tree_freeze(t).tree_diagram()
         == "Test\n    └#─ a=<class 'tuple'>\n        ├#─ a_0=1\n        ├#─ a_1=2\n        └#─ a_2=3   "
     )
+
+
+def test_mark():
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.static_field(default=1)
+        b: int = 2
+
+    t = Test()
+
+    assert t.__repr__() == "Test(*a=1,b=2)"
+    assert t.__str__() == "Test(*a=1,b=2)"
+
+    assert tree_freeze(t).__repr__() == "Test(#a=1,#b=2)"
+    assert tree_freeze(t).__str__() == "Test(#a=1,#b=2)"
