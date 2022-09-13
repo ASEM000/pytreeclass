@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import Field, field
 from types import FunctionType
 from typing import Any, Callable
 
@@ -10,6 +11,32 @@ import numpy as np
 from pytreeclass._src.dispatch import dispatch
 
 PyTree = Any
+
+
+def is_frozen_field(field: Field) -> bool:
+    """check if field is frozen"""
+    return field.metadata.get("frozen", False)
+
+
+def is_static_field(field: Field) -> bool:
+    """check if field is static"""
+    return field.metadata.get("static", False)  # and not is_frozen_field(field)
+
+
+def is_treeclass_frozen(tree):
+    """assert if a treeclass is frozen"""
+    if is_treeclass(tree):
+        return all(is_frozen_field(f) for f in _tree_fields(tree).values())
+    else:
+        return False
+
+
+def is_treeclass_static(tree):
+    """assert if a treeclass is static"""
+    if is_treeclass(tree):
+        return all(is_static_field(f) for f in _tree_fields(tree).values())
+    else:
+        return False
 
 
 def is_treeclass(tree):
@@ -54,14 +81,6 @@ def is_treeclass_equal(lhs, rhs):
     return (lhs_treedef == rhs_treedef) and all(
         [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
     )
-
-
-def is_treeclass_frozen(tree):
-    """assert if a treeclass is frozen"""
-    if is_treeclass(tree):
-        return hasattr(tree, "__pytree_structure_cache__")
-    else:
-        return False
 
 
 def tree_copy(tree):
@@ -152,31 +171,53 @@ def _tree_hash(tree):
     )
 
 
-def tree_freeze(tree):
-    def recursive_freeze(tree):
-        # cache the tree structure (dynamic/static)
-        if is_treeclass(tree):
-            object.__setattr__(
-                tree, "__pytree_structure_cache__", _tree_structure(tree)
-            )
-            for kw in _tree_fields(tree):
-                recursive_freeze(tree.__dict__[kw])
-        return tree
+def _field(name: str, type: type, metadata: dict[str, Any], repr: bool) -> Field:
+    """field factory with option to add name, and type"""
+    field_item = field(metadata=metadata, repr=repr)
+    object.__setattr__(field_item, "name", name)
+    object.__setattr__(field_item, "type", type)
+    return field_item
 
-    return recursive_freeze(tree_copy(tree))
+
+def tree_freeze(tree):
+    return _pytree_map(
+        tree,
+        # traverse all nodes
+        cond=lambda _, __, ___: True,
+        # Extends the field metadata to add {nondiff:True}
+        true_func=lambda tree, field_item, _: {
+            **tree.__undeclared_fields__,
+            **{
+                field_item.name: _field(
+                    name=field_item.name,
+                    type=field_item.type,
+                    metadata={"static": True, "frozen": True},
+                    repr=field_item.repr,
+                )
+            },
+        },
+        # keep the field as is if its differentiable
+        false_func=lambda tree, __, ___: tree.__undeclared_fields__,
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        # do not recurse if the field is `static`
+        is_leaf=lambda _, field_item, __: False,
+    )
 
 
 def tree_unfreeze(tree):
-    # remove the cached frozen structure
-    def recursive_unfreeze(tree):
-        if is_treeclass(tree):
-            if hasattr(tree, "__pytree_structure_cache__"):
-                object.__delattr__(tree, "__pytree_structure_cache__")
-            for kw in _tree_fields(tree):
-                recursive_unfreeze(tree.__dict__[kw])
-        return tree
-
-    return recursive_unfreeze(tree_copy(tree))
+    """remove fields added by `tree_freeze"""
+    return _pytree_map(
+        tree,
+        cond=lambda _, __, ___: True,
+        true_func=lambda tree, field_item, node_item: {
+            field_name: field_value
+            for field_name, field_value in tree.__undeclared_fields__.items()
+            if not field_value.metadata.get("frozen", False)
+        },
+        false_func=lambda _, __, ___: {},
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        is_leaf=lambda _, __, ___: False,
+    )
 
 
 def _node_true(node, array_as_leaves: bool = True):
@@ -278,6 +319,7 @@ def _pytree_map(
                 )
 
             else:
+                # apply at leaves
                 object.__setattr__(
                     tree,
                     attr_func(tree, field_item, node_item),
@@ -316,6 +358,7 @@ def _pytree_map(
                 )
 
             else:
+                # apply at leaves
                 object.__setattr__(
                     tree,
                     attr_func(tree, field_item, node_item),
