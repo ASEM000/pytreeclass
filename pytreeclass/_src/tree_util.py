@@ -7,7 +7,6 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
 
 PyTree = Any
@@ -249,66 +248,105 @@ def _pytree_map(
         PyTree or dataclass : new dataclass with updated attributes
     """
 
-    @dispatch(argnum=1)
-    def _map(tree, cond, true_func, false_func, attr_func, is_leaf):
-        raise ValueError(
-            f"cond must be Callable, bool, or PyTree of same structure. Found {cond}"
+    def _recurse_treeclass_mask(
+        tree: PyTree,
+        *,
+        cond: PyTree,
+        true_func: Callable[[Any, Any, Any], Any],
+        attr_func: Callable[[Any, Any, Any], str],
+        is_leaf: Callable[[Any, Any, Any], bool],
+        false_func: Callable[[Any, Any, Any], Any],
+    ):
+        for field_item, cond_item in zip(
+            _tree_fields(tree).values(), _tree_fields(cond).values()
+        ):
+            node_item = getattr(tree, field_item.name)
+            cond_item = getattr(cond, cond_item.name)
+
+            if is_leaf(tree, field_item, node_item):
+                # skip if the node is a leaf
+                continue
+
+            if is_treeclass(node_item):
+                _recurse_treeclass_mask(
+                    tree=node_item,
+                    cond=cond_item,
+                    true_func=true_func,
+                    false_func=false_func,
+                    attr_func=attr_func,
+                    is_leaf=is_leaf,
+                )
+
+            else:
+                object.__setattr__(
+                    tree,
+                    attr_func(tree, field_item, node_item),
+                    true_func(tree, field_item, node_item)
+                    if cond_item
+                    else false_func(tree, field_item, node_item),
+                )
+
+        return tree
+
+    def _recurse_callable_mask(
+        tree: PyTree,
+        *,
+        cond: PyTree,
+        true_func: Callable[[Any, Any, Any], Any],
+        attr_func: Callable[[Any, Any, Any], str],
+        is_leaf: Callable[[Any, Any, Any], bool],
+        false_func: Callable[[Any, Any, Any], Any],
+        state: Any = None,
+    ):
+        for field_item in _tree_fields(tree).values():
+            node_item = getattr(tree, field_item.name)
+
+            if is_leaf(tree, field_item, node_item):
+                continue
+
+            if is_treeclass(node_item):
+                _recurse_callable_mask(
+                    tree=node_item,
+                    cond=cond,
+                    true_func=true_func,
+                    false_func=false_func,
+                    attr_func=attr_func,
+                    is_leaf=is_leaf,
+                    state=jtu.tree_all(cond(tree, field_item, node_item)) or state,
+                )
+
+            else:
+                object.__setattr__(
+                    tree,
+                    attr_func(tree, field_item, node_item),
+                    true_func(tree, field_item, node_item)
+                    if (state or cond(tree, field_item, node_item))
+                    else false_func(tree, field_item, node_item),
+                )
+
+        return tree
+
+    if isinstance(cond, FunctionType):
+        return _recurse_callable_mask(
+            tree=tree_copy(tree),
+            cond=cond,
+            true_func=true_func,
+            false_func=false_func,
+            attr_func=attr_func,
+            is_leaf=is_leaf,
+            state=None,
+        )
+    elif isinstance(cond, type(tree)):
+        return _recurse_treeclass_mask(
+            tree=tree_copy(tree),
+            cond=cond,
+            true_func=true_func,
+            false_func=false_func,
+            attr_func=attr_func,
+            is_leaf=is_leaf,
         )
 
-    @_map.register(src.tree_base._treeBase)
-    def _(tree, cond: PyTree, true_func, false_func, attr_func, is_leaf):
-        def recurse(tree):
-            for field_item, cond_item in zip(
-                _tree_fields(tree).values(), _tree_fields(cond).values()
-            ):
-                node_item = getattr(tree, field_item.name)
-                cond_item = getattr(cond, cond_item.name)
-
-                if is_leaf(tree, field_item, node_item):
-                    continue
-
-                if is_treeclass(node_item):
-                    recurse(node_item)
-
-                else:
-                    object.__setattr__(
-                        tree,
-                        attr_func(tree, field_item, node_item),
-                        true_func(tree, field_item, node_item)
-                        if cond_item
-                        else false_func(tree, field_item, node_item),
-                    )
-
-            return tree
-
-        return recurse((tree))
-
-    @_map.register(FunctionType)
-    def _(tree, cond: Callable, true_func, false_func, attr_func, is_leaf):
-        def recurse(tree, state):
-            for field_item in _tree_fields(tree).values():
-                node_item = getattr(tree, field_item.name)
-
-                if is_leaf(tree, field_item, node_item):
-                    continue
-
-                if is_treeclass(node_item):
-                    recurse(
-                        node_item,
-                        jtu.tree_all(cond(tree, field_item, node_item)) or state,
-                    )
-
-                else:
-                    object.__setattr__(
-                        tree,
-                        attr_func(tree, field_item, node_item),
-                        true_func(tree, field_item, node_item)
-                        if (state or cond(tree, field_item, node_item))
-                        else false_func(tree, field_item, node_item),
-                    )
-
-            return tree
-
-        return recurse((tree), state=None)
-
-    return _map(tree_copy(tree), cond, true_func, false_func, attr_func, is_leaf)
+    else:
+        raise TypeError(
+            f"cond must be Callable, or PyTree of same structure. Found {cond}"
+        )

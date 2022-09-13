@@ -222,15 +222,17 @@ def filter_nondiff(tree, where: PyTree | None = None):
     # on the node value.
     # in essence any field with non-differentiable value is filtered out.
 
-    if not isinstance(where, (type(tree), type(None))):
-        raise TypeError(f"where must be of the same type as tree. Found {type(where)}")
+    # using a mask is faster than using a callable _is_nondiff function
+    mask = jtu.tree_map(_is_nondiff, tree, is_leaf=lambda x: isinstance(x, Iterable))
+
+    assert isinstance(mask, type(tree)), "mask must be of the same type as tree."
 
     return _pytree_map(
         tree,
         # condition is a lambda function that returns True if the field is non-differentiable
-        cond=where or (lambda _, __, node_item: _is_nondiff(node_item)),
+        cond=where or mask,
         # Extends the field metadata to add {nondiff:True}
-        true_func=lambda tree, field_item, node_item: {
+        true_func=lambda tree, field_item, _: {
             **tree.__undeclared_fields__,
             **{
                 field_item.name: _field(
@@ -241,7 +243,7 @@ def filter_nondiff(tree, where: PyTree | None = None):
                 )
             },
         },
-        # keep the field as is
+        # keep the field as is if its differentiable
         false_func=lambda tree, __, ___: tree.__undeclared_fields__,
         attr_func=lambda _, __, ___: "__undeclared_fields__",
         # do not recurse if the field is `static`
