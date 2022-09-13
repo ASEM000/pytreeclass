@@ -202,10 +202,10 @@ def test_freeze_diagram():
     assert is_treeclass_frozen(a.d) is True
     assert (
         tree_diagram(a)
-    ) == "B\n    ├── c=3\n    └*─ d=A\n        ├*─ a=1\n        └*─ b=2     "
+    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
     assert (
         a.tree_diagram()
-    ) == "B\n    ├── c=3\n    └*─ d=A\n        ├*─ a=1\n        └*─ b=2     "
+    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
 
     a = B()
 
@@ -213,4 +213,4 @@ def test_freeze_diagram():
     assert is_treeclass_frozen(a.d) is True
     assert (
         tree_diagram(a)
-    ) == "B\n    ├── c=3\n    └*─ d=A\n        ├*─ a=1\n        └*─ b=2     "
+    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "

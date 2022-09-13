@@ -88,7 +88,7 @@ def test_model_viz_frozen_value():
         # trunk-ignore(flake8/E501)
         "StackedLinear\n    ├── l1=Linear\n    │   ├── weight=f32[1,128]\n    │   ├── bias=f32[1,128]\n    │   └*─ notes='string'  \n    ├── l2=Linear\n    │   ├── weight=f32[128,128]\n    │   ├── bias=f32[1,128]\n    │   └*─ notes='string'  \n    └── l3=Linear\n        ├── weight=f32[128,1]\n        ├── bias=f32[1,1]\n        └*─ notes='string'      ",
         # trunk-ignore(flake8/E501)
-        "StackedLinear\n    ├*─ l1=Linear\n    │   ├*─ weight=f32[1,128]\n    │   ├*─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    ├*─ l2=Linear\n    │   ├*─ weight=f32[128,128]\n    │   ├*─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    └*─ l3=Linear\n        ├*─ weight=f32[128,1]\n        ├*─ bias=f32[1,1]\n        └*─ notes='string'      ",
+        "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes='string'  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes='string'  \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └#─ notes='string'      ",
     )
 
 
@@ -145,7 +145,7 @@ def test_model_viz_frozen_field():
     assert (
         (tree_freeze(model).tree_diagram())
         # trunk-ignore(flake8/E501)
-        == "StackedLinear\n    ├*─ l1=Linear\n    │   ├*─ weight=f32[1,128]\n    │   ├*─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    ├*─ l2=Linear\n    │   ├*─ weight=f32[128,128]\n    │   ├*─ bias=f32[1,128]\n    │   └*─ notes='string'  \n    └*─ l3=Linear\n        ├*─ weight=f32[128,1]\n        ├*─ bias=f32[1,1]\n        └*─ notes='string'      "
+        == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes='string'  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes='string'  \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └#─ notes='string'      "
     )
     assert (
         (model.tree_diagram())
@@ -548,7 +548,7 @@ def test_summary():
     )
     assert (
         tree_freeze(t).tree_diagram()
-        == "Test\n    └*─ a=<class 'list'>\n        ├*─ a_0=1\n        ├*─ a_1=2\n        └*─ a_2=3   "
+        == "Test\n    └#─ a=<class 'list'>\n        ├#─ a_0=1\n        ├#─ a_1=2\n        └#─ a_2=3   "
     )
 
     t = Test((1, 2, 3))
@@ -558,5 +558,5 @@ def test_summary():
     )
     assert (
         tree_freeze(t).tree_diagram()
-        == "Test\n    └*─ a=<class 'tuple'>\n        ├*─ a_0=1\n        ├*─ a_1=2\n        └*─ a_2=3   "
+        == "Test\n    └#─ a=<class 'tuple'>\n        ├#─ a_0=1\n        ├#─ a_1=2\n        └#─ a_2=3   "
     )

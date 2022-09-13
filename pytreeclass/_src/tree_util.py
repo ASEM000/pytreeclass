@@ -19,8 +19,8 @@ def is_frozen_field(field: Field) -> bool:
 
 
 def is_static_field(field: Field) -> bool:
-    """check if field is static"""
-    return field.metadata.get("static", False)  # and not is_frozen_field(field)
+    """check if field is strictly static"""
+    return field.metadata.get("static", False) and not is_frozen_field(field)
 
 
 def is_treeclass_frozen(tree):
@@ -212,7 +212,7 @@ def tree_unfreeze(tree):
         true_func=lambda tree, field_item, node_item: {
             field_name: field_value
             for field_name, field_value in tree.__undeclared_fields__.items()
-            if not field_value.metadata.get("frozen", False)
+            if not is_frozen_field(field_item)
         },
         false_func=lambda _, __, ___: {},
         attr_func=lambda _, __, ___: "__undeclared_fields__",

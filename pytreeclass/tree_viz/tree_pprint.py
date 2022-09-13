@@ -10,6 +10,7 @@ from pytreeclass._src.tree_util import (
     is_frozen_field,
     is_static_field,
     is_treeclass,
+    is_treeclass_frozen,
     is_treeclass_static,
 )
 from pytreeclass.tree_viz.node_pprint import (
@@ -52,8 +53,8 @@ def tree_repr(tree, width: int = 60) -> str:
             # mark a module static if all its fields are static
             if is_static_field(field_item) or is_treeclass_static(node_item):
                 mark = "*"
-            # elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
-            # mark = "#"
+            elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
+                mark = "#"
             else:
                 mark = ""
 
@@ -132,8 +133,8 @@ def tree_str(tree, width: int = 40) -> str:
             # mark a module static if all its fields are static
             if is_static_field(field_item) or is_treeclass_static(node_item):
                 mark = "*"
-            # elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
-            # mark = "#"
+            elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
+                mark = "#"
             else:
                 mark = ""
 
@@ -187,6 +188,8 @@ def _tree_diagram(tree):
         if field_item.repr:
             if is_static_field(field_item):
                 mark = "*"
+            elif is_frozen_field(field_item):
+                mark = "#"
             else:
                 mark = "─"
 
@@ -249,6 +252,8 @@ def _tree_diagram(tree):
 
             if is_static_field(field_item) or is_treeclass_static(node_item):
                 mark = "*"
+            elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
+                mark = "#"
             else:
                 mark = "─"
 
