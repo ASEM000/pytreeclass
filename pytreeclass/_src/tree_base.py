@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import MISSING, field
 from typing import Any
 
+from pytreeclass._src.misc import cached_method
 from pytreeclass._src.tree_util import _tree_fields, _tree_structure
 
 
@@ -21,6 +22,7 @@ class _treeBase:
 
         return self
 
+    @cached_method
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
 
