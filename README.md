@@ -11,7 +11,7 @@
 |[**Filtering**](#Filtering)
 |[**StatefulComputation**](#StatefulComputation)
 |[**Applications**](#Applications)
-|[**Benchmarking**](#Benchmarking)
+<!-- |[**Benchmarking**](#Benchmarking) -->
 |[**Acknowledgements**](#Acknowledgements)
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
@@ -552,7 +552,7 @@ Physics-based Neural network library
 </table>
 </div>
 
-## ⌛ Benchmarking<a id="Benchmarking"></a><a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/PyTreeClass_benchmarks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+<!-- ## ⌛ Benchmarking<a id="Benchmarking"></a><a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/PyTreeClass_benchmarks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 `tree_flatten`/ `tree_unflatten` are integral steps in any training / or `jax` operation.
 The following is a comparison of `PyTreeClass`, `Treex`, and `Equinox` for an identical model with 9 `Linear` layers for the `tree_flatten`/ `tree_unflatten` process.
@@ -571,7 +571,7 @@ The following is a comparison of `PyTreeClass`, `Treex`, and `Equinox` for an id
 
 </tr>
 
-</table>
+</table> -->
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 
