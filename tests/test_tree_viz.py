@@ -41,7 +41,7 @@ def test_model_viz_frozen_value():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
-        notes: str = pytc.static_field(default=("string"))
+        notes: str = pytc.nondiff_field(default=("string"))
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -228,7 +228,7 @@ def test_tree_repr():
     class level2:
         d: level1
         e: level1
-        name: str = pytc.static_field(default="A")
+        name: str = pytc.nondiff_field(default="A")
 
     A = (
         level2(
@@ -481,7 +481,7 @@ def test_reoslve_line():
 def test_static_in_summary():
     @pytc.treeclass
     class Test:
-        in_dim: int = pytc.static_field()
+        in_dim: int = pytc.nondiff_field()
 
     t = Test(1)
 
@@ -565,7 +565,7 @@ def test_summary():
 def test_mark():
     @pytc.treeclass
     class Test:
-        a: int = pytc.static_field(default=1)
+        a: int = pytc.nondiff_field(default=1)
         b: int = 2
 
     t = Test()

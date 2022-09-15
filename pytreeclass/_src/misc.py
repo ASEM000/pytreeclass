@@ -24,6 +24,11 @@ def static_field(**kwargs):
     return field(**{**kwargs, **{"metadata": {"static": True}}})
 
 
+def nondiff_field(**kwargs):
+    """ignore from pytree computations"""
+    return field(**{**kwargs, **{"metadata": {"static": True, "nondiff": True}}})
+
+
 def _mutable(func):
     """decorator that allow mutable behvior
     for class methods/ function with treeclass as first argument

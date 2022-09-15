@@ -20,6 +20,10 @@ from pytreeclass.tree_viz.node_pprint import (
     _format_width,
 )
 
+# def _marker(field_item, node_item):
+#     # return the suitable marker given the field and node item
+#     # so far we have non-diff, frozen
+
 
 def tree_repr(tree, width: int = 60) -> str:
     """Prertty print `treeclass_leaves`

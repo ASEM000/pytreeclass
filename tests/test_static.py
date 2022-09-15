@@ -6,7 +6,7 @@ import jax.tree_util as jtu
 import numpy.testing as npt
 
 import pytreeclass as pytc
-from pytreeclass import static_field
+from pytreeclass import nondiff_field
 
 # import pytest
 
@@ -29,8 +29,8 @@ def test_static():
 
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = static_field(default=jnp.array([1, 2, 3]))
-        b: jnp.ndarray = static_field(default=jnp.array([4, 5, 6]))
+        a: jnp.ndarray = nondiff_field(default=jnp.array([1, 2, 3]))
+        b: jnp.ndarray = nondiff_field(default=jnp.array([4, 5, 6]))
 
     test = Test()
 
@@ -38,7 +38,7 @@ def test_static():
 
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = static_field(default=jnp.array([1, 2, 3]))
+        a: jnp.ndarray = nondiff_field(default=jnp.array([1, 2, 3]))
         b: jnp.ndarray = jnp.array([4, 5, 6])
 
     test = Test()

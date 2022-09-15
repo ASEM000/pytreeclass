@@ -13,7 +13,7 @@ from pytreeclass._src.tree_util import is_treeclass_equal
 def test_filter_nondiff():
     @pytc.treeclass
     class Test:
-        a: int = pytc.static_field(default=1)
+        a: int = pytc.nondiff_field(default=1)
         b: str = "a"
 
     t = Test()

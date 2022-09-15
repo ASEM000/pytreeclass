@@ -9,7 +9,7 @@ from pytreeclass._src.tree_op import _dispatched_op_tree_map
 #     a: float
 #     b: float
 #     c: float
-#     name: str = pytc.static_field()
+#     name: str = pytc.nondiff_field()
 
 
 def test_ops():
@@ -18,7 +18,7 @@ def test_ops():
         a: float
         b: float
         c: float
-        name: str = pytc.static_field()
+        name: str = pytc.nondiff_field()
 
     A = Test(10, 20, 30, ("A"))
     # binary operations
@@ -33,7 +33,7 @@ def test_ops():
     class Test:
         a: float
         b: float
-        name: str = pytc.static_field()
+        name: str = pytc.nondiff_field()
 
     A = Test(-10, 20, ("A"))
 
@@ -64,7 +64,7 @@ def test_op_errors():
         a: float
         b: float
         c: float
-        name: str = pytc.static_field()
+        name: str = pytc.nondiff_field()
 
     A = Test(10, 20, 30, ("A"))
 
