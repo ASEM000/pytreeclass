@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Any, Sequence
 
 import jax.tree_util as jtu
 
@@ -43,14 +43,14 @@ def _vbox(*text: tuple[str, ...]) -> str:
         str: stacked boxes string
 
     Examples:
-    >>> _vbox("a","b")
+        >>> _vbox("a","b")
         ┌───┐
         │a  │
         ├───┤
         │b  │
         └───┘
 
-    >>> _vbox("a","","a")
+        >>> _vbox("a","","a")
         ┌───┐
         │a  │
         ├───┤
@@ -149,25 +149,23 @@ def _resolve_line(cols: Sequence[str, ...]) -> str:
     return "".join(map(lambda x: "".join(x), cols))
 
 
-def _table(lines):
-    """
+def _table(lines: Sequence[str, ...]) -> str:
+    """create a table with self aligning rows and cols
 
-    === Explanation
-        create a _table with self aligning rows and cols
+    Args:
+        lines (Sequence[str,...]): list of lists of cols values
 
-    === Args
-        lines : list of lists of cols values
+    Returns:
+        str: box string
 
-    === Examples
+    Example:
         >>> print(_table([['1\n','2'],['3','4000']]))
-            ┌─┬────────┐
-            │1│3       │
-            │ │        │
-            ├─┼────────┤
-            │2│40000000│
-            └─┴────────┘
-
-
+        ┌─┬────────┐
+        │1│3       │
+        │ │        │
+        ├─┼────────┤
+        │2│40000000│
+        └─┴────────┘
     """
     # align _cells vertically
     for i, _cells in enumerate(zip(*lines)):
@@ -179,12 +177,18 @@ def _table(lines):
     return _hstack(cols)
 
 
-def _layer_box(name, indim=None, outdim=None):
-    """
-    === Explanation
-        create a keras-like layer diagram
+def _layer_box(name: str, indim: Any = None, outdim: Any = None) -> str:
+    """Create a keras-like layer diagram
 
-    ==== Examples
+    Args:
+        name (str): layer name
+        indim (Any): input shape. Defaults to None.
+        outdim (Any): output shape. Defaults to None.
+
+    Returns:
+        str: box string
+
+    Examples:
         >>> print(_layer_box("Test",(1,1,1),(1,1,1)))
         ┌──────┬────────┬───────────┐
         │      │ Input  │ (1, 1, 1) │
@@ -193,7 +197,6 @@ def _layer_box(name, indim=None, outdim=None):
         └──────┴────────┴───────────┘
 
     """
-
     return _hstack(
         [
             _vbox(f"\n {name} \n"),

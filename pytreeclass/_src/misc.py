@@ -23,7 +23,7 @@ def _mutable(func):
     """
     assert isinstance(
         func, FunctionType
-    ), f"mutable can only be applied to methods. Found{type(func)}"
+    ), f"`mutable` can only be applied to methods. Found{type(func)}"
 
     @ft.wraps(func)
     def mutable_method(self, *args, **kwargs):

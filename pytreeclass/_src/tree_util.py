@@ -324,10 +324,10 @@ def _pytree_map(
 # filtering nondifferentiable nodes
 
 
-def _is_nondiff(item):
+def _is_nondiff(item: Any) -> bool:
     """check if tree is non-differentiable"""
 
-    def _is_nondiff_item(node):
+    def _is_nondiff_item(node: Any):
         """check if node is non-differentiable"""
         # non-differentiable types
         if isinstance(node, (int, bool, str)):
@@ -352,8 +352,17 @@ def _is_nondiff(item):
     return _is_nondiff_item(item)
 
 
-def filter_nondiff(tree, where: PyTree | None = None):
+def filter_nondiff(tree, where: PyTree | None = None) -> PyTree:
     """filter non-differentiable fields from a treeclass instance
+
+    Args:
+        tree (_type_):
+            PyTree to be filtered
+        where (PyTree | None, optional):
+            boolean PyTree mask, where a true node marks this node to be filtered, otherwise not. Defaults to None.
+
+    Returns:
+        PyTree: filtered PyTree
 
     Note:
         Mark fields as non-differentiable with adding metadata `dict(static=True,nondiff=True)`
@@ -419,7 +428,7 @@ def filter_nondiff(tree, where: PyTree | None = None):
         # )
 
 
-    ** for non-`None` where, fields as non-differentiable by using `where` mask.
+    ** for non-`None` where, mark fields as non-differentiable by using `where` mask.
 
     Example:
         @pytc.treeclass

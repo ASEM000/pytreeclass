@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from types import FunctionType
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
@@ -20,7 +21,18 @@ def _format_width(string, width=50):
 
 
 def _jax_numpy_repr(node: jnp.ndarray) -> str:
-    """Replace jnp.ndarray repr with short hand notation for type and shape"""
+    """Replace jnp.ndarray repr with short hand notation for type and shape
+
+    Args:
+        node (jnp.ndarray): jax numpy array
+
+    Returns:
+        str: short hand notation for type and shape
+
+    Example:
+        >>> _jax_numpy_repr(jnp.ones((2,3)))
+        'f32[2,3]'
+    """
     replace_tuple = (
         ("int", "i"),
         ("float", "f"),
@@ -38,7 +50,21 @@ def _jax_numpy_repr(node: jnp.ndarray) -> str:
     return formatted_string
 
 
-def _func_repr(func):
+def _func_repr(func: Callable) -> str:
+    """Pretty print function
+
+    Args:
+        func (Callable): function to be printed
+
+    Returns:
+        str: pretty printed function
+
+    Example:
+        >>> def example(a: int, b=1, *c, d, e=2, **f) -> str:
+            ...
+        >>> _func_repr(example)
+        "example(a,b,*c,d,e,**f)"
+    """
     args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(func)
     args = (",".join(args)) if len(args) > 0 else ""
     varargs = ("*" + varargs) if varargs is not None else ""
@@ -52,7 +78,30 @@ def _func_repr(func):
     )
 
 
-def _format_node_repr(node, depth):
+def _format_node_repr(node: Any, depth: int = 0) -> str:
+    """pretty printer for a node
+
+    Args:
+        node (Any): node to be printed
+        depth (int, optional): indentation depth. Defaults to 0.
+
+    Returns:
+        str: pretty printed node
+
+    Examples:
+
+        >>> print(_format_node_repr(dict(a=1, b=2, c=3, d= "x"*5), depth=0))
+        {a:1,b:2,c:3,d:'xxxxx'}
+
+        >>> print(_format_node_repr(dict(a=1, b=2, c=3, d= "x"*40), depth=0))
+        {
+            a:1,
+            b:2,
+            c:3,
+            d:'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        }
+    """
+
     if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
 
@@ -110,6 +159,31 @@ def _format_node_repr(node, depth):
 
 
 def _format_node_str(node, depth):
+    """
+    Pretty printer for a node, differs from `_format_node_repr` in that
+    it calls !s instead of !r
+
+    Args:
+        node (Any): node to be printed
+        depth (int, optional): indentation depth. Defaults to 0.
+
+    Returns:
+        str: pretty printed node
+
+    Examples:
+
+        >>> print(_format_node_repr(dict(a=1, b=2, c=3, d= "x"*5), depth=0))
+        {a:1,b:2,c:3,d:'xxxxx'}
+
+        >>> print(_format_node_repr(dict(a=1, b=2, c=3, d= "x"*40), depth=0))
+        {
+            a:1,
+            b:2,
+            c:3,
+            d:'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        }
+    """
+
     if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
 

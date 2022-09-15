@@ -20,6 +20,8 @@ from pytreeclass.tree_viz.node_pprint import (
     _format_width,
 )
 
+PyTree = Any
+
 
 def _marker(field_item: Field, node_item: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item
@@ -177,13 +179,14 @@ def tree_str(tree, width: int = 40) -> str:
     return FMT.expandtabs(2)
 
 
-def _tree_diagram(tree):
-    """
-    === Explanation
-        pretty print treeclass tree with tree structure diagram
+def _tree_diagram(tree: PyTree) -> str:
+    """Pretty print treeclass tree with tree structure diagram
 
-    === Args
-        tree : boolean to create tree-structure
+    Args:
+        tree (PyTree): treeclass tree
+
+    Returns:
+        str: string of tree diagram
     """
 
     @dispatch(argnum=1)
