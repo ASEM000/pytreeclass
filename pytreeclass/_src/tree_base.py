@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import MISSING, field
 from typing import Any
 
-from pytreeclass._src.misc import cached_method
 from pytreeclass._src.tree_util import _tree_fields, _tree_structure
 
 
@@ -22,12 +21,11 @@ class _treeBase:
 
         return self
 
-    @cached_method
     def tree_flatten(self):
         """Flatten rule for `jax.tree_flatten`
 
         Returns:
-            Tuple of dynamic values and (dynamic keys,static dict, cached values)
+            Tuple of dynamic values and (dynamic keys,static dict)
         """
         dynamic, static = _tree_structure(self)
         return dynamic.values(), (dynamic.keys(), static)
@@ -39,7 +37,7 @@ class _treeBase:
         Args:
             treedef:
                 Pytree definition
-                includes Dynamic nodes keys , static dictionary and frozen state
+                includes Dynamic nodes keys , static dictionary
             leaves:
                 Dynamic nodes values
 
