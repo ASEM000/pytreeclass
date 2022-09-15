@@ -18,12 +18,7 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import (
-    _node_false,
-    _node_true,
-    _pytree_map,
-    _tree_fields,
-)
+from pytreeclass._src.tree_util import _node_false, _node_true, _pytree_map
 
 PyTree = Any
 
@@ -187,11 +182,16 @@ def _tree_hash(tree):
     def _hash_node(node):
         """hash the leaves of the tree"""
         if isinstance(node, jnp.ndarray):
-            return hash(np.array(node).tobytes())
+            return np.array(node).tobytes()
+        elif isinstance(node, set):
+            # jtu.tree_map does not traverse sets
+            return frozenset(node)
         else:
-            return hash(node)
+            return node
 
-    return hash(tuple(jtu.tree_map(_hash_node, _tree_fields(tree))))
+    return hash(
+        (*jtu.tree_map(_hash_node, jtu.tree_leaves(tree)), jtu.tree_structure(tree))
+    )
 
 
 class _treeOp:
