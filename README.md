@@ -628,9 +628,6 @@ print(unfiltered_model)
 </details>
 
 
-
-Additionally, you can pass a boolean mask
-
 ## 📜 Stateful computations<a id="StatefulComputation"></a>
 
 First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
