@@ -9,7 +9,7 @@ from pytreeclass._src.tree_util import (
     is_treeclass,
     is_treeclass_frozen,
     is_treeclass_leaf,
-    is_treeclass_static,
+    is_treeclass_nondiff,
     tree_freeze,
 )
 from pytreeclass.tree_viz.utils import _node_count_and_size
@@ -63,14 +63,14 @@ def test_is_treeclass_frozen():
     assert is_treeclass_frozen([1]) is False
 
 
-def test_is_treeclass_static():
+def test_is_treeclass_nondiff():
     @pytc.treeclass
     class Test:
         a: jnp.ndarray = jnp.array([1.0, 2.0, 3.0])
         b: int = 1
 
-    assert is_treeclass_static(Test()) is False
-    assert is_treeclass_static(1) is False
+    assert is_treeclass_nondiff(Test()) is False
+    assert is_treeclass_nondiff(1) is False
 
 
 def test__node_count_and_size():

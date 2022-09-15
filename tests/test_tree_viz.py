@@ -8,8 +8,8 @@ import jax.random as jr
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.misc import filter_nondiff, static_field
-from pytreeclass._src.tree_util import tree_freeze
+from pytreeclass._src.misc import filter_nondiff
+from pytreeclass._src.tree_util import tree_freeze, nondiff_field
 from pytreeclass.tree_viz.box_drawing import _resolve_line
 from pytreeclass.tree_viz.tree_box import tree_box
 from pytreeclass.tree_viz.tree_pprint import tree_diagram
@@ -98,7 +98,7 @@ def test_model_viz_frozen_field():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
-        notes: str = static_field(default=("string"))
+        notes: str = nondiff_field(default=("string"))
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -268,7 +268,7 @@ def test_repr_true_false():
         a: float = field(repr=False)
         b: float = field(repr=False)
         c: float = field(repr=False)
-        name: str = field(repr=False, metadata={"static": True})
+        name: str = field(repr=False, metadata={"static": True, "nondiff":True})
 
     A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), ("A"))
 
@@ -279,7 +279,7 @@ def test_repr_true_false():
         a: float = field(repr=False)
         b: float = field(repr=True)
         c: float = field(repr=True)
-        name: str = field(repr=True, metadata={"static": True})
+        name: str = field(repr=True, metadata={"static": True, "nondiff":True})
 
     A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), ("A"))
     A = Test(10, 20, jnp.ones([10]), ("Test"))
@@ -292,7 +292,7 @@ def test_repr_true_false():
         a: float = field(repr=False)
         b: float
         c: float
-        name: str = field(repr=False, metadata={"static": True})
+        name: str = field(repr=False, metadata={"static": True, "nondiff":True})
 
     A = Test(10, 20, jnp.ones([10]), "Test")
 
@@ -304,7 +304,7 @@ def test_repr_true_false():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
-        notes: str = field(default=("string"), metadata={"static": True})
+        notes: str = field(default=("string"), metadata={"static": True, "nondiff":True})
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -355,7 +355,7 @@ def test_tree_with_containers():
     class MLP:
         layers: Any
         act_func: Callable = field(
-            default=(jax.nn.relu), repr=False, metadata={"static": True}
+            default=(jax.nn.relu), repr=False, metadata={"static": True, "nondiff":True}
         )
 
         def __init__(

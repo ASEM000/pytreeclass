@@ -14,19 +14,11 @@ from pytreeclass._src.tree_util import (
     _tree_immutate,
     _tree_mutate,
     is_treeclass,
+    _tree_fields
 )
 
 PyTree = Any
 
-
-def static_field(**kwargs):
-    """ignore from pytree computations"""
-    return field(**{**kwargs, **{"metadata": {"static": True}}})
-
-
-def nondiff_field(**kwargs):
-    """ignore from pytree computations"""
-    return field(**{**kwargs, **{"metadata": {"static": True, "nondiff": True}}})
 
 
 def _mutable(func):

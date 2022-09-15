@@ -8,10 +8,10 @@ from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
     _tree_fields,
     is_frozen_field,
-    is_static_field,
+    is_nondiff_field,
     is_treeclass,
     is_treeclass_frozen,
-    is_treeclass_static,
+    is_treeclass_nondiff,
 )
 from pytreeclass.tree_viz.node_pprint import (
     _format_node_diagram,
@@ -23,6 +23,7 @@ from pytreeclass.tree_viz.node_pprint import (
 # def _marker(field_item, node_item):
 #     # return the suitable marker given the field and node item
 #     # so far we have non-diff, frozen
+
 
 
 def tree_repr(tree, width: int = 60) -> str:
@@ -40,7 +41,7 @@ def tree_repr(tree, width: int = 60) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            mark = ("*" if is_static_field(field_item) else ("#" if is_frozen_field(field_item) else ""))  # fmt: skip
+            mark = ("*" if is_nondiff_field(field_item) else ("#" if is_frozen_field(field_item) else ""))  # fmt: skip
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
             FMT += "="
@@ -55,7 +56,7 @@ def tree_repr(tree, width: int = 60) -> str:
 
         if field_item.repr:
             # mark a module static if all its fields are static
-            if is_static_field(field_item) or is_treeclass_static(node_item):
+            if is_nondiff_field(field_item) or is_treeclass_nondiff(node_item):
                 mark = "*"
             elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
                 mark = "#"
@@ -113,7 +114,7 @@ def tree_str(tree, width: int = 40) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            mark = ("*" if is_static_field(field_item) else ("#" if is_frozen_field(field_item) else ""))  # fmt: skip
+            mark = ("*" if is_nondiff_field(field_item) else ("#" if is_frozen_field(field_item) else ""))  # fmt: skip
             FMT += "\n" + "\t" * depth
             FMT += f"{mark}{field_item.name}"
             FMT += "="
@@ -135,7 +136,7 @@ def tree_str(tree, width: int = 40) -> str:
 
         if field_item.repr:
             # mark a module static if all its fields are static
-            if is_static_field(field_item) or is_treeclass_static(node_item):
+            if is_nondiff_field(field_item) or is_treeclass_nondiff(node_item):
                 mark = "*"
             elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
                 mark = "#"
@@ -190,7 +191,7 @@ def _tree_diagram(tree):
         nonlocal FMT
 
         if field_item.repr:
-            if is_static_field(field_item):
+            if is_nondiff_field(field_item):
                 mark = "*"
             elif is_frozen_field(field_item):
                 mark = "#"
@@ -228,7 +229,7 @@ def _tree_diagram(tree):
             for i, layer in enumerate(node_item):
                 new_field = field(
                     metadata={
-                        "static": is_static_field(field_item),
+                        "static": is_nondiff_field(field_item),
                         "frozen": is_frozen_field(field_item),
                     }
                 )
@@ -252,9 +253,9 @@ def _tree_diagram(tree):
         if field_item.repr:
             # mark a module static if all its fields are static
             is_static = field_item.metadata.get("static", False)
-            is_static = is_static or is_treeclass_static(node_item)
+            is_static = is_static or is_treeclass_nondiff(node_item)
 
-            if is_static_field(field_item) or is_treeclass_static(node_item):
+            if is_nondiff_field(field_item) or is_treeclass_nondiff(node_item):
                 mark = "*"
             elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
                 mark = "#"

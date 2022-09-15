@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import Field
+from dataclasses import Field, field
 from types import FunctionType
 from typing import Any, Callable
 
@@ -14,14 +14,20 @@ from pytreeclass._src.dispatch import dispatch
 PyTree = Any
 
 
+
+def nondiff_field(**kwargs):
+    """ignore from pytree computations"""
+    return field(**{**kwargs, **{"metadata": {"static": True, "nondiff": True}}})
+
+
 def is_frozen_field(field_item: Field) -> bool:
     """check if field is frozen"""
     return field_item.metadata.get("frozen", False)
 
 
-def is_static_field(field_item: Field) -> bool:
+def is_nondiff_field(field_item: Field) -> bool:
     """check if field is strictly static"""
-    return field_item.metadata.get("static", False) and not is_frozen_field(field_item)
+    return field_item.metadata.get("nondiff", False)
 
 
 def is_treeclass_frozen(tree):
@@ -32,12 +38,13 @@ def is_treeclass_frozen(tree):
         return False
 
 
-def is_treeclass_static(tree):
+def is_treeclass_nondiff(tree):
     """assert if a treeclass is static"""
     if is_treeclass(tree):
-        return all(is_static_field(f) for f in _tree_fields(tree).values())
+        return all(is_nondiff_field(f) for f in _tree_fields(tree).values())
     else:
         return False
+
 
 
 def is_treeclass(tree):
