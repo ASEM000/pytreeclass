@@ -14,11 +14,9 @@ from pytreeclass._src.tree_util import (
     _tree_immutate,
     _tree_mutate,
     is_treeclass,
-    _tree_fields
 )
 
 PyTree = Any
-
 
 
 def _mutable(func):

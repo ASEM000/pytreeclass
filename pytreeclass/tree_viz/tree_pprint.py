@@ -21,8 +21,18 @@ from pytreeclass.tree_viz.node_pprint import (
 )
 
 
-def _marker(field_item: Field, node_item: Any, default: str = ""):
-    # return the suitable marker given the field and node item
+def _marker(field_item: Field, node_item: Any, default: str = "") -> str:
+    """return the suitable marker given the field and node item
+
+    Args:
+        field_item (Field): field item of the pytree node
+        node_item (Any): node item
+        default (str, optional): default marker. Defaults to "".
+
+    Returns:
+        str: marker character.
+    """
+    # for now, we only have two markers '*' for non-diff and '#' for frozen
     if is_nondiff_field(field_item) or is_treeclass_nondiff(node_item):
         return "*"
     elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
@@ -60,21 +70,17 @@ def tree_repr(tree, width: int = 60) -> str:
         nonlocal FMT
 
         if field_item.repr:
-            # mark a module static if all its fields are static
             mark = _marker(field_item, node_item)
             FMT += "\n" + "\t" * depth
             layer_class_name = f"{node_item.__class__.__name__}"
-
             FMT += f"{mark}{field_item.name}"
             FMT += f"={layer_class_name}" + "("
             start_cursor = len(FMT)  # capture children repr
-
             recurse(tree=node_item, depth=depth + 1)
-
-            FMT = FMT[:start_cursor] + _format_width(
-                FMT[start_cursor:] + "\n" + "\t" * (depth) + ")"
-            )
-            FMT += "" if is_last_field else ","
+            temp = FMT[:start_cursor]
+            temp += _format_width(FMT[start_cursor:] + "\n" + "\t" * (depth) + ")")
+            temp += "" if is_last_field else ","
+            FMT = temp
 
     def recurse(tree, depth):
         if not is_treeclass(tree):
@@ -146,10 +152,10 @@ def tree_str(tree, width: int = 40) -> str:
 
             recurse(node_item, depth=depth + 1)
 
-            FMT = FMT[:start_cursor] + _format_width(
-                FMT[start_cursor:] + "\n" + "\t" * (depth) + ")"
-            )
-            FMT += "" if is_last_field else ","
+            temp = FMT[:start_cursor]
+            temp += _format_width(FMT[start_cursor:] + "\n" + "\t" * (depth) + ")")
+            temp += "" if is_last_field else ","
+            FMT = temp
 
     def recurse(tree, depth):
         if not is_treeclass(tree):
@@ -211,8 +217,6 @@ def _tree_diagram(tree):
                 parent_level_count,
                 node_index,
             )
-
-            # is_static = field_item.metadata.get("static", False)
 
             for i, layer in enumerate(node_item):
                 new_field = field(

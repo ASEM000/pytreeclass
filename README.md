@@ -1,18 +1,17 @@
 <!-- <h1 align="center" style="font-family:Monospace" >Py🌲Class</h1> -->
 <div align="center">
 <img width="350px" src="assets/pytc%20logo.svg"> <br>
-“Everything should be made as simple as possible, but no simpler”
 </div>
 <br>
 
-[**Installation**](#Installation)
-|[**Description**](#Description)
-|[**Quick Example**](#QuickExample)
-|[**Filtering**](#Filtering)
-|[**StatefulComputation**](#StatefulComputation)
-|[**Applications**](#Applications)
+🛠️[**Installation**](#Installation)
+|📖[**Description**](#Description)
+|⏩[**Quick Example**](#QuickExample)
+|☝️[**Filtering**](#Filtering)
+|📜[**StatefulComputation**](#StatefulComputation)
+|📝[**Applications**](#Applications)|📙[**Acknowledgements**](#Acknowledgements)
+
 <!-- |[**Benchmarking**](#Benchmarking) -->
-|[**Acknowledgements**](#Acknowledgements)
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.7%203.8%203.9%203.10-red)
