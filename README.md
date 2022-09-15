@@ -4,12 +4,13 @@
 </div>
 <br>
 
-🛠️[**Installation**](#Installation)
-|📖[**Description**](#Description)
-|⏩[**Quick Example**](#QuickExample)
-|☝️[**Filtering**](#Filtering)
-|📜[**StatefulComputation**](#StatefulComputation)
-|📝[**Applications**](#Applications)|📙[**Acknowledgements**](#Acknowledgements)
+[**Installation**](#Installation)
+|[**Description**](#Description)
+|[**Quick Example**](#QuickExample)
+|[**Filtering**](#Filtering)
+|[**StatefulComputation**](#StatefulComputation)
+|[**Applications**](#Applications)|
+[**Acknowledgements**](#Acknowledgements)
 
 <!-- |[**Benchmarking**](#Benchmarking) -->
 

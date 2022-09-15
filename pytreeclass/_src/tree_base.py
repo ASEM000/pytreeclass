@@ -53,12 +53,9 @@ class _treeBase:
         # this approach creates the attribute once.
         self = object.__new__(cls)
 
-        dynamic = dict(zip(treedef[0], leaves))
-        static = treedef[1]
-
         # update the instance values with the retrieved dynamic and static values
-        self.__dict__.update(dynamic)
-        self.__dict__.update(static)
+        self.__dict__.update(dict(zip(treedef[0], leaves)))
+        self.__dict__.update(treedef[1])
 
         return self
 
