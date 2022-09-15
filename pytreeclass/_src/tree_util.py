@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import Field, field
 from types import FunctionType
 from typing import Any, Callable
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
-import numpy as np
 
 import pytreeclass._src as src
 from pytreeclass._src.dispatch import dispatch
 
 PyTree = Any
-
 
 
 def nondiff_field(**kwargs):
@@ -44,7 +43,6 @@ def is_treeclass_nondiff(tree):
         return all(is_nondiff_field(f) for f in _tree_fields(tree).values())
     else:
         return False
-
 
 
 def is_treeclass(tree):
@@ -156,69 +154,6 @@ def _tree_fields(tree):
         tree.__dataclass_fields__
         if len(tree.__undeclared_fields__) == 0
         else {**tree.__dataclass_fields__, **tree.__undeclared_fields__}
-    )
-
-
-def _tree_hash(tree):
-    """Return a hash of the tree"""
-
-    def _hash_node(node):
-        """hash the leaves of the tree"""
-        if isinstance(node, set):
-            return frozenset(node)
-        elif isinstance(node, jnp.ndarray):
-            return np.array(node).tobytes()
-        else:
-            return node
-
-    return hash(tuple(jtu.tree_map(_hash_node, _tree_fields(tree))))
-
-
-def tree_freeze(tree):
-    def true_func(tree, field_item, _):
-        new_field = src.misc._field(
-            name=field_item.name,
-            type=field_item.type,
-            metadata={"static": True, "frozen": True},
-            repr=field_item.repr,
-        )
-
-        return {
-            **tree.__undeclared_fields__,
-            **{field_item.name: new_field},
-        }
-
-    return _pytree_map(
-        tree,
-        # traverse all nodes
-        cond=lambda _, __, ___: True,
-        # Extends the field metadata to add {nondiff:True}
-        true_func=true_func,
-        # keep the field as is if its differentiable
-        false_func=lambda tree, __, ___: tree.__undeclared_fields__,
-        attr_func=lambda _, __, ___: "__undeclared_fields__",
-        # do not recurse if the field is `static`
-        is_leaf=lambda _, field_item, __: False,
-    )
-
-
-def tree_unfreeze(tree):
-    """remove fields added by `tree_freeze"""
-
-    def true_func(tree, field_item, _):
-        return {
-            field_name: field_value
-            for field_name, field_value in tree.__undeclared_fields__.items()
-            if not is_frozen_field(field_item)
-        }
-
-    return _pytree_map(
-        tree,
-        cond=lambda _, __, ___: True,
-        true_func=true_func,
-        false_func=lambda _, __, ___: {},
-        attr_func=lambda _, __, ___: "__undeclared_fields__",
-        is_leaf=lambda _, __, ___: False,
     )
 
 
@@ -383,4 +318,258 @@ def _pytree_map(
         false_func=false_func,
         attr_func=attr_func,
         is_leaf=is_leaf,
+    )
+
+
+# filtering nondifferentiable nodes
+
+
+def _is_nondiff(item):
+    """check if tree is non-differentiable"""
+
+    def _is_nondiff_item(node):
+        """check if node is non-differentiable"""
+        # non-differentiable types
+        if isinstance(node, (int, bool, str)):
+            return True
+
+        # non-differentiable array
+        elif isinstance(node, jnp.ndarray) and not jnp.issubdtype(
+            node.dtype, jnp.inexact
+        ):
+            return True
+
+        # non-differentiable type
+        elif isinstance(node, Callable) and not is_treeclass(node):
+            return True
+
+        return False
+
+    if isinstance(item, Iterable):
+        # if an iterable has at least one non-differentiable item
+        # then the whole iterable is non-differentiable
+        return jtu.tree_all(jtu.tree_map(_is_nondiff_item, item))
+    return _is_nondiff_item(item)
+
+
+def filter_nondiff(tree, where: PyTree | None = None):
+    """filter non-differentiable fields from a treeclass instance
+
+    Note:
+        Mark fields as non-differentiable with adding metadata `dict(static=True,nondiff=True)`
+        the way it is done is by adding a field in `__undeclared_fields__` to the treeclass instance
+        that contains the non-differentiable fields.
+        This is done to avoid mutating the original treeclass class .
+
+        during the `tree_flatten`, tree_fields are the combination of
+        {__dataclass_fields__, __undeclared_fields__} this means that a field defined
+        in `__undeclared_fields__` with the same name as in __dataclass_fields__
+        will override its properties, this is useful if you want to change the metadata
+        of a field but don't want to change the original field definition defined in the class.
+
+    Example:
+        # here we try to optimize a differentiable value `b` that
+        # is wrapped within a non-differentiable function `jax.nn.tanh`
+
+        @pytc.treeclass
+        class Linear:
+            weight: jnp.ndarray
+            bias: jnp.ndarray
+            other: jnp.ndarray = (1,2,3,4)
+            a: int = 1
+            b: float = 1.0
+            c: int = 1
+            d: float = 2.0
+            act : Callable = jax.nn.tanh
+
+            def __init__(self,in_dim,out_dim):
+                self.weight = jnp.ones((in_dim,out_dim))
+                self.bias =  jnp.ones((1,out_dim))
+
+            def __call__(self,x):
+                return self.act(self.b+x)
+
+        @jax.value_and_grad
+        def loss_func(model):
+            return jnp.mean((model(1.)-0.5)**2)
+
+        @jax.jit
+        def update(model):
+            value,grad = loss_func(model)
+            return value,model-1e-3*grad
+
+        def train(model,epochs=10_000):
+            model = filter_nondiff(model)
+            for _ in range(epochs):
+                value,model = update(model)
+            return model
+
+        >>> model = Linear(1,1)
+        >>> model = train(model)
+        >>> print(model)
+        # Linear(
+        #   weight=[[1.]],
+        #   bias=[[1.]],
+        #   *other=(1,2,3,4),
+        #   *a=1,
+        #   b=-0.36423424,
+        #   *c=1,
+        #   d=2.0,
+        #   *act=tanh(x)
+        # )
+
+
+    ** for non-`None` where, fields as non-differentiable by using `where` mask.
+
+    Example:
+        @pytc.treeclass
+        class L0:
+            a: int = 1
+            b: int = 2
+            c: int = 3
+
+        @pytc.treeclass
+        class L1:
+            a: int = 1
+            b: int = 2
+            c: int = 3
+            d: L0 = L0()
+
+        @pytc.treeclass
+        class L2:
+            a: int = 10
+            b: int = 20
+            c: int = 30
+            d: L1 = L1()
+
+        >>> t = L2()
+
+        >>> print(t.tree_diagram())
+        # L2
+        #     ├── a=10
+        #     ├── b=20
+        #     ├── c=30
+        #     └── d=L1
+        #         ├── a=1
+        #         ├── b=2
+        #         ├── c=3
+        #         └── d=L0
+        #             ├── a=1
+        #             ├── b=2
+        #             └── c=3
+
+        # Let's mark `a` and `b`  in `L0` as non-differentiable
+        # we can do this by using `where` mask
+
+        >>> t = t.at["d"].at["d"].set(filter_nondiff(t.d.d, where= L0(a=True,b=True, c=False)))
+
+        >>> print(t.tree_diagram())
+        # L2
+        #     ├── a=10
+        #     ├── b=20
+        #     ├── c=30
+        #     └── d=L1
+        #         ├── a=1
+        #         ├── b=2
+        #         ├── c=3
+        #         └── d=L0
+        #             ├*─ a=1
+        #             ├*─ b=2
+        #             └── c=3
+        # note `*` indicates that the field is non-differentiable
+    """
+
+    def add_nondiff_field(tree, field_item, node_item):
+        new_field = src.misc._field(
+            name=field_item.name,
+            type=field_item.type,
+            metadata={"static": True, "nondiff": True},
+            repr=field_item.repr,
+        )
+
+        return {
+            **tree.__undeclared_fields__,
+            **{field_item.name: new_field},
+        }
+
+    return _pytree_map(
+        tree,
+        # condition is a lambda function that returns True if the field is non-differentiable
+        cond=where or (lambda _, __, node_item: _is_nondiff(node_item)),
+        # Extends the field metadata to add {nondiff:True}
+        true_func=add_nondiff_field,
+        # keep the field as is if its differentiable
+        false_func=lambda tree, __, ___: tree.__undeclared_fields__,
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        # do not recurse if the field is `static`
+        is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),
+    )
+
+
+def unfilter_nondiff(tree):
+    """remove fields added by `filter_nondiff"""
+
+    def remove_nondiff_field(tree, field_item, node_item):
+        # remove frozen fields from __undeclared_fields__
+        return {
+            field_name: field_value
+            for field_name, field_value in tree.__undeclared_fields__.items()
+            if not field_value.metadata.get("nondiff", False)
+        }
+
+    return _pytree_map(
+        tree,
+        cond=lambda _, __, ___: True,
+        true_func=remove_nondiff_field,
+        false_func=lambda _, __, ___: None,
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        is_leaf=lambda _, __, ___: False,
+    )
+
+
+def tree_freeze(tree):
+    def add_frozen_field(tree, field_item, _):
+        new_field = src.misc._field(
+            name=field_item.name,
+            type=field_item.type,
+            metadata={"static": True, "frozen": True},
+            repr=field_item.repr,
+        )
+
+        return {
+            **tree.__undeclared_fields__,
+            **{field_item.name: new_field},
+        }
+
+    return _pytree_map(
+        tree,
+        # traverse all nodes
+        cond=lambda _, __, ___: True,
+        # Extends the field metadata to add {nondiff:True}
+        true_func=add_frozen_field,
+        # keep the field as is if its differentiable
+        false_func=lambda tree, __, ___: tree.__undeclared_fields__,
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        # do not recurse if the field is `static`
+        is_leaf=lambda _, field_item, __: False,
+    )
+
+
+def tree_unfreeze(tree):
+    """remove fields added by `tree_freeze"""
+
+    def remove_frozen_field(tree, field_item, _):
+        return {
+            field_name: field_value
+            for field_name, field_value in tree.__undeclared_fields__.items()
+            if not is_frozen_field(field_item)
+        }
+
+    return _pytree_map(
+        tree,
+        cond=lambda _, __, ___: True,
+        true_func=remove_frozen_field,
+        false_func=lambda _, __, ___: {},
+        attr_func=lambda _, __, ___: "__undeclared_fields__",
+        is_leaf=lambda _, __, ___: False,
     )

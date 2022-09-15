@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.misc import filter_nondiff, unfilter_nondiff
+from pytreeclass._src.tree_util import filter_nondiff, unfilter_nondiff
 
 
 def test_nn():

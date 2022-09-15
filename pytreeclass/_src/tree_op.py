@@ -13,10 +13,17 @@ import operator as op
 from typing import Any
 
 import jax
+import jax.numpy as jnp
 import jax.tree_util as jtu
+import numpy as np
 
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import _node_false, _node_true, _pytree_map, _tree_hash
+from pytreeclass._src.tree_util import (
+    _node_false,
+    _node_true,
+    _pytree_map,
+    _tree_fields,
+)
 
 PyTree = Any
 
@@ -172,6 +179,21 @@ def _append_math_eq_ne(func):
         return inner_wrapper(self, rhs)
 
     return wrapper
+
+
+def _tree_hash(tree):
+    """Return a hash of the tree"""
+
+    def _hash_node(node):
+        """hash the leaves of the tree"""
+        if isinstance(node, set):
+            return frozenset(node)
+        elif isinstance(node, jnp.ndarray):
+            return np.array(node).tobytes()
+        else:
+            return node
+
+    return hash(tuple(jtu.tree_map(_hash_node, _tree_fields(tree))))
 
 
 class _treeOp:

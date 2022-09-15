@@ -8,8 +8,7 @@ import jax.random as jr
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.misc import filter_nondiff
-from pytreeclass._src.tree_util import tree_freeze, nondiff_field
+from pytreeclass._src.tree_util import filter_nondiff, nondiff_field, tree_freeze
 from pytreeclass.tree_viz.box_drawing import _resolve_line
 from pytreeclass.tree_viz.tree_box import tree_box
 from pytreeclass.tree_viz.tree_pprint import tree_diagram
@@ -268,7 +267,7 @@ def test_repr_true_false():
         a: float = field(repr=False)
         b: float = field(repr=False)
         c: float = field(repr=False)
-        name: str = field(repr=False, metadata={"static": True, "nondiff":True})
+        name: str = field(repr=False, metadata={"static": True, "nondiff": True})
 
     A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), ("A"))
 
@@ -279,7 +278,7 @@ def test_repr_true_false():
         a: float = field(repr=False)
         b: float = field(repr=True)
         c: float = field(repr=True)
-        name: str = field(repr=True, metadata={"static": True, "nondiff":True})
+        name: str = field(repr=True, metadata={"static": True, "nondiff": True})
 
     A = Test(10, 20, jnp.array([1, 2, 3, 4, 5]), ("A"))
     A = Test(10, 20, jnp.ones([10]), ("Test"))
@@ -292,7 +291,7 @@ def test_repr_true_false():
         a: float = field(repr=False)
         b: float
         c: float
-        name: str = field(repr=False, metadata={"static": True, "nondiff":True})
+        name: str = field(repr=False, metadata={"static": True, "nondiff": True})
 
     A = Test(10, 20, jnp.ones([10]), "Test")
 
@@ -304,7 +303,9 @@ def test_repr_true_false():
 
         weight: jnp.ndarray
         bias: jnp.ndarray
-        notes: str = field(default=("string"), metadata={"static": True, "nondiff":True})
+        notes: str = field(
+            default=("string"), metadata={"static": True, "nondiff": True}
+        )
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
@@ -355,7 +356,9 @@ def test_tree_with_containers():
     class MLP:
         layers: Any
         act_func: Callable = field(
-            default=(jax.nn.relu), repr=False, metadata={"static": True, "nondiff":True}
+            default=(jax.nn.relu),
+            repr=False,
+            metadata={"static": True, "nondiff": True},
         )
 
         def __init__(
@@ -601,11 +604,25 @@ def test_mark():
     tt = t.at["d"].set(tree_freeze(t.d))
     ttt = t.at["d"].set(filter_nondiff(t.d))
 
-    assert ttt.__repr__() == ttt.__str__() == "L2(a=10,b=20,c=30,d=L1(*a=1,*b=2,*c=3,*d=L0(*a=1,*b=2,*c=3)))"
-    assert tt.__repr__() == tt.__str__() == "L2(a=10,b=20,c=30,d=L1(#a=1,#b=2,#c=3,#d=L0(#a=1,#b=2,#c=3)))"
+    assert (
+        ttt.__repr__()
+        == ttt.__str__()
+        == "L2(a=10,b=20,c=30,d=L1(*a=1,*b=2,*c=3,*d=L0(*a=1,*b=2,*c=3)))"
+    )
+    assert (
+        tt.__repr__()
+        == tt.__str__()
+        == "L2(a=10,b=20,c=30,d=L1(#a=1,#b=2,#c=3,#d=L0(#a=1,#b=2,#c=3)))"
+    )
 
-    # trunk-ignore(flake8/E501)
-    assert tt.tree_diagram() == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├#─ a=1\n        ├#─ b=2\n        ├#─ c=3\n        └#─ d=L0\n            ├#─ a=1\n            ├#─ b=2\n            └#─ c=3         "
+    assert (
+        tt.tree_diagram()
+        # trunk-ignore(flake8/E501)
+        == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├#─ a=1\n        ├#─ b=2\n        ├#─ c=3\n        └#─ d=L0\n            ├#─ a=1\n            ├#─ b=2\n            └#─ c=3         "
+    )
 
-    # trunk-ignore(flake8/E501)
-    assert ttt.tree_diagram() == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├*─ a=1\n        ├*─ b=2\n        ├*─ c=3\n        └*─ d=L0\n            ├*─ a=1\n            ├*─ b=2\n            └*─ c=3         "
+    assert (
+        ttt.tree_diagram()
+        # trunk-ignore(flake8/E501)
+        == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├*─ a=1\n        ├*─ b=2\n        ├*─ c=3\n        └*─ d=L0\n            ├*─ a=1\n            ├*─ b=2\n            └*─ c=3         "
+    )

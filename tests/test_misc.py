@@ -6,8 +6,12 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.misc import cached_method, filter_nondiff, unfilter_nondiff
-from pytreeclass._src.tree_util import is_treeclass_equal
+from pytreeclass._src.misc import cached_method
+from pytreeclass._src.tree_util import (
+    filter_nondiff,
+    is_treeclass_equal,
+    unfilter_nondiff,
+)
 
 
 def test_filter_nondiff():
