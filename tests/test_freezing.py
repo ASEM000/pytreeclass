@@ -185,6 +185,12 @@ def test_freezing_with_ops():
     t = t1()
     assert is_treeclass_equal(tree_unfreeze(tree_freeze(t)), t)
 
+    @pytc.treeclass
+    class t2:
+        a: int = t1()
+
+    assert is_treeclass_equal(tree_unfreeze(tree_freeze(t2())), t2())
+
 
 def test_freeze_diagram():
     @pytc.treeclass
