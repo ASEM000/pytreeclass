@@ -27,6 +27,22 @@ def test_filter_nondiff():
     assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t))) == ["a"]
     assert is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t)))
 
+    @pytc.treeclass
+    class T0:
+        a: Test = Test()
+
+    t = T0()
+
+    assert jtu.tree_leaves(t) == ["a"]
+    assert jtu.tree_leaves(filter_nondiff(t)) == []
+    assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t))) == ["a"]
+    assert is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t)))
+
+    assert jtu.tree_leaves(t) == ["a"]
+    assert jtu.tree_leaves(filter_nondiff(t, t == t)) == []
+    assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t, t == t))) == ["a"]
+    assert is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t, t == t)))
+
 
 def test_cached_method():
     class Test:

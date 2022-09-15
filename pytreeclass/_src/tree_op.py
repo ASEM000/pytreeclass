@@ -186,12 +186,10 @@ def _tree_hash(tree):
 
     def _hash_node(node):
         """hash the leaves of the tree"""
-        if isinstance(node, set):
-            return frozenset(node)
-        elif isinstance(node, jnp.ndarray):
-            return np.array(node).tobytes()
+        if isinstance(node, jnp.ndarray):
+            return hash(np.array(node).tobytes())
         else:
-            return node
+            return hash(node)
 
     return hash(tuple(jtu.tree_map(_hash_node, _tree_fields(tree))))
 
