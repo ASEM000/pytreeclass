@@ -175,6 +175,7 @@ print(model.tree_box(array=x))
 <td>
 
 ```python
+
 print(model.tree_diagram())
 StackedLinear
     ├── l1=Linear
@@ -202,12 +203,13 @@ StackedLinear
 <tr>
  
 <td>
+<div align="center",font-weight="bold id="mermaid">✨ Generate shareable vizualization links ✨</div>
 
 ```python
 # generate mermaid diagrams
 # print(pytc.tree_viz.tree_mermaid(model)) # generate core syntax
-pytc.tree_viz.save_viz(model,filename="test_mermaid",method="tree_mermaid_md")
-# use `method="tree_mermaid_html"` to save as html
+>>> pytc.tree_viz.tree_mermaid(model,link=True)
+# 'Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id=*********'
 ```
 
 ```mermaid
@@ -223,13 +225,6 @@ flowchart LR
     id15696277213149321320 --> id7572222925824649475(l3\nLinear)
     id7572222925824649475 --- id4749243995442935477["weight\nf32[10,1]"]
     id7572222925824649475 --- id8042761346510512486["bias\nf32[1,1]"]
-```
-
-<div align="center",font-weight="bold id="mermaid">✨ Generate shareable vizualization links ✨</div>
-
-```python
->>> pytc.tree_viz.tree_mermaid(model,link=True)
-'Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id=*********'
 ```
 
 </td>
@@ -490,6 +485,151 @@ StackedLinear(
   l2=Linear(weight=[0.98507565 0.99815285],bias=[])
 )
 ```
+
+#### Marking fields non-differentiable ✨ _NEW_ ✨
+
+
+<details>
+<summary>
+Automatically marking fields non-differentiable
+</summary>
+
+
+In the following code example, we train a model with differentiable and non-differentiable fields.
+Using  `jax.grad` will throw an error, however to circumvent this we use `pytc.filter_nondiff` to filter out any non-differentiable field.
+
+```python
+
+import pytreeclass as pytc 
+import jax.numpy as jnp
+import jax
+from typing import  Callable
+
+@pytc.treeclass
+class Linear:
+    weight: jnp.ndarray                 # ✅ differentiable
+    bias: jnp.ndarray                   # ✅ differentiable
+    other: tuple[int,...] = (1,2,3,4)   # ❌ non-differentiable
+    a: int = 1                          # ❌ non-differentiable
+    b: float = 1.0                      # ✅ differentiable
+    c: int = 1                          # ❌ non-differentiable
+    d: float = 2.0                      # ✅ differentiable
+    act : Callable = jax.nn.tanh        # ❌ non-differentiable
+
+    def __init__(self,in_dim,out_dim):
+        self.weight = jnp.ones((in_dim,out_dim))
+        self.bias =  jnp.ones((1,out_dim))
+
+    def __call__(self,x):
+        return self.act(self.b+x)
+
+@jax.value_and_grad
+def loss_func(model):
+    # lets optimize a differentiable field `b`
+    # inside a non-differentiable field `act`
+    return jnp.mean((model(1.)-0.5)**2)
+
+@jax.jit
+def update(model):
+    value,grad = loss_func(model)
+    return value,model-1e-3*grad
+
+def train(model,epochs=10_000):
+    # here we use the filter_nondiff function
+    # to filter out the non-differentiable fields
+    # otherwise we would get an error
+    model = pytc.filter_nondiff(model)
+    for _ in range(epochs):
+        value,model = update(model)
+    return model
+
+# before any filtering or training
+model = Linear(1,1)
+print(model)
+# Linear(
+#   weight=[[1.]],
+#   bias=[[1.]],
+#   other=(1,2,3,4),
+#   a=1,
+#   b=1.0,
+#   c=1,
+#   d=2.0,
+#   act=tanh(x)
+# )
+
+
+model = train(model)
+
+# after filtering and training
+# note that the non-differentiable fields are not updated
+# and the differentiable fields are updated
+# the non-differentiable fields are marked with a `*`
+print(model)
+# Linear(
+#   weight=[[1.]],
+#   bias=[[1.]],
+#   *other=(1,2,3,4),
+#   *a=1,
+#   b=-0.36423424,
+#   *c=1,
+#   d=2.0,
+#   *act=tanh(x)
+# )
+
+```
+</details>
+
+
+<details>
+
+<summary>
+Marking fields non-differentiable with a mask 
+</summary>
+In the following example, let's say we want to train only the field `b` and mark all other fields non-differentiable, we can simply do this in the following code
+
+```python
+
+new_model = pytc.filter_nondiff(model, model != "b")
+# we can see all fields except `b` are marked with 
+# `*` to mark non-differentiable.
+print(new_model)
+
+# Linear(
+#   *weight=f32[1,1],
+#   *bias=f32[1,1],
+#   *other=(1,2,3,4),
+#   *a=1,
+#   b=f32[],
+#   *c=1,
+#   *d=f32[],
+#   *act=tanh(x)
+# )
+
+
+# undo the filtering
+# note the removal of `*` that marks non-diff fields
+unfiltered_model = pytc.unfilter_nondiff(new_model)
+print(unfiltered_model)
+
+# Linear(
+#   weight=f32[1,1],
+#   bias=f32[1,1],
+#   other=(1,2,3,4),
+#   a=1,
+#   b=f32[],
+#   c=1,
+#   d=f32[],
+#   act=tanh(x)
+# )
+
+```
+
+
+</details>
+
+
+
+Additionally, you can pass a boolean mask
 
 ## 📜 Stateful computations<a id="StatefulComputation"></a>
 
