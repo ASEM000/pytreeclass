@@ -78,13 +78,6 @@ def _append_math_op(func):
 
 def _append_math_eq_ne(func):
     """Append eq/ne operations"""
-    assert func in [op.eq, op.ne], f"func={func} is not implemented."
-
-    def _isinstance(x, y):
-        if func is op.eq:
-            return isinstance(x, y)
-        elif func is op.ne:
-            return not isinstance(x, y)
 
     @ft.wraps(func)
     def wrapper(self, rhs):
@@ -129,23 +122,13 @@ def _append_math_eq_ne(func):
 
         @inner_wrapper.register(type)
         def _(tree, where: type, **kwargs):
-
             """Filter by field type"""
-            # here _pytree_map is used to traverse the tree depth first
-            # and broadcast True/False to the children values
-            # if the field type matches the where `type`
-            return _pytree_map(
+            return jtu.tree_map(
+                lambda x: jtu.tree_map(lambda node: _node_true(node), x)
+                if func(x, where)
+                else _node_false(x),
                 tree,
-                # condition to check for each node
-                cond=lambda _, __, node_item: _isinstance(node_item, where),  # fmt: skip
-                # if the condition is True, then broadcast True to the children
-                true_func=lambda _, __, node_item: _node_true(node_item),
-                # if the condition is False, then broadcast False to the children
-                false_func=lambda _, __, node_item: _node_false(node_item),
-                # which attribute to use in the object.__setattr__ function
-                attr_func=lambda _, field_item, __: field_item.name,
-                # if the node is a leaf, then do not traverse the children
-                is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
+                is_leaf=lambda x: isinstance(x, where),
             )
 
         @inner_wrapper.register(dict)
@@ -194,6 +177,22 @@ def _tree_hash(tree):
     )
 
 
+def _eq(lhs, rhs):
+    # make eq work with type comparison
+    if isinstance(rhs, type):
+        return isinstance(lhs, rhs)
+    else:
+        return op.eq(lhs, rhs)
+
+
+def _ne(lhs, rhs):
+    # make ne work with type comparison
+    if isinstance(rhs, type):
+        return not isinstance(lhs, rhs)
+    else:
+        return op.ne(lhs, rhs)
+
+
 class _treeOp:
 
     __hash__ = _tree_hash
@@ -202,7 +201,7 @@ class _treeOp:
     __radd__ = _append_math_op(op.add)
     __and__ = _append_math_op(op.and_)
     __rand__ = _append_math_op(op.and_)
-    __eq__ = _append_math_eq_ne(op.eq)
+    __eq__ = _append_math_eq_ne(_eq)
     __floordiv__ = _append_math_op(op.floordiv)
     __ge__ = _append_math_op(op.ge)
     __gt__ = _append_math_op(op.gt)
@@ -215,7 +214,7 @@ class _treeOp:
     __mod__ = _append_math_op(op.mod)
     __mul__ = _append_math_op(op.mul)
     __rmul__ = _append_math_op(op.mul)
-    __ne__ = _append_math_eq_ne(op.ne)
+    __ne__ = _append_math_eq_ne(_ne)
     __neg__ = _append_math_op(op.neg)
     __not__ = _append_math_op(op.not_)
     __or__ = _append_math_op(op.or_)
