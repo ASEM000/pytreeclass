@@ -626,3 +626,20 @@ def test_mark():
         # trunk-ignore(flake8/E501)
         == "L2\n    ├── a=10\n    ├── b=20\n    ├── c=30\n    └── d=L1\n        ├*─ a=1\n        ├*─ b=2\n        ├*─ c=3\n        └*─ d=L0\n            ├*─ a=1\n            ├*─ b=2\n            └*─ c=3         "
     )
+
+
+def test_field_repr():
+    @pytc.treeclass
+    class Test:
+        a: Any
+
+    t = Test(field())
+
+    assert (
+        t.__repr__()
+        == "Test(\n  a=Field('name=None','type=None','init=True','repr=True','compare=True')\n)"
+    )
+    assert (
+        t.__str__()
+        == "Test(\n  a=Field('name=None','type=None','init=True','repr=True','compare=True')\n)"
+    )

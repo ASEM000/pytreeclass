@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import Field
+from dataclasses import MISSING, Field
 from types import FunctionType
 from typing import Any, Callable
 
@@ -79,6 +79,106 @@ def _func_repr(func: Callable) -> str:
     )
 
 
+def _list_repr(node: list, depth: int) -> str:
+    string = (",\n" + "\t" * (depth + 1)).join(
+        f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
+    )
+    return _format_width(
+        "[\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "]"
+    )
+
+
+def _list_str(node: list, depth: int) -> str:
+    string = (",\n" + "\t" * (depth + 1)).join(
+        f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
+    )
+    return _format_width(
+        "[\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "]"
+    )
+
+
+def _tuple_repr(node: tuple, depth: int) -> str:
+    string = (",\n" + "\t" * (depth + 1)).join(
+        f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
+    )
+    return _format_width(
+        "(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
+    )
+
+
+def _tuple_str(node: tuple, depth: int) -> str:
+    string = (",\n" + "\t" * (depth + 1)).join(
+        f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
+    )
+    return _format_width(
+        "(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
+    )
+
+
+def _set_repr(node: set, depth: int) -> str:
+    string = (",\n" + "\t" * (depth + 1)).join(
+        f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
+    )
+    return _format_width(
+        "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+    )
+
+
+def _set_str(node: set, depth: int) -> str:
+    string = (",\n" + "\t" * (depth + 1)).join(
+        f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
+    )
+    return _format_width(
+        "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+    )
+
+
+def _dict_repr(node: dict, depth: int) -> str:
+    string = (",\n" + "\t" * (depth + 1)).join(
+        f"{k}:{_format_node_repr(v,depth=depth+1)}"
+        if "\n" not in f"{v!s}"
+        else f"{k}:"
+        + "\n"
+        + "\t" * (depth + 1)
+        + f"{_format_width(_format_node_repr(v,depth=depth+1))}"
+        for k, v in node.items()
+    )
+    return _format_width(
+        "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+    )
+
+
+def _dict_str(node: dict, depth: int) -> str:
+    string = (",\n" + "\t" * (depth + 1)).join(
+        f"{k}:{_format_node_str(v,depth=depth+1)}"
+        if "\n" not in f"{v!s}"
+        else f"{k}:"
+        + "\n"
+        + "\t" * (depth + 1)
+        + f"{_format_width(_format_node_str(v,depth=depth+1))}"
+        for k, v in node.items()
+    )
+    return _format_width(
+        "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+    )
+
+
+def _field_repr(node: Field, depth: int) -> str:
+    attrs = [f"name={node.name}"]
+    attrs += [f"type={node.type}"]
+    attrs += [f"default={node.default}"] if node.default is not MISSING else []
+    attrs += [f"default_factory={node.default_factory}"] if node.default_factory is not MISSING else []  # fmt: skip
+    attrs += [f"init={node.init}"]
+    attrs += [f"repr={node.repr}"]
+    attrs += [f"hash={node.hash}"] if node.hash is not None else []
+    attrs += [f"compare={node.compare}"]
+    attrs += [f"metadata={node.metadata}"] if node.metadata != {} else []
+    string = (",").join(
+        f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in attrs
+    )
+    return _format_width("Field(" + (string) + ")")
+
+
 def _format_node_repr(node: Any, depth: int = 0) -> str:
     """pretty printer for a node
 
@@ -110,69 +210,19 @@ def _format_node_repr(node: Any, depth: int = 0) -> str:
         return _jax_numpy_repr(node)
 
     elif isinstance(node, list):
-        # increase depth for each item in list
-        # moreover, '_format_width' is done on each item repr
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
-        )
-        return _format_width(
-            "[\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "]"
-        )
+        return _list_repr(node, depth)
 
     elif isinstance(node, tuple):
-        # increase depth by 1 for each item in the tuple
-        # moreover, `_format_width` is done on each item repr
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
-        )
-        return _format_width(
-            "(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
-        )
+        return _tuple_repr(node, depth)
 
     elif isinstance(node, set):
-        # increase depth by 1 for each item in the set
-        # moreover, `_format_width` is done on each item repr
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
-        )
-        return _format_width(
-            "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
-        )
+        return _set_repr(node, depth)
 
     elif isinstance(node, dict):
-        # increase depth by 1 for each item in the dict
-        # moreover, `_format_width` is done on each item repr
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{k}:{_format_node_repr(v,depth=depth+1)}"
-            if "\n" not in f"{v!s}"
-            else f"{k}:"
-            + "\n"
-            + "\t" * (depth + 1)
-            + f"{_format_width(_format_node_repr(v,depth=depth+1))}"
-            for k, v in node.items()
-        )
-        return _format_width(
-            "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
-        )
+        return _dict_repr(node, depth)
 
     elif isinstance(node, Field):
-        attrs = [
-            f"name={node.name}",
-            f"type={node.type}",
-            f"default={node.default}",
-            f"default_factory={node.default_factory}",
-            f"init={node.init}",
-            f"repr={node.repr}",
-            f"hash={node.hash}",
-            f"compare={node.compare}",
-            f"metadata={node.metadata}",
-        ]
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in attrs
-        )
-        return _format_width(
-            "Field(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
-        )
+        return _field_repr(node, depth)
 
     else:
         return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
@@ -208,61 +258,19 @@ def _format_node_str(node, depth):
         return _func_repr(node)
 
     elif isinstance(node, list):
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
-        )
-        return _format_width(
-            "[\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "]"
-        )
+        return _list_str(node, depth)
 
     elif isinstance(node, tuple):
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
-        )
-        return _format_width(
-            "(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
-        )
+        return _tuple_str(node, depth)
 
     elif isinstance(node, set):
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
-        )
-        return _format_width(
-            "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
-        )
+        return _set_str(node, depth)
 
     elif isinstance(node, dict):
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{k}:{_format_node_str(v,depth=depth+1)}"
-            if "\n" not in f"{v!s}"
-            else f"{k}:"
-            + "\n"
-            + "\t" * (depth + 1)
-            + f"{_format_width(_format_node_str(v,depth=depth+1))}"
-            for k, v in node.items()
-        )
-        return _format_width(
-            "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
-        )
+        return _dict_str(node, depth)
 
     elif isinstance(node, Field):
-        attrs = [
-            f"name={node.name}",
-            f"type={node.type}",
-            f"default={node.default}",
-            f"default_factory={node.default_factory}",
-            f"init={node.init}",
-            f"repr={node.repr}",
-            f"hash={node.hash}",
-            f"compare={node.compare}",
-            f"metadata={node.metadata}",
-        ]
-        string = (",\n" + "\t" * (depth + 1)).join(
-            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in attrs
-        )
-        return _format_width(
-            "Field(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
-        )
+        return _field_repr(node, depth)
 
     else:
         return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
