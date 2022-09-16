@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import Field
 from types import FunctionType
 from typing import Any, Callable
 
@@ -154,6 +155,25 @@ def _format_node_repr(node: Any, depth: int = 0) -> str:
             "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
         )
 
+    elif isinstance(node, Field):
+        attrs = [
+            f"name={node.name}",
+            f"type={node.type}",
+            f"default={node.default}",
+            f"default_factory={node.default_factory}",
+            f"init={node.init}",
+            f"repr={node.repr}",
+            f"hash={node.hash}",
+            f"compare={node.compare}",
+            f"metadata={node.metadata}",
+        ]
+        string = (",\n" + "\t" * (depth + 1)).join(
+            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in attrs
+        )
+        return _format_width(
+            "Field(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
+        )
+
     else:
         return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
 
@@ -223,6 +243,25 @@ def _format_node_str(node, depth):
         )
         return _format_width(
             "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+        )
+
+    elif isinstance(node, Field):
+        attrs = [
+            f"name={node.name}",
+            f"type={node.type}",
+            f"default={node.default}",
+            f"default_factory={node.default_factory}",
+            f"init={node.init}",
+            f"repr={node.repr}",
+            f"hash={node.hash}",
+            f"compare={node.compare}",
+            f"metadata={node.metadata}",
+        ]
+        string = (",\n" + "\t" * (depth + 1)).join(
+            f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in attrs
+        )
+        return _format_width(
+            "Field(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
         )
 
     else:
