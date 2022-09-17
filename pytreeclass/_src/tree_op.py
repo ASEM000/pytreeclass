@@ -18,11 +18,13 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import (  # _annotated_tree,
+from pytreeclass._src.tree_util import (
+    _annotated_leaves,
     _named_leaves,
     _node_false,
     _node_true,
     _pytree_map,
+    _typed_leaves,
 )
 
 PyTree = Any
@@ -126,12 +128,13 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(type)
         def _(tree, where: type, **kwargs):
             """Filter by field type"""
-            return jtu.tree_map(
-                lambda x: jtu.tree_map(_node_true, x)
-                if func(x, where)
-                else _node_false(x),
-                tree,
-                is_leaf=lambda x: isinstance(x, where),
+            leaves, treedef = jtu.tree_flatten(tree, is_leaf=lambda x: x is None)
+            return jtu.tree_unflatten(
+                treedef,
+                [
+                    _node_true(x) if func(y, where) else _node_false(x)
+                    for x, y in zip(leaves, _typed_leaves(tree))
+                ],
             )
 
         @inner_wrapper.register(dict)
@@ -153,6 +156,16 @@ def _append_math_eq_ne(func):
             # this mechanism could filter by multiple metadata, however possible drawbacks
             # are that some data structures might have the same metadata for all of it's elements (list/dict/tuple)
             # and this would filter out all the elements without distinction
+            # leaves, treedef = jtu.tree_flatten(tree, is_leaf=lambda x: x is None)
+
+            # return jtu.tree_unflatten(
+            #     treedef,
+            #     [
+            #         _node_true(x) if func(y, where) else _node_false(x)
+            #         for x, y in zip(leaves, _annotated_leaves(tree))
+            #     ],
+            # )
+
             return _pytree_map(
                 tree,
                 # condition to check for each dataclass field
@@ -191,22 +204,19 @@ def _tree_hash(tree):
 
 
 def _eq(lhs, rhs):
-    if isinstance(rhs, type):
-        #  == <-> isinstance
-        return isinstance(lhs, rhs)
-    elif isinstance(rhs, (str, dict)):
-        # == <-> kw in (kws,...)
+    if isinstance(rhs, (str, dict)):
         return rhs in lhs
+    elif isinstance(rhs, type):
+        return any([issubclass(x, rhs) for x in lhs])
     else:
         return op.eq(lhs, rhs)
 
 
 def _ne(lhs, rhs):
-    # make ne work with type comparison
-    if isinstance(rhs, type):
-        return not isinstance(lhs, rhs)
-    elif isinstance(rhs, (str, dict)):
+    if isinstance(rhs, (str, dict)):
         return rhs not in lhs
+    elif isinstance(rhs, type):
+        return not any([issubclass(x, rhs) for x in lhs])
     else:
         return op.ne(lhs, rhs)
 
