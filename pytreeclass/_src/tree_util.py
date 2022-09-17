@@ -162,30 +162,6 @@ def _tree_fields(tree):
     )
 
 
-def _node_true(node, array_as_leaves: bool = True):
-    @dispatch(argnum=0)
-    def _node_true(node):
-        return True
-
-    @_node_true.register(jnp.ndarray)
-    def _(node):
-        return jnp.ones_like(node).astype(jnp.bool_) if array_as_leaves else True
-
-    return _node_true(node)
-
-
-def _node_false(node, array_as_leaves: bool = True):
-    @dispatch(argnum=0)
-    def _node_false(node):
-        return False
-
-    @_node_false.register(jnp.ndarray)
-    def _(node):
-        return jnp.zeros_like(node).astype(jnp.bool_) if array_as_leaves else True
-
-    return _node_false(node)
-
-
 def _pytree_map(
     tree: PyTree,
     *,

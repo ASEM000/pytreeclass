@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import functools as ft
 import operator as op
+from collections.abc import Iterable
 from dataclasses import Field
 from typing import Any, Callable, Generator
 
@@ -20,9 +21,7 @@ import numpy as np
 from jax._src.tree_util import flatten_one_level
 
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import (
-    _node_false,
-    _node_true,
+from pytreeclass._src.tree_util import (  # _node_false,; _node_true,
     _tree_fields,
     is_treeclass,
 )
@@ -86,9 +85,8 @@ def _append_math_op(func):
 def _field_boolean_map(
     cond: Callable[[Field, Any], Any],
     tree: PyTree,
-    is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTree:
-    """Set node True if func(field, value) is True, otherwise set node False
+    """Set node True if cond(field, value) is True, otherwise set node False
 
     Args:
         cond (Callable[[Field, Any], Any]): Condition function applied to each field
@@ -98,6 +96,26 @@ def _field_boolean_map(
     Returns:
         PyTree: boolean mapped tree
     """
+
+    def _node_true(node):
+        # handles array and Iterable boolean broadcasting
+        if isinstance(node, jnp.ndarray):
+            return jnp.ones_like(node).astype(jnp.bool_)
+        elif isinstance(node, Iterable):
+            return jtu.tree_map(lambda _: True, node)
+        else:
+            return True
+
+    def _node_false(node):
+        if isinstance(node, jnp.ndarray):
+            return jnp.zeros_like(node).astype(jnp.bool_)
+        elif isinstance(node, Iterable):
+            return jtu.tree_map(lambda _: False, node)
+        else:
+            return False
+
+    def _is_leaf(node):
+        return isinstance(node, Iterable) or node is None
 
     def _traverse(tree) -> Generator[Any, ...]:
         """traverse the tree and yield the applied function on the field and node"""
@@ -110,14 +128,14 @@ def _field_boolean_map(
             if is_treeclass(node_item):
                 yield from [
                     _node_true(item)
-                    for item in jtu.tree_leaves(node_item, is_leaf=is_leaf)
+                    for item in jtu.tree_leaves(node_item, is_leaf=_is_leaf)
                 ] if condition else _traverse(tree=node_item)
 
             else:
                 yield _node_true(node_item) if condition else _node_false(node_item)
 
     return jtu.tree_unflatten(
-        treedef=jtu.tree_structure(tree, is_leaf=is_leaf),
+        treedef=jtu.tree_structure(tree, is_leaf=_is_leaf),
         leaves=tuple(_traverse(tree=tree)),
     )
 
@@ -154,23 +172,17 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(str)
         def _(tree, where: str, **kwargs):
             """Filter by field name"""
-            return _field_boolean_map(
-                lambda x, y: func(x.name, where), tree, is_leaf=lambda x: x is None
-            )
+            return _field_boolean_map(lambda x, y: func(x.name, where), tree)
 
         @inner_wrapper.register(type)
         def _(tree, where: type, **kwargs):
             """Filter by field type"""
-            return _field_boolean_map(
-                lambda x, y: func(y, where), tree, is_leaf=lambda x: x is None
-            )
+            return _field_boolean_map(lambda x, y: func(y, where), tree)
 
         @inner_wrapper.register(dict)
         def _(tree, where: dict[str, Any], **kwargs):
             """Filter by metadata"""
-            return _field_boolean_map(
-                lambda x, y: func(x.metadata, where), tree, is_leaf=lambda x: x is None
-            )
+            return _field_boolean_map(lambda x, y: func(x.metadata, where), tree)
 
         return inner_wrapper(self, rhs)
 
