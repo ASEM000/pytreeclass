@@ -11,19 +11,19 @@ from __future__ import annotations
 import functools as ft
 import operator as op
 from dataclasses import Field
-from typing import Any, Callable
+from typing import Any, Callable, Generator
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
+from jax._src.tree_util import flatten_one_level
 
 from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
     _node_false,
     _node_true,
     _tree_fields,
-    is_static_field,
     is_treeclass,
 )
 
@@ -83,27 +83,43 @@ def _append_math_op(func):
     return wrapper
 
 
-def _field_leaves(func: Callable[[Field, Any], Any], tree: PyTree) -> list[Any]:
-    """traverse the tree and apply func to the leaves of the tree"""
+def _field_map(
+    func: Callable[[Field, Any], Any],
+    tree: PyTree,
+    is_leaf: Callable[[Any], bool] | None = None,
+) -> PyTree:
+    """Similar to tree_map but with the field as the first argument
 
-    def _recurse(tree, path):
-        nonlocal leaves
-        for field_item in _tree_fields(tree).values():
-            node_item = getattr(tree, field_item.name)
-            if not is_static_field(field_item):
-                if is_treeclass(node_item):
-                    _recurse(tree=node_item, path=[*path, func(node_item, field_item)])
-                else:
-                    leaves += [[*path, func(node_item, field_item)]]
-        return leaves
+    Args:
+        func (Callable[[Field, Any], Any]): _description_
+        tree (PyTree): _description_
+        is_leaf (Callable[[Any], bool] | None, optional): is_leaf. Defaults to None.
 
-    leaves = list()
-    return _recurse(tree=tree, path=list())
+    Returns:
+        PyTree: mapped tree
+    """
 
+    def _traverse(tree) -> Generator[Any, ...]:
+        """traverse the tree and yield the applied function on the field and node"""
+        leaves = flatten_one_level(tree)[0]
+        field_items = _tree_fields(tree).values()
 
-_named_leaves = ft.partial(_field_leaves, func=lambda _, field_item: field_item.name)
-_typed_leaves = ft.partial(_field_leaves, func=lambda node, __: type(node))
-_meta_leaves = ft.partial(_field_leaves, func=lambda _, field_item: field_item.metadata)
+        for field_item, node_item in zip(field_items, leaves):
+            condition = func(field_item, node_item)
+
+            if is_treeclass(node_item):
+                yield from [
+                    _node_true(item)
+                    for item in jtu.tree_leaves(node_item, is_leaf=is_leaf)
+                ] if condition else _traverse(tree=node_item)
+
+            else:
+                yield _node_true(node_item) if condition else _node_false(node_item)
+
+    return jtu.tree_unflatten(
+        treedef=jtu.tree_structure(tree, is_leaf=is_leaf),
+        leaves=tuple(_traverse(tree=tree)),
+    )
 
 
 def _append_math_eq_ne(func):
@@ -138,38 +154,22 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(str)
         def _(tree, where: str, **kwargs):
             """Filter by field name"""
-            leaves, treedef = jtu.tree_flatten(tree, is_leaf=lambda x: x is None)
-
-            return jtu.tree_unflatten(
-                treedef,
-                [
-                    _node_true(x) if func(y, where) else _node_false(x)
-                    for x, y in zip(leaves, _named_leaves(tree=tree))
-                ],
+            return _field_map(
+                lambda x, y: func(x.name, where), tree, is_leaf=lambda x: x is None
             )
 
         @inner_wrapper.register(type)
         def _(tree, where: type, **kwargs):
             """Filter by field type"""
-            leaves, treedef = jtu.tree_flatten(tree, is_leaf=lambda x: x is None)
-            return jtu.tree_unflatten(
-                treedef,
-                [
-                    _node_true(x) if func(y, where) else _node_false(x)
-                    for x, y in zip(leaves, _typed_leaves(tree=tree))
-                ],
+            return _field_map(
+                lambda x, y: func(y, where), tree, is_leaf=lambda x: x is None
             )
 
         @inner_wrapper.register(dict)
-        def _(tree, where: dict, **kwargs):
+        def _(tree, where: dict[str, Any], **kwargs):
             """Filter by metadata"""
-            leaves, treedef = jtu.tree_flatten(tree, is_leaf=lambda x: isinstance(x, list))  # fmt: skip
-            return jtu.tree_unflatten(
-                treedef,
-                [
-                    _node_true(x) if func(y, where) else _node_false(x)
-                    for x, y in zip(leaves, _meta_leaves(tree=tree))
-                ],
+            return _field_map(
+                lambda x, y: func(x.metadata, where), tree, is_leaf=lambda x: x is None
             )
 
         return inner_wrapper(self, rhs)
@@ -196,20 +196,15 @@ def _tree_hash(tree):
 
 
 def _eq(lhs, rhs):
-    if isinstance(rhs, (str, dict)):
-        return rhs in lhs
-    elif isinstance(rhs, type):
-        return any([issubclass(x, rhs) for x in lhs])
+    if isinstance(rhs, type):
+        return isinstance(lhs, rhs)
     else:
         return op.eq(lhs, rhs)
 
 
 def _ne(lhs, rhs):
-    # compare to the top most node
-    if isinstance(rhs, (str, dict)):
-        return rhs != lhs[0]
-    elif isinstance(rhs, type):
-        return not issubclass(lhs[0], rhs)
+    if isinstance(rhs, type):
+        return not isinstance(lhs, rhs)
     else:
         return op.ne(lhs, rhs)
 
