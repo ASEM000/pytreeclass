@@ -186,60 +186,6 @@ def _node_false(node, array_as_leaves: bool = True):
     return _node_false(node)
 
 
-def _named_leaves(tree):
-    """Replace leaf nodes with their name path."""
-
-    def _recurse(tree, path):
-        nonlocal leaves
-        for field_item in _tree_fields(tree).values():
-            node_item = getattr(tree, field_item.name)
-            if not is_static_field(field_item):
-                if is_treeclass(node_item):
-                    _recurse(tree=node_item, path=[*path, field_item.name])
-                else:
-                    leaves += [[*path, field_item.name]]
-        return leaves
-
-    leaves = list()
-    return _recurse(tree=tree, path=list())
-
-
-def _typed_leaves(tree):
-    """Replace leaf nodes with their name path."""
-
-    def _recurse(tree, path):
-        nonlocal leaves
-        for field_item in _tree_fields(tree).values():
-            node_item = getattr(tree, field_item.name)
-            if not is_static_field(field_item):
-                if is_treeclass(node_item):
-                    _recurse(tree=node_item, path=[*path, type(node_item)])
-                else:
-                    leaves += [[*path, type(node_item)]]
-        return leaves
-
-    leaves = list()
-    return _recurse(tree=tree, path=list())
-
-
-def _annotated_leaves(tree):
-    """Replace leaf nodes with their name path."""
-
-    def _recurse(tree, path):
-        nonlocal leaves
-        for field_item in _tree_fields(tree).values():
-            node_item = getattr(tree, field_item.name)
-            if not is_static_field(field_item):
-                if is_treeclass(node_item):
-                    _recurse(tree=node_item, path=[*path, field_item.metadata])
-                else:
-                    leaves += [[*path, field_item.metadata]]
-        return leaves
-
-    leaves = list()
-    return _recurse(tree=tree, path=list())
-
-
 def _pytree_map(
     tree: PyTree,
     *,

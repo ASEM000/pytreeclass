@@ -966,3 +966,5 @@ def test_not_equal():
     assert is_treeclass_equal(t.at[t == int].set(10), Test(a=10, b=1.0))
 
     assert is_treeclass_equal(t.at[t != int].set(10.0), Test(a=1, b=10.0))
+
+    assert is_treeclass_equal(t.at[t != 10].set(10.0), Test(a=10.0, b=10.0))

@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import functools as ft
 import operator as op
-from typing import Any
+from dataclasses import Field
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
@@ -19,12 +20,11 @@ import numpy as np
 
 from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
-    _annotated_leaves,
-    _named_leaves,
     _node_false,
     _node_true,
-    _pytree_map,
-    _typed_leaves,
+    _tree_fields,
+    is_static_field,
+    is_treeclass,
 )
 
 PyTree = Any
@@ -83,6 +83,29 @@ def _append_math_op(func):
     return wrapper
 
 
+def _field_leaves(func: Callable[[Field, Any], Any], tree: PyTree) -> list[Any]:
+    """traverse the tree and apply func to the leaves of the tree"""
+
+    def _recurse(tree, path):
+        nonlocal leaves
+        for field_item in _tree_fields(tree).values():
+            node_item = getattr(tree, field_item.name)
+            if not is_static_field(field_item):
+                if is_treeclass(node_item):
+                    _recurse(tree=node_item, path=[*path, func(node_item, field_item)])
+                else:
+                    leaves += [[*path, func(node_item, field_item)]]
+        return leaves
+
+    leaves = list()
+    return _recurse(tree=tree, path=list())
+
+
+_named_leaves = ft.partial(_field_leaves, func=lambda _, field_item: field_item.name)
+_typed_leaves = ft.partial(_field_leaves, func=lambda node, __: type(node))
+_meta_leaves = ft.partial(_field_leaves, func=lambda _, field_item: field_item.metadata)
+
+
 def _append_math_eq_ne(func):
     """Append eq/ne operations"""
 
@@ -121,7 +144,7 @@ def _append_math_eq_ne(func):
                 treedef,
                 [
                     _node_true(x) if func(y, where) else _node_false(x)
-                    for x, y in zip(leaves, _named_leaves(tree))
+                    for x, y in zip(leaves, _named_leaves(tree=tree))
                 ],
             )
 
@@ -133,7 +156,7 @@ def _append_math_eq_ne(func):
                 treedef,
                 [
                     _node_true(x) if func(y, where) else _node_false(x)
-                    for x, y in zip(leaves, _typed_leaves(tree))
+                    for x, y in zip(leaves, _typed_leaves(tree=tree))
                 ],
             )
 
@@ -145,7 +168,7 @@ def _append_math_eq_ne(func):
                 treedef,
                 [
                     _node_true(x) if func(y, where) else _node_false(x)
-                    for x, y in zip(leaves, _annotated_leaves(tree))
+                    for x, y in zip(leaves, _meta_leaves(tree=tree))
                 ],
             )
 
