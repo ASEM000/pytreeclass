@@ -29,6 +29,11 @@ def is_nondiff_field(field_item: Field) -> bool:
     return field_item.metadata.get("nondiff", False)
 
 
+def is_static_field(field_item: Field) -> bool:
+    """check if field is static"""
+    return field_item.metadata.get("static", False)
+
+
 def is_treeclass_frozen(tree):
     """assert if a treeclass is frozen"""
     if is_treeclass(tree):
@@ -179,6 +184,22 @@ def _node_false(node, array_as_leaves: bool = True):
         return jnp.zeros_like(node).astype(jnp.bool_) if array_as_leaves else True
 
     return _node_false(node)
+
+
+def _named_leaves(tree):
+    """Replace leaf nodes with their name path."""
+    def _recurse(tree, path):
+        nonlocal leaves
+        for field_item in _tree_fields(tree).values():
+            node_item = getattr(tree, field_item.name)
+            if not is_static_field(field_item):
+                if is_treeclass(node_item):
+                    _recurse(tree=node_item, path=[*path, field_item.name])
+                else:
+                    leaves += [[*path, field_item.name]]
+        return leaves
+    leaves = list()
+    return _recurse(tree=tree, path=list())
 
 
 def _pytree_map(

@@ -18,7 +18,12 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import _node_false, _node_true, _pytree_map
+from pytreeclass._src.tree_util import (  # _annotated_tree,
+    _named_leaves,
+    _node_false,
+    _node_true,
+    _pytree_map,
+)
 
 PyTree = Any
 
@@ -108,23 +113,21 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(str)
         def _(tree, where: str, **kwargs):
             """Filter by field name"""
-            # here _pytree_map is used to traverse the tree depth first
-            # and broadcast True/False to the children values
-            # if the field name matches the where `string``
-            return _pytree_map(
-                tree,
-                cond=lambda _, field_item, __: func(field_item.name, where),
-                true_func=lambda _, __, node_item: _node_true(node_item),
-                false_func=lambda _, __, node_item: _node_false(node_item),
-                attr_func=lambda _, field_item, __: field_item.name,
-                is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
+            leaves, treedef = jtu.tree_flatten(tree, is_leaf=lambda x: x is None)
+
+            return jtu.tree_unflatten(
+                treedef,
+                [
+                    _node_true(x) if func(y, where) else _node_false(x)
+                    for x, y in zip(leaves, _named_leaves(tree))
+                ],
             )
 
         @inner_wrapper.register(type)
         def _(tree, where: type, **kwargs):
             """Filter by field type"""
             return jtu.tree_map(
-                lambda x: jtu.tree_map(lambda node: _node_true(node), x)
+                lambda x: jtu.tree_map(_node_true, x)
                 if func(x, where)
                 else _node_false(x),
                 tree,
@@ -134,6 +137,16 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(dict)
         def _(tree, where: dict, **kwargs):
             """Filter by metadata"""
+            # is_leaf = None
+            # lhs_tree = _annotated_tree(tree, is_leaf)
+
+            # return jtu.tree_map(
+            #     lambda x, y: _node_true(y) if func(x, where) else _node_false(y),
+            #     lhs_tree,
+            #     tree,
+            #     is_leaf=is_leaf,
+            # )
+
             # here _pytree_map is used to traverse the tree depth first
             # and broadcast True/False to the children values
             # if the field metadata contains the where `dict`
@@ -178,9 +191,12 @@ def _tree_hash(tree):
 
 
 def _eq(lhs, rhs):
-    # make eq work with type comparison
     if isinstance(rhs, type):
+        #  == <-> isinstance
         return isinstance(lhs, rhs)
+    elif isinstance(rhs, (str, dict)):
+        # == <-> kw in (kws,...)
+        return rhs in lhs
     else:
         return op.eq(lhs, rhs)
 
@@ -189,6 +205,8 @@ def _ne(lhs, rhs):
     # make ne work with type comparison
     if isinstance(rhs, type):
         return not isinstance(lhs, rhs)
+    elif isinstance(rhs, (str, dict)):
+        return rhs not in lhs
     else:
         return op.ne(lhs, rhs)
 
