@@ -83,20 +83,20 @@ def _append_math_op(func):
     return wrapper
 
 
-def _field_map(
-    func: Callable[[Field, Any], Any],
+def _field_boolean_map(
+    cond: Callable[[Field, Any], Any],
     tree: PyTree,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTree:
-    """Similar to tree_map but with the field as the first argument
+    """Set node True if func(field, value) is True, otherwise set node False
 
     Args:
-        func (Callable[[Field, Any], Any]): _description_
+        cond (Callable[[Field, Any], Any]): Condition function applied to each field
         tree (PyTree): _description_
         is_leaf (Callable[[Any], bool] | None, optional): is_leaf. Defaults to None.
 
     Returns:
-        PyTree: mapped tree
+        PyTree: boolean mapped tree
     """
 
     def _traverse(tree) -> Generator[Any, ...]:
@@ -105,7 +105,7 @@ def _field_map(
         field_items = _tree_fields(tree).values()
 
         for field_item, node_item in zip(field_items, leaves):
-            condition = func(field_item, node_item)
+            condition = cond(field_item, node_item)
 
             if is_treeclass(node_item):
                 yield from [
@@ -154,21 +154,21 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(str)
         def _(tree, where: str, **kwargs):
             """Filter by field name"""
-            return _field_map(
+            return _field_boolean_map(
                 lambda x, y: func(x.name, where), tree, is_leaf=lambda x: x is None
             )
 
         @inner_wrapper.register(type)
         def _(tree, where: type, **kwargs):
             """Filter by field type"""
-            return _field_map(
+            return _field_boolean_map(
                 lambda x, y: func(y, where), tree, is_leaf=lambda x: x is None
             )
 
         @inner_wrapper.register(dict)
         def _(tree, where: dict[str, Any], **kwargs):
             """Filter by metadata"""
-            return _field_map(
+            return _field_boolean_map(
                 lambda x, y: func(x.metadata, where), tree, is_leaf=lambda x: x is None
             )
 
