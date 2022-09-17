@@ -140,44 +140,13 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(dict)
         def _(tree, where: dict, **kwargs):
             """Filter by metadata"""
-            # is_leaf = None
-            # lhs_tree = _annotated_tree(tree, is_leaf)
-
-            # return jtu.tree_map(
-            #     lambda x, y: _node_true(y) if func(x, where) else _node_false(y),
-            #     lhs_tree,
-            #     tree,
-            #     is_leaf=is_leaf,
-            # )
-
-            # here _pytree_map is used to traverse the tree depth first
-            # and broadcast True/False to the children values
-            # if the field metadata contains the where `dict`
-            # this mechanism could filter by multiple metadata, however possible drawbacks
-            # are that some data structures might have the same metadata for all of it's elements (list/dict/tuple)
-            # and this would filter out all the elements without distinction
-            # leaves, treedef = jtu.tree_flatten(tree, is_leaf=lambda x: x is None)
-
-            # return jtu.tree_unflatten(
-            #     treedef,
-            #     [
-            #         _node_true(x) if func(y, where) else _node_false(x)
-            #         for x, y in zip(leaves, _annotated_leaves(tree))
-            #     ],
-            # )
-
-            return _pytree_map(
-                tree,
-                # condition to check for each dataclass field
-                cond=lambda _, field_item, __: func(where, field_item.metadata),
-                # if the condition is True, then broadcast True to the children
-                true_func=lambda _, __, node_item: _node_true(node_item),
-                # if the condition is False, then broadcast False to the children
-                false_func=lambda _, __, node_item: _node_false(node_item),
-                # which attribute to use in the object.__setattr__ function
-                attr_func=lambda _, field_item, __: field_item.name,
-                # if the node is a leaf, then do not traverse the children
-                is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),  # fmt: skip
+            leaves, treedef = jtu.tree_flatten(tree, is_leaf=lambda x: isinstance(x, list))  # fmt: skip
+            return jtu.tree_unflatten(
+                treedef,
+                [
+                    _node_true(x) if func(y, where) else _node_false(x)
+                    for x, y in zip(leaves, _annotated_leaves(tree))
+                ],
             )
 
         return inner_wrapper(self, rhs)
@@ -213,10 +182,11 @@ def _eq(lhs, rhs):
 
 
 def _ne(lhs, rhs):
+    # compare to the top most node
     if isinstance(rhs, (str, dict)):
-        return rhs not in lhs
+        return rhs != lhs[0]
     elif isinstance(rhs, type):
-        return not any([issubclass(x, rhs) for x in lhs])
+        return not issubclass(lhs[0], rhs)
     else:
         return op.ne(lhs, rhs)
 

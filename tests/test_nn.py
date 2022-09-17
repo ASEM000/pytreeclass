@@ -194,12 +194,13 @@ def test_filter_nondiff():
     def loss_func(model, x, y):
         return jnp.mean((model(x) - y) ** 2)
 
-    @jax.jit
-    def update(model, x, y):
-        value, grads = jax.value_and_grad(loss_func)(model, x, y)
-        return value, model - 1e-3 * grads
-
     with pytest.raises(TypeError):
+
+        @jax.jit
+        def update(model, x, y):
+            value, grads = jax.value_and_grad(loss_func)(model, x, y)
+            return value, model - 1e-3 * grads
+
         for _ in range(1, 10_001):
             value, model = update(model, x, y)
 
