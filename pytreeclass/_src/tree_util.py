@@ -9,7 +9,6 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 import pytreeclass._src as src
-from pytreeclass._src.dispatch import dispatch
 
 PyTree = Any
 
@@ -17,6 +16,11 @@ PyTree = Any
 def nondiff_field(**kwargs):
     """ignore from pytree computations"""
     return field(**{**kwargs, **{"metadata": {"static": True, "nondiff": True}}})
+
+
+def frozen_field(**kwargs):
+    """ignore from pytree computations"""
+    return field(**{**kwargs, **{"metadata": {"static": True, "frozen": True}}})
 
 
 def is_frozen_field(field_item: Field) -> bool:
@@ -162,147 +166,7 @@ def _tree_fields(tree):
     )
 
 
-def _pytree_map(
-    tree: PyTree,
-    *,
-    cond: Callable[[Any, Any, Any], bool] | PyTree,
-    true_func: Callable[[Any, Any, Any], Any],
-    attr_func: Callable[[Any, Any, Any], str],
-    is_leaf: Callable[[Any, Any, Any], bool],
-    false_func: Callable[[Any, Any, Any], Any] | None = None,
-) -> PyTree:
-
-    """
-    traverse the dataclass fields in a depth first manner
-
-    Here, we apply true_func to node_item if condition is true and vice versa
-    we use attr_func to select the attribute to be updated in the dataclass and
-    is_leaf to decide whether to continue the traversal or not.
-
-    a `jtu.tree_map` like function for treeclass instances with the option to modify
-    the dataclass fields in-place
-
-    Args:
-        tree (Any):
-            dataclass to be traversed
-
-        cond (Callable[[Any, Any,Any], bool]) | (PyTree):
-            - Callable to be applied on each (tree,field_item,node_item) or
-            - a pytree of the same tree structure, where each node is a bool
-            that determines whether to apply true_func or false_func
-
-        true_func (Callable[[Any, Any,Any], Any]):
-            function applied if cond is true, accepts (tree,field_item,node_item)
-
-        attr_func (Callable[[Any, Any,Any], str]):
-            function that returns the attribute to be updated, accepts (tree,field_item,node_item)
-
-        is_leaf (Callable[[Any,Any,Any], bool]):
-            stops recursion if false on (tree,field_item,node_item)
-
-        false_func (Callable[[Any, Any,Any], Any]):  Defaults to None.
-            function applied if cond is false, accepts (tree,field_item,node_item)
-
-    Returns:
-        PyTree or dataclass : new dataclass with updated attributes
-    """
-
-    @dispatch(argnum="cond")
-    def _recurse(tree, *, cond, true_func, attr_func, is_leaf, false_func):
-        raise TypeError("_pytree only supports treeclass instances")
-
-    @_recurse.register(type(tree))
-    def _recurse_treeclass_mask(
-        tree: PyTree,
-        *,
-        cond: PyTree,
-        true_func: Callable[[Any, Any, Any], Any],
-        attr_func: Callable[[Any, Any, Any], str],
-        is_leaf: Callable[[Any, Any, Any], bool],
-        false_func: Callable[[Any, Any, Any], Any],
-    ):
-        for field_item, cond_item in zip(
-            _tree_fields(tree).values(), _tree_fields(cond).values()
-        ):
-            node_item = getattr(tree, field_item.name)
-            cond_item = getattr(cond, cond_item.name)
-
-            if is_leaf(tree, field_item, node_item):
-                continue
-
-            if is_treeclass(node_item):
-                _recurse_treeclass_mask(
-                    tree=node_item,
-                    cond=cond_item,
-                    true_func=true_func,
-                    false_func=false_func,
-                    attr_func=attr_func,
-                    is_leaf=is_leaf,
-                )
-
-            else:
-                # apply at leaves
-                object.__setattr__(
-                    tree,
-                    attr_func(tree, field_item, node_item),
-                    true_func(tree, field_item, node_item)
-                    if jnp.all(cond_item)
-                    else false_func(tree, field_item, node_item),
-                )
-
-        return tree
-
-    @_recurse.register(FunctionType)
-    def _recurse_callable_mask(
-        tree: PyTree,
-        *,
-        cond: Callable[[Any, Any, Any], bool],
-        true_func: Callable[[Any, Any, Any], Any],
-        attr_func: Callable[[Any, Any, Any], str],
-        is_leaf: Callable[[Any, Any, Any], bool],
-        false_func: Callable[[Any, Any, Any], Any],
-        state: Any = None,
-    ):
-        for field_item in _tree_fields(tree).values():
-            node_item = getattr(tree, field_item.name)
-
-            if is_leaf(tree, field_item, node_item):
-                continue
-
-            if is_treeclass(node_item):
-                _recurse_callable_mask(
-                    tree=node_item,
-                    cond=cond,
-                    true_func=true_func,
-                    false_func=false_func,
-                    attr_func=attr_func,
-                    is_leaf=is_leaf,
-                    state=jtu.tree_all(cond(tree, field_item, node_item)) or state,
-                )
-
-            else:
-                # apply at leaves
-                object.__setattr__(
-                    tree,
-                    attr_func(tree, field_item, node_item),
-                    true_func(tree, field_item, node_item)
-                    if (state or cond(tree, field_item, node_item))
-                    else false_func(tree, field_item, node_item),
-                )
-
-        return tree
-
-    return _recurse(
-        tree=tree_copy(tree),
-        cond=cond,
-        true_func=true_func,
-        false_func=false_func,
-        attr_func=attr_func,
-        is_leaf=is_leaf,
-    )
-
-
-# filtering nondifferentiable nodes
+# filtering nondifferentiable fields
 
 
 def _is_nondiff(item: Any) -> bool:
@@ -310,47 +174,34 @@ def _is_nondiff(item: Any) -> bool:
 
     def _is_nondiff_item(node: Any):
         """check if node is non-differentiable"""
-        # non-differentiable types
-        if isinstance(node, (int, bool, str)):
-            return True
+        # differentiable types
+        if isinstance(node, (float, complex, src.tree_base._treeBase)):
+            return False
 
-        # non-differentiable array
-        elif isinstance(node, jnp.ndarray) and not jnp.issubdtype(
-            node.dtype, jnp.inexact
-        ):
-            return True
+        # differentiable array
+        elif isinstance(node, jnp.ndarray) and jnp.issubdtype(node.dtype, jnp.inexact):
+            return False
 
-        # non-differentiable type
-        elif isinstance(node, Callable) and not is_treeclass(node):
-            return True
-
-        return False
+        return True
 
     if isinstance(item, Iterable):
         # if an iterable has at least one non-differentiable item
         # then the whole iterable is non-differentiable
-        return jtu.tree_all(jtu.tree_map(_is_nondiff_item, item))
+        return any([_is_nondiff_item(item) for item in jtu.tree_leaves(item)])
     return _is_nondiff_item(item)
 
 
-def filter_nondiff(tree, where: PyTree | None = None) -> PyTree:
+def filter_nondiff(
+    tree: PyTree, where: Callable[[Field, Any], bool] | PyTree = _is_nondiff
+):
+
     """filter non-differentiable fields from a treeclass instance
-
-    Args:
-        tree (_type_):
-            PyTree to be filtered
-        where (PyTree | None, optional):
-            boolean PyTree mask, where a true node marks this node to be filtered, otherwise not. Defaults to None.
-
-    Returns:
-        PyTree: filtered PyTree
 
     Note:
         Mark fields as non-differentiable with adding metadata `dict(static=True,nondiff=True)`
         the way it is done is by adding a field in `__undeclared_fields__` to the treeclass instance
         that contains the non-differentiable fields.
         This is done to avoid mutating the original treeclass class .
-
         during the `tree_flatten`, tree_fields are the combination of
         {__dataclass_fields__, __undeclared_fields__} this means that a field defined
         in `__undeclared_fields__` with the same name as in __dataclass_fields__
@@ -360,7 +211,6 @@ def filter_nondiff(tree, where: PyTree | None = None) -> PyTree:
     Example:
         # here we try to optimize a differentiable value `b` that
         # is wrapped within a non-differentiable function `jax.nn.tanh`
-
         @pytc.treeclass
         class Linear:
             weight: jnp.ndarray
@@ -371,11 +221,9 @@ def filter_nondiff(tree, where: PyTree | None = None) -> PyTree:
             c: int = 1
             d: float = 2.0
             act : Callable = jax.nn.tanh
-
             def __init__(self,in_dim,out_dim):
                 self.weight = jnp.ones((in_dim,out_dim))
                 self.bias =  jnp.ones((1,out_dim))
-
             def __call__(self,x):
                 return self.act(self.b+x)
 
@@ -408,7 +256,6 @@ def filter_nondiff(tree, where: PyTree | None = None) -> PyTree:
         #   *act=tanh(x)
         # )
 
-
     ** for non-`None` where, mark fields as non-differentiable by using `where` mask.
 
     Example:
@@ -433,7 +280,6 @@ def filter_nondiff(tree, where: PyTree | None = None) -> PyTree:
             d: L1 = L1()
 
         >>> t = L2()
-
         >>> print(t.tree_diagram())
         # L2
         #     ├── a=10
@@ -447,12 +293,10 @@ def filter_nondiff(tree, where: PyTree | None = None) -> PyTree:
         #             ├── a=1
         #             ├── b=2
         #             └── c=3
-
         # Let's mark `a` and `b`  in `L0` as non-differentiable
         # we can do this by using `where` mask
 
         >>> t = t.at["d"].at["d"].set(filter_nondiff(t.d.d, where= L0(a=True,b=True, c=False)))
-
         >>> print(t.tree_diagram())
         # L2
         #     ├── a=10
@@ -469,97 +313,123 @@ def filter_nondiff(tree, where: PyTree | None = None) -> PyTree:
         # note `*` indicates that the field is non-differentiable
     """
 
-    def add_nondiff_field(tree, field_item, node_item):
-        new_field = src.misc._field(
-            name=field_item.name,
-            type=field_item.type,
-            metadata={"static": True, "nondiff": True},
-            repr=field_item.repr,
-        )
+    def _nondiff_callable_map(tree: PyTree, where):
+        for field_item in _tree_fields(tree).values():
+            node_item = getattr(tree, field_item.name)
 
-        return {
-            **tree.__undeclared_fields__,
-            **{field_item.name: new_field},
-        }
+            if is_treeclass(node_item):
+                _nondiff_callable_map(tree=node_item, where=where)
 
-    return _pytree_map(
-        tree,
-        # condition is a lambda function that returns True if the field is non-differentiable
-        cond=where or (lambda _, __, node_item: _is_nondiff(node_item)),
-        # Extends the field metadata to add {nondiff:True}
-        true_func=add_nondiff_field,
-        # keep the field as is if its differentiable
-        false_func=lambda tree, __, ___: tree.__undeclared_fields__,
-        attr_func=lambda _, __, ___: "__undeclared_fields__",
-        # do not recurse if the field is `static`
-        is_leaf=lambda _, field_item, __: field_item.metadata.get("static", False),
-    )
+            elif where(node_item):
+                new_field = nondiff_field(repr=field_item.repr)
+                object.__setattr__(new_field, "name", field_item.name)
+                object.__setattr__(new_field, "type", field_item.type)
+                new_fields = {**tree.__undeclared_fields__, **{field_item.name: new_field}}  # fmt: skip
+                object.__setattr__(tree, "__undeclared_fields__", new_fields)
+
+        return tree
+
+    def _nondiff_mask_map(tree: PyTree, where):
+        for (lhs_field_item, rhs_field_item) in zip(
+            _tree_fields(tree).values(), _tree_fields(where).values()
+        ):
+            lhs_node_item = getattr(tree, lhs_field_item.name)
+            rhs_node_item = getattr(where, rhs_field_item.name)
+
+            if is_treeclass(lhs_node_item):
+                _nondiff_mask_map(tree=lhs_node_item, where=rhs_node_item)
+
+            elif rhs_node_item:
+                new_field = nondiff_field(repr=lhs_field_item.repr)
+                object.__setattr__(new_field, "name", lhs_field_item.name)
+                object.__setattr__(new_field, "type", lhs_field_item.type)
+                new_fields = {**tree.__undeclared_fields__, **{lhs_field_item.name: new_field}}  # fmt: skip
+                object.__setattr__(tree, "__undeclared_fields__", new_fields)
+
+        return tree
+
+    if isinstance(where, FunctionType):
+        return _nondiff_callable_map(tree_copy(tree), where)
+    elif isinstance(where, type(tree)):
+        return _nondiff_mask_map(tree_copy(tree), where)
+    else:
+        raise TypeError(f"`where` must be a Callable or a {type(tree)}")
 
 
 def unfilter_nondiff(tree):
     """remove fields added by `filter_nondiff"""
 
-    def remove_nondiff_field(tree, field_item, node_item):
-        # remove frozen fields from __undeclared_fields__
-        return {
-            field_name: field_value
-            for field_name, field_value in tree.__undeclared_fields__.items()
-            if not field_value.metadata.get("nondiff", False)
-        }
+    def _recurse(tree):
+        for field_item in _tree_fields(tree).values():
+            node_item = getattr(tree, field_item.name)
+            if is_treeclass(node_item):
+                _recurse(tree=node_item)
+            elif is_nondiff_field(field_item):
+                del tree.__undeclared_fields__[field_item.name]
+        return tree
 
-    return _pytree_map(
-        tree,
-        cond=lambda _, __, ___: True,
-        true_func=remove_nondiff_field,
-        false_func=lambda _, __, ___: None,
-        attr_func=lambda _, __, ___: "__undeclared_fields__",
-        is_leaf=lambda _, __, ___: False,
-    )
+    return _recurse(tree_copy(tree))
 
 
-def tree_freeze(tree):
-    def add_frozen_field(tree, field_item, _):
-        new_field = src.misc._field(
-            name=field_item.name,
-            type=field_item.type,
-            metadata={"static": True, "frozen": True},
-            repr=field_item.repr,
-        )
+# filtering freezing
 
-        return {
-            **tree.__undeclared_fields__,
-            **{field_item.name: new_field},
-        }
 
-    return _pytree_map(
-        tree,
-        # traverse all nodes
-        cond=lambda _, __, ___: True,
-        # Extends the field metadata to add {nondiff:True}
-        true_func=add_frozen_field,
-        # keep the field as is if its differentiable
-        false_func=lambda tree, __, ___: tree.__undeclared_fields__,
-        attr_func=lambda _, __, ___: "__undeclared_fields__",
-        # do not recurse if the field is `static`
-        is_leaf=lambda _, field_item, __: False,
-    )
+def tree_freeze(
+    tree: PyTree, where: Callable[[Field, Any], bool] | PyTree = lambda _: True
+):
+    def _callable_map(tree: PyTree, where):
+        for field_item in _tree_fields(tree).values():
+            node_item = getattr(tree, field_item.name)
+
+            if is_treeclass(node_item):
+                _callable_map(tree=node_item, where=where)
+
+            elif where(node_item):
+                new_field = frozen_field(repr=field_item.repr)
+                object.__setattr__(new_field, "name", field_item.name)
+                object.__setattr__(new_field, "type", field_item.type)
+                new_fields = {**tree.__undeclared_fields__, **{field_item.name: new_field}}  # fmt: skip
+                object.__setattr__(tree, "__undeclared_fields__", new_fields)
+
+        return tree
+
+    def _mask_map(tree: PyTree, where):
+        for (lhs_field_item, rhs_field_item) in zip(
+            _tree_fields(tree).values(), _tree_fields(where).values()
+        ):
+            lhs_node_item = getattr(tree, lhs_field_item.name)
+            rhs_node_item = getattr(where, rhs_field_item.name)
+
+            if is_treeclass(lhs_node_item):
+                _mask_map(tree=lhs_node_item, where=rhs_node_item)
+
+            elif rhs_node_item:
+                new_field = frozen_field(repr=lhs_field_item.repr)
+                object.__setattr__(new_field, "name", lhs_field_item.name)
+                object.__setattr__(new_field, "type", lhs_field_item.type)
+                new_fields = {**tree.__undeclared_fields__, **{lhs_field_item.name: new_field}}  # fmt: skip
+                object.__setattr__(tree, "__undeclared_fields__", new_fields)
+
+        return tree
+
+    if isinstance(where, FunctionType):
+        return _callable_map(tree_copy(tree), where)
+    elif isinstance(where, type(tree)):
+        return _mask_map(tree_copy(tree), where)
+    else:
+        raise TypeError(f"`where` must be a Callable or a {type(tree)}")
 
 
 def tree_unfreeze(tree):
     """remove fields added by `tree_freeze"""
 
-    def remove_frozen_field(tree, field_item, _):
-        return {
-            field_name: field_value
-            for field_name, field_value in tree.__undeclared_fields__.items()
-            if not is_frozen_field(field_item)
-        }
+    def _recurse(tree):
+        for field_item in _tree_fields(tree).values():
+            node_item = getattr(tree, field_item.name)
+            if is_treeclass(node_item):
+                _recurse(tree=node_item)
+            elif is_frozen_field(field_item):
+                del tree.__undeclared_fields__[field_item.name]
+        return tree
 
-    return _pytree_map(
-        tree,
-        cond=lambda _, __, ___: True,
-        true_func=remove_frozen_field,
-        false_func=lambda _, __, ___: {},
-        attr_func=lambda _, __, ___: "__undeclared_fields__",
-        is_leaf=lambda _, __, ___: False,
-    )
+    return _recurse(tree_copy(tree))
