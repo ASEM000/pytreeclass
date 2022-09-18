@@ -14,17 +14,14 @@ from collections.abc import Iterable
 from dataclasses import Field
 from typing import Any, Callable, Generator
 
-import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 from jax._src.tree_util import flatten_one_level
+from jax.core import Tracer
 
 from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import (  # _node_false,; _node_true,
-    _tree_fields,
-    is_treeclass,
-)
+from pytreeclass._src.tree_util import _tree_fields, is_treeclass
 
 PyTree = Any
 
@@ -42,8 +39,8 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
         # the rhs tree here must be of the same type as lhs tree
         return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
 
-    @_tree_map.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
-    @_tree_map.register(jax.numpy.ndarray)
+    @_tree_map.register(Tracer)
+    @_tree_map.register(jnp.ndarray)
     @_tree_map.register(int)
     @_tree_map.register(float)
     @_tree_map.register(complex)
@@ -51,13 +48,7 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
     @_tree_map.register(str)
     def _(
         lhs,
-        rhs: int
-        | float
-        | complex
-        | bool
-        | str
-        | jax.numpy.ndarray
-        | jax.interpreters.partial_eval.DynamicJaxprTracer,
+        rhs: int | float | complex | bool | str | jnp.ndarray | Tracer,
     ):
         # broadcast the scalar rhs to the lhs
         return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
@@ -83,33 +74,38 @@ def _append_math_op(func):
 
 
 def _field_boolean_map(
-    cond: Callable[[Field, Any], Any],
+    cond: Callable[[Field, Any], bool],
     tree: PyTree,
 ) -> PyTree:
     """Set node True if cond(field, value) is True, otherwise set node False
 
     Args:
-        cond (Callable[[Field, Any], Any]): Condition function applied to each field
+        cond (Callable[[Field, Any], bool]): Condition function applied to each field
         tree (PyTree): _description_
         is_leaf (Callable[[Any], bool] | None, optional): is_leaf. Defaults to None.
 
     Returns:
         PyTree: boolean mapped tree
     """
+    # this is the function responsible for the boolean mapping of
+    # `node_type`, `field_name`, and `field_metadata` comparisons.
 
     def _node_true(node):
-        # handles array and Iterable boolean broadcasting
         if isinstance(node, jnp.ndarray):
+            # broadcast True to the shape of the array
             return jnp.ones_like(node).astype(jnp.bool_)
         elif isinstance(node, Iterable):
+            # broadcast False to the node
             return jtu.tree_map(lambda _: True, node)
         else:
             return True
 
     def _node_false(node):
         if isinstance(node, jnp.ndarray):
+            # broadcast False to the shape of the array
             return jnp.zeros_like(node).astype(jnp.bool_)
         elif isinstance(node, Iterable):
+            # broadcast False to the node
             return jtu.tree_map(lambda _: False, node)
         else:
             return False
@@ -119,6 +115,14 @@ def _field_boolean_map(
 
     def _traverse(tree) -> Generator[Any, ...]:
         """traverse the tree and yield the applied function on the field and node"""
+        # We check each level of the tree not tree leaves,
+        # this is because, if a condition is met at a parent tree
+        # then the entire subtree is marked by a `True` subtree of the same structure.
+        # for example let `Test` be a pytreeclass wrapped class
+        # >>> tree = Test(a=1, b=Test(c=2,d=3))
+        # if we  check a field name == "b", then the entire subtree at b is marked True
+        # however if we get the tree_leaves of the tree, `b` will not be visible to the condition.
+
         leaves = flatten_one_level(tree)[0]
         field_items = _tree_fields(tree).values()
 
@@ -154,17 +158,11 @@ def _append_math_eq_ne(func):
         @inner_wrapper.register(complex)
         @inner_wrapper.register(bool)
         @inner_wrapper.register(type(self))
-        @inner_wrapper.register(jax.interpreters.partial_eval.DynamicJaxprTracer)
-        @inner_wrapper.register(jax.numpy.ndarray)
+        @inner_wrapper.register(Tracer)
+        @inner_wrapper.register(jnp.ndarray)
         def _(
             self,
-            rhs: int
-            | float
-            | complex
-            | bool
-            | type(self)
-            | jax.interpreters.partial_eval.DynamicJaxprTracer
-            | jax.numpy.ndarray,
+            rhs: int | float | complex | bool | type(self) | Tracer | jnp.ndarray,
         ):
             # this function is handling all the numeric types
             return _dispatched_op_tree_map(func, self, rhs)
@@ -208,17 +206,12 @@ def _tree_hash(tree):
 
 
 def _eq(lhs, rhs):
-    if isinstance(rhs, type):
-        return isinstance(lhs, rhs)
-    else:
-        return op.eq(lhs, rhs)
+    # (x == int)  <-> isinstance(x,int)
+    return isinstance(lhs, rhs) if isinstance(rhs, type) else op.eq(lhs, rhs)
 
 
 def _ne(lhs, rhs):
-    if isinstance(rhs, type):
-        return not isinstance(lhs, rhs)
-    else:
-        return op.ne(lhs, rhs)
+    return not isinstance(lhs, rhs) if isinstance(rhs, type) else op.ne(lhs, rhs)
 
 
 class _treeOp:

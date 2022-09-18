@@ -9,7 +9,7 @@ from typing import Any, Sequence
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from jax.interpreters.partial_eval import DynamicJaxprTracer
+from jax.core import Tracer
 
 from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
@@ -38,11 +38,9 @@ def _at_get(tree, where, **kwargs):
         """
         raise NotImplementedError(f"Get node type ={type(lhs)} is not implemented.")
 
-    @_lhs_get.register(DynamicJaxprTracer)
+    @_lhs_get.register(Tracer)
     @_lhs_get.register(jnp.ndarray)
-    def _(
-        lhs: jnp.ndarray | DynamicJaxprTracer, where: Any, array_as_leaves: bool = True
-    ):
+    def _(lhs: jnp.ndarray | Tracer, where: Any, array_as_leaves: bool = True):
         return (
             (lhs[jnp.where(where)])
             if array_as_leaves
@@ -119,12 +117,10 @@ def _at_set(tree, where, set_value, **kwargs):
         """
         raise NotImplementedError(f"Set node type = {type(lhs)} is unknown.")
 
-    @_lhs_set.register(DynamicJaxprTracer)
+    @_lhs_set.register(Tracer)
     @_lhs_set.register(jnp.ndarray)
     @dispatch(argnum="set_value")
-    def _set_value_set(
-        lhs: jnp.ndarray | DynamicJaxprTracer, where: Any, set_value: Any
-    ):
+    def _set_value_set(lhs: jnp.ndarray | Tracer, where: Any, set_value: Any):
         """Multi dispatched on lhs and where type"""
         # lhs is numeric node
         # set_value in not acceptable set_value type for numeric node
@@ -135,7 +131,7 @@ def _at_set(tree, where, set_value, **kwargs):
         return set_value if jnp.all(where) else lhs
 
     @_set_value_set.register(bool)
-    def _(lhs: jnp.ndarray | DynamicJaxprTracer, where: Any, set_value: bool):
+    def _(lhs: jnp.ndarray | Tracer, where: Any, set_value: bool):
         # in python isinstance(True/False,int) is True
         # without this dispatch, it will be handled with the int dispatch
         return set_value if jnp.all(where) else lhs
@@ -145,7 +141,7 @@ def _at_set(tree, where, set_value, **kwargs):
     @_set_value_set.register(complex)
     @_set_value_set.register(jnp.ndarray)
     def _(
-        lhs: jnp.ndarray | DynamicJaxprTracer,
+        lhs: jnp.ndarray,
         where: Any,
         set_value: int | float | complex | jnp.ndarray,
         array_as_leaves: bool = True,
@@ -215,10 +211,10 @@ def _at_apply(tree, where, func, **kwargs):
         """
         raise NotImplementedError(f"Apply node type= {type(lhs)} is not implemented.")
 
-    @_lhs_apply.register(DynamicJaxprTracer)
+    @_lhs_apply.register(Tracer)
     @_lhs_apply.register(jnp.ndarray)
     def _(
-        lhs: jnp.ndarray | DynamicJaxprTracer,
+        lhs: jnp.ndarray | Tracer,
         where: Any,
         func: Any,
         array_as_leaves: bool = True,
