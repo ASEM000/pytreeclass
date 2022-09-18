@@ -221,7 +221,7 @@ def _append_field(
             if is_treeclass(node_item):
                 _callable_map(tree=node_item, where=where)
 
-            elif where(node_item) and not is_static_field(field_item):
+            elif where(node_item):
                 new_field = replacing_field(repr=field_item.repr)
                 object.__setattr__(new_field, "name", field_item.name)
                 object.__setattr__(new_field, "type", field_item.type)
@@ -241,7 +241,7 @@ def _append_field(
             if is_treeclass(lhs_node_item):
                 _mask_map(tree=lhs_node_item, where=rhs_node_item)
 
-            elif jnp.all(rhs_node_item) and not is_static_field(lhs_field_item):
+            elif jnp.all(rhs_node_item):
                 new_field = replacing_field(repr=lhs_field_item.repr)
                 object.__setattr__(new_field, "name", lhs_field_item.name)
                 object.__setattr__(new_field, "type", lhs_field_item.type)

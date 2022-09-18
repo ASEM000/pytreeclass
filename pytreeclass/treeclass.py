@@ -50,5 +50,5 @@ def treeclass(*args, **kwargs):
         return class_wrapper(args[0])
     else:
         raise TypeError(
-            f"Input argument to `treeclass` must be of `class` type. Found {type(args[0])}"
+            f"Input argument to `treeclass` must be of `class` type. Found {(*args, *kwargs)}."
         )
