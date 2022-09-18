@@ -25,17 +25,17 @@ def frozen_field(**kwargs):
 
 def is_frozen_field(field_item: Field) -> bool:
     """check if field is frozen"""
-    return field_item.metadata.get("frozen", False)
+    return isinstance(field_item, Field) and field_item.metadata.get("frozen", False)
 
 
 def is_nondiff_field(field_item: Field) -> bool:
     """check if field is strictly static"""
-    return field_item.metadata.get("nondiff", False)
+    return isinstance(field_item, Field) and field_item.metadata.get("nondiff", False)
 
 
 def is_static_field(field_item: Field) -> bool:
     """check if field is static"""
-    return field_item.metadata.get("static", False)
+    return isinstance(field_item, Field) and field_item.metadata.get("static", False)
 
 
 def is_treeclass_frozen(tree):

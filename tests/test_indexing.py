@@ -968,3 +968,14 @@ def test_not_equal():
     assert is_treeclass_equal(t.at[t != int].set(10.0), Test(a=1, b=10.0))
 
     assert is_treeclass_equal(t.at[t != 10].set(10.0), Test(a=10.0, b=10.0))
+
+
+def test_iterable_node():
+    @pytc.treeclass
+    class Test:
+        a: int
+
+    t = Test([1, 2, 3, 4])
+    assert is_treeclass_equal(t.at[...].set(True), Test([True, True, True, True]))
+    assert is_treeclass_equal(t.at[t == "a"].set(True), Test([True, True, True, True]))
+    assert is_treeclass_equal(t.at[t != "a"].set(True), Test([1, 2, 3, 4]))
