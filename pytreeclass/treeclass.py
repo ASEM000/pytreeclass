@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-import functools as ft
 import inspect
 from dataclasses import dataclass
 
 import jax
 
 from pytreeclass._src.misc import _mutable
-from pytreeclass._src.tree_base import _explicitSetter, _implicitSetter, _treeBase
+from pytreeclass._src.tree_base import _implicitSetter, _treeBase
 from pytreeclass._src.tree_indexer import _treeIndexer
 from pytreeclass._src.tree_op import _treeOp
 from pytreeclass._src.tree_pretty import _treePretty
 
 
 def treeclass(*args, **kwargs):
-    def class_wrapper(cls, field_only: bool):
+    def class_wrapper(cls):
 
         if "__setattr__" in cls.__dict__:
             raise AttributeError(
@@ -31,7 +30,7 @@ def treeclass(*args, **kwargs):
         )(cls)
 
         base_classes = (dCls,)
-        base_classes += (_explicitSetter,) if field_only else (_implicitSetter,)
+        base_classes += (_implicitSetter,)
         base_classes += (_treeIndexer, _treeOp, _treePretty)
         base_classes += (_treeBase,)
 
@@ -48,9 +47,8 @@ def treeclass(*args, **kwargs):
 
     if len(args) == 1 and inspect.isclass(args[0]):
         # no args are passed to the decorator (i.e. @treeclass)
-        return class_wrapper(args[0], field_only=False)
-
-    elif len(args) == 0 and len(kwargs) > 0:
-        # args are passed to the decorator (i.e. @treeclass(field_only=True))
-        field_only = kwargs.get("field_only", False)
-        return ft.partial(class_wrapper, field_only=field_only)
+        return class_wrapper(args[0])
+    else:
+        raise TypeError(
+            f"Input argument to `treeclass` must be of `class` type. Found {type(args[0])}"
+        )

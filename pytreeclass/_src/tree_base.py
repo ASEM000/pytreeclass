@@ -87,17 +87,3 @@ class _implicitSetter:
 
             # register it to class
             self.__undeclared_fields__.update({key: field_value})
-
-
-class _explicitSetter:
-    """Register dataclass fields"""
-
-    __immutable_pytree__ = True
-
-    def __setattr__(self, key, value):
-        if self.__immutable_pytree__:
-            raise ImmutableInstanceError(
-                f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
-            )
-
-        object.__setattr__(self, key, value)

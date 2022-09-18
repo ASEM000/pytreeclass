@@ -112,6 +112,16 @@ def _tree_mutate(tree):
     return tree
 
 
+def _tree_immutate(tree):
+    """Enable immutable behavior for a treeclass instance"""
+    if is_treeclass(tree):
+        object.__setattr__(tree, "__immutable_pytree__", True)
+        for field_item in _tree_fields(tree).values():
+            if hasattr(tree, field_item.name):
+                _tree_immutate(getattr(tree, field_item.name))
+    return tree
+
+
 class _fieldDict(dict):
     """A dict used for `__pytree_structure__` attribute of a treeclass instance"""
 
@@ -136,16 +146,6 @@ def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
         else:
             dynamic[field_item.name] = getattr(tree, field_item.name)
     return (dynamic, static)
-
-
-def _tree_immutate(tree):
-    """Enable immutable behavior for a treeclass instance"""
-    if is_treeclass(tree):
-        object.__setattr__(tree, "__immutable_pytree__", True)
-        for field_item in _tree_fields(tree).values():
-            if hasattr(tree, field_item.name):
-                _tree_immutate(getattr(tree, field_item.name))
-    return tree
 
 
 def _tree_fields(tree):
@@ -195,7 +195,7 @@ def _append_field(
     tree: PyTree,
     where: Callable[[Field, Any], bool] | PyTree,
     replacing_field: Field = field,
-):
+) -> PyTree:
     """append a dataclass field to a treeclass `__undeclared_fields__`
 
     Args:
@@ -213,7 +213,7 @@ def _append_field(
         of a field but don't want to change the original field definition defined in the class.
     """
 
-    def _callable_map(tree: PyTree, where):
+    def _callable_map(tree: PyTree, where: Callable[[Field, Any], bool]) -> PyTree:
         # filter based on a conditional callable
         for field_item in _tree_fields(tree).values():
             node_item = getattr(tree, field_item.name)
@@ -221,7 +221,7 @@ def _append_field(
             if is_treeclass(node_item):
                 _callable_map(tree=node_item, where=where)
 
-            elif where(node_item):
+            elif where(node_item) and not is_static_field(field_item):
                 new_field = replacing_field(repr=field_item.repr)
                 object.__setattr__(new_field, "name", field_item.name)
                 object.__setattr__(new_field, "type", field_item.type)
@@ -230,7 +230,7 @@ def _append_field(
 
         return tree
 
-    def _mask_map(tree: PyTree, where):
+    def _mask_map(tree: PyTree, where: PyTree) -> PyTree:
         # filter based on a mask of the same type as `tree`
         for (lhs_field_item, rhs_field_item) in zip(
             _tree_fields(tree).values(), _tree_fields(where).values()
@@ -241,7 +241,7 @@ def _append_field(
             if is_treeclass(lhs_node_item):
                 _mask_map(tree=lhs_node_item, where=rhs_node_item)
 
-            elif rhs_node_item:
+            elif jnp.all(rhs_node_item) and not is_static_field(lhs_field_item):
                 new_field = replacing_field(repr=lhs_field_item.repr)
                 object.__setattr__(new_field, "name", lhs_field_item.name)
                 object.__setattr__(new_field, "type", lhs_field_item.type)

@@ -39,7 +39,7 @@ def test_freezing_unfreezing():
         c: int = 3
         d: A = A(1, 2)
 
-    @pytc.treeclass(field_only=True)
+    @pytc.treeclass
     class A:
         a: int
         b: int
@@ -94,7 +94,7 @@ def test_freezing_errors():
     class T:
         pass
 
-    @pytc.treeclass(field_only=False)
+    @pytc.treeclass
     class Test:
         a: Any
 
@@ -121,18 +121,7 @@ def test_freezing_with_ops():
         c: int = 3
         d: A = A(1, 2)
 
-    @pytc.treeclass(field_only=False)
-    class Test:
-        a: int = 1
-        b: float = pytc.nondiff_field(default=(1.0))
-        c: str = "test"
-
-    t = Test()
-
-    with pytest.raises(ImmutableInstanceError):
-        tree_freeze(t).a = 1
-
-    @pytc.treeclass(field_only=True)
+    @pytc.treeclass
     class Test:
         a: int = 1
         b: float = pytc.nondiff_field(default=(1.0))
