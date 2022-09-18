@@ -220,3 +220,18 @@ def test_freeze_diagram():
     assert (
         tree_diagram(a)
     ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
+
+
+def test_freeze_mask():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: int = 2
+        c: float = 3.0
+
+    t = Test()
+
+    assert jtu.tree_leaves(tree_freeze(t, t == "a")) == [2, 3.0]
+    assert jtu.tree_leaves(tree_freeze(t, t == "b")) == [1, 3.0]
+    assert jtu.tree_leaves(tree_freeze(t, t == "c")) == [1, 2]
+    assert jtu.tree_leaves(tree_freeze(t, t == t)) == []

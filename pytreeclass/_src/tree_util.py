@@ -191,193 +191,30 @@ def _is_nondiff(item: Any) -> bool:
     return _is_nondiff_item(item)
 
 
-def filter_nondiff(
-    tree: PyTree, where: Callable[[Field, Any], bool] | PyTree = _is_nondiff
+def _append_field(
+    tree: PyTree,
+    where: Callable[[Field, Any], bool] | PyTree,
+    replacing_field: Field = field,
 ):
+    """append a dataclass field to a treeclass `__undeclared_fields__`
 
-    """filter non-differentiable fields from a treeclass instance
+    Args:
+        tree (PyTree): tree to append field to
+        where (Callable[[Field, Any], bool] | PyTree, optional): where to append field. Defaults to _is_nondiff.
+        replacing_field (Field, optional): type of field. Defaults to field.
 
     Note:
-        Mark fields as non-differentiable with adding metadata `dict(static=True,nondiff=True)`
-        the way it is done is by adding a field in `__undeclared_fields__` to the treeclass instance
-        that contains the non-differentiable fields.
-        This is done to avoid mutating the original treeclass class .
+        This is the base mechanism for controlling the static/dynamic behavior of a treeclass instance.
+
         during the `tree_flatten`, tree_fields are the combination of
         {__dataclass_fields__, __undeclared_fields__} this means that a field defined
         in `__undeclared_fields__` with the same name as in __dataclass_fields__
         will override its properties, this is useful if you want to change the metadata
         of a field but don't want to change the original field definition defined in the class.
-
-    Example:
-        # here we try to optimize a differentiable value `b` that
-        # is wrapped within a non-differentiable function `jax.nn.tanh`
-        @pytc.treeclass
-        class Linear:
-            weight: jnp.ndarray
-            bias: jnp.ndarray
-            other: jnp.ndarray = (1,2,3,4)
-            a: int = 1
-            b: float = 1.0
-            c: int = 1
-            d: float = 2.0
-            act : Callable = jax.nn.tanh
-            def __init__(self,in_dim,out_dim):
-                self.weight = jnp.ones((in_dim,out_dim))
-                self.bias =  jnp.ones((1,out_dim))
-            def __call__(self,x):
-                return self.act(self.b+x)
-
-        @jax.value_and_grad
-        def loss_func(model):
-            return jnp.mean((model(1.)-0.5)**2)
-
-        @jax.jit
-        def update(model):
-            value,grad = loss_func(model)
-            return value,model-1e-3*grad
-
-        def train(model,epochs=10_000):
-            model = filter_nondiff(model)
-            for _ in range(epochs):
-                value,model = update(model)
-            return model
-
-        >>> model = Linear(1,1)
-        >>> model = train(model)
-        >>> print(model)
-        # Linear(
-        #   weight=[[1.]],
-        #   bias=[[1.]],
-        #   *other=(1,2,3,4),
-        #   *a=1,
-        #   b=-0.36423424,
-        #   *c=1,
-        #   d=2.0,
-        #   *act=tanh(x)
-        # )
-
-    ** for non-`None` where, mark fields as non-differentiable by using `where` mask.
-
-    Example:
-        @pytc.treeclass
-        class L0:
-            a: int = 1
-            b: int = 2
-            c: int = 3
-
-        @pytc.treeclass
-        class L1:
-            a: int = 1
-            b: int = 2
-            c: int = 3
-            d: L0 = L0()
-
-        @pytc.treeclass
-        class L2:
-            a: int = 10
-            b: int = 20
-            c: int = 30
-            d: L1 = L1()
-
-        >>> t = L2()
-        >>> print(t.tree_diagram())
-        # L2
-        #     ├── a=10
-        #     ├── b=20
-        #     ├── c=30
-        #     └── d=L1
-        #         ├── a=1
-        #         ├── b=2
-        #         ├── c=3
-        #         └── d=L0
-        #             ├── a=1
-        #             ├── b=2
-        #             └── c=3
-        # Let's mark `a` and `b`  in `L0` as non-differentiable
-        # we can do this by using `where` mask
-
-        >>> t = t.at["d"].at["d"].set(filter_nondiff(t.d.d, where= L0(a=True,b=True, c=False)))
-        >>> print(t.tree_diagram())
-        # L2
-        #     ├── a=10
-        #     ├── b=20
-        #     ├── c=30
-        #     └── d=L1
-        #         ├── a=1
-        #         ├── b=2
-        #         ├── c=3
-        #         └── d=L0
-        #             ├*─ a=1
-        #             ├*─ b=2
-        #             └── c=3
-        # note `*` indicates that the field is non-differentiable
     """
 
-    def _nondiff_callable_map(tree: PyTree, where):
-        for field_item in _tree_fields(tree).values():
-            node_item = getattr(tree, field_item.name)
-
-            if is_treeclass(node_item):
-                _nondiff_callable_map(tree=node_item, where=where)
-
-            elif where(node_item):
-                new_field = nondiff_field(repr=field_item.repr)
-                object.__setattr__(new_field, "name", field_item.name)
-                object.__setattr__(new_field, "type", field_item.type)
-                new_fields = {**tree.__undeclared_fields__, **{field_item.name: new_field}}  # fmt: skip
-                object.__setattr__(tree, "__undeclared_fields__", new_fields)
-
-        return tree
-
-    def _nondiff_mask_map(tree: PyTree, where):
-        for (lhs_field_item, rhs_field_item) in zip(
-            _tree_fields(tree).values(), _tree_fields(where).values()
-        ):
-            lhs_node_item = getattr(tree, lhs_field_item.name)
-            rhs_node_item = getattr(where, rhs_field_item.name)
-
-            if is_treeclass(lhs_node_item):
-                _nondiff_mask_map(tree=lhs_node_item, where=rhs_node_item)
-
-            elif rhs_node_item:
-                new_field = nondiff_field(repr=lhs_field_item.repr)
-                object.__setattr__(new_field, "name", lhs_field_item.name)
-                object.__setattr__(new_field, "type", lhs_field_item.type)
-                new_fields = {**tree.__undeclared_fields__, **{lhs_field_item.name: new_field}}  # fmt: skip
-                object.__setattr__(tree, "__undeclared_fields__", new_fields)
-
-        return tree
-
-    if isinstance(where, FunctionType):
-        return _nondiff_callable_map(tree_copy(tree), where)
-    elif isinstance(where, type(tree)):
-        return _nondiff_mask_map(tree_copy(tree), where)
-    else:
-        raise TypeError(f"`where` must be a Callable or a {type(tree)}")
-
-
-def unfilter_nondiff(tree):
-    """remove fields added by `filter_nondiff"""
-
-    def _recurse(tree):
-        for field_item in _tree_fields(tree).values():
-            node_item = getattr(tree, field_item.name)
-            if is_treeclass(node_item):
-                _recurse(tree=node_item)
-            elif is_nondiff_field(field_item):
-                del tree.__undeclared_fields__[field_item.name]
-        return tree
-
-    return _recurse(tree_copy(tree))
-
-
-# filtering freezing
-
-
-def tree_freeze(
-    tree: PyTree, where: Callable[[Field, Any], bool] | PyTree = lambda _: True
-):
     def _callable_map(tree: PyTree, where):
+        # filter based on a conditional callable
         for field_item in _tree_fields(tree).values():
             node_item = getattr(tree, field_item.name)
 
@@ -385,7 +222,7 @@ def tree_freeze(
                 _callable_map(tree=node_item, where=where)
 
             elif where(node_item):
-                new_field = frozen_field(repr=field_item.repr)
+                new_field = replacing_field(repr=field_item.repr)
                 object.__setattr__(new_field, "name", field_item.name)
                 object.__setattr__(new_field, "type", field_item.type)
                 new_fields = {**tree.__undeclared_fields__, **{field_item.name: new_field}}  # fmt: skip
@@ -394,6 +231,7 @@ def tree_freeze(
         return tree
 
     def _mask_map(tree: PyTree, where):
+        # filter based on a mask of the same type as `tree`
         for (lhs_field_item, rhs_field_item) in zip(
             _tree_fields(tree).values(), _tree_fields(where).values()
         ):
@@ -404,7 +242,7 @@ def tree_freeze(
                 _mask_map(tree=lhs_node_item, where=rhs_node_item)
 
             elif rhs_node_item:
-                new_field = frozen_field(repr=lhs_field_item.repr)
+                new_field = replacing_field(repr=lhs_field_item.repr)
                 object.__setattr__(new_field, "name", lhs_field_item.name)
                 object.__setattr__(new_field, "type", lhs_field_item.type)
                 new_fields = {**tree.__undeclared_fields__, **{lhs_field_item.name: new_field}}  # fmt: skip
@@ -420,16 +258,36 @@ def tree_freeze(
         raise TypeError(f"`where` must be a Callable or a {type(tree)}")
 
 
-def tree_unfreeze(tree):
-    """remove fields added by `tree_freeze"""
+def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
+    """remove a dataclass field from `__undeclared_fields__` added if some condition is met"""
 
     def _recurse(tree):
         for field_item in _tree_fields(tree).values():
             node_item = getattr(tree, field_item.name)
             if is_treeclass(node_item):
                 _recurse(tree=node_item)
-            elif is_frozen_field(field_item):
+            elif cond(field_item):
                 del tree.__undeclared_fields__[field_item.name]
         return tree
 
     return _recurse(tree_copy(tree))
+
+
+def filter_nondiff(
+    tree: PyTree, where: PyTree | Callable[[Field, Any], bool] = _is_nondiff
+) -> PyTree:
+    return _append_field(tree=tree, where=where, replacing_field=nondiff_field)
+
+
+def unfilter_nondiff(tree):
+    return _unappend_field(tree, is_nondiff_field)
+
+
+def tree_freeze(
+    tree: PyTree, where: PyTree | Callable[[Field, Any], bool] = lambda _: True
+) -> PyTree:
+    return _append_field(tree=tree, where=where, replacing_field=frozen_field)
+
+
+def tree_unfreeze(tree):
+    return _unappend_field(tree, is_frozen_field)
