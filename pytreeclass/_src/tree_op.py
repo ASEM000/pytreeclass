@@ -20,7 +20,6 @@ import numpy as np
 from jax._src.tree_util import flatten_one_level
 from jax.core import Tracer
 
-from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import _tree_fields, is_treeclass
 
 PyTree = Any
@@ -28,43 +27,18 @@ PyTree = Any
 
 def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
     """`jtu.tree_map` for unary/binary operators broadcasting"""
-
-    @dispatch(argnum=1)
-    def _tree_map(lhs, rhs):
-        raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
-
-    @_tree_map.register(type(lhs))
-    def _(lhs, rhs):
-        # if rhs is a tree, then apply the operator to the tree
-        # the rhs tree here must be of the same type as lhs tree
+    if isinstance(rhs, type(lhs)):
         return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
-
-    @_tree_map.register(Tracer)
-    @_tree_map.register(jnp.ndarray)
-    @_tree_map.register(int)
-    @_tree_map.register(float)
-    @_tree_map.register(complex)
-    @_tree_map.register(bool)
-    @_tree_map.register(str)
-    def _(
-        lhs,
-        rhs: int | float | complex | bool | str | jnp.ndarray | Tracer,
-    ):
-        # broadcast the scalar rhs to the lhs
+    elif isinstance(rhs, (Tracer, jnp.ndarray, int, float, complex, bool, str)):
         return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
-
-    @_tree_map.register(type(None))
-    def _(lhs, rhs=None):
-        # if rhs is None, then apply the operator to the tree
-        # i.e. this defines the unary operator
+    elif isinstance(rhs, type(None)):  # unary operator
         return jtu.tree_map(func, lhs, is_leaf=is_leaf)
-
-    return _tree_map(lhs, rhs)
+    else:
+        raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
 
 
 def _append_math_op(func):
     """binary and unary magic operations"""
-    # make `func` work on pytree
 
     @ft.wraps(func)
     def wrapper(self, rhs=None):
@@ -148,41 +122,18 @@ def _append_math_eq_ne(func):
     """Append eq/ne operations"""
 
     @ft.wraps(func)
-    def wrapper(self, rhs):
-        @dispatch(argnum=1)
-        def inner_wrapper(tree, where, **kwargs):
-            raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
+    def wrapper(self, where):
 
-        @inner_wrapper.register(int)
-        @inner_wrapper.register(float)
-        @inner_wrapper.register(complex)
-        @inner_wrapper.register(bool)
-        @inner_wrapper.register(type(self))
-        @inner_wrapper.register(Tracer)
-        @inner_wrapper.register(jnp.ndarray)
-        def _(
-            self,
-            rhs: int | float | complex | bool | type(self) | Tracer | jnp.ndarray,
-        ):
-            # this function is handling all the numeric types
-            return _dispatched_op_tree_map(func, self, rhs)
-
-        @inner_wrapper.register(str)
-        def _(tree, where: str, **kwargs):
-            """Filter by field name"""
-            return _field_boolean_map(lambda x, y: func(x.name, where), tree)
-
-        @inner_wrapper.register(type)
-        def _(tree, where: type, **kwargs):
-            """Filter by field type"""
-            return _field_boolean_map(lambda x, y: func(y, where), tree)
-
-        @inner_wrapper.register(dict)
-        def _(tree, where: dict[str, Any], **kwargs):
-            """Filter by metadata"""
-            return _field_boolean_map(lambda x, y: func(x.metadata, where), tree)
-
-        return inner_wrapper(self, rhs)
+        if isinstance(where, (int, float, complex, bool, type(self), Tracer, jnp.ndarray)):  # fmt: skip
+            return _dispatched_op_tree_map(func, self, where)
+        elif isinstance(where, str):
+            return _field_boolean_map(lambda x, y: func(x.name, where), self)
+        elif isinstance(where, type):
+            return _field_boolean_map(lambda x, y: func(y, where), self)
+        elif isinstance(where, dict):
+            return _field_boolean_map(lambda x, y: func(x.metadata, where), self)
+        else:
+            raise NotImplementedError(f"rhs of type {type(where)} is not implemented.")
 
     return wrapper
 
