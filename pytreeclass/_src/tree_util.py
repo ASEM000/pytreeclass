@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import Field, field
-from types import FunctionType
+from types import FunctionType, MappingProxyType
 from typing import Any, Callable
 
 import jax.numpy as jnp
@@ -226,7 +226,7 @@ def _append_field(
                 object.__setattr__(new_field, "name", field_item.name)
                 object.__setattr__(new_field, "type", field_item.type)
                 new_fields = {**tree.__undeclared_fields__, **{field_item.name: new_field}}  # fmt: skip
-                object.__setattr__(tree, "__undeclared_fields__", new_fields)
+                object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
 
         return tree
 
@@ -246,7 +246,7 @@ def _append_field(
                 object.__setattr__(new_field, "name", lhs_field_item.name)
                 object.__setattr__(new_field, "type", lhs_field_item.type)
                 new_fields = {**tree.__undeclared_fields__, **{lhs_field_item.name: new_field}}  # fmt: skip
-                object.__setattr__(tree, "__undeclared_fields__", new_fields)
+                object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
 
         return tree
 
@@ -267,7 +267,11 @@ def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
             if is_treeclass(node_item):
                 _recurse(tree=node_item)
             elif cond(field_item):
-                del tree.__undeclared_fields__[field_item.name]
+                new_fields = dict(tree.__undeclared_fields__)
+                new_fields.pop(field_item.name)
+                object.__setattr__(
+                    tree, "__undeclared_fields__", MappingProxyType(new_fields)
+                )
         return tree
 
     return _recurse(tree_copy(tree))

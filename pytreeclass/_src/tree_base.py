@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import MISSING, field
+from types import MappingProxyType
 from typing import Any
 
 from pytreeclass._src.tree_util import _tree_fields, _tree_structure
@@ -12,7 +13,7 @@ from pytreeclass._src.tree_util import _tree_fields, _tree_structure
 class _treeBase:
     def __new__(cls, *args, **kwargs):
         self = object.__new__(cls)
-        object.__setattr__(self, "__undeclared_fields__", {})
+        object.__setattr__(self, "__undeclared_fields__", MappingProxyType({}))
         # set default values to class instance
         # Note: ideally this method should be called once
         for field_item in self.__dataclass_fields__.values():
@@ -86,4 +87,5 @@ class _implicitSetter:
             object.__setattr__(field_value, "type", type(value))
 
             # register it to class
-            self.__undeclared_fields__.update({key: field_value})
+            new_fields = {**self.__undeclared_fields__, **{key: field_value}}  # fmt: skip
+            object.__setattr__(self, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
