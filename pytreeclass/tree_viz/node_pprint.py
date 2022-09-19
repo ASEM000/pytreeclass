@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 from jax._src.custom_derivatives import custom_jvp
 from jaxlib.xla_extension import CompiledFunction
 
@@ -206,6 +207,9 @@ def _format_node_repr(node: Any, depth: int = 0) -> str:
     if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
 
+    elif isinstance(node, jtu.Partial):
+        return f"Partial({_func_repr(node.func)})"
+
     elif isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
         return _jax_numpy_repr(node)
 
@@ -228,7 +232,7 @@ def _format_node_repr(node: Any, depth: int = 0) -> str:
         return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
 
 
-def _format_node_str(node, depth):
+def _format_node_str(node, depth: int = 0):
     """
     Pretty printer for a node, differs from `_format_node_repr` in that
     it calls !s instead of !r
@@ -257,6 +261,9 @@ def _format_node_str(node, depth):
     if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
 
+    elif isinstance(node, jtu.Partial):
+        return f"Partial({_func_repr(node.func)})"
+
     elif isinstance(node, list):
         return _list_str(node, depth)
 
@@ -279,6 +286,9 @@ def _format_node_str(node, depth):
 def _format_node_diagram(node, *args, **kwargs):
     if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
+
+    elif isinstance(node, jtu.Partial):
+        return f"Partial({_func_repr(node.func)})"
 
     elif isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
         return _jax_numpy_repr(node)
