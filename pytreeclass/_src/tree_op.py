@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import functools as ft
 import operator as op
-from collections.abc import Iterable
 from dataclasses import Field
 from typing import Any, Callable, Generator
 
@@ -60,28 +59,24 @@ def _field_boolean_map(
     # this is the function responsible for the boolean mapping of
     # `node_type`, `field_name`, and `field_metadata` comparisons.
 
-    def _node_true(node):
-        if isinstance(node, jnp.ndarray):
-            # broadcast True to the shape of the array
-            return jnp.ones_like(node).astype(jnp.bool_)
-        elif isinstance(node, Iterable):
-            # broadcast False to the node
-            return jtu.tree_map(lambda _: True, node)
-        else:
-            return True
+    def _true_leaves(node):
+        return [
+            jnp.ones_like(leaf).astype(jnp.bool_)
+            if isinstance(leaf, jnp.ndarray)
+            else True
+            for leaf in jtu.tree_leaves(node, is_leaf=_is_leaf)
+        ]
 
-    def _node_false(node):
-        if isinstance(node, jnp.ndarray):
-            # broadcast False to the shape of the array
-            return jnp.zeros_like(node).astype(jnp.bool_)
-        elif isinstance(node, Iterable):
-            # broadcast False to the node
-            return jtu.tree_map(lambda _: False, node)
-        else:
-            return False
+    def _false_leaves(node):
+        return [
+            jnp.zeros_like(leaf).astype(jnp.bool_)
+            if isinstance(leaf, jnp.ndarray)
+            else False
+            for leaf in jtu.tree_leaves(node, is_leaf=_is_leaf)
+        ]
 
     def _is_leaf(node):
-        return isinstance(node, Iterable) or node is None
+        return node is None
 
     def _traverse(tree) -> Generator[Any, ...]:
         """traverse the tree and yield the applied function on the field and node"""
@@ -99,14 +94,11 @@ def _field_boolean_map(
         for field_item, node_item in zip(field_items, leaves):
             condition = cond(field_item, node_item)
 
-            if is_treeclass(node_item):
-                yield from (
-                    _node_true(item)
-                    for item in jtu.tree_leaves(node_item, is_leaf=_is_leaf)
-                ) if condition else _traverse(tree=node_item)
-
-            else:
-                yield _node_true(node_item) if condition else _node_false(node_item)
+            yield from _true_leaves(node_item) if condition else (
+                _traverse(node_item)
+                if is_treeclass(node_item)
+                else _false_leaves(node_item)
+            )
 
     return jtu.tree_unflatten(
         treedef=jtu.tree_structure(tree, is_leaf=_is_leaf),
