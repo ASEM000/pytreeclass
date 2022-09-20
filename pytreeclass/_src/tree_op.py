@@ -2,10 +2,6 @@
 # the main idea is to use the jax.tree_map function to apply the operator to the tree
 # possible lhs/rhs are scalar/jnp.ndarray or tree of the same type/structure
 
-# Techincal note: the following code uses function dispatch heavily, to navigate
-# through diffeent data types and how to handle each type.
-# @dispatch is defined in dispatch.py and is based on functools.singledispatch
-
 from __future__ import annotations
 
 import functools as ft
@@ -104,10 +100,10 @@ def _field_boolean_map(
             condition = cond(field_item, node_item)
 
             if is_treeclass(node_item):
-                yield from [
+                yield from (
                     _node_true(item)
                     for item in jtu.tree_leaves(node_item, is_leaf=_is_leaf)
-                ] if condition else _traverse(tree=node_item)
+                ) if condition else _traverse(tree=node_item)
 
             else:
                 yield _node_true(node_item) if condition else _node_false(node_item)

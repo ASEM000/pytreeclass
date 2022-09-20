@@ -1,7 +1,7 @@
 <!-- <h1 align="center" style="font-family:Monospace" >Py🌲Class</h1> -->
-<div align="center">
+<h5 align="center">
 <img width="350px" src="assets/pytc%20logo.svg"> <br>
-</div>
+
 <br>
 
 [**Installation**](#Installation)
@@ -24,6 +24,8 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ASEM000/pytreeclass)
 [![DOI](https://zenodo.org/badge/512717921.svg)](https://zenodo.org/badge/latestdoi/512717921)
 ![PyPI](https://img.shields.io/pypi/v/pytreeclass)
+
+</h5>
 
 ## 🛠️ Installation<a id="Installation"></a>
 

@@ -64,7 +64,7 @@ def _at_get(tree, where, **kwargs):
     @_where_get.register(type(tree))
     def _(tree: PyTree, where: PyTree, is_leaf=None, **kwargs):
         lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-        where_leaves, where_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
+        where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
         lhs_leaves = [
             _lhs_get(lhs=lhs_leaf, where=where_leaf, **kwargs)
             for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
