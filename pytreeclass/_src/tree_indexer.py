@@ -11,7 +11,6 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.core import Tracer
 
-from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
     _tree_immutate,
     _tree_mutate,
@@ -19,13 +18,14 @@ from pytreeclass._src.tree_util import (
     tree_copy,
 )
 
+PyTree = Any
+
 """ .at[...].get() """
 
 
-def _at_get(tree, where, **kwargs):
-    PyTree = type(tree)
-
-    @dispatch(argnum="lhs")
+def _at_get(
+    tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool] = None, **kwargs
+):
     def _lhs_get(lhs: Any, where: Any, **kwargs):
         """Get pytree node  value
 
@@ -36,74 +36,51 @@ def _at_get(tree, where, **kwargs):
         Raises:
             NotImplementedError:
         """
-        raise NotImplementedError(f"Get node type ={type(lhs)} is not implemented.")
+        if isinstance(lhs, (Tracer, jnp.ndarray)):
+            array_as_leaves = kwargs.get("array_as_leaves", True)
+            # array_as_leaves defins whether the condition/where
+            # is applied to each array element
+            return (
+                lhs[jnp.where(where)]
+                if array_as_leaves
+                else (lhs if jnp.all(where) else None)
+            )
 
-    @_lhs_get.register(Tracer)
-    @_lhs_get.register(jnp.ndarray)
-    def _(lhs: jnp.ndarray | Tracer, where: Any, array_as_leaves: bool = True):
-        return (
-            (lhs[jnp.where(where)])
-            if array_as_leaves
-            else (lhs if jnp.all(where) else None)
-        )
+        elif isinstance(lhs, (int, float, complex, tuple, list, str)):
+            return lhs if where else None
+        else:
+            raise NotImplementedError(f"Get node type ={type(lhs)} is not implemented.")
 
-    @_lhs_get.register(int)
-    @_lhs_get.register(float)
-    @_lhs_get.register(complex)
-    @_lhs_get.register(tuple)
-    @_lhs_get.register(list)
-    @_lhs_get.register(str)
-    def _(lhs: int | float | complex | tuple | list | str, where: Any, **kwargs):
-        # set None to non-chosen non-array values
-        return lhs if where else None
+    def _where_get(tree: Any, where: Any, is_leaf: Callable[[Any], bool], **kwargs):
 
-    @dispatch(argnum="where")
-    def _where_get(tree: Any, where: Any, **kwargs):
-        raise NotImplementedError(f"Get where type = {type(where)} is not implemented.")
+        if isinstance(where, type(tree)):
+            lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
+            where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
+            lhs_leaves = [
+                _lhs_get(lhs=lhs_leaf, where=where_leaf, **kwargs)
+                for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
+            ]
 
-    @_where_get.register(type(tree))
-    def _(tree: PyTree, where: PyTree, is_leaf=None, **kwargs):
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-        where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
-        lhs_leaves = [
-            _lhs_get(lhs=lhs_leaf, where=where_leaf, **kwargs)
-            for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
-        ]
+            return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
 
-        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+        else:
+            raise NotImplementedError(
+                f"Get where type = {type(where)} is not implemented."
+            )
 
-    return _where_get(tree=tree, where=where, **kwargs)
+    return _where_get(tree=tree, where=where, is_leaf=is_leaf, **kwargs)
 
 
 """ .at[...].set() """
 
 
-def _at_set(tree, where, set_value, **kwargs):
-    # Dispatch table
-    # ----------------------------------------------------------------#
-    # lhs           | where(rhs)    | set_value     | operation       #
-    # ----------------------------------------------------------------#
-    # jnp.ndarray,  |               |               | set_value       #
-    # JaxprTracer   | bool          | bool          | if jnp.all(where)
-    #               |               |               | else set_value  #
-    # ----------------------------------------------------------------#
-    # jnp.ndarray,  |               |               | set_value       #
-    # JaxprTracer   | bool          | bool          | if jnp.all(where)
-    #               |               |               | else set_value  #
-    # ----------------------------------------------------------------#
-    #               |               |               |[array_as_leaves]#
-    #               |               |               | jnp.where(where,#
-    #               |               |int, float,    |   set_value, lhs)
-    # jnp.ndarray   | bool          |jnp.ndarray    | [otherwise]     #
-    # JaxprTracer   |               |complex,       | set_value       #
-    #               |               |               | if jnp.all(where)
-    #               |               |               | else set_value  #
-    #               |               |               |                 #
-    # ----------------------------------------------------------------#
-
-    PyTree = type(tree)
-
-    @dispatch(argnum="lhs")
+def _at_set(
+    tree: PyTree,
+    where: PyTree,
+    set_value,
+    is_leaf: Callable[[Any], bool] = None,
+    **kwargs,
+):
     def _lhs_set(lhs: Any, where: Any, set_value: Any, **kwargs):
         """Set pytree node value.
 
@@ -115,89 +92,73 @@ def _at_set(tree, where, set_value, **kwargs):
         Returns:
             Modified node value.
         """
-        raise NotImplementedError(f"Set node type = {type(lhs)} is unknown.")
+        if isinstance(lhs, (Tracer, jnp.ndarray)):
 
-    @_lhs_set.register(Tracer)
-    @_lhs_set.register(jnp.ndarray)
-    @dispatch(argnum="set_value")
-    def _set_value_set(lhs: jnp.ndarray | Tracer, where: Any, set_value: Any):
-        """Multi dispatched on lhs and where type"""
-        # lhs is numeric node
-        # set_value in not acceptable set_value type for numeric node
-        # thus array_as_leaves is not an optional keyword argument
-        # An example is setting an array to None
-        # then the entire array is set to None if all array elements are
-        # satisfied by the where condition
-        return set_value if jnp.all(where) else lhs
+            if isinstance(set_value, (bool)):
+                return set_value if jnp.all(where) else lhs
 
-    @_set_value_set.register(bool)
-    def _(lhs: jnp.ndarray | Tracer, where: Any, set_value: bool):
-        # in python isinstance(True/False,int) is True
-        # without this dispatch, it will be handled with the int dispatch
-        return set_value if jnp.all(where) else lhs
+            elif isinstance(set_value, (int, float, complex, jnp.ndarray)):
+                # lhs is numeric node
+                # set_value in acceptable set_value type for a numeric node
+                # For some reason python isinstance(True,int) is True ?
+                array_as_leaves = kwargs.get("array_as_leaves", True)
+                return (
+                    jnp.where(where, set_value, lhs)
+                    if array_as_leaves
+                    else (set_value if jnp.all(where) else lhs)
+                )
+            else:
+                # lhs is numeric node
+                # set_value in not acceptable set_value type for numeric node
+                # thus array_as_leaves is not an optional keyword argument
+                # An example is setting an array to None
+                # then the entire array is set to None if all array elements are
+                # satisfied by the where condition
+                return set_value if jnp.all(where) else lhs
 
-    @_set_value_set.register(int)
-    @_set_value_set.register(float)
-    @_set_value_set.register(complex)
-    @_set_value_set.register(jnp.ndarray)
-    def _(
-        lhs: jnp.ndarray,
-        where: Any,
-        set_value: int | float | complex | jnp.ndarray,
-        array_as_leaves: bool = True,
-    ):
-        # lhs is numeric node
-        # set_value in acceptable set_value type for a numeric node
-        # For some reason python isinstance(True,int) is True ?
-        return (
-            jnp.where(where, set_value, lhs)
-            if array_as_leaves
-            else (set_value if jnp.all(where) else lhs)
-        )
+        elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
+            return set_value if (where in [True, None]) else lhs
 
-    @_lhs_set.register(int)
-    @_lhs_set.register(float)
-    @_lhs_set.register(complex)
-    @_lhs_set.register(tuple)
-    @_lhs_set.register(list)
-    @_lhs_set.register(str)
-    @_lhs_set.register(type(None))
-    def _(
-        lhs: int | float | complex | tuple | list | str | None,
-        where: Any,
+        else:
+            raise NotImplementedError(f"Set node type = {type(lhs)} is unknown.")
+
+    def _where_set(
+        tree: PyTree,
+        where: PyTree,
         set_value: Any,
+        is_leaf: Callable[[Any], bool],
         **kwargs,
     ):
-        # where == None can be obtained by
-        # is_leaf = lambda x : x is None
-        return set_value if (where in [True, None]) else lhs
+        if isinstance(where, type(tree)):
+            lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
+            where_leaves, rhs_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
+            lhs_leaves = [
+                _lhs_set(lhs=lhs_leaf, where=where_leaf, set_value=set_value, **kwargs)
+                for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
+            ]
 
-    @dispatch(argnum="where")
-    def _where_set(tree: PyTree, where: PyTree, set_value: Any, is_leaf=None, **kwargs):
-        raise NotImplementedError(f"Set where type = {type(where)} is not implemented.")
+            return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
 
-    @_where_set.register(type(tree))
-    def _(tree: PyTree, where: PyTree, set_value: Any, is_leaf=None, **kwargs):
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-        where_leaves, rhs_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
-        lhs_leaves = [
-            _lhs_set(lhs=lhs_leaf, where=where_leaf, set_value=set_value, **kwargs)
-            for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
-        ]
+        else:
+            raise NotImplementedError(
+                f"Set where type = {type(where)} is not implemented."
+            )
 
-        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
-
-    return _where_set(tree=tree, where=where, set_value=set_value, **kwargs)
+    return _where_set(
+        tree=tree, where=where, set_value=set_value, is_leaf=is_leaf, **kwargs
+    )
 
 
 """ .at[...].apply() """
 
 
-def _at_apply(tree, where, func, **kwargs):
-
-    PyTree = type(tree)
-
-    @dispatch(argnum="lhs")
+def _at_apply(
+    tree: PyTree,
+    where: PyTree,
+    func: Callable[[Any], Any],
+    is_leaf: Callable[[Any], bool] = None,
+    **kwargs,
+):
     def _lhs_apply(lhs: Any, where: bool, func: Callable[[Any], Any], **kwargs):
         """Set pytree node
 
@@ -209,77 +170,69 @@ def _at_apply(tree, where, func, **kwargs):
         Raises:
             NotImplementedError:
         """
-        raise NotImplementedError(f"Apply node type= {type(lhs)} is not implemented.")
 
-    @_lhs_apply.register(Tracer)
-    @_lhs_apply.register(jnp.ndarray)
-    def _(
-        lhs: jnp.ndarray | Tracer,
+        if isinstance(lhs, (Tracer, jnp.ndarray)):
+            array_as_leaves = kwargs.get("array_as_leaves", True)
+            # array_as_leaves defins whether the condition/where is applied to each array element
+            return (
+                jnp.where(where, func(lhs), lhs)
+                if array_as_leaves
+                else (func(lhs) if jnp.all(where) else lhs)
+            )
+
+        elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
+            return func(lhs) if (where in [True, None]) else lhs
+
+        else:
+            raise NotImplementedError(f"Apply node type = {type(lhs)} is unknown.")
+
+    def _where_apply(
+        tree: PyTree,
         where: Any,
         func: Any,
-        array_as_leaves: bool = True,
-    ):
-        # array_as_leaves defins whether the condition/where is applied to each array element
-        return (
-            jnp.where(where, func(lhs), lhs)
-            if array_as_leaves
-            else (func(lhs) if jnp.all(where) else lhs)
-        )
-
-    @_lhs_apply.register(int)
-    @_lhs_apply.register(float)
-    @_lhs_apply.register(complex)
-    @_lhs_apply.register(tuple)
-    @_lhs_apply.register(list)
-    @_lhs_apply.register(str)
-    @_lhs_apply.register(type(None))
-    def _(
-        lhs: int | float | complex | tuple | list | str | None,
-        where: Any,
-        func: Any,
+        is_leaf: Callable[[Any], bool],
         **kwargs,
     ):
-        return func(lhs) if (where in [True, None]) else lhs
+        if isinstance(where, type(tree)):
+            lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
+            where_leaves, rhs_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
+            lhs_leaves = [
+                _lhs_apply(
+                    lhs=lhs_leaf, where=where_leaf, func=func, is_leaf=is_leaf, **kwargs
+                )
+                for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
+            ]
 
-    @dispatch(argnum="where")
-    def _where_apply(tree: PyTree, where: Any, func: Any, **kwargs):
-        raise NotImplementedError(
-            f"Apply where type = {type(where)} is not implemented."
-        )
+            return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
 
-    @_where_apply.register(type(tree))
-    def _(tree: PyTree, where: PyTree, func: Any, is_leaf: bool = None, **kwargs):
+        else:
+            raise NotImplementedError(
+                f"Apply where type = {type(where)} is not implemented."
+            )
 
-        lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-        where_leaves, rhs_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
-        lhs_leaves = [
-            _lhs_apply(lhs=lhs_leaf, where=where_leaf, func=func, **kwargs)
-            for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
-        ]
-
-        return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
-
-    return _where_apply(tree=tree, where=where, func=func, **kwargs)
+    return _where_apply(tree=tree, where=where, func=func, is_leaf=is_leaf, **kwargs)
 
 
 """ .at[...].reduce() """
 
 
-def _at_reduce(tree, where, func, **kwargs):
-    @dispatch(argnum="where")
-    def _where_reduce(tree, where, func, **kwargs):
+def _at_reduce(
+    tree: PyTree,
+    where: PyTree,
+    func: Callable[[Any], Any],
+    is_leaf: Callable[[Any], bool] = None,
+    initializer: Any = 0,
+    **kwargs,
+):
+
+    if isinstance(tree, type(tree)):
+        return jtu.tree_reduce(
+            func, tree.at[where].get(is_leaf=is_leaf, **kwargs), initializer
+        )
+    else:
         raise NotImplementedError(
             f"Reduce where type = {type(where)} is not implemented."
         )
-
-    @_where_reduce.register(type(tree))
-    def _(tree, where, func, initializer=0, **kwargs):
-        return jtu.tree_reduce(func, tree.at[where].get(), initializer)
-
-    return _where_reduce(tree=tree, where=where, func=func, **kwargs)
-
-
-PyTree = Any
 
 
 @dataclass(eq=False, frozen=True)
