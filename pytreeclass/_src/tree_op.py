@@ -58,7 +58,7 @@ def _field_boolean_map(
     # this is the function responsible for the boolean mapping of
     # `node_type`, `field_name`, and `field_metadata` comparisons.
 
-    def _true_leaves(node):
+    def _true_leaves(node: Any) -> list[bool, ...]:
         return [
             jnp.ones_like(leaf).astype(jnp.bool_)
             if isinstance(leaf, jnp.ndarray)
@@ -66,7 +66,7 @@ def _field_boolean_map(
             for leaf in jtu.tree_leaves(node, is_leaf=_is_leaf)
         ]
 
-    def _false_leaves(node):
+    def _false_leaves(node: Any) -> list[bool, ...]:
         return [
             jnp.zeros_like(leaf).astype(jnp.bool_)
             if isinstance(leaf, jnp.ndarray)
@@ -74,7 +74,7 @@ def _field_boolean_map(
             for leaf in jtu.tree_leaves(node, is_leaf=_is_leaf)
         ]
 
-    def _is_leaf(node):
+    def _is_leaf(node: Any) -> bool:
         return node is None
 
     def _traverse(tree) -> Generator[Any, ...]:
