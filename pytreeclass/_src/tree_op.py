@@ -12,10 +12,9 @@ from typing import Any, Callable, Generator
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
-from jax._src.tree_util import flatten_one_level
 from jax.core import Tracer
 
-from pytreeclass._src.tree_util import _tree_fields, is_treeclass
+from pytreeclass._src.tree_util import _tree_fields, is_static_field, is_treeclass
 
 PyTree = Any
 
@@ -88,13 +87,13 @@ def _field_boolean_map(
         # if we  check a field name == "b", then the entire subtree at b is marked True
         # however if we get the tree_leaves of the tree, `b` will not be visible to the condition.
 
-        leaves = flatten_one_level(tree)[0]
-        field_items = _tree_fields(tree).values()
+        for field_item, node_item in (
+            [f, getattr(tree, k)]
+            for k, f in _tree_fields(tree).items()
+            if not is_static_field(f)
+        ):
 
-        for field_item, node_item in zip(field_items, leaves):
-            condition = cond(field_item, node_item)
-
-            yield from _true_leaves(node_item) if condition else (
+            yield from _true_leaves(node_item) if cond(field_item, node_item) else (
                 _traverse(node_item)
                 if is_treeclass(node_item)
                 else _false_leaves(node_item)
