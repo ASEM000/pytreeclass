@@ -33,11 +33,6 @@ def is_nondiff_field(field_item: Field) -> bool:
     return isinstance(field_item, Field) and field_item.metadata.get("nondiff", False)
 
 
-def is_static_field(field_item: Field) -> bool:
-    """check if field is static"""
-    return isinstance(field_item, Field) and field_item.metadata.get("static", False)
-
-
 def is_treeclass_frozen(tree):
     """assert if a treeclass is frozen"""
     if is_treeclass(tree):

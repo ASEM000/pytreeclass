@@ -29,14 +29,12 @@ def _at_get(
     def _lhs_get(lhs: Any, where: Any, **kwargs):
         """Get pytree node  value"""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
-            array_as_leaves = kwargs.get("array_as_leaves", True)
             # array_as_leaves defins whether the condition/where
             # is applied to each array element
-            return (
-                lhs[jnp.where(where)]
-                if array_as_leaves
-                else (lhs if jnp.all(where) else None)
-            )
+            if kwargs.get("array_as_leaves", True):
+                return lhs[jnp.where(where)]
+            else:
+                return lhs if jnp.all(where) else None  # fmt: skip
 
         elif isinstance(lhs, (int, float, complex, tuple, list, str)):
             return lhs if where else None
@@ -71,14 +69,10 @@ def _at_set(
             return set_value if jnp.all(where) else lhs
 
         elif isinstance(set_value, (int, float, complex, jnp.ndarray)):
-            array_as_leaves = kwargs.get("array_as_leaves", True)
-            return (
-                jnp.where(where, set_value, lhs)
-                if array_as_leaves
-                else (set_value if jnp.all(where) else lhs)
-            )
-        else:
-            return set_value if jnp.all(where) else lhs
+            if kwargs.get("array_as_leaves", True):
+                return jnp.where(where, set_value, lhs)
+            else:
+                return set_value if jnp.all(where) else lhs
 
     def _lhs_set(lhs: Any, where: Any, set_value: Any, **kwargs):
         """Set pytree node value."""
@@ -118,13 +112,12 @@ def _at_apply(
         """Set pytree node"""
 
         if isinstance(lhs, (Tracer, jnp.ndarray)):
-            array_as_leaves = kwargs.get("array_as_leaves", True)
-            # array_as_leaves defins whether the condition/where is applied to each array element
-            return (
-                jnp.where(where, func(lhs), lhs)
-                if array_as_leaves
-                else (func(lhs) if jnp.all(where) else lhs)
-            )
+            # array_as_leaves defins whether the condition/where
+            # is applied to each array element
+            if kwargs.get("array_as_leaves", True):
+                return jnp.where(where, func(lhs), lhs)
+            else:
+                return func(lhs) if jnp.all(where) else lhs
 
         elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
             return func(lhs) if (where in [True, None]) else lhs

@@ -14,7 +14,7 @@ import jax.tree_util as jtu
 import numpy as np
 from jax.core import Tracer
 
-from pytreeclass._src.tree_util import _tree_fields, is_static_field, is_treeclass
+from pytreeclass._src.tree_util import _tree_fields, is_treeclass
 
 PyTree = Any
 
@@ -90,7 +90,7 @@ def _field_boolean_map(
         for field_item, node_item in (
             [f, getattr(tree, k)]
             for k, f in _tree_fields(tree).items()
-            if not is_static_field(f)
+            if not f.metadata.get("static", False)
         ):
 
             yield from _true_leaves(node_item) if cond(field_item, node_item) else (

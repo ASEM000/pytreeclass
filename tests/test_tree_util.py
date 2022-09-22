@@ -5,12 +5,10 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_util import (
-    is_static_field,
     is_treeclass,
     is_treeclass_frozen,
     is_treeclass_leaf,
     is_treeclass_nondiff,
-    nondiff_field,
     tree_freeze,
 )
 from pytreeclass.tree_viz.utils import _node_count_and_size
@@ -111,9 +109,3 @@ def test__node_count_and_size():
         xx.a = 1
 
     assert _node_count_and_size("string") == (complex(0, 0), complex(0, 0))
-
-
-def test_is_static_field():
-    a = nondiff_field()
-    assert is_static_field(a) is True
-    assert is_static_field(1) is False
