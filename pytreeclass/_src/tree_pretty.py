@@ -14,14 +14,14 @@ from pytreeclass.tree_viz.tree_summary import tree_summary
 class _treePretty:
     """Base class for tree repr/str/summary/tree_box"""
 
-    @cached_method
+    # @cached_method
     def __repr__(self) -> str:
         """pretty print pytree instance"""
         # since the instance is immutable, the result of the tree_repr
         # should not change, thus we can cache it
         return tree_repr(self, width=60)
 
-    @cached_method
+    # @cached_method
     def __str__(self):
         """pretty print pytree instance"""
         # since the instance is immutable, the result of the tree_str
@@ -59,7 +59,7 @@ class _treePretty:
         """
         return tree_summary(self, array)
 
-    @cached_method
+    # @cached_method
     def tree_diagram(self) -> str:
         """Print a diagram of the pytree instance
 

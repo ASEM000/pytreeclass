@@ -137,14 +137,12 @@ def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
     # otherwise the cached values are returned.
     dynamic = _fieldDict()
 
-    # undeclared fields are the fields that are not defined in the dataclass fields
-    static = _fieldDict(__undeclared_fields__=tree.__undeclared_fields__)
+    static = _fieldDict(tree.__dict__)
 
     for field_item in _tree_fields(tree).values():
-        if field_item.metadata.get("static", False):
-            static[field_item.name] = getattr(tree, field_item.name)
-        else:
-            dynamic[field_item.name] = getattr(tree, field_item.name)
+        if not field_item.metadata.get("static", False):
+            dynamic[field_item.name] = static.pop(field_item.name)
+
     return (dynamic, static)
 
 
