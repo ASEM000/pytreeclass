@@ -1,27 +1,52 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Any
 
 import jax
 
 from pytreeclass._src.misc import _mutable
-from pytreeclass._src.tree_base import _implicitSetter, _treeBase
+from pytreeclass._src.tree_base import _treeBase
 from pytreeclass._src.tree_indexer import _treeIndexer
 from pytreeclass._src.tree_op import _treeOp
 from pytreeclass._src.tree_pretty import _treePretty
+from pytreeclass._src.tree_util import _tree_fields
+
+
+class ImmutableInstanceError(Exception):
+    pass
 
 
 def treeclass(*args, **kwargs):
-    def class_wrapper(cls):
+    def immutable_setter(tree, key: str, value: Any) -> None:
 
-        if "__setattr__" in cls.__dict__:
-            raise AttributeError(
-                "`treeclass` cannot be applied to class with `__setattr__` method."
+        if tree.__immutable_pytree__:
+            raise ImmutableInstanceError(
+                f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
             )
 
+        object.__setattr__(tree, key, value)
+
+        if (isinstance(value, _treeBase)) and (key not in _tree_fields(tree)):
+            # create field
+            field_value = field()
+
+            object.__setattr__(field_value, "name", key)
+            object.__setattr__(field_value, "type", type(value))
+
+            # register it to class
+            new_fields = {**tree.__undeclared_fields__, **{key: field_value}}  # fmt: skip
+            object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
+
+    def class_wrapper(cls):
+
+        if "__setattr__" in vars(cls):
+            raise AttributeError("`treeclass` cannot be applied to class with `__setattr__` method.")  # fmt: skip
+
         dCls = dataclass(
-            init="__init__" not in cls.__dict__,
+            init="__init__" not in vars(cls),
             repr=False,  # repr is handled by _treePretty
             eq=False,  # eq is handled by _treeOpBase
             unsafe_hash=False,  # hash is handled by _treeOpBase
@@ -29,12 +54,16 @@ def treeclass(*args, **kwargs):
             frozen=False,  # frozen is handled by _explicitSetter/_implicitSetter
         )(cls)
 
-        base_classes = (dCls,)
-        base_classes += (_implicitSetter,)
-        base_classes += (_treeIndexer, _treeOp, _treePretty)
-        base_classes += (_treeBase,)
+        new_cls = type(
+            cls.__name__,
+            (dCls, _treeIndexer, _treeOp, _treePretty, _treeBase),
+            {
+                "__immutable_pytree__": True,
+                "__undeclared_fields__": MappingProxyType({}),
+                "__setattr__": immutable_setter,
+            },
+        )
 
-        new_cls = type(cls.__name__, base_classes, {})
         # temporarily mutate the tree instance to execute the __init__ method
         # without raising `__immutable_treeclass__` error
         # then restore the tree original immutable behavior after the function is called

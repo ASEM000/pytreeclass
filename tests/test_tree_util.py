@@ -4,7 +4,6 @@ import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_base import ImmutableInstanceError
 from pytreeclass._src.tree_util import (
     is_static_field,
     is_treeclass,
@@ -15,6 +14,7 @@ from pytreeclass._src.tree_util import (
     tree_freeze,
 )
 from pytreeclass.tree_viz.utils import _node_count_and_size
+from pytreeclass.treeclass import ImmutableInstanceError
 
 
 def test_is_frozen():

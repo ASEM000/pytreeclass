@@ -131,13 +131,13 @@ class _fieldDict(dict):
 
 def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return dynamic and static fields of the pytree instance"""
-    # this property scans the class fields and returns a tuple of two dicts (dynamic, static)
+    # this function classifies tree vars into trainable/untrainable dict items
+    # and returns a tuple of two dicts (dynamic, static)
     # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
     # not seen by JAX computations. the scanning is done if the instance is not frozen.
     # otherwise the cached values are returned.
-    dynamic = _fieldDict()
 
-    static = _fieldDict(tree.__dict__)
+    static, dynamic = _fieldDict(tree.__dict__), _fieldDict()
 
     for field_item in _tree_fields(tree).values():
         if not field_item.metadata.get("static", False):

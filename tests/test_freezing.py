@@ -5,7 +5,6 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_base import ImmutableInstanceError
 from pytreeclass._src.tree_util import (
     is_treeclass_equal,
     is_treeclass_frozen,
@@ -13,6 +12,7 @@ from pytreeclass._src.tree_util import (
     tree_unfreeze,
 )
 from pytreeclass.tree_viz.tree_pprint import tree_diagram
+from pytreeclass.treeclass import ImmutableInstanceError
 
 
 def test_freezing_unfreezing():
