@@ -6,7 +6,6 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.misc import cached_method
 from pytreeclass._src.tree_util import (
     filter_nondiff,
     is_treeclass_equal,
@@ -42,26 +41,6 @@ def test_filter_nondiff():
     assert jtu.tree_leaves(filter_nondiff(t, t == t)) == []
     assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t, t == t))) == ["a"]
     assert is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t, t == t)))
-
-
-def test_cached_method():
-    class Test:
-        @cached_method
-        def a(self):
-            return 1
-
-    t = Test()
-    assert t.a() == 1
-    assert t.a() == 1
-
-    class Test:
-        @cached_method
-        def a(self):
-            return 2
-
-    t = Test()
-    assert t.a() == 2
-    assert t.a() == 2
 
 
 def test_filter_nondiff_func():

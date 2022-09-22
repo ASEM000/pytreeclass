@@ -5,11 +5,11 @@ from dataclasses import Field
 from typing import Any
 
 import pytreeclass._src as src
-from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
     _tree_fields,
     is_frozen_field,
     is_nondiff_field,
+    is_treeclass,
     is_treeclass_frozen,
     is_treeclass_nondiff,
 )
@@ -45,11 +45,21 @@ def _tree_mermaid(tree: PyTree):
         """hash a node by its location in a tree"""
         return ctypes.c_size_t(hash(input)).value
 
-    @dispatch(argnum="node_item")
+    # @dispatch(argnum="node_item")
     def recurse_field(field_item, node_item, depth, prev_id, order):
         nonlocal FMT
 
-        if field_item.repr:
+        if not field_item.repr:
+            return
+
+        if isinstance(node_item, src.tree_base._treeBase):
+            layer_class_name = node_item.__class__.__name__
+            cur_id = node_id((depth, order, prev_id))
+            mark = _marker(field_item, node_item, default="-->")
+            FMT += f"\n\tid{prev_id} {mark} id{cur_id}({field_item.name}\\n{layer_class_name})"
+            recurse(tree=node_item, depth=depth + 1, prev_id=cur_id)
+
+        else:
             # create node id from depth, order, and previous id
             cur_id = node_id((depth, order, prev_id))
             mark = _marker(field_item, node_item)
@@ -58,37 +68,14 @@ def _tree_mermaid(tree: PyTree):
 
         recurse(tree=node_item, depth=depth, prev_id=prev_id)
 
-    @recurse_field.register(src.tree_base._treeBase)
-    def _(field_item, node_item, depth, prev_id, order):
-        nonlocal FMT
-
-        if field_item.repr:
-            layer_class_name = node_item.__class__.__name__
-            cur_id = node_id((depth, order, prev_id))
-            mark = _marker(field_item, node_item, default="-->")
-            FMT += f"\n\tid{prev_id} {mark} id{cur_id}({field_item.name}\\n{layer_class_name})"
-            recurse(tree=node_item, depth=depth + 1, prev_id=cur_id)
-
-    @dispatch(argnum="tree")
     def recurse(tree, depth, prev_id):
-        ...
+        if not is_treeclass(tree):
+            return
 
-    @recurse.register(src.tree_base._treeBase)
-    def _(tree, depth, prev_id):
         nonlocal FMT
 
         for i, fi in enumerate(_tree_fields(tree).values()):
-
-            # retrieve node item
-            cur_node = tree.__dict__[fi.name]
-
-            recurse_field(
-                field_item=fi,
-                node_item=cur_node,
-                depth=depth,
-                prev_id=prev_id,
-                order=i,
-            )
+            recurse_field(fi, getattr(tree, fi.name), depth, prev_id, i)
 
     cur_id = node_id((0, 0, -1, 0))
     FMT = f"flowchart LR\n\tid{cur_id}[{tree.__class__.__name__}]"

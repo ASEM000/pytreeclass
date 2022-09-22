@@ -7,10 +7,12 @@ from dataclasses import field
 import jax.numpy as jnp
 
 import pytreeclass._src as src
-from pytreeclass._src.dispatch import dispatch
+
+# from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
     _tree_fields,
     _tree_structure,
+    is_frozen_field,
     is_treeclass_frozen,
     is_treeclass_non_leaf,
     tree_unfreeze,
@@ -97,47 +99,17 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
             for i in range(len(indim_shape))
         ]
 
-    @dispatch(argnum="node_item")
+    # @dispatch(argnum="node_item")
     def recurse_field(field_item, node_item, name_path, type_path):
-        ...
-
-    @recurse_field.register(int)
-    @recurse_field.register(float)
-    @recurse_field.register(complex)
-    @recurse_field.register(str)
-    @recurse_field.register(bool)
-    @recurse_field.register(jnp.ndarray)
-    def _(field_item, node_item, name_path, type_path):
 
         nonlocal ROWS, COUNT, SIZE
 
-        if field_item.repr:
-            is_frozen = field_item.metadata.get("frozen", False)
-            count, size = _reduce_count_and_size(node_item)
-            ROWS.append(
-                [
-                    "/".join(name_path) + f"{('(frozen)' if is_frozen else '')}",
-                    "/".join(type_path),
-                    _format_count(count),
-                    _format_size(size, True),
-                    f"{field_item.name}={_format_node(node_item)}",
-                ]
-            )
+        if not field_item.repr:
+            return
 
-            # non-treeclass leaf inherit frozen state
-            COUNT[1 if is_frozen else 0] += count
-            SIZE[1 if is_frozen else 0] += size
-
-    @recurse_field.register(list)
-    @recurse_field.register(tuple)
-    def _(field_item, node_item, name_path, type_path):
-        # handles containers
-        # here what we do is we just add the name/type of the container to the path by passing
-        # a created field_item with the name/type for each item in the container
-        if field_item.repr:
-            is_frozen = field_item.metadata.get("frozen", False)
+        if isinstance(node_item, (list, tuple)):
             for i, layer in enumerate(node_item):
-                new_field = field(metadata={"frozen": is_frozen})
+                new_field = field(metadata={"frozen": is_frozen_field(field_item)})
                 object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
                 object.__setattr__(new_field, "type", type(layer))
 
@@ -148,12 +120,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     type_path=type_path + (layer.__class__.__name__,),
                 )
 
-    @recurse_field.register(src.tree_base._treeBase)
-    def _(field_item, node_item, name_path, type_path):
-        # handles treeclass
-        nonlocal ROWS, COUNT, SIZE
-
-        if field_item.repr:
+        elif isinstance(node_item, src.tree_base._treeBase):
             # a module is considred frozen if all it's parameters are frozen
             is_frozen = field_item.metadata.get("frozen", False)
             is_frozen = is_frozen or is_treeclass_frozen(node_item)
@@ -172,6 +139,68 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
 
             COUNT[1 if is_frozen else 0] += count
             SIZE[1 if is_frozen else 0] += size
+
+        else:
+            is_frozen = field_item.metadata.get("frozen", False)
+            count, size = _reduce_count_and_size(node_item)
+            ROWS.append(
+                [
+                    "/".join(name_path) + f"{('(frozen)' if is_frozen else '')}",
+                    "/".join(type_path),
+                    _format_count(count),
+                    _format_size(size, True),
+                    f"{field_item.name}={_format_node(node_item)}",
+                ]
+            )
+
+            # non-treeclass leaf inherit frozen state
+            COUNT[1 if is_frozen else 0] += count
+            SIZE[1 if is_frozen else 0] += size
+
+    # @recurse_field.register(list)
+    # @recurse_field.register(tuple)
+    # def _(field_item, node_item, name_path, type_path):
+    #     # handles containers
+    #     # here what we do is we just add the name/type of the container to the path by passing
+    #     # a created field_item with the name/type for each item in the container
+    #     if field_item.repr:
+    #         is_frozen = field_item.metadata.get("frozen", False)
+    #         for i, layer in enumerate(node_item):
+    #             new_field = field(metadata={"frozen": is_frozen})
+    #             object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
+    #             object.__setattr__(new_field, "type", type(layer))
+
+    #             recurse_field(
+    #                 field_item=new_field,
+    #                 node_item=layer,
+    #                 name_path=name_path + (f"{field_item.name}_{i}",),
+    #                 type_path=type_path + (layer.__class__.__name__,),
+    #             )
+
+    # @recurse_field.register(src.tree_base._treeBase)
+    # def _(field_item, node_item, name_path, type_path):
+    #     # handles treeclass
+    #     nonlocal ROWS, COUNT, SIZE
+
+    #     if field_item.repr:
+    #         # a module is considred frozen if all it's parameters are frozen
+    #         is_frozen = field_item.metadata.get("frozen", False)
+    #         is_frozen = is_frozen or is_treeclass_frozen(node_item)
+    #         count, size = _reduce_count_and_size(tree_unfreeze(node_item))
+    #         dynamic, _ = _tree_structure(tree_unfreeze(node_item))
+    #         ROWS.append(
+    #             [
+    #                 "/".join(name_path)
+    #                 + f"{(os.linesep + '(frozen)' if is_frozen else '')}",
+    #                 "/".join(type_path),
+    #                 _format_count(count),
+    #                 _format_size(size, True),
+    #                 "\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()]),
+    #             ]
+    #         )
+
+    #         COUNT[1 if is_frozen else 0] += count
+    #         SIZE[1 if is_frozen else 0] += size
 
     def recurse(tree, name_path, type_path):
 

@@ -7,7 +7,6 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import _tree_structure, is_treeclass
 
 
@@ -39,45 +38,33 @@ def _reduce_count_and_size(leaf):
 def _node_count_and_size(node: Any) -> tuple[complex, complex]:
     """Calculate number and size of `trainable` and `non-trainable` parameters
 
-    Args:
-        node (Any): treeclass node
-
     Returns:
         complex: Complex number of (inexact, exact) parameters for count/size
     """
 
-    @dispatch(argnum=0)
-    def count_and_size(node):
-        count = complex(0, 0)
-        size = complex(0, 0)
-        return count, size
+    if isinstance(node, jnp.ndarray):
 
-    @count_and_size.register(jnp.ndarray)
-    def _(node):
-        # inexact(trainable) array
         if jnp.issubdtype(node, jnp.inexact):
+            # inexact(trainable) array
             count = complex(int(jnp.array(node.shape).prod()), 0)
             size = complex(int(node.nbytes), 0)
-
-        # exact paramter
         else:
+            # non in-exact paramter
             count = complex(0, int(jnp.array(node.shape).prod()))
             size = complex(0, int(node.nbytes))
-        return count, size
 
-    @count_and_size.register(float)
-    @count_and_size.register(complex)
-    def _(node):
+    elif isinstance(node, (float, complex)):
         # inexact non-array (array_like)
         count = complex(1, 0)
         size = complex(sys.getsizeof(node), 0)
-        return count, size
 
-    @count_and_size.register(int)
-    def _(node):
+    elif isinstance(node, int):
         # exact non-array
         count = complex(0, 1)
         size = complex(0, sys.getsizeof(node))
         return count, size
+    else:
+        count = complex(0, 0)
+        size = complex(0, 0)
 
-    return count_and_size(node)
+    return count, size

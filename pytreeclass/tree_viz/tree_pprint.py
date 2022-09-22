@@ -4,14 +4,15 @@ from dataclasses import Field, field
 from typing import Any
 
 import pytreeclass._src as src
-from pytreeclass._src.dispatch import dispatch
 from pytreeclass._src.tree_util import (
     _tree_fields,
+    frozen_field,
     is_frozen_field,
     is_nondiff_field,
     is_treeclass,
     is_treeclass_frozen,
     is_treeclass_nondiff,
+    nondiff_field,
 )
 from pytreeclass.tree_viz.node_pprint import (
     _format_node_diagram,
@@ -24,16 +25,7 @@ PyTree = Any
 
 
 def _marker(field_item: Field, node_item: Any, default: str = "") -> str:
-    """return the suitable marker given the field and node item
-
-    Args:
-        field_item (Field): field item of the pytree node
-        node_item (Any): node item
-        default (str, optional): default marker. Defaults to "".
-
-    Returns:
-        str: marker character.
-    """
+    """return the suitable marker given the field and node item"""
     # for now, we only have two markers '*' for non-diff and '#' for frozen
     if is_nondiff_field(field_item) or is_treeclass_nondiff(node_item):
         return "*"
@@ -44,36 +36,20 @@ def _marker(field_item: Field, node_item: Any, default: str = "") -> str:
 
 
 def tree_repr(tree, width: int = 60) -> str:
-    """Prertty print `treeclass_leaves`
+    """Prertty print `treeclass_leaves`"""
 
-    Returns:
-        str: indented tree leaves.
-    """
-
-    @dispatch(argnum="node_item")
     def recurse_field(
         field_item: Field, node_item: Any, depth: int, is_last_field: bool
     ):
-        """format non-treeclass field"""
         nonlocal FMT
 
-        if field_item.repr:
-            mark = _marker(field_item, node_item)
-            FMT += "\n" + "\t" * depth
-            FMT += f"{mark}{field_item.name}"
-            FMT += "="
-            FMT += f"{(_format_node_repr(node_item,depth))}"
-            FMT += "" if is_last_field else ","
-        recurse(node_item, depth)
+        if not field_item.repr:
+            return
 
-    @recurse_field.register(src.tree_base._treeBase)
-    def _(field_item: Field, node_item: Any, depth: int, is_last_field: bool):
-        """format treeclass field"""
-        nonlocal FMT
+        mark = _marker(field_item, node_item)
+        FMT += "\n" + "\t" * depth
 
-        if field_item.repr:
-            mark = _marker(field_item, node_item)
-            FMT += "\n" + "\t" * depth
+        if isinstance(node_item, src.tree_base._treeBase):
             layer_class_name = f"{node_item.__class__.__name__}"
             FMT += f"{mark}{field_item.name}"
             FMT += f"={layer_class_name}" + "("
@@ -84,6 +60,14 @@ def tree_repr(tree, width: int = 60) -> str:
             temp += "" if is_last_field else ","
             FMT = temp
 
+        else:
+            FMT += f"{mark}{field_item.name}"
+            FMT += "="
+            FMT += f"{(_format_node_repr(node_item,depth))}"
+            FMT += "" if is_last_field else ","
+
+            recurse(node_item, depth)
+
     def recurse(tree, depth):
         if not is_treeclass(tree):
             return
@@ -92,12 +76,7 @@ def tree_repr(tree, width: int = 60) -> str:
 
         leaves_count = len(_tree_fields(tree))
         for i, fi in enumerate(_tree_fields(tree).values()):
-            recurse_field(
-                field_item=fi,
-                node_item=getattr(tree, fi.name),
-                depth=depth,
-                is_last_field=True if i == (leaves_count - 1) else False,
-            )
+            recurse_field(fi, getattr(tree, fi.name), depth, i == (leaves_count - 1))
 
     FMT = ""
     recurse(tree=tree, depth=1)
@@ -107,45 +86,20 @@ def tree_repr(tree, width: int = 60) -> str:
 
 
 def tree_str(tree, width: int = 40) -> str:
-    """Prertty print `treeclass_leaves`
+    """Prertty print `treeclass_leaves`"""
 
-    Returns:
-        str: indented tree leaves.
-    """
-
-    @dispatch(argnum="node_item")
     def recurse_field(
         field_item: Field, node_item: Any, depth: int, is_last_field: bool
     ):
-        """format non-treeclass field"""
         nonlocal FMT
 
-        if field_item.repr:
-            mark = _marker(field_item, node_item)
-            FMT += "\n" + "\t" * depth
-            FMT += f"{mark}{field_item.name}"
-            FMT += "="
+        if not field_item.repr:
+            return
 
-            if "\n" in f"{node_item!s}":
-                FMT += "\n" + "\t" * (depth + 1)
-                FMT += f"{(_format_node_str(node_item,depth+1))}"
-            else:
-                FMT += f"{(_format_node_str(node_item,depth))}"
+        mark = _marker(field_item, node_item)
+        FMT += "\n" + "\t" * depth
 
-            FMT += "" if is_last_field else ","
-
-        recurse(node_item, depth)
-
-    @recurse_field.register(src.tree_base._treeBase)
-    def _(field_item: Field, node_item: Any, depth: int, is_last_field: bool):
-        """format treeclass field"""
-        nonlocal FMT
-
-        if field_item.repr:
-            # mark a module static if all its fields are static
-            mark = _marker(field_item, node_item)
-
-            FMT += "\n" + "\t" * depth
+        if isinstance(node_item, src.tree_base._treeBase):
             layer_class_name = f"{node_item.__class__.__name__}"
 
             FMT += f"{mark}{field_item.name}"
@@ -159,18 +113,28 @@ def tree_str(tree, width: int = 40) -> str:
             temp += "" if is_last_field else ","
             FMT = temp
 
+        else:
+            FMT += f"{mark}{field_item.name}"
+            FMT += "="
+
+            if "\n" in f"{node_item!s}":
+                FMT += "\n" + "\t" * (depth + 1) + f"{(_format_node_str(node_item,depth+1))}"  # fmt: skip
+            else:
+                FMT += f"{(_format_node_str(node_item,depth))}"
+
+            FMT += "" if is_last_field else ","
+            recurse(node_item, depth)
+
     def recurse(tree, depth):
         if not is_treeclass(tree):
             return
+
         nonlocal FMT
+
         leaves_count = len(_tree_fields(tree))
+
         for i, fi in enumerate(_tree_fields(tree).values()):
-            recurse_field(
-                field_item=fi,
-                node_item=getattr(tree, fi.name),
-                depth=depth,
-                is_last_field=True if i == (leaves_count - 1) else False,
-            )
+            recurse_field(fi, getattr(tree, fi.name), depth, i == (leaves_count - 1))
 
     FMT = ""
     recurse(tree, depth=1)
@@ -179,84 +143,56 @@ def tree_str(tree, width: int = 40) -> str:
     return FMT.expandtabs(2)
 
 
-def _tree_diagram(tree: PyTree) -> str:
-    """Pretty print treeclass tree with tree structure diagram
+def tree_diagram(tree: PyTree) -> str:
+    """Pretty print treeclass tree with tree structure diagram"""
 
-    Args:
-        tree (PyTree): treeclass tree
-
-    Returns:
-        str: string of tree diagram
-    """
-
-    @dispatch(argnum=1)
     def recurse_field(field_item, node_item, parent_level_count, node_index):
         nonlocal FMT
 
-        if field_item.repr:
-            mark = _marker(field_item, node_item, default="─")
-            is_last_field = node_index <= 1
+        if not field_item.repr:
+            return
 
-            FMT += "\n"
-            FMT += "".join(
-                [(("│" if lvl > 1 else "") + "\t") for lvl in parent_level_count]
-            )
-
-            FMT += f"└{mark}─ " if is_last_field else f"├{mark}─ "
-            FMT += f"{field_item.name}"
-            FMT += f"={_format_node_diagram(node_item)}"
-
-        recurse(node_item, parent_level_count + [1])
-
-    @recurse_field.register(list)
-    @recurse_field.register(tuple)
-    def _(field_item, node_item, parent_level_count, node_index):
-        nonlocal FMT
-
-        if field_item.repr:
-            recurse_field(
-                field_item,
-                node_item.__class__,
-                parent_level_count,
-                node_index,
-            )
-
-            for i, layer in enumerate(node_item):
-                new_field = field(
-                    metadata={
-                        "static": is_nondiff_field(field_item),
-                        "frozen": is_frozen_field(field_item),
-                    }
-                )
-
-                object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
-                object.__setattr__(new_field, "type", type(layer))
-
-                recurse_field(
-                    new_field,
-                    layer,
-                    parent_level_count + [node_index],
-                    len(node_item) - i,
-                )
-
-        recurse(node_item, parent_level_count)
-
-    @recurse_field.register(src.tree_base._treeBase)
-    def _(field_item, node_item, parent_level_count, node_index):
-        nonlocal FMT
-
-        if field_item.repr:
+        if isinstance(node_item, src.tree_base._treeBase):
             mark = _marker(field_item, node_item, default="─")
             layer_class_name = node_item.__class__.__name__
             is_last_field = node_index == 1
-            FMT += "\n" + "".join(
-                [(("│" if lvl > 1 else "") + "\t") for lvl in parent_level_count]
-            )
+            FMT += "\n" + "".join([(("│" if lvl > 1 else "") + "\t") for lvl in parent_level_count])  # fmt: skip
             FMT += f"└{mark}─ " if is_last_field else f"├{mark}─ "
             FMT += f"{field_item.name}"
             FMT += f"={layer_class_name}"
 
             recurse(node_item, parent_level_count + [node_index])
+
+        elif isinstance(node_item, (list, tuple)):
+            recurse_field(field_item, node_item.__class__, parent_level_count, node_index)  # fmt: skip
+
+            for i, layer in enumerate(node_item):
+
+                if is_frozen_field(field_item):
+                    new_field = frozen_field()
+                elif is_nondiff_field(field_item):
+                    new_field = nondiff_field()
+                else:
+                    new_field = field()
+
+                object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
+                object.__setattr__(new_field, "type", type(layer))
+
+                recurse_field(new_field, layer, parent_level_count + [node_index], len(node_item) - i)  # fmt: skip
+
+            recurse(node_item, parent_level_count)
+
+        else:
+            mark = _marker(field_item, node_item, default="─")
+            is_last_field = node_index <= 1
+
+            FMT += "\n"
+            FMT += "".join([(("│" if lvl > 1 else "") + "\t") for lvl in parent_level_count])  # fmt: skip
+            FMT += f"└{mark}─ " if is_last_field else f"├{mark}─ "
+            FMT += f"{field_item.name}"
+            FMT += f"={_format_node_diagram(node_item)}"
+
+            recurse(node_item, parent_level_count + [1])
 
     def recurse(tree, parent_level_count):
         if not is_treeclass(tree):
@@ -267,12 +203,7 @@ def _tree_diagram(tree: PyTree) -> str:
         leaves_count = len(_tree_fields(tree))
 
         for i, fi in enumerate(_tree_fields(tree).values()):
-            recurse_field(
-                fi,
-                getattr(tree, fi.name),
-                parent_level_count,
-                leaves_count - i,
-            )
+            recurse_field(fi, getattr(tree, fi.name), parent_level_count, leaves_count - i)  # fmt: skip
 
         FMT += "\t"
 
@@ -281,16 +212,3 @@ def _tree_diagram(tree: PyTree) -> str:
     recurse(tree, [1])
 
     return FMT.expandtabs(4)
-
-
-def tree_diagram(tree, link=False):
-    string = _tree_diagram(tree)
-
-    # if link:
-    #     string = string.replace("   ", "&emsp;&emsp;")
-    #     string = "".join(map(_mermaid_table_row, string.split("\n")))
-    #     string = "flowchart TD\n" + "A[" + '"' + _mermaid_table(string) + '"' + "]"
-    #     return _generate_mermaid_link(string)
-
-    # else:
-    return string

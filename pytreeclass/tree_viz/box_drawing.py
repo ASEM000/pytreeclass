@@ -61,8 +61,7 @@ def _vbox(*text: tuple[str, ...]) -> str:
     """
 
     max_width = (
-        max(jtu.tree_flatten([[len(t) for t in item.split("\n")] for item in text])[0])
-        + 0
+        max(jtu.tree_leaves([[len(t) for t in item.split("\n")] for item in text])) + 0
     )
 
     top = f"┌{'─'*max_width}┐"
@@ -169,9 +168,9 @@ def _table(lines: Sequence[str, ...]) -> str:
     """
     # align _cells vertically
     for i, _cells in enumerate(zip(*lines)):
-        max__cell_height = max(map(lambda x: x.count("\n"), _cells))
+        max_cell_height = max(map(lambda x: x.count("\n"), _cells))
         for j in range(len(_cells)):
-            lines[j][i] += "\n" * (max__cell_height - lines[j][i].count("\n"))
+            lines[j][i] += "\n" * (max_cell_height - lines[j][i].count("\n"))
     cols = [_vbox(*col) for col in lines]
 
     return _hstack(cols)
