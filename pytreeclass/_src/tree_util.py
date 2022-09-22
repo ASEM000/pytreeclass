@@ -267,9 +267,7 @@ def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
             elif cond(field_item):
                 new_fields = dict(tree.__undeclared_fields__)
                 new_fields.pop(field_item.name)
-                object.__setattr__(
-                    tree, "__undeclared_fields__", MappingProxyType(new_fields)
-                )
+                object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
         return tree
 
     return _recurse(tree_copy(tree))

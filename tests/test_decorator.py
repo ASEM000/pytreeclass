@@ -3,6 +3,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
+from pytreeclass._src.tree_util import tree_copy
 
 
 def test_hash():
@@ -74,3 +75,17 @@ def test_nonclass_input():
         @pytc.treeclass
         def f(x):
             return x
+
+
+def test_registering_state():
+    @pytc.treeclass
+    class L0:
+        def __init__(self):
+            self.a = 10
+            self.b = 20
+
+    t = L0()
+    tt = tree_copy(t)
+
+    assert tt.a == 10
+    assert tt.b == 20

@@ -52,15 +52,11 @@ def treeclass(*args, **kwargs):
             frozen=False,  # frozen is `immutable_setter`
         )(cls)
 
-        new_cls = type(
-            cls.__name__,
-            (dCls, _treeIndexer, _treeOp, _treePretty, _treeBase),
-            {
-                "__immutable_pytree__": True,
-                "__undeclared_fields__": MappingProxyType({}),
-                "__setattr__": immutable_setter,
-            },
-        )
+        bases = (dCls, _treeIndexer, _treeOp, _treePretty, _treeBase)
+
+        attrs_keys = ("__setattr__", "__immutable_pytree__", "__undeclared_fields__")
+        attrs_vals = (immutable_setter, False, MappingProxyType({}))
+        new_cls = type(cls.__name__, bases, dict(zip(attrs_keys, attrs_vals)))  # fmt: skip
 
         # temporarily mutate the tree instance to execute the __init__ method
         # without raising `__immutable_treeclass__` error
@@ -76,6 +72,4 @@ def treeclass(*args, **kwargs):
         # no args are passed to the decorator (i.e. @treeclass)
         return class_wrapper(args[0])
     else:
-        raise TypeError(
-            f"Input argument to `treeclass` must be of `class` type. Found {(*args, *kwargs)}."
-        )
+        raise TypeError(f"`treeclass` input must be of `class` type. Found {(*args, *kwargs)}.")  # fmt: skip
