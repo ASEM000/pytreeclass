@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import jax.numpy as jnp
 
-from pytreeclass._src.misc import cached_method
 from pytreeclass.tree_viz.tree_box import tree_box
 from pytreeclass.tree_viz.tree_pprint import tree_diagram, tree_repr, tree_str
 from pytreeclass.tree_viz.tree_summary import tree_summary
@@ -14,18 +13,12 @@ from pytreeclass.tree_viz.tree_summary import tree_summary
 class _treePretty:
     """Base class for tree repr/str/summary/tree_box"""
 
-    # @cached_method
     def __repr__(self) -> str:
         """pretty print pytree instance"""
-        # since the instance is immutable, the result of the tree_repr
-        # should not change, thus we can cache it
         return tree_repr(self, width=60)
 
-    # @cached_method
     def __str__(self):
         """pretty print pytree instance"""
-        # since the instance is immutable, the result of the tree_str
-        # should not change, thus we can cache it
         return tree_str(self, width=60)
 
     def summary(self, array: jnp.ndarray = None) -> str:
@@ -59,7 +52,6 @@ class _treePretty:
         """
         return tree_summary(self, array)
 
-    # @cached_method
     def tree_diagram(self) -> str:
         """Print a diagram of the pytree instance
 

@@ -23,9 +23,7 @@ def treeclass(*args, **kwargs):
     def immutable_setter(tree, key: str, value: Any) -> None:
 
         if tree.__immutable_pytree__:
-            raise ImmutableInstanceError(
-                f"Cannot set {key} = {value}. Use `.at['{key}'].set({value!r})` instead."
-            )
+            raise ImmutableInstanceError(f"Cannot set {key}. Use `.at['{key}'].set({value!r})` instead.")  # fmt: skip
 
         object.__setattr__(tree, key, value)
 
@@ -51,7 +49,7 @@ def treeclass(*args, **kwargs):
             eq=False,  # eq is handled by _treeOpBase
             unsafe_hash=False,  # hash is handled by _treeOpBase
             order=False,  # order is handled by _treeOpBase
-            frozen=False,  # frozen is handled by _explicitSetter/_implicitSetter
+            frozen=False,  # frozen is `immutable_setter`
         )(cls)
 
         new_cls = type(
