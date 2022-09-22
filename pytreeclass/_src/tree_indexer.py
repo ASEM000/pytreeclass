@@ -60,7 +60,7 @@ def _at_get(
 def _at_set(
     tree: PyTree,
     where: PyTree,
-    set_value,
+    set_value: bool | int | float | complex | jnp.ndarray,
     is_leaf: Callable[[Any], bool] = None,
     **kwargs,
 ):
