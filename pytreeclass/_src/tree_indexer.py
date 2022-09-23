@@ -29,12 +29,7 @@ def _at_get(
     def _lhs_get(lhs: Any, where: Any, **kwargs):
         """Get pytree node  value"""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
-            # array_as_leaves defins whether the condition/where
-            # is applied to each array element
-            if kwargs.get("array_as_leaves", True):
-                return lhs[jnp.where(where)]
-            else:
-                return lhs if jnp.all(where) else None  # fmt: skip
+            return lhs[jnp.where(where)]
 
         elif isinstance(lhs, (int, float, complex, tuple, list, str)):
             return lhs if where else None
@@ -64,20 +59,14 @@ def _at_set(
     is_leaf: Callable[[Any], bool] = None,
     **kwargs,
 ):
-    def _array_set(lhs: Any, where: bool, set_value, **kwargs):
-        if isinstance(set_value, (bool)):
-            return set_value if jnp.all(where) else lhs
-
-        elif isinstance(set_value, (int, float, complex, jnp.ndarray)):
-            if kwargs.get("array_as_leaves", True):
-                return jnp.where(where, set_value, lhs)
-            else:
-                return set_value if jnp.all(where) else lhs
-
     def _lhs_set(lhs: Any, where: Any, set_value: Any, **kwargs):
         """Set pytree node value."""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
-            return _array_set(lhs, where, set_value, **kwargs)
+            if isinstance(set_value, (bool)):
+                return set_value if jnp.all(where) else lhs
+
+            elif isinstance(set_value, (int, float, complex, jnp.ndarray)):
+                return jnp.where(where, set_value, lhs)
 
         elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
             return set_value if (where in [True, None]) else lhs
@@ -112,12 +101,7 @@ def _at_apply(
         """Set pytree node"""
 
         if isinstance(lhs, (Tracer, jnp.ndarray)):
-            # array_as_leaves defins whether the condition/where
-            # is applied to each array element
-            if kwargs.get("array_as_leaves", True):
-                return jnp.where(where, func(lhs), lhs)
-            else:
-                return func(lhs) if jnp.all(where) else lhs
+            return jnp.where(where, func(lhs), lhs)
 
         elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
             return func(lhs) if (where in [True, None]) else lhs
