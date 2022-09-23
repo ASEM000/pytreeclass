@@ -45,7 +45,6 @@ def _tree_mermaid(tree: PyTree):
         """hash a node by its location in a tree"""
         return ctypes.c_size_t(hash(input)).value
 
-    # @dispatch(argnum="node_item")
     def recurse_field(field_item, node_item, depth, prev_id, order):
         nonlocal FMT
 

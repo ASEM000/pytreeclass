@@ -152,7 +152,7 @@ def _at_reduce(
     **kwargs,
 ):
 
-    if not isinstance(tree, type(tree)):
+    if not isinstance(where, type(tree)):
         raise NotImplementedError(
             f"Reduce tree type = {type(tree)} is not implemented."
         )

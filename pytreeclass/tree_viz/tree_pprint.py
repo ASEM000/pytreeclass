@@ -38,45 +38,33 @@ def _marker(field_item: Field, node_item: Any, default: str = "") -> str:
 def tree_repr(tree, width: int = 60) -> str:
     """Prertty print `treeclass_leaves`"""
 
-    def recurse_field(
-        field_item: Field, node_item: Any, depth: int, is_last_field: bool
-    ):
-        nonlocal FMT
-
-        if not field_item.repr:
-            return
-
-        mark = _marker(field_item, node_item)
-        FMT += "\n" + "\t" * depth
-
-        if isinstance(node_item, src.tree_base._treeBase):
-            layer_class_name = f"{node_item.__class__.__name__}"
-            FMT += f"{mark}{field_item.name}"
-            FMT += f"={layer_class_name}" + "("
-            start_cursor = len(FMT)  # capture children repr
-            recurse(tree=node_item, depth=depth + 1)
-            temp = FMT[:start_cursor]
-            temp += _format_width(FMT[start_cursor:] + "\n" + "\t" * (depth) + ")")
-            temp += "" if is_last_field else ","
-            FMT = temp
-
-        else:
-            FMT += f"{mark}{field_item.name}"
-            FMT += "="
-            FMT += f"{(_format_node_repr(node_item,depth))}"
-            FMT += "" if is_last_field else ","
-
-            recurse(node_item, depth)
-
-    def recurse(tree, depth):
+    def recurse(tree: PyTree, depth: int):
         if not is_treeclass(tree):
             return
 
         nonlocal FMT
 
         leaves_count = len(_tree_fields(tree))
-        for i, fi in enumerate(_tree_fields(tree).values()):
-            recurse_field(fi, getattr(tree, fi.name), depth, i == (leaves_count - 1))
+        for i, field_item in enumerate(_tree_fields(tree).values()):
+
+            if not field_item.repr:
+                continue
+
+            node_item = getattr(tree, field_item.name)
+            is_last_field = i == (leaves_count - 1)
+            mark = _marker(field_item, node_item)
+            endl = "" if is_last_field else ","
+            FMT += "\n" + "\t" * depth
+
+            if isinstance(node_item, src.tree_base._treeBase):
+                FMT += f"{mark}{field_item.name}={node_item.__class__.__name__}("
+                cursor = len(FMT)  # capture children repr
+                recurse(tree=node_item, depth=depth + 1)
+                FMT = FMT[:cursor] + _format_width(FMT[cursor:] + "\n" + "\t" * (depth) + ")") + endl  # fmt: skip
+
+            else:
+                FMT += f"{mark}{field_item.name}={(_format_node_repr(node_item,depth))}" + endl  # fmt: skip
+                recurse(tree=node_item, depth=depth)
 
     FMT = ""
     recurse(tree=tree, depth=1)
@@ -88,43 +76,6 @@ def tree_repr(tree, width: int = 60) -> str:
 def tree_str(tree, width: int = 40) -> str:
     """Prertty print `treeclass_leaves`"""
 
-    def recurse_field(
-        field_item: Field, node_item: Any, depth: int, is_last_field: bool
-    ):
-        nonlocal FMT
-
-        if not field_item.repr:
-            return
-
-        mark = _marker(field_item, node_item)
-        FMT += "\n" + "\t" * depth
-
-        if isinstance(node_item, src.tree_base._treeBase):
-            layer_class_name = f"{node_item.__class__.__name__}"
-
-            FMT += f"{mark}{field_item.name}"
-            FMT += f"={layer_class_name}" + "("
-            start_cursor = len(FMT)  # capture children repr
-
-            recurse(node_item, depth=depth + 1)
-
-            temp = FMT[:start_cursor]
-            temp += _format_width(FMT[start_cursor:] + "\n" + "\t" * (depth) + ")")
-            temp += "" if is_last_field else ","
-            FMT = temp
-
-        else:
-            FMT += f"{mark}{field_item.name}"
-            FMT += "="
-
-            if "\n" in f"{node_item!s}":
-                FMT += "\n" + "\t" * (depth + 1) + f"{(_format_node_str(node_item,depth+1))}"  # fmt: skip
-            else:
-                FMT += f"{(_format_node_str(node_item,depth))}"
-
-            FMT += "" if is_last_field else ","
-            recurse(node_item, depth)
-
     def recurse(tree, depth):
         if not is_treeclass(tree):
             return
@@ -133,8 +84,32 @@ def tree_str(tree, width: int = 40) -> str:
 
         leaves_count = len(_tree_fields(tree))
 
-        for i, fi in enumerate(_tree_fields(tree).values()):
-            recurse_field(fi, getattr(tree, fi.name), depth, i == (leaves_count - 1))
+        for i, field_item in enumerate(_tree_fields(tree).values()):
+
+            if not field_item.repr:
+                continue
+
+            is_last_field = i == (leaves_count - 1)
+            node_item = getattr(tree, field_item.name)
+            mark = _marker(field_item, node_item)
+            endl = "" if is_last_field else ","
+            FMT += "\n" + "\t" * depth
+
+            if isinstance(node_item, src.tree_base._treeBase):
+                FMT += f"{mark}{field_item.name}={node_item.__class__.__name__}" + "("
+                cursor = len(FMT)
+                recurse(tree=node_item, depth=depth + 1)
+                FMT = FMT[:cursor] + _format_width(FMT[cursor:] + "\n" + "\t" * (depth) + ")") + endl  # fmt: skip
+
+            else:
+                FMT += f"{mark}{field_item.name}="
+
+                if "\n" in f"{node_item!s}":
+                    FMT += "\n" + "\t" * (depth + 1) + f"{(_format_node_str(node_item,depth+1))}" + endl  # fmt: skip
+                else:
+                    FMT += f"{(_format_node_str(node_item,depth))}" + endl
+
+                recurse(tree=node_item, depth=depth)
 
     FMT = ""
     recurse(tree, depth=1)
