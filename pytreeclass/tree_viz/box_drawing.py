@@ -19,13 +19,10 @@ def _hbox(*text):
 
 
 def _hstack(boxes):
-
     boxes = [(box).split("\n") for box in boxes]
     max_col_height = max([len(b) for b in boxes])
-
     # expand height of each col before merging
     boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
-
     FMT = ""
 
     _cells = tuple(zip(*boxes))

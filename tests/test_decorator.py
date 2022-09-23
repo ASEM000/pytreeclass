@@ -1,3 +1,5 @@
+import copy
+
 import jax.tree_util as jtu
 import pytest
 from jax import numpy as jnp
@@ -89,3 +91,17 @@ def test_registering_state():
 
     assert tt.a == 10
     assert tt.b == 20
+
+
+def test_copy():
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+        b: int = 3
+        c: int = 5
+
+    t = L0()
+
+    assert copy.copy(t).a == 1
+    assert copy.copy(t).b == 3
+    assert copy.copy(t).c == 5

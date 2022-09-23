@@ -14,7 +14,7 @@ import jax.tree_util as jtu
 import numpy as np
 from jax.core import Tracer
 
-from pytreeclass._src.tree_util import _tree_fields, is_treeclass
+from pytreeclass._src.tree_util import _tree_fields, is_treeclass, tree_copy
 
 PyTree = Any
 
@@ -155,6 +155,7 @@ def _ne(lhs, rhs):
 class _treeOp:
 
     __hash__ = _tree_hash
+    __copy__ = tree_copy
     __abs__ = _append_math_op(op.abs)
     __add__ = _append_math_op(op.add)
     __radd__ = _append_math_op(op.add)

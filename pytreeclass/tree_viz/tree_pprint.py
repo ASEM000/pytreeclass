@@ -51,9 +51,8 @@ def tree_repr(tree, width: int = 60) -> str:
                 continue
 
             node_item = getattr(tree, field_item.name)
-            is_last_field = i == (leaves_count - 1)
             mark = _marker(field_item, node_item)
-            endl = "" if is_last_field else ","
+            endl = "" if i == (leaves_count - 1) else ","
             FMT += "\n" + "\t" * depth
 
             if isinstance(node_item, src.tree_base._treeBase):
@@ -89,10 +88,9 @@ def tree_str(tree, width: int = 40) -> str:
             if not field_item.repr:
                 continue
 
-            is_last_field = i == (leaves_count - 1)
             node_item = getattr(tree, field_item.name)
             mark = _marker(field_item, node_item)
-            endl = "" if is_last_field else ","
+            endl = "" if i == (leaves_count - 1) else ","
             FMT += "\n" + "\t" * depth
 
             if isinstance(node_item, src.tree_base._treeBase):
