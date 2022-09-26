@@ -248,6 +248,9 @@ class _strIndexer:
 
 
 class _treeIndexer:
+    def __getitem__(self, where: PyTree | str) -> Any:
+        return self.at[where].get()
+
     @property
     def at(self):
         class _atIndexer:
