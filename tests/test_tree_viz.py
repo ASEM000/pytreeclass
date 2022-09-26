@@ -215,6 +215,32 @@ def test_save_viz():
     #     "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="
     # )
 
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @pytc.treeclass
+    class L1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @pytc.treeclass
+    class L2:
+        a: int = field(metadata={"static": True, "nondiff": True}, default=10)
+        b: int = field(metadata={"static": True, "frozen": True}, default=20)
+        c: int = 30
+        d: L1 = L1()
+
+    t = L2()
+
+    assert pytc.tree_viz.tree_mermaid(t, link=True).startswith(
+        "Open URL in browser: https://pytreeclass.herokuapp.com/temp/?id="
+    )
+
 
 def test_tree_repr():
     @pytc.treeclass
@@ -563,6 +589,33 @@ def test_summary():
         tree_freeze(t).tree_diagram()
         == "Test\n    └#─ a=<class 'tuple'>\n        ├#─ a_0=1\n        ├#─ a_1=2\n        └#─ a_2=3   "
     )
+
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    @pytc.treeclass
+    class L1:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+        d: L0 = L0()
+
+    @pytc.treeclass
+    class L2:
+        a: int = field(metadata={"static": True, "nondiff": True}, default=10)
+        b: int = field(
+            metadata={"static": True, "frozen": True}, default=20, repr=False
+        )
+        c: int = 30
+        d: L1 = L1()
+
+    model = L2()
+
+    # trunk-ignore(flake8/E501)
+    model.summary() == "┌────┬──────┬───────┬────────┬──────┐\n│Name│Type  │Param #│Size    │Config│\n├────┼──────┼───────┼────────┼──────┤\n│c   │int   │0(1)   │0.00B   │c=30  │\n│    │      │       │(28.00B)│      │\n├────┼──────┼───────┼────────┼──────┤\n│d/a │L1/int│0(1)   │0.00B   │a=1   │\n│    │      │       │(28.00B)│      │\n├────┼──────┼───────┼────────┼──────┤\n│d/b │L1/int│0(1)   │0.00B   │b=2   │\n│    │      │       │(28.00B)│      │\n├────┼──────┼───────┼────────┼──────┤\n│d/c │L1/int│0(1)   │0.00B   │c=3   │\n│    │      │       │(28.00B)│      │\n├────┼──────┼───────┼────────┼──────┤\n│d/d │L1/L0 │0(3)   │0.00B   │a=1   │\n│    │      │       │(84.00B)│b=2   │\n│    │      │       │        │c=3   │\n└────┴──────┴───────┴────────┴──────┘\nTotal count :\t0(7)\nDynamic count :\t0(7)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t0.00B(196.00B)\nDynamic size :\t0.00B(196.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
 
 
 def test_mark():
