@@ -65,14 +65,6 @@ def test_getter_by_val():
 
     assert is_treeclass_equal(B, C)
 
-    B = A[A == 0]
-    C = level2(
-        d=level1(a=None, b=None, c=jnp.array([])),
-        e=level1(a=None, b=None, c=jnp.array([])),
-    )
-
-    assert is_treeclass_equal(B, C)
-
     with pytest.raises(AssertionError):
         B = A.at[A].get()
 
