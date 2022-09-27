@@ -20,8 +20,6 @@ from pytreeclass._src.tree_util import (
 
 PyTree = Any
 
-""" .at[...].get() """
-
 
 def _at_get(
     tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool] = None, **kwargs
@@ -49,9 +47,6 @@ def _at_get(
     return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
 
 
-""" .at[...].set() """
-
-
 def _at_set(
     tree: PyTree,
     where: PyTree,
@@ -69,7 +64,7 @@ def _at_set(
                 return jnp.where(where, set_value, lhs)
 
         elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
-            return set_value if (where in [True, None]) else lhs
+            return set_value if (where is True or where is None) else lhs
 
         else:
             raise NotImplementedError(f"Set node type = {type(lhs)} is unknown.")
@@ -78,16 +73,13 @@ def _at_set(
         raise NotImplementedError(f"Set where type = {type(where)} is not implemented.")
 
     lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-    where_leaves, rhs_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
+    where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
     lhs_leaves = [
         _lhs_set(lhs=lhs_leaf, where=where_leaf, set_value=set_value, **kwargs)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
     ]
 
     return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
-
-
-""" .at[...].apply() """
 
 
 def _at_apply(
@@ -104,7 +96,9 @@ def _at_apply(
             return jnp.where(where, func(lhs), lhs)
 
         elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
-            return func(lhs) if (where in [True, None]) else lhs
+            # in case of None , we override the value
+            # None will be encountered only when is_leaf is allowing traversing None
+            return func(lhs) if (where is True or where is None) else lhs
 
         else:
             raise NotImplementedError(f"Apply node type = {type(lhs)} is unknown.")
@@ -115,7 +109,7 @@ def _at_apply(
         )
 
     lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-    where_leaves, rhs_treedef = jtu.tree_flatten(where, is_leaf=is_leaf)
+    where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
     lhs_leaves = [
         _lhs_apply(lhs=lhs_leaf, where=where_leaf, func=func, is_leaf=is_leaf, **kwargs)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
@@ -182,7 +176,7 @@ class _pyTreeIndexer:
 
 
 def _getter(item: Any, path: Sequence[str]):
-    """ "recursive getter"""
+    """recursive getter"""
     # this function gets a certain attribute value based on a
     # sequence of strings.
     # for example _getter(item , ["a", "b", "c"]) is equivalent to item.a.b.c
@@ -234,11 +228,11 @@ class _strIndexer:
 
     def __call__(self, *args, **kwargs):
         # x.at[method_name]() -> returns value and new_tree
-        new_self = _tree_mutate(tree_copy(self.tree))
-        method = getattr(new_self, self.where)
+        tree = _tree_mutate(tree_copy(self.tree))
+        method = getattr(tree, self.where)
         value = method(*args, **kwargs)
-        new_self = _tree_immutate(new_self)
-        return value, new_self
+        tree = _tree_immutate(tree)
+        return value, tree
 
     def __repr__(self):
         return f"where={self.where!r}"
