@@ -73,14 +73,6 @@ def test_getter_by_val():
 
 
 def test_getter_by_param():
-
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
-
-    B = A.at[(A == "a") | (A == "b") | (A == "c") | (A == "d")].get(
-        array_as_leaves=False
-    )
-    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
     @pytc.treeclass
     class L0:
         a: int = 1
@@ -228,24 +220,6 @@ def test_setter_by_metadata():
         c: float = field(metadata={"name": "c"})
         d: jnp.ndarray = field(metadata={"name": "d"})
         name: str
-
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
-
-    B = A.at[A == {"name": "a"}].set(100, array_as_leaves=False)
-    assert is_treeclass_equal(B, Test(100, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
-    B = A.at[(A == {"name": "a"}) | (A == {"name": "b"})].set(
-        100, array_as_leaves=False
-    )
-    assert is_treeclass_equal(B, Test(100, 100, 30, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
-    B = A.at[A == {"": ""}].set(100, array_as_leaves=False)
-    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
-    B = A.at[(A == {"name": "a"}) | (A == {"name": "b"}) | (A == {"name": "c"})].set(
-        100, array_as_leaves=False
-    )
-    assert is_treeclass_equal(B, Test(100, 100, 100, jnp.array([1, 2, 3, 4, 5]), ("A")))
 
     @pytc.treeclass
     class L0:
@@ -463,22 +437,6 @@ def test_apply_and_its_derivatives():
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
 
-    B = A.at[A == {"name": "a"}].apply(lambda _: 100, array_as_leaves=False)
-    assert is_treeclass_equal(B, Test(100, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
-    B = A.at[(A == {"name": "a"}) | (A == {"name": "b"})].set(
-        100, array_as_leaves=False
-    )
-    assert is_treeclass_equal(B, Test(100, 100, 30, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
-    B = A.at[A == {"": ""}].apply(lambda _: 100, array_as_leaves=False)
-    assert is_treeclass_equal(B, Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
-    B = A.at[(A == {"name": "a"}) | (A == {"name": "b"}) | (A == {"name": "c"})].set(
-        100, array_as_leaves=False
-    )
-    assert is_treeclass_equal(B, Test(100, 100, 100, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
     B = A.at[A != {"name": "a"}].apply(lambda _: 100)
     assert is_treeclass_equal(
         B, Test(10, 100, 100, jnp.array([100, 100, 100, 100, 100]), ("A"))
@@ -605,13 +563,6 @@ def test_reduce_and_its_derivatives():
             self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
             self.l2 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
 
-        # def __call__(self, x):
-        #     x = self.l1(x)
-        #     x = jax.nn.tanh(x)
-        #     x = self.l2(x)
-
-        #     return x
-
     model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=5, key=jax.random.PRNGKey(0))
 
     assert (
@@ -677,28 +628,28 @@ def test_not_implemented():
     t = Test()
 
     with pytest.raises(NotImplementedError):
-        _at_get(t == t, 3)
+        _at_get(t == t, 3, None)
 
     with pytest.raises(NotImplementedError):
-        _at_set(t == t, 3, 3)
+        _at_set(t == t, 3, 3, None)
 
     with pytest.raises(NotImplementedError):
-        _at_reduce(t == t, lambda x: x, 3)
+        _at_reduce(t == t, lambda x: x, 3, None, 0)
 
     with pytest.raises(NotImplementedError):
-        _at_apply(t == t, lambda x: x, 3)
+        _at_apply(t == t, lambda x: x, 3, None)
 
     with pytest.raises(NotImplementedError):
-        _at_get(t == t, np.array([1, 2, 3]))
+        _at_get(t == t, np.array([1, 2, 3]), None)
 
     with pytest.raises(NotImplementedError):
-        _at_set(t == t, 3, np.array([1, 2, 3]))
+        _at_set(t == t, 3, np.array([1, 2, 3]), None)
 
     with pytest.raises(NotImplementedError):
-        _at_reduce(t == t, lambda x: x, np.array([1, 2, 3]))
+        _at_reduce(t == t, lambda x: x, np.array([1, 2, 3]), None, 0)
 
     with pytest.raises(NotImplementedError):
-        _at_apply(t == t, lambda x: x, np.array([1, 2, 3]))
+        _at_apply(t == t, lambda x: x, np.array([1, 2, 3]), None)
 
 
 def test_is_leaf():

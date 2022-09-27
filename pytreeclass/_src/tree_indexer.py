@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import functools as ft
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Sequence
@@ -21,10 +20,8 @@ from pytreeclass._src.tree_util import (
 PyTree = Any
 
 
-def _at_get(
-    tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool] = None, **kwargs
-):
-    def _lhs_get(lhs: Any, where: Any, **kwargs):
+def _at_get(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
+    def _lhs_get(lhs: Any, where: Any):
         """Get pytree node  value"""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return lhs[jnp.where(where)]
@@ -40,7 +37,7 @@ def _at_get(
     lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
     where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
     lhs_leaves = [
-        _lhs_get(lhs=lhs_leaf, where=where_leaf, **kwargs)
+        _lhs_get(lhs=lhs_leaf, where=where_leaf)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
     ]
 
@@ -51,10 +48,9 @@ def _at_set(
     tree: PyTree,
     where: PyTree,
     set_value: bool | int | float | complex | jnp.ndarray,
-    is_leaf: Callable[[Any], bool] = None,
-    **kwargs,
+    is_leaf: Callable[[Any], bool],
 ):
-    def _lhs_set(lhs: Any, where: Any, set_value: Any, **kwargs):
+    def _lhs_set(lhs: Any, where: Any, set_value: Any):
         """Set pytree node value."""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             if isinstance(set_value, (bool)):
@@ -75,7 +71,7 @@ def _at_set(
     lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
     where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
     lhs_leaves = [
-        _lhs_set(lhs=lhs_leaf, where=where_leaf, set_value=set_value, **kwargs)
+        _lhs_set(lhs=lhs_leaf, where=where_leaf, set_value=set_value)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
     ]
 
@@ -86,10 +82,9 @@ def _at_apply(
     tree: PyTree,
     where: PyTree,
     func: Callable[[Any], Any],
-    is_leaf: Callable[[Any], bool] = None,
-    **kwargs,
+    is_leaf: Callable[[Any], bool],
 ):
-    def _lhs_apply(lhs: Any, where: bool, func: Callable[[Any], Any], **kwargs):
+    def _lhs_apply(lhs: Any, where: bool, func: Callable[[Any], Any]):
         """Set pytree node"""
 
         if isinstance(lhs, (Tracer, jnp.ndarray)):
@@ -111,7 +106,7 @@ def _at_apply(
     lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
     where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
     lhs_leaves = [
-        _lhs_apply(lhs=lhs_leaf, where=where_leaf, func=func, is_leaf=is_leaf, **kwargs)
+        _lhs_apply(lhs=lhs_leaf, where=where_leaf, func=func)
         for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
     ]
 
@@ -125,9 +120,8 @@ def _at_reduce(
     tree: PyTree,
     where: PyTree,
     func: Callable[[Any], Any],
-    is_leaf: Callable[[Any], bool] = None,
-    initializer: Any = 0,
-    **kwargs,
+    is_leaf: Callable[[Any], bool],
+    initializer: Any,
 ):
 
     if not isinstance(where, type(tree)):
@@ -135,9 +129,7 @@ def _at_reduce(
             f"Reduce tree type = {type(tree)} is not implemented."
         )
 
-    return jtu.tree_reduce(
-        func, tree.at[where].get(is_leaf=is_leaf, **kwargs), initializer
-    )
+    return jtu.tree_reduce(func, tree.at[where].get(is_leaf=is_leaf), initializer)
 
 
 @dataclass(eq=False, frozen=True)
@@ -150,23 +142,17 @@ class _pyTreeIndexer:
             is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(self.where)
         ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(self.where)}"
 
-    def get(self, **kwargs):
-        return ft.partial(_at_get, where=self.where)(tree=self.tree, **kwargs)
+    def get(self, is_leaf: Callable[[Any], bool] = None):
+        return _at_get(self.tree, self.where, is_leaf=is_leaf)
 
-    def set(self, set_value, **kwargs):
-        return ft.partial(_at_set, where=self.where)(
-            tree=self.tree, set_value=set_value, **kwargs
-        )
+    def set(self, set_value, is_leaf: Callable[[Any], bool] = None):
+        return _at_set(self.tree, self.where, set_value, is_leaf)
 
-    def apply(self, func, **kwargs):
-        return ft.partial(_at_apply, where=self.where)(
-            tree=self.tree, func=func, **kwargs
-        )
+    def apply(self, func, is_leaf: Callable[[Any], bool] = None):
+        return _at_apply(self.tree, self.where, func, is_leaf)
 
-    def reduce(self, func, **kwargs):
-        return ft.partial(_at_reduce, where=self.where)(
-            tree=self.tree, func=func, **kwargs
-        )
+    def reduce(self, func, is_leaf: Callable[[Any], bool] = None, initializer=0):
+        return _at_reduce(self.tree, self.where, func, is_leaf, initializer)
 
     def __repr__(self):
         return f"where={self.where!r}"
@@ -223,7 +209,7 @@ class _strIndexer:
         # x.at["a"].set(value) returns a new tree with x.a = value
         return _setter(tree_copy(self.tree), self.where.split("."), set_value)
 
-    def apply(self, func, **kwargs):
+    def apply(self, func):
         return self.tree.at[self.where].set(func(self.tree.at[self.where].get()))
 
     def __call__(self, *args, **kwargs):
