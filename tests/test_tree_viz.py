@@ -442,7 +442,7 @@ def test_tree_with_containers():
     assert (
         l2.tree_diagram()
         # trunk-ignore(flake8/E501)
-        == "level2\n    ├── e=<class 'tuple'>\n    │   ├── e_0=level1\n    │   │   ├── c=<class 'tuple'>\n    │   │   │   ├── c_0=level0\n    │   │   │   │   ├── a=1\n    │   │   │   │   └── b=2 \n    │   │   │   └── c_1=level0\n    │   │   │       ├── a=1\n    │   │   │       └── b=2 \n    │   │   └── d=2 \n    │   └── e_1=1\n    └── f=level0\n        ├── a=1\n        └── b=2     "
+        == "level2\n    ├── e=<class 'tuple'>\n    │   ├── e[0]=level1\n    │   │   ├── c=<class 'tuple'>\n    │   │   │   ├── c[0]=level0\n    │   │   │   │   ├── a=1\n    │   │   │   │   └── b=2 \n    │   │   │   └── c[1]=level0\n    │   │   │       ├── a=1\n    │   │   │       └── b=2 \n    │   │   └── d=2 \n    │   └── e[1]=1\n    └── f=level0\n        ├── a=1\n        └── b=2     "
     )
 
     @pytc.treeclass
@@ -453,7 +453,7 @@ def test_tree_with_containers():
     assert (
         Test((1, Test(2, 10), (3, 4, (5, 6))), 1).tree_diagram()
         # trunk-ignore(flake8/E501)
-        == "Test\n    ├── a=<class 'tuple'>\n    │   ├── a_0=1\n    │   ├── a_1=Test\n    │   │   ├── a=2\n    │   │   └── b=10    \n    │   └── a_2=<class 'tuple'>\n    │       ├── a_2_0=3\n    │       ├── a_2_1=4\n    │       └── a_2_2=<class 'tuple'>\n    │           ├── a_2_2_0=5\n    │           └── a_2_2_1=6\n    └── b=1 "
+        == "Test\n    ├── a=<class 'tuple'>\n    │   ├── a[0]=1\n    │   ├── a[1]=Test\n    │   │   ├── a=2\n    │   │   └── b=10    \n    │   └── a[2]=(3, 4, (5, 6))\n    └── b=1 "
     )
 
     @pytc.treeclass
@@ -556,13 +556,13 @@ def test_summary():
     assert (
         (Test((1, 2)).summary())
         # trunk-ignore(flake8/E501)
-        == "┌─────┬─────────┬───────┬────────┬──────┐\n│Name │Type     │Param #│Size    │Config│\n├─────┼─────────┼───────┼────────┼──────┤\n│a/a_0│tuple/int│0(1)   │0.00B   │a_0=1 │\n│     │         │       │(28.00B)│      │\n├─────┼─────────┼───────┼────────┼──────┤\n│a/a_1│tuple/int│0(1)   │0.00B   │a_1=2 │\n│     │         │       │(28.00B)│      │\n└─────┴─────────┴───────┴────────┴──────┘\nTotal count :\t0(2)\nDynamic count :\t0(2)\nFrozen count :\t0(0)\n-----------------------------------------\nTotal size :\t0.00B(56.00B)\nDynamic size :\t0.00B(56.00B)\nFrozen size :\t0.00B(0.00B)\n========================================="
+        == "┌────┬─────┬───────┬────────┬───────┐\n│Name│Type │Param #│Size    │Config │\n├────┼─────┼───────┼────────┼───────┤\n│a   │tuple│0(2)   │0.00B   │a=(1,2)│\n│    │     │       │(56.00B)│       │\n└────┴─────┴───────┴────────┴───────┘\nTotal count :\t0(2)\nDynamic count :\t0(2)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t0.00B(56.00B)\nDynamic size :\t0.00B(56.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
     )
 
     assert (
         (Test([1, 2]).summary())
         # trunk-ignore(flake8/E501)
-        == "┌─────┬────────┬───────┬────────┬──────┐\n│Name │Type    │Param #│Size    │Config│\n├─────┼────────┼───────┼────────┼──────┤\n│a/a_0│list/int│0(1)   │0.00B   │a_0=1 │\n│     │        │       │(28.00B)│      │\n├─────┼────────┼───────┼────────┼──────┤\n│a/a_1│list/int│0(1)   │0.00B   │a_1=2 │\n│     │        │       │(28.00B)│      │\n└─────┴────────┴───────┴────────┴──────┘\nTotal count :\t0(2)\nDynamic count :\t0(2)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t0.00B(56.00B)\nDynamic size :\t0.00B(56.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
+        == "┌────┬─────┬───────┬────────┬───────┐\n│Name│Type │Param #│Size    │Config │\n├────┼─────┼───────┼────────┼───────┤\n│a   │list │0(2)   │0.00B   │a=[1,2]│\n│    │     │       │(56.00B)│       │\n└────┴─────┴───────┴────────┴───────┘\nTotal count :\t0(2)\nDynamic count :\t0(2)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t0.00B(56.00B)\nDynamic size :\t0.00B(56.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
     )
 
     @pytc.treeclass
@@ -571,24 +571,12 @@ def test_summary():
 
     t = Test([1, 2, 3])
 
-    assert (
-        t.tree_diagram()
-        == "Test\n    └── a=<class 'list'>\n        ├── a_0=1\n        ├── a_1=2\n        └── a_2=3   "
-    )
-    assert (
-        tree_freeze(t).tree_diagram()
-        == "Test\n    └#─ a=<class 'list'>\n        ├#─ a_0=1\n        ├#─ a_1=2\n        └#─ a_2=3   "
-    )
+    assert t.tree_diagram() == "Test\n    └── a=[1, 2, 3] "
+    assert tree_freeze(t).tree_diagram() == "Test\n    └#─ a=[1, 2, 3] "
 
     t = Test((1, 2, 3))
-    assert (
-        t.tree_diagram()
-        == "Test\n    └── a=<class 'tuple'>\n        ├── a_0=1\n        ├── a_1=2\n        └── a_2=3   "
-    )
-    assert (
-        tree_freeze(t).tree_diagram()
-        == "Test\n    └#─ a=<class 'tuple'>\n        ├#─ a_0=1\n        ├#─ a_1=2\n        └#─ a_2=3   "
-    )
+    assert t.tree_diagram() == "Test\n    └── a=(1, 2, 3) "
+    assert tree_freeze(t).tree_diagram() == "Test\n    └#─ a=(1, 2, 3) "
 
     @pytc.treeclass
     class L0:

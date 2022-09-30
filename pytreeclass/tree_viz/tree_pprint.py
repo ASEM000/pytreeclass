@@ -136,7 +136,10 @@ def tree_diagram(tree: PyTree) -> str:
 
             recurse(node_item, parent_level_count + [node_index])
 
-        elif isinstance(node_item, (list, tuple)):
+        elif isinstance(node_item, (list, tuple)) and any(
+            is_treeclass(leaf) for leaf in (node_item)
+        ):
+            # expand a contaner if any item  in the container `is treeclass`
             recurse_field(field_item, node_item.__class__, parent_level_count, node_index)  # fmt: skip
 
             for i, layer in enumerate(node_item):
@@ -148,7 +151,7 @@ def tree_diagram(tree: PyTree) -> str:
                 else:
                     new_field = field()
 
-                object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
+                object.__setattr__(new_field, "name", f"{field_item.name}[{i}]")
                 object.__setattr__(new_field, "type", type(layer))
 
                 recurse_field(new_field, layer, parent_level_count + [node_index], len(node_item) - i)  # fmt: skip

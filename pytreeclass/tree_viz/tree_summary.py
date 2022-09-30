@@ -13,6 +13,7 @@ from pytreeclass._src.tree_util import (
     _tree_fields,
     _tree_structure,
     is_frozen_field,
+    is_treeclass,
     is_treeclass_frozen,
     is_treeclass_non_leaf,
     tree_unfreeze,
@@ -107,16 +108,19 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
         if not field_item.repr:
             return
 
-        if isinstance(node_item, (list, tuple)):
+        if isinstance(node_item, (list, tuple)) and any(
+            is_treeclass(leaf) for leaf in node_item
+        ):
+            # expand container if any item is a `treeclass`
             for i, layer in enumerate(node_item):
                 new_field = field(metadata={"frozen": is_frozen_field(field_item)})
-                object.__setattr__(new_field, "name", f"{field_item.name}_{i}")
+                object.__setattr__(new_field, "name", f"{field_item.name}[{i}]")
                 object.__setattr__(new_field, "type", type(layer))
 
                 recurse_field(
                     field_item=new_field,
                     node_item=layer,
-                    name_path=name_path + (f"{field_item.name}_{i}",),
+                    name_path=name_path + (f"{field_item.name}[{i}]",),
                     type_path=type_path + (layer.__class__.__name__,),
                 )
 
