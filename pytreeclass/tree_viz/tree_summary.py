@@ -100,7 +100,6 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
             for i in range(len(indim_shape))
         ]
 
-    # @dispatch(argnum="node_item")
     def recurse_field(field_item, node_item, name_path, type_path):
 
         nonlocal ROWS, COUNT, SIZE
@@ -136,7 +135,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     + f"{(os.linesep + '(frozen)' if is_frozen else '')}",
                     "/".join(type_path),
                     _format_count(count),
-                    _format_size(size, True),
+                    _format_size(size),
                     "\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()]),
                 ]
             )
@@ -152,7 +151,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                     "/".join(name_path) + f"{('(frozen)' if is_frozen else '')}",
                     "/".join(type_path),
                     _format_count(count),
-                    _format_size(size, True),
+                    _format_size(size),
                     f"{field_item.name}={_format_node(node_item)}",
                 ]
             )
