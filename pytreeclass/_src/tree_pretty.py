@@ -21,8 +21,12 @@ class _treePretty:
         """pretty print pytree instance"""
         return tree_str(self, width=60)
 
-    def summary(self, array: jnp.ndarray = None) -> str:
+    def summary(self, array: jnp.ndarray = None, compact: bool = False) -> str:
         """print a summary of the pytree instance
+
+        Args:
+            array (jnp.ndarray, optional): Input jax.numpy used to call the class. Defaults to None.
+            compact (bool, optional): If True, the summary will be printed in a compact format. Defaults to False.
 
         Example:
             >>> import pytreeclass as pytc
@@ -50,7 +54,7 @@ class _treePretty:
             Frozen size :   0.00B(0.00B)
             ========================================
         """
-        return tree_summary(self, array)
+        return tree_summary(self, array, compact)
 
     def tree_diagram(self) -> str:
         """Print a diagram of the pytree instance

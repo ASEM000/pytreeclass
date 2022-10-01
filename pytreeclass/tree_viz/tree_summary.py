@@ -45,12 +45,13 @@ def _format_count(node_count, newline=False):
     return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
 
 
-def tree_summary(tree, array: jnp.ndarray = None) -> str:
+def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
     """Prints a summary of the tree structure.
 
     Args:
         tree (PyTree): @treeclass decorated class.
         array (jnp.ndarray, optional): Input jax.numpy used to call the class. Defaults to None.
+        compact (bool, optional): If True, the summary will be printed in a compact format. Defaults to False.
 
     Example:
         @pytc.treeclass
@@ -94,7 +95,7 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
     if array is not None:
         shape = _sequential_tree_shape_eval(tree, array)
         indim_shape, outdim_shape = shape[:-1], shape[1:]
-
+        
         shape_str = ["Input/Output"] + [
             f"{_format_node(indim_shape[i])}\n{_format_node(outdim_shape[i])}"
             for i in range(len(indim_shape))
@@ -129,16 +130,19 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
             is_frozen = is_frozen or is_treeclass_frozen(node_item)
             count, size = _reduce_count_and_size(tree_unfreeze(node_item))
             dynamic, _ = _tree_structure(tree_unfreeze(node_item))
-            ROWS.append(
-                [
-                    "/".join(name_path)
-                    + f"{(os.linesep + '(frozen)' if is_frozen else '')}",
-                    "/".join(type_path),
-                    _format_count(count),
-                    _format_size(size),
-                    "\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()]),
-                ]
-            )
+
+            row = [
+                "/".join(name_path)
+                + f"{(os.linesep + '(frozen)' if is_frozen else '')}",
+                "/".join(type_path),
+                _format_count(count),
+                _format_size(size),
+            ]
+
+            if not compact:
+                row += ["\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()])]  # fmt: skip
+
+            ROWS.append(row)
 
             COUNT[1 if is_frozen else 0] += count
             SIZE[1 if is_frozen else 0] += size
@@ -146,15 +150,15 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
         else:
             is_frozen = field_item.metadata.get("frozen", False)
             count, size = _reduce_count_and_size(node_item)
-            ROWS.append(
-                [
-                    "/".join(name_path) + f"{('(frozen)' if is_frozen else '')}",
-                    "/".join(type_path),
-                    _format_count(count),
-                    _format_size(size),
-                    f"{field_item.name}={_format_node(node_item)}",
-                ]
-            )
+            row = [
+                "/".join(name_path) + f"{('(frozen)' if is_frozen else '')}",
+                "/".join(type_path),
+                _format_count(count),
+                _format_size(size),
+            ]
+            if not compact:
+                row += [f"{field_item.name}={_format_node(node_item)}"]  # fmt: skip
+            ROWS.append(row)
 
             # non-treeclass leaf inherit frozen state
             COUNT[1 if is_frozen else 0] += count
@@ -193,7 +197,11 @@ def tree_summary(tree, array: jnp.ndarray = None) -> str:
                         type_path=type_path + (node_item.__class__.__name__,),
                     )
 
-    ROWS = [["Name", "Type ", "Param #", "Size ", "Config"]]
+    if compact:
+        ROWS = [["Name", "Type ", "Param #", "Size "]]
+    else:
+        ROWS = [["Name", "Type ", "Param #", "Size ", "Config"]]
+
     COUNT = [0, 0]
     SIZE = [0, 0]
 
