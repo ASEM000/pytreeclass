@@ -95,11 +95,9 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
     if array is not None:
         shape = _sequential_tree_shape_eval(tree, array)
         indim_shape, outdim_shape = shape[:-1], shape[1:]
-        
-        shape_str = ["Input/Output"] + [
-            f"{_format_node(indim_shape[i])}\n{_format_node(outdim_shape[i])}"
-            for i in range(len(indim_shape))
-        ]
+
+        in_shape_str = ["Input"] + list(map(_format_node, indim_shape))
+        out_shape_str = ["Output"] + list(map(_format_node, outdim_shape))
 
     def recurse_field(field_item, node_item, name_path, type_path):
 
@@ -212,7 +210,8 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
     COLS = [list(c) for c in zip(*ROWS)]
 
     if array is not None:
-        COLS += [shape_str]
+        COLS += [in_shape_str]
+        COLS += [out_shape_str]
 
     layer_table = _table(COLS)
     table_width = len(layer_table.split("\n")[0])
