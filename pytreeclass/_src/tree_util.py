@@ -36,17 +36,19 @@ def is_nondiff_field(field_item: Field) -> bool:
 def is_treeclass_frozen(tree):
     """assert if a treeclass is frozen"""
     if is_treeclass(tree):
-        return all(is_frozen_field(f) for f in _tree_fields(tree).values())
-    else:
-        return False
+        field_items = _tree_fields(tree).values()
+        if len(field_items) > 0:
+            return all(is_frozen_field(f) for f in field_items)
+    return False
 
 
 def is_treeclass_nondiff(tree):
     """assert if a treeclass is static"""
     if is_treeclass(tree):
-        return all(is_nondiff_field(f) for f in _tree_fields(tree).values())
-    else:
-        return False
+        field_items = _tree_fields(tree).values()
+        if len(field_items) > 0:
+            return all(is_nondiff_field(f) for f in field_items)
+    return False
 
 
 def is_treeclass(tree):
