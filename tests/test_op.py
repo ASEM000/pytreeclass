@@ -18,7 +18,7 @@ def test_ops():
         a: float
         b: float
         c: float
-        name: str = pytc.nondiff_field()
+        name: str = pytc.field(nondiff=True)
 
     A = Test(10, 20, 30, ("A"))
     # binary operations
@@ -33,7 +33,7 @@ def test_ops():
     class Test:
         a: float
         b: float
-        name: str = pytc.nondiff_field()
+        name: str = pytc.field(nondiff=True)
 
     A = Test(-10, 20, ("A"))
 
@@ -64,7 +64,7 @@ def test_op_errors():
         a: float
         b: float
         c: float
-        name: str = pytc.nondiff_field()
+        name: str = pytc.field(nondiff=True)
 
     A = Test(10, 20, 30, ("A"))
 

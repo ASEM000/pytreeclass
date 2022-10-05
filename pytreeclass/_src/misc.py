@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import functools as ft
 from types import FunctionType
 from typing import Any
@@ -32,3 +33,19 @@ def _mutable(func):
         return output
 
     return mutable_method
+
+
+def field(
+    *, nondiff: bool = False, frozen: bool = False, **kwargs
+) -> dataclasses.Field:
+    """Similar to dataclasses.field but with additional arguments
+    Args:
+        nondiff: if True, the field will not be differentiated
+        frozen: if True, the field will be frozen
+        **kwargs: additional arguments to pass to dataclasses.field
+    """
+    metadata = kwargs.pop("metadata", {})
+    metadata["nondiff"] = nondiff
+    metadata["frozen"] = frozen
+    metadata["static"] = nondiff or frozen
+    return dataclasses.field(metadata=metadata, **kwargs)

@@ -16,7 +16,7 @@ from pytreeclass._src.tree_util import (
 def test_filter_nondiff():
     @pytc.treeclass
     class Test:
-        a: int = pytc.nondiff_field(default=1)
+        a: int = pytc.field(nondiff=True, default=1)
         b: str = "a"
 
     t = Test()

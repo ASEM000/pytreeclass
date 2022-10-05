@@ -4,15 +4,13 @@ from dataclasses import Field, field
 from typing import Any
 
 import pytreeclass._src as src
-from pytreeclass._src.tree_util import (
+from pytreeclass._src.tree_util import (  # frozen_field,; nondiff_field,
     _tree_fields,
-    frozen_field,
     is_frozen_field,
     is_nondiff_field,
     is_treeclass,
     is_treeclass_frozen,
     is_treeclass_nondiff,
-    nondiff_field,
 )
 from pytreeclass.tree_viz.node_pprint import (
     _format_node_diagram,
@@ -145,9 +143,9 @@ def tree_diagram(tree: PyTree) -> str:
             for i, layer in enumerate(node_item):
 
                 if is_frozen_field(field_item):
-                    new_field = frozen_field()
+                    new_field = src.misc.field(frozen=True)
                 elif is_nondiff_field(field_item):
-                    new_field = nondiff_field()
+                    new_field = src.misc.field(nondiff=True)
                 else:
                     new_field = field()
 

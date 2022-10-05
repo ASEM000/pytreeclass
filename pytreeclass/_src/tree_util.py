@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools as ft
 from collections.abc import Iterable
 from dataclasses import Field, field
 from types import FunctionType, MappingProxyType
@@ -11,16 +12,6 @@ import jax.tree_util as jtu
 import pytreeclass._src as src
 
 PyTree = Any
-
-
-def nondiff_field(**kwargs):
-    """ignore from pytree computations"""
-    return field(**{**kwargs, **{"metadata": {"static": True, "nondiff": True}}})
-
-
-def frozen_field(**kwargs):
-    """ignore from pytree computations"""
-    return field(**{**kwargs, **{"metadata": {"static": True, "frozen": True}}})
 
 
 def is_frozen_field(field_item: Field) -> bool:
@@ -273,6 +264,9 @@ def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
 def filter_nondiff(
     tree: PyTree, where: PyTree | Callable[[Field, Any], bool] = _is_nondiff
 ) -> PyTree:
+
+    nondiff_field = ft.partial(src.misc.field, nondiff=True)
+
     return _append_field(tree=tree, where=where, replacing_field=nondiff_field)
 
 
@@ -283,6 +277,9 @@ def unfilter_nondiff(tree):
 def tree_freeze(
     tree: PyTree, where: PyTree | Callable[[Field, Any], bool] = lambda _: True
 ) -> PyTree:
+
+    frozen_field = ft.partial(src.misc.field, frozen=True)
+
     return _append_field(tree=tree, where=where, replacing_field=frozen_field)
 
 

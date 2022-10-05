@@ -21,7 +21,7 @@ class Test:
     b: float
     c: float
     d: jnp.ndarray
-    name: str = pytc.nondiff_field()
+    name: str = pytc.field(nondiff=True)
 
 
 def test_getter_by_val():
@@ -112,7 +112,7 @@ def test_getter_by_metadata():
         b: float = field(metadata={"name": "b"})
         c: float = field(metadata={"name": "c"})
         d: jnp.ndarray = field(metadata={"name": "d"})
-        name: str = pytc.nondiff_field()
+        name: str = pytc.field(nondiff=True)
 
     @pytc.treeclass
     class L0:
@@ -433,7 +433,7 @@ def test_apply_and_its_derivatives():
         b: float = field(metadata={"name": "b"})
         c: float = field(metadata={"name": "c"})
         d: jnp.ndarray = field(metadata={"name": "d"})
-        name: str = pytc.nondiff_field()
+        name: str = pytc.field(nondiff=True)
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
 
