@@ -223,6 +223,45 @@ class _strIndexer:
         return f"where={self.where!s}"
 
 
+def _str_nested_indexer(tree, where):
+    class _strNestedIndexer(_strIndexer):
+        def __getitem__(nested_self, nested_where):
+            return _strNestedIndexer(
+                tree=tree, where=nested_self.where + "." + nested_where
+            )
+
+        def __getattr__(nested_self, name):
+            # support nested `.at``
+            # for example `.at[A].at[B]` represents model.A.B
+            if name == "at":
+                return _strNestedIndexer(tree=tree, where=nested_self.where)
+
+            raise AttributeError(f"{name} is not a valid attribute of {nested_self}")
+
+    return _strNestedIndexer(tree=tree, where=where)
+
+
+def _pytree_nested_indexer(tree, where):
+    class _pyTreeNestedIndexer(_pyTreeIndexer):
+        def __getitem__(nested_self, nested_where):
+            # here the case is .at[cond1].at[cond2] <-> .at[ cond1 and cond2 ]
+            return _pyTreeNestedIndexer(
+                tree=tree,
+                where=(nested_self.where & nested_where),
+            )
+
+        def __getattr__(nested_self, name):
+            # support for nested `.at`
+            # e.g. `tree.at[tree>0].at[tree == str ]
+            # corrsponds to (tree>0 and tree == str`)
+            if name == "at":
+                return _pyTreeNestedIndexer(tree=tree, where=nested_self.where)
+
+            raise AttributeError(f"{name} is not a valid attribute of {nested_self}")
+
+    return _pyTreeNestedIndexer(tree=tree, where=where)
+
+
 class _treeIndexer:
     @property
     def at(self):
@@ -230,60 +269,18 @@ class _treeIndexer:
             def __getitem__(_, where):
 
                 if isinstance(where, str):
-
-                    class _strNestedIndexer(_strIndexer):
-                        # subclass to preserve the tree state(i.e. self)
-                        # during recursive calls
-                        def __getitem__(nested_self, nested_where):
-                            return _strNestedIndexer(
-                                tree=self, where=nested_self.where + "." + nested_where
-                            )
-
-                        def __getattr__(nested_self, name):
-                            # support nested `.at``
-                            # for example `.at[A].at[B]` represents model.A.B
-                            if name != "at":
-                                raise AttributeError(
-                                    f"{name} is not a valid attribute of {nested_self}"
-                                )
-                            return _strNestedIndexer(tree=self, where=nested_self.where)
-
-                    return _strNestedIndexer(tree=self, where=where)
+                    return _str_nested_indexer(tree=self, where=where)
 
                 elif isinstance(where, type(self)):
                     # indexing by boolean pytree
-                    class _pyTreeNestedIndexer(_pyTreeIndexer):
-                        # subclass to preserve the tree state(i.e. self)
-                        # during recursive calls
-                        def __getitem__(nested_self, nested_where):
-                            # here the case is .at[cond1].at[cond2] <-> .at[ cond1 and cond2 ]
-                            return _pyTreeNestedIndexer(
-                                tree=self,
-                                where=(nested_self.where & nested_where),
-                            )
-
-                        def __getattr__(nested_self, name):
-                            # support for nested `.at`
-                            # e.g. `tree.at[tree>0].at[tree == str ]
-                            # corrsponds to (tree>0 and tree == str`)
-                            if name != "at":
-                                raise AttributeError(
-                                    f"{name} is not a valid attribute of {nested_self}"
-                                )
-                            return _pyTreeNestedIndexer(
-                                tree=self, where=nested_self.where
-                            )
-
-                    return _pyTreeNestedIndexer(tree=self, where=where)
+                    return _pytree_nested_indexer(tree=self, where=where)
 
                 elif isinstance(where, type(Ellipsis)):
                     # Ellipsis as an alias for all elements
-                    # model.at[model == model ] <==> model.at[...]
+                    # model.at[model == model ] <--> model.at[...]
                     return self.at[self == self]
 
-                else:
-                    raise NotImplementedError(
-                        f"Indexing with type{type(where)} is not implemented."
-                    )
+                msg = f"Indexing with type{type(where)} is not implemented."
+                raise NotImplementedError(msg)
 
         return _atIndexer()
