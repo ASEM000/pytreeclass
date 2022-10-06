@@ -3,15 +3,8 @@ from __future__ import annotations
 from dataclasses import Field, field
 from typing import Any
 
+import pytreeclass as pytc
 import pytreeclass._src as src
-from pytreeclass._src.tree_util import (  # frozen_field,; nondiff_field,
-    _tree_fields,
-    is_frozen_field,
-    is_nondiff_field,
-    is_treeclass,
-    is_treeclass_frozen,
-    is_treeclass_nondiff,
-)
 from pytreeclass.tree_viz.node_pprint import (
     _format_node_diagram,
     _format_node_repr,
@@ -25,9 +18,9 @@ PyTree = Any
 def _marker(field_item: Field, node_item: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item"""
     # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if is_nondiff_field(field_item) or is_treeclass_nondiff(node_item):
+    if pytc.is_nondiff_field(field_item) or pytc.is_treeclass_nondiff(node_item):
         return "*"
-    elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
+    elif pytc.is_frozen_field(field_item) or pytc.is_treeclass_frozen(node_item):
         return "#"
     else:
         return default
@@ -37,13 +30,13 @@ def tree_repr(tree, width: int = 60) -> str:
     """Prertty print `treeclass_leaves`"""
 
     def recurse(tree: PyTree, depth: int):
-        if not is_treeclass(tree):
+        if not pytc.is_treeclass(tree):
             return
 
         nonlocal FMT
 
-        leaves_count = len(_tree_fields(tree))
-        for i, field_item in enumerate(_tree_fields(tree).values()):
+        leaves_count = len(pytc.fields(tree))
+        for i, field_item in enumerate(pytc.fields(tree).values()):
 
             if not field_item.repr:
                 continue
@@ -74,14 +67,14 @@ def tree_str(tree, width: int = 40) -> str:
     """Prertty print `treeclass_leaves`"""
 
     def recurse(tree, depth):
-        if not is_treeclass(tree):
+        if not pytc.is_treeclass(tree):
             return
 
         nonlocal FMT
 
-        leaves_count = len(_tree_fields(tree))
+        leaves_count = len(pytc.fields(tree))
 
-        for i, field_item in enumerate(_tree_fields(tree).values()):
+        for i, field_item in enumerate(pytc.fields(tree).values()):
 
             if not field_item.repr:
                 continue
@@ -135,16 +128,16 @@ def tree_diagram(tree: PyTree) -> str:
             recurse(node_item, parent_level_count + [node_index])
 
         elif isinstance(node_item, (list, tuple)) and any(
-            is_treeclass(leaf) for leaf in (node_item)
+            pytc.is_treeclass(leaf) for leaf in (node_item)
         ):
             # expand a contaner if any item  in the container `is treeclass`
             recurse_field(field_item, node_item.__class__, parent_level_count, node_index)  # fmt: skip
 
             for i, layer in enumerate(node_item):
 
-                if is_frozen_field(field_item):
+                if pytc.is_frozen_field(field_item):
                     new_field = src.misc.field(frozen=True)
-                elif is_nondiff_field(field_item):
+                elif pytc.is_nondiff_field(field_item):
                     new_field = src.misc.field(nondiff=True)
                 else:
                     new_field = field()
@@ -169,14 +162,14 @@ def tree_diagram(tree: PyTree) -> str:
             recurse(node_item, parent_level_count + [1])
 
     def recurse(tree, parent_level_count):
-        if not is_treeclass(tree):
+        if not pytc.is_treeclass(tree):
             return
 
         nonlocal FMT
 
-        leaves_count = len(_tree_fields(tree))
+        leaves_count = len(pytc.fields(tree))
 
-        for i, fi in enumerate(_tree_fields(tree).values()):
+        for i, fi in enumerate(pytc.fields(tree).values()):
             recurse_field(fi, getattr(tree, fi.name), parent_level_count, leaves_count - i)  # fmt: skip
 
         FMT += "\t"

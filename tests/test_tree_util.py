@@ -4,13 +4,7 @@ import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import (
-    is_treeclass,
-    is_treeclass_frozen,
-    is_treeclass_leaf,
-    is_treeclass_nondiff,
-    tree_freeze,
-)
+from pytreeclass._src.tree_util import tree_freeze
 from pytreeclass.tree_viz.utils import _node_count_and_size
 from pytreeclass.treeclass import ImmutableInstanceError
 
@@ -21,8 +15,8 @@ def test_is_frozen():
         a: jnp.ndarray = jnp.array([1.0, 2.0, 3.0])
         b: int = 1
 
-    assert is_treeclass_frozen(tree_freeze(Test())) is True
-    assert is_treeclass_frozen(1) is False
+    assert pytc.is_treeclass_frozen(tree_freeze(Test())) is True
+    assert pytc.is_treeclass_frozen(1) is False
 
 
 @pytc.treeclass
@@ -41,15 +35,15 @@ class Test2:
 
 
 def test_is_treeclass():
-    assert is_treeclass(a) is True
-    assert all(is_treeclass(bi) for bi in b) is False
+    assert pytc.is_treeclass(a) is True
+    assert all(pytc.is_treeclass(bi) for bi in b) is False
 
 
 def test_is_treeclass_leaf():
-    assert is_treeclass_leaf(a) is True
-    assert all(is_treeclass_leaf(bi) for bi in b) is False
-    assert is_treeclass_leaf(Test2()) is False
-    assert is_treeclass_leaf(Test2().b) is True
+    assert pytc.is_treeclass_leaf(a) is True
+    assert all(pytc.is_treeclass_leaf(bi) for bi in b) is False
+    assert pytc.is_treeclass_leaf(Test2()) is False
+    assert pytc.is_treeclass_leaf(Test2().b) is True
 
 
 def test_is_treeclass_frozen():
@@ -58,9 +52,9 @@ def test_is_treeclass_frozen():
         a: jnp.ndarray = jnp.array([1.0, 2.0, 3.0])
         b: int = 1
 
-    assert is_treeclass_frozen(Test()) is False
-    assert is_treeclass_frozen(tree_freeze(Test())) is True
-    assert is_treeclass_frozen([1]) is False
+    assert pytc.is_treeclass_frozen(Test()) is False
+    assert pytc.is_treeclass_frozen(tree_freeze(Test())) is True
+    assert pytc.is_treeclass_frozen([1]) is False
 
 
 def test_is_treeclass_nondiff():
@@ -69,8 +63,8 @@ def test_is_treeclass_nondiff():
         a: jnp.ndarray = jnp.array([1.0, 2.0, 3.0])
         b: int = 1
 
-    assert is_treeclass_nondiff(Test()) is False
-    assert is_treeclass_nondiff(1) is False
+    assert pytc.is_treeclass_nondiff(Test()) is False
+    assert pytc.is_treeclass_nondiff(1) is False
 
 
 def test__node_count_and_size():

@@ -4,8 +4,33 @@
 from __future__ import annotations
 
 from dataclasses import MISSING
+from typing import Any
 
-from pytreeclass._src.tree_util import _tree_structure
+import pytreeclass as pytc
+
+
+class _fieldDict(dict):
+    """A dict used for `__pytree_structure__` attribute of a treeclass instance"""
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+
+def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return dynamic and static fields of the pytree instance"""
+    # this function classifies tree vars into trainable/untrainable dict items
+    # and returns a tuple of two dicts (dynamic, static)
+    # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
+    # not seen by JAX computations. the scanning is done if the instance is not frozen.
+    # otherwise the cached values are returned.
+
+    static, dynamic = _fieldDict(tree.__dict__), _fieldDict()
+
+    for field_item in pytc.fields(tree).values():
+        if not field_item.metadata.get("static", False):
+            dynamic[field_item.name] = static.pop(field_item.name)
+
+    return (dynamic, static)
 
 
 class _treeBase:

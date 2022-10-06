@@ -4,15 +4,8 @@ import ctypes
 from dataclasses import Field
 from typing import Any
 
+import pytreeclass as pytc
 import pytreeclass._src as src
-from pytreeclass._src.tree_util import (
-    _tree_fields,
-    is_frozen_field,
-    is_nondiff_field,
-    is_treeclass,
-    is_treeclass_frozen,
-    is_treeclass_nondiff,
-)
 from pytreeclass.tree_viz.node_pprint import _format_node_diagram
 from pytreeclass.tree_viz.tree_export import _generate_mermaid_link
 
@@ -29,9 +22,9 @@ def _marker(field_item: Field, node_item: Any, default: str = "---") -> str:
         str: marker character.
     """
     # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if is_nondiff_field(field_item) or is_treeclass_nondiff(node_item):
+    if pytc.is_nondiff_field(field_item) or pytc.is_treeclass_nondiff(node_item):
         return "--x"
-    elif is_frozen_field(field_item) or is_treeclass_frozen(node_item):
+    elif pytc.is_frozen_field(field_item) or pytc.is_treeclass_frozen(node_item):
         return "-..-"
     else:
         return default
@@ -46,12 +39,12 @@ def _tree_mermaid(tree: PyTree):
         return ctypes.c_size_t(hash(input)).value
 
     def recurse(tree, depth, prev_id):
-        if not is_treeclass(tree):
+        if not pytc.is_treeclass(tree):
             return
 
         nonlocal FMT
 
-        for i, field_item in enumerate(_tree_fields(tree).values()):
+        for i, field_item in enumerate(pytc.fields(tree).values()):
 
             if not field_item.repr:
                 continue

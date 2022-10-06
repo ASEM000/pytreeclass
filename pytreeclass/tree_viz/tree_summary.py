@@ -6,18 +6,12 @@ from dataclasses import field
 
 import jax.numpy as jnp
 
+import pytreeclass as pytc
 import pytreeclass._src as src
+from pytreeclass._src.tree_base import _tree_structure
 
 # from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import (
-    _tree_fields,
-    _tree_structure,
-    is_frozen_field,
-    is_treeclass,
-    is_treeclass_frozen,
-    is_treeclass_non_leaf,
-    tree_unfreeze,
-)
+from pytreeclass._src.tree_util import tree_unfreeze
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
@@ -107,11 +101,11 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
             return
 
         if isinstance(node_item, (list, tuple)) and any(
-            is_treeclass(leaf) for leaf in node_item
+            pytc.is_treeclass(leaf) for leaf in node_item
         ):
             # expand container if any item is a `treeclass`
             for i, layer in enumerate(node_item):
-                new_field = field(metadata={"frozen": is_frozen_field(field_item)})
+                new_field = field(metadata={"frozen": pytc.is_frozen_field(field_item)})
                 object.__setattr__(new_field, "name", f"{field_item.name}[{i}]")
                 object.__setattr__(new_field, "type", type(layer))
 
@@ -124,14 +118,14 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
 
         elif isinstance(node_item, src.tree_base._treeBase):
             # a module is considred frozen if all it's parameters are frozen
-            is_frozen = field_item.metadata.get("frozen", False)
-            is_frozen = is_frozen or is_treeclass_frozen(node_item)
+            pytc.is_frozen = field_item.metadata.get("frozen", False)
+            pytc.is_frozen = pytc.is_frozen or pytc.is_treeclass_frozen(node_item)
             count, size = _reduce_count_and_size(tree_unfreeze(node_item))
             dynamic, _ = _tree_structure(tree_unfreeze(node_item))
 
             row = [
                 "/".join(name_path)
-                + f"{(os.linesep + '(frozen)' if is_frozen else '')}",
+                + f"{(os.linesep + '(frozen)' if pytc.is_frozen else '')}",
                 "/".join(type_path),
                 _format_count(count),
                 _format_size(size),
@@ -142,14 +136,14 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
 
             ROWS.append(row)
 
-            COUNT[1 if is_frozen else 0] += count
-            SIZE[1 if is_frozen else 0] += size
+            COUNT[1 if pytc.is_frozen else 0] += count
+            SIZE[1 if pytc.is_frozen else 0] += size
 
         else:
-            is_frozen = field_item.metadata.get("frozen", False)
+            pytc.is_frozen = field_item.metadata.get("frozen", False)
             count, size = _reduce_count_and_size(node_item)
             row = [
-                "/".join(name_path) + f"{('(frozen)' if is_frozen else '')}",
+                "/".join(name_path) + f"{('(frozen)' if pytc.is_frozen else '')}",
                 "/".join(type_path),
                 _format_count(count),
                 _format_size(size),
@@ -159,18 +153,18 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
             ROWS.append(row)
 
             # non-treeclass leaf inherit frozen state
-            COUNT[1 if is_frozen else 0] += count
-            SIZE[1 if is_frozen else 0] += size
+            COUNT[1 if pytc.is_frozen else 0] += count
+            SIZE[1 if pytc.is_frozen else 0] += size
 
     def recurse(tree, name_path, type_path):
 
         nonlocal ROWS, COUNT, SIZE
 
-        for field_item in _tree_fields(tree).values():
+        for field_item in pytc.fields(tree).values():
 
             node_item = getattr(tree, field_item.name)
 
-            if is_treeclass_non_leaf(node_item):
+            if pytc.is_treeclass_non_leaf(node_item):
                 # recurse if the field is a treeclass
                 # the recursion passes the frozen state of the current node
                 # name_path,type_path (i.e. location of the ndoe in the tree)
@@ -183,11 +177,13 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
 
             else:
 
-                is_static = field_item.metadata.get("static", False)
-                is_static = is_static and not field_item.metadata.get("frozen", False)
+                pytc.is_static = field_item.metadata.get("static", False)
+                pytc.is_static = pytc.is_static and not field_item.metadata.get(
+                    "frozen", False
+                )
 
                 # skip if the field is static and not frozen
-                if not (is_static):
+                if not (pytc.is_static):
                     recurse_field(
                         field_item=field_item,
                         node_item=node_item,

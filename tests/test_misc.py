@@ -6,11 +6,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import (
-    filter_nondiff,
-    is_treeclass_equal,
-    unfilter_nondiff,
-)
+from pytreeclass._src.tree_util import filter_nondiff, unfilter_nondiff
 
 
 def test_filter_nondiff():
@@ -24,7 +20,7 @@ def test_filter_nondiff():
     assert jtu.tree_leaves(t) == ["a"]
     assert jtu.tree_leaves(filter_nondiff(t)) == []
     assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t))) == ["a"]
-    assert is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t)))
+    assert pytc.is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t)))
 
     @pytc.treeclass
     class T0:
@@ -35,12 +31,12 @@ def test_filter_nondiff():
     assert jtu.tree_leaves(t) == ["a"]
     assert jtu.tree_leaves(filter_nondiff(t)) == []
     assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t))) == ["a"]
-    assert is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t)))
+    assert pytc.is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t)))
 
     assert jtu.tree_leaves(t) == ["a"]
     assert jtu.tree_leaves(filter_nondiff(t, t == t)) == []
     assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t, t == t))) == ["a"]
-    assert is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t, t == t)))
+    assert pytc.is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t, t == t)))
 
 
 def test_filter_nondiff_func():

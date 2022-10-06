@@ -7,7 +7,8 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass._src.tree_util import _tree_structure, is_treeclass
+import pytreeclass as pytc
+from pytreeclass._src.tree_base import _tree_structure
 
 
 def _sequential_tree_shape_eval(tree, array):
@@ -16,7 +17,7 @@ def _sequential_tree_shape_eval(tree, array):
 
     # all dynamic/static leaves
     all_leaves = (*dyanmic.values(), *static.values())
-    leaves = [leaf for leaf in all_leaves if is_treeclass(leaf)]
+    leaves = [leaf for leaf in all_leaves if pytc.is_treeclass(leaf)]
 
     shape = [jax.eval_shape(lambda x: x, array)]
     for leave in leaves:

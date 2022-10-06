@@ -9,81 +9,10 @@ from typing import Any, Callable
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
+import pytreeclass as pytc
 import pytreeclass._src as src
 
 PyTree = Any
-
-
-def is_frozen_field(field_item: Field) -> bool:
-    """check if field is frozen"""
-    return isinstance(field_item, Field) and field_item.metadata.get("frozen", False)
-
-
-def is_nondiff_field(field_item: Field) -> bool:
-    """check if field is strictly static"""
-    return isinstance(field_item, Field) and field_item.metadata.get("nondiff", False)
-
-
-def is_treeclass_frozen(tree):
-    """assert if a treeclass is frozen"""
-    if is_treeclass(tree):
-        field_items = _tree_fields(tree).values()
-        if len(field_items) > 0:
-            return all(is_frozen_field(f) for f in field_items)
-    return False
-
-
-def is_treeclass_nondiff(tree):
-    """assert if a treeclass is static"""
-    if is_treeclass(tree):
-        field_items = _tree_fields(tree).values()
-        if len(field_items) > 0:
-            return all(is_nondiff_field(f) for f in field_items)
-    return False
-
-
-def is_treeclass(tree):
-    """check if a class is treeclass"""
-    return hasattr(tree, "__immutable_pytree__")
-
-
-def is_treeclass_leaf_bool(node):
-    """assert if treeclass leaf is boolean (for boolen indexing)"""
-    if isinstance(node, jnp.ndarray):
-        return node.dtype == "bool"
-    else:
-        return isinstance(node, bool)
-
-
-def is_treeclass_leaf(tree):
-    """assert if a node is treeclass leaf"""
-    if is_treeclass(tree):
-
-        return is_treeclass(tree) and not any(
-            [is_treeclass(tree.__dict__[fi.name]) for fi in _tree_fields(tree).values()]
-        )
-    else:
-        return False
-
-
-def is_treeclass_non_leaf(tree):
-    return is_treeclass(tree) and not is_treeclass_leaf(tree)
-
-
-def is_treeclass_equal(lhs, rhs):
-    """Assert if two treeclasses are equal"""
-    lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
-    rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
-
-    def is_node_equal(lhs_node, rhs_node):
-        if isinstance(lhs_node, jnp.ndarray) and isinstance(rhs_node, jnp.ndarray):
-            return jnp.array_equal(lhs_node, rhs_node)
-        else:
-            return lhs_node == rhs_node
-
-    return (lhs_treedef == rhs_treedef) and all(
-        [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
-    )
 
 
 def tree_copy(tree):
@@ -92,9 +21,9 @@ def tree_copy(tree):
 
 def _tree_mutate(tree):
     """Enable mutable behavior for a treeclass instance"""
-    if is_treeclass(tree):
+    if pytc.is_treeclass(tree):
         object.__setattr__(tree, "__immutable_pytree__", False)
-        for field_item in _tree_fields(tree).values():
+        for field_item in pytc.fields(tree).values():
             if hasattr(tree, field_item.name):
                 _tree_mutate(getattr(tree, field_item.name))
     return tree
@@ -102,54 +31,37 @@ def _tree_mutate(tree):
 
 def _tree_immutate(tree):
     """Enable immutable behavior for a treeclass instance"""
-    if is_treeclass(tree):
+    if pytc.is_treeclass(tree):
         object.__setattr__(tree, "__immutable_pytree__", True)
-        for field_item in _tree_fields(tree).values():
+        for field_item in pytc.fields(tree).values():
             if hasattr(tree, field_item.name):
                 _tree_immutate(getattr(tree, field_item.name))
     return tree
 
 
-class _fieldDict(dict):
-    """A dict used for `__pytree_structure__` attribute of a treeclass instance"""
+def _mutable(func):
+    """decorator that allow mutable behvior
+    for class methods/ function with treeclass as first argument
 
-    def __eq__(self, other):
-        return self.__dict__ == other.__dict__
+    Example:
+        class ... :
 
+        >>> @_mutable
+        ... def mutable_method(self):
+        ...    return self.value + 1
+    """
+    assert isinstance(
+        func, FunctionType
+    ), f"`mutable` can only be applied to methods. Found{type(func)}"
 
-def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Return dynamic and static fields of the pytree instance"""
-    # this function classifies tree vars into trainable/untrainable dict items
-    # and returns a tuple of two dicts (dynamic, static)
-    # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
-    # not seen by JAX computations. the scanning is done if the instance is not frozen.
-    # otherwise the cached values are returned.
+    @ft.wraps(func)
+    def mutable_method(self, *args, **kwargs):
+        self = _tree_mutate(tree=self)
+        output = func(self, *args, **kwargs)
+        self = _tree_immutate(tree=self)
+        return output
 
-    static, dynamic = _fieldDict(tree.__dict__), _fieldDict()
-
-    for field_item in _tree_fields(tree).values():
-        if not field_item.metadata.get("static", False):
-            dynamic[field_item.name] = static.pop(field_item.name)
-
-    return (dynamic, static)
-
-
-def _tree_fields(tree):
-    """Return a dictionary of all fields in the dataclass"""
-    # in case of explicit treebase with no `param` then
-    # its preferable not to create a new dict and just point to `__dataclass_fields__`
-    # ** another feature of using an instance variable to store extra fields is that:
-    # we can shadow the fields in the dataclass by creating a similarly named field in
-    # the `undeclared_fields` instance variable, this avoids mutating the class fields.
-    # For example in {**a,**b},  b keys will override a keys if they exist in both dicts.
-    # this feature is used in functions that can set the `static` metadata
-    # to specific instance fields (e.g. `filter_non_diff`)
-
-    return (
-        tree.__dataclass_fields__
-        if len(tree.__undeclared_fields__) == 0
-        else {**tree.__dataclass_fields__, **tree.__undeclared_fields__}
-    )
+    return mutable_method
 
 
 # filtering nondifferentiable fields
@@ -201,10 +113,10 @@ def _append_field(
 
     def _callable_map(tree: PyTree, where: Callable[[Field, Any], bool]) -> PyTree:
         # filter based on a conditional callable
-        for field_item in _tree_fields(tree).values():
+        for field_item in pytc.fields(tree).values():
             node_item = getattr(tree, field_item.name)
 
-            if is_treeclass(node_item):
+            if pytc.is_treeclass(node_item):
                 _callable_map(tree=node_item, where=where)
 
             elif where(node_item):
@@ -219,12 +131,12 @@ def _append_field(
     def _mask_map(tree: PyTree, where: PyTree) -> PyTree:
         # filter based on a mask of the same type as `tree`
         for (lhs_field_item, rhs_field_item) in zip(
-            _tree_fields(tree).values(), _tree_fields(where).values()
+            pytc.fields(tree).values(), pytc.fields(where).values()
         ):
             lhs_node_item = getattr(tree, lhs_field_item.name)
             rhs_node_item = getattr(where, rhs_field_item.name)
 
-            if is_treeclass(lhs_node_item):
+            if pytc.is_treeclass(lhs_node_item):
                 _mask_map(tree=lhs_node_item, where=rhs_node_item)
 
             elif jnp.all(rhs_node_item):
@@ -240,17 +152,16 @@ def _append_field(
         return _callable_map(tree_copy(tree), where)
     elif isinstance(where, type(tree)):
         return _mask_map(tree_copy(tree), where)
-    else:
-        raise TypeError(f"`where` must be a Callable or a {type(tree)}")
+    raise TypeError(f"`where` must be a Callable or a {type(tree)}")
 
 
 def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
     """remove a dataclass field from `__undeclared_fields__` added if some condition is met"""
 
     def _recurse(tree):
-        for field_item in _tree_fields(tree).values():
+        for field_item in pytc.fields(tree).values():
             node_item = getattr(tree, field_item.name)
-            if is_treeclass(node_item):
+            if pytc.is_treeclass(node_item):
                 _recurse(tree=node_item)
             elif cond(field_item):
                 new_fields = dict(tree.__undeclared_fields__)
@@ -262,26 +173,43 @@ def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
 
 
 def filter_nondiff(
-    tree: PyTree, where: PyTree | Callable[[Field, Any], bool] = _is_nondiff
+    tree: PyTree, where: PyTree | Callable[[Field, Any], bool] = None
 ) -> PyTree:
+    def _is_nondiff_item(node: Any):
+        if isinstance(node, (float, complex, src.tree_base._treeBase)):
+            # differentiable types
+            return False
 
-    nondiff_field = ft.partial(src.misc.field, nondiff=True)
+        elif isinstance(node, jnp.ndarray) and jnp.issubdtype(node.dtype, jnp.inexact):
+            # differentiable array
+            return False
 
+        return True
+
+    def _is_nondiff(item: Any) -> bool:
+        if isinstance(item, Iterable):
+            # if an iterable has at least one non-differentiable item
+            # then the whole iterable is non-differentiable
+            return any([_is_nondiff_item(item) for item in jtu.tree_leaves(item)])
+        return _is_nondiff_item(item)
+
+    nondiff_field = ft.partial(pytc.field, nondiff=True)
+    where = where or _is_nondiff
     return _append_field(tree=tree, where=where, replacing_field=nondiff_field)
 
 
 def unfilter_nondiff(tree):
-    return _unappend_field(tree, is_nondiff_field)
+    return _unappend_field(tree, pytc.is_nondiff_field)
 
 
 def tree_freeze(
     tree: PyTree, where: PyTree | Callable[[Field, Any], bool] = lambda _: True
 ) -> PyTree:
 
-    frozen_field = ft.partial(src.misc.field, frozen=True)
+    frozen_field = ft.partial(pytc.field, frozen=True)
 
     return _append_field(tree=tree, where=where, replacing_field=frozen_field)
 
 
 def tree_unfreeze(tree):
-    return _unappend_field(tree, is_frozen_field)
+    return _unappend_field(tree, pytc.is_frozen_field)

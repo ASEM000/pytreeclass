@@ -5,12 +5,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import (
-    is_treeclass_equal,
-    is_treeclass_frozen,
-    tree_freeze,
-    tree_unfreeze,
-)
+from pytreeclass._src.tree_util import tree_freeze, tree_unfreeze
 from pytreeclass.tree_viz.tree_pprint import tree_diagram
 from pytreeclass.treeclass import ImmutableInstanceError
 
@@ -141,7 +136,7 @@ def test_freezing_with_ops():
     t = Test()
     tree_unfreeze(t)
     tree_freeze(t)
-    assert is_treeclass_frozen(t) is False
+    assert pytc.is_treeclass_frozen(t) is False
 
     @pytc.treeclass
     class Test:
@@ -149,9 +144,9 @@ def test_freezing_with_ops():
 
     t = tree_freeze(Test(100))
 
-    assert is_treeclass_equal(t.at[...].set(0), t)
-    assert is_treeclass_equal(t.at[...].apply(lambda x: x + 1), t)
-    assert is_treeclass_equal(t.at[...].reduce(jnp.sin), 0.0)
+    assert pytc.is_treeclass_equal(t.at[...].set(0), t)
+    assert pytc.is_treeclass_equal(t.at[...].apply(lambda x: x + 1), t)
+    assert pytc.is_treeclass_equal(t.at[...].reduce(jnp.sin), 0.0)
 
     @pytc.treeclass
     class Test:
@@ -161,7 +156,7 @@ def test_freezing_with_ops():
             self.x = x
 
     t = Test(jnp.array([1, 2, 3]))
-    assert is_treeclass_equal(t.at[...].set(None), Test(x=None))
+    assert pytc.is_treeclass_equal(t.at[...].set(None), Test(x=None))
 
     @pytc.treeclass
     class t0:
@@ -172,13 +167,13 @@ def test_freezing_with_ops():
         a: int = t0()
 
     t = t1()
-    assert is_treeclass_equal(tree_unfreeze(tree_freeze(t)), t)
+    assert pytc.is_treeclass_equal(tree_unfreeze(tree_freeze(t)), t)
 
     @pytc.treeclass
     class t2:
         a: int = t1()
 
-    assert is_treeclass_equal(tree_unfreeze(tree_freeze(t2())), t2())
+    assert pytc.is_treeclass_equal(tree_unfreeze(tree_freeze(t2())), t2())
 
 
 def test_freeze_diagram():
@@ -194,7 +189,7 @@ def test_freeze_diagram():
 
     a = B()
     a = a.at["d"].set(tree_freeze(a.d))
-    assert is_treeclass_frozen(a.d) is True
+    assert pytc.is_treeclass_frozen(a.d) is True
     assert (
         tree_diagram(a)
     ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
@@ -205,7 +200,7 @@ def test_freeze_diagram():
     a = B()
 
     a = a.at["d"].set(tree_freeze(a.d))  # = a.d.freeze()
-    assert is_treeclass_frozen(a.d) is True
+    assert pytc.is_treeclass_frozen(a.d) is True
     assert (
         tree_diagram(a)
     ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "

@@ -132,17 +132,13 @@ def test_ops_with_jit():
     with pytest.raises(jax.errors.ConcretizationTypeError):
         getter(T0())
 
-    assert pytc._src.tree_util.is_treeclass_equal(T0(0, 0, 0), setter(T0()))
+    assert pytc.is_treeclass_equal(T0(0, 0, 0), setter(T0()))
 
-    assert pytc._src.tree_util.is_treeclass_equal(T0(0, 0, 0), applier(T0()))
+    assert pytc.is_treeclass_equal(T0(0, 0, 0), applier(T0()))
 
     with pytest.raises(jax.errors.ConcretizationTypeError):
         getter(T1())
 
-    assert pytc._src.tree_util.is_treeclass_equal(
-        T1(0, 0, 0, jnp.array([0, 0, 0])), setter(T1())
-    )
+    assert pytc.is_treeclass_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), setter(T1()))
 
-    assert pytc._src.tree_util.is_treeclass_equal(
-        T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1())
-    )
+    assert pytc.is_treeclass_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1()))
