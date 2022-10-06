@@ -22,10 +22,8 @@ def _at_get(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return lhs[jnp.where(where)]
 
-        elif isinstance(lhs, (int, float, complex, tuple, list, str)):
-            return lhs if where else None
         else:
-            raise NotImplementedError(f"Get node type ={type(lhs)} is not implemented.")
+            return lhs if where else None
 
     if not isinstance(where, type(tree)):
         raise NotImplementedError(f"Get where type = {type(where)} is not implemented.")
@@ -54,12 +52,8 @@ def _at_set(
 
             elif isinstance(set_value, (int, float, complex, jnp.ndarray)):
                 return jnp.where(where, set_value, lhs)
-
-        elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
-            return set_value if (where is True or where is None) else lhs
-
         else:
-            raise NotImplementedError(f"Set node type = {type(lhs)} is unknown.")
+            return set_value if (where is True or where is None) else lhs
 
     if not isinstance(where, type(tree)):
         raise NotImplementedError(f"Set where type = {type(where)} is not implemented.")
@@ -86,13 +80,8 @@ def _at_apply(
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return jnp.where(where, func(lhs), lhs)
 
-        elif isinstance(lhs, (int, float, complex, tuple, list, str, type(None))):
-            # in case of None , we override the value
-            # None will be encountered only when is_leaf is allowing traversing None
-            return func(lhs) if (where is True or where is None) else lhs
-
         else:
-            raise NotImplementedError(f"Apply node type = {type(lhs)} is unknown.")
+            return func(lhs) if (where is True or where is None) else lhs
 
     if not isinstance(where, type(tree)):
         raise NotImplementedError(
