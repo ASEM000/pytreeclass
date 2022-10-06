@@ -20,6 +20,14 @@ from pytreeclass.treeclass import (
     treeclass,
 )
 
+
+import functools as ft 
+
+nondiff_field = ft.partial(field, nondiff=True)
+frozen_field = ft.partial(field, frozen=True)
+static_field = nondiff_field
+
+
 __all__ = (
     "treeclass",
     "tree_viz",
@@ -39,6 +47,9 @@ __all__ = (
     "is_treeclass_leaf",
     "is_treeclass_non_leaf",
     "is_treeclass_nondiff",
+    "nondiff_field",
+    "frozen_field",
+    "static_field",
 )
 
 __version__ = "0.1.10"

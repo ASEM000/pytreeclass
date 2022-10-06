@@ -22,8 +22,7 @@ def _at_get(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return lhs[jnp.where(where)]
 
-        else:
-            return lhs if where else None
+        return lhs if where else None
 
     if not isinstance(where, type(tree)):
         raise NotImplementedError(f"Get where type = {type(where)} is not implemented.")
@@ -47,13 +46,8 @@ def _at_set(
     def _lhs_set(lhs: Any, where: Any, set_value: Any):
         """Set pytree node value."""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
-            if isinstance(set_value, (bool)):
-                return set_value if jnp.all(where) else lhs
-
-            elif isinstance(set_value, (int, float, complex, jnp.ndarray)):
-                return jnp.where(where, set_value, lhs)
-        else:
-            return set_value if (where is True or where is None) else lhs
+            return jnp.where(where, set_value, lhs)
+        return set_value if (where is True or where is None) else lhs
 
     if not isinstance(where, type(tree)):
         raise NotImplementedError(f"Set where type = {type(where)} is not implemented.")
@@ -80,8 +74,7 @@ def _at_apply(
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return jnp.where(where, func(lhs), lhs)
 
-        else:
-            return func(lhs) if (where is True or where is None) else lhs
+        return func(lhs) if (where is True or where is None) else lhs
 
     if not isinstance(where, type(tree)):
         raise NotImplementedError(
