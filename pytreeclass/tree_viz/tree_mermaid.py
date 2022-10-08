@@ -77,13 +77,13 @@ def _tree_mermaid(tree: PyTree):
             if isinstance(node_item, src.tree_base._treeBase):
                 mark = _marker(field_item, node_item, default="--->")
                 FMT += f"\n\tid{prev_id} {mark} "
-                FMT += f'|"{_bold_text(count)}<br>{_bold_text(size)}"| '
+                FMT += f'|"{(count)}<br>{(size)}"| '
                 FMT += f'id{cur_id}("{_bold_text(field_item.name) }<br>{node_item.__class__.__name__}")'
                 recurse(tree=node_item, depth=depth + 1, prev_id=cur_id)
             else:
                 mark = _marker(field_item, node_item, default="----")
                 FMT += f"\n\tid{prev_id} {mark} "
-                FMT += f'|"{_bold_text(count)}<br>{_bold_text(size)}"| '
+                FMT += f'|"{(count)}<br>{(size)}"| '
                 FMT += f'id{cur_id}["{_bold_text(field_item.name)}<br>{_format_node_diagram(node_item)}"]'
 
         prev_id = cur_id
