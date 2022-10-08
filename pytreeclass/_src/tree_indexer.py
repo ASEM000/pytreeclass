@@ -244,25 +244,30 @@ def _pytree_nested_indexer(tree, where):
     return _pyTreeNestedIndexer(tree=tree, where=where)
 
 
+def _at_indexer(tree):
+    class _atIndexer:
+        def __getitem__(_, where):
+
+            if isinstance(where, str):
+                return _str_nested_indexer(tree=tree, where=where)
+
+            elif isinstance(where, type(tree)):
+                # indexing by boolean pytree
+                return _pytree_nested_indexer(tree=tree, where=where)
+
+            elif isinstance(where, type(Ellipsis)):
+                # Ellipsis as an alias for all elements
+                # model.at[model == model ] <--> model.at[...]
+                return tree.at[tree == tree]
+
+            raise NotImplementedError(
+                f"Indexing with {type(where)} is not implemented."
+            )
+
+    return _atIndexer()
+
+
 class _treeIndexer:
     @property
     def at(self):
-        class _atIndexer:
-            def __getitem__(_, where):
-
-                if isinstance(where, str):
-                    return _str_nested_indexer(tree=self, where=where)
-
-                elif isinstance(where, type(self)):
-                    # indexing by boolean pytree
-                    return _pytree_nested_indexer(tree=self, where=where)
-
-                elif isinstance(where, type(Ellipsis)):
-                    # Ellipsis as an alias for all elements
-                    # model.at[model == model ] <--> model.at[...]
-                    return self.at[self == self]
-
-                msg = f"Indexing with type{type(where)} is not implemented."
-                raise NotImplementedError(msg)
-
-        return _atIndexer()
+        return _at_indexer(tree=self)
