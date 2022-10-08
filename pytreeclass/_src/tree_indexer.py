@@ -21,20 +21,11 @@ def _at_get(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
         """Get pytree node  value"""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return lhs[jnp.where(where)]
-
         return lhs if where else None
 
     if not isinstance(where, type(tree)):
         raise NotImplementedError(f"Get where type = {type(where)} is not implemented.")
-
-    lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-    where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
-    lhs_leaves = [
-        _lhs_get(lhs=lhs_leaf, where=where_leaf)
-        for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
-    ]
-
-    return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+    return jtu.tree_map(_lhs_get, tree, where, is_leaf=is_leaf)
 
 
 def _at_set(
@@ -43,7 +34,7 @@ def _at_set(
     set_value: bool | int | float | complex | jnp.ndarray,
     is_leaf: Callable[[Any], bool],
 ):
-    def _lhs_set(lhs: Any, where: Any, set_value: Any):
+    def _lhs_set(lhs: Any, where: Any):
         """Set pytree node value."""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return jnp.where(where, set_value, lhs)
@@ -51,15 +42,7 @@ def _at_set(
 
     if not isinstance(where, type(tree)):
         raise NotImplementedError(f"Set where type = {type(where)} is not implemented.")
-
-    lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-    where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
-    lhs_leaves = [
-        _lhs_set(lhs=lhs_leaf, where=where_leaf, set_value=set_value)
-        for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
-    ]
-
-    return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+    return jtu.tree_map(_lhs_set, tree, where, is_leaf=is_leaf)
 
 
 def _at_apply(
@@ -68,7 +51,7 @@ def _at_apply(
     func: Callable[[Any], Any],
     is_leaf: Callable[[Any], bool],
 ):
-    def _lhs_apply(lhs: Any, where: bool, func: Callable[[Any], Any]):
+    def _lhs_apply(lhs: Any, where: bool):
         """Set pytree node"""
 
         if isinstance(lhs, (Tracer, jnp.ndarray)):
@@ -80,15 +63,7 @@ def _at_apply(
         raise NotImplementedError(
             f"Apply where type = {type(where)} is not implemented."
         )
-
-    lhs_leaves, lhs_treedef = jtu.tree_flatten(tree, is_leaf=is_leaf)
-    where_leaves = jtu.tree_leaves(where, is_leaf=is_leaf)
-    lhs_leaves = [
-        _lhs_apply(lhs=lhs_leaf, where=where_leaf, func=func)
-        for lhs_leaf, where_leaf in zip(lhs_leaves, where_leaves)
-    ]
-
-    return jtu.tree_unflatten(lhs_treedef, lhs_leaves)
+    return jtu.tree_map(_lhs_apply, tree, where, is_leaf=is_leaf)
 
 
 """ .at[...].reduce() """
@@ -106,7 +81,6 @@ def _at_reduce(
         raise NotImplementedError(
             f"Reduce tree type = {type(tree)} is not implemented."
         )
-
     return jtu.tree_reduce(func, tree.at[where].get(is_leaf=is_leaf), initializer)
 
 
