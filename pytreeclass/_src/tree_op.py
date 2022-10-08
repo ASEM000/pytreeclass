@@ -89,8 +89,8 @@ def _field_boolean_map(
         # however if we get the tree_leaves of the tree, `b` will not be visible to the condition.
 
         for field_item, node_item in (
-            [f, getattr(tree, k)]
-            for k, f in pytc.fields(tree).items()
+            [f, getattr(tree, f.name)]
+            for f in pytc.fields(tree)
             if not f.metadata.get("static", False)
         ):
 

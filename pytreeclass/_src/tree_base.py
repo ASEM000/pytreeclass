@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from dataclasses import MISSING
+# from dataclasses import MISSING
+import dataclasses
 from typing import Any
 
 import pytreeclass as pytc
@@ -26,7 +27,7 @@ def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
 
     static, dynamic = _fieldDict(tree.__dict__), _fieldDict()
 
-    for field_item in pytc.fields(tree).values():
+    for field_item in pytc.fields(tree):  # .values():
         if not field_item.metadata.get("static", False):
             dynamic[field_item.name] = static.pop(field_item.name)
 
@@ -36,8 +37,8 @@ def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
 class _treeBase:
     def __new__(cls, *args, **kwargs):
         self = object.__new__(cls)
-        for field_item in self.__dataclass_fields__.values():
-            if field_item.default is not MISSING:
+        for field_item in dataclasses.fields(self):
+            if field_item.default is not dataclasses.MISSING:
                 object.__setattr__(self, field_item.name, field_item.default)
         return self
 

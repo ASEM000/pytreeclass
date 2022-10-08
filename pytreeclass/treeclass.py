@@ -52,11 +52,10 @@ def is_nondiff_field(field_item: dataclasses.Field) -> bool:
 
 
 def fields(tree):
-    """Similar to dataclasses.fields but with including `__undeclared_fields__`"""
     return (
-        tree.__dataclass_fields__
+        tree.__dataclass_fields__.values()
         if len(tree.__undeclared_fields__) == 0
-        else {**tree.__dataclass_fields__, **tree.__undeclared_fields__}
+        else {**tree.__dataclass_fields__, **tree.__undeclared_fields__}.values()
     )
 
 
@@ -69,7 +68,9 @@ def treeclass(*args, **kwargs):
 
         object.__setattr__(tree, key, value)
 
-        if (isinstance(value, _treeBase)) and (key not in fields(tree)):
+        if (isinstance(value, _treeBase)) and (
+            key not in [f.name for f in fields(tree)]
+        ):
             # create field
             field_value = field()
 
@@ -125,7 +126,7 @@ def is_treeclass(tree):
 def is_treeclass_frozen(tree):
     """assert if a treeclass is frozen"""
     if is_treeclass(tree):
-        field_items = fields(tree).values()
+        field_items = fields(tree)
         if len(field_items) > 0:
             return all(is_frozen_field(f) for f in field_items)
     return False
@@ -134,7 +135,7 @@ def is_treeclass_frozen(tree):
 def is_treeclass_nondiff(tree):
     """assert if a treeclass is static"""
     if is_treeclass(tree):
-        field_items = fields(tree).values()
+        field_items = fields(tree)
         if len(field_items) > 0:
             return all(is_nondiff_field(f) for f in field_items)
     return False
@@ -144,8 +145,7 @@ def is_treeclass_leaf_bool(node):
     """assert if treeclass leaf is boolean (for boolen indexing)"""
     if isinstance(node, jnp.ndarray):
         return node.dtype == "bool"
-    else:
-        return isinstance(node, bool)
+    return isinstance(node, bool)
 
 
 def is_treeclass_leaf(tree):
@@ -153,10 +153,9 @@ def is_treeclass_leaf(tree):
     if is_treeclass(tree):
 
         return is_treeclass(tree) and not any(
-            [is_treeclass(tree.__dict__[fi.name]) for fi in fields(tree).values()]
+            [is_treeclass(getattr(tree, fi.name)) for fi in fields(tree)]
         )
-    else:
-        return False
+    return False
 
 
 def is_treeclass_non_leaf(tree):
@@ -171,8 +170,7 @@ def is_treeclass_equal(lhs, rhs):
     def is_node_equal(lhs_node, rhs_node):
         if isinstance(lhs_node, jnp.ndarray) and isinstance(rhs_node, jnp.ndarray):
             return jnp.array_equal(lhs_node, rhs_node)
-        else:
-            return lhs_node == rhs_node
+        return lhs_node == rhs_node
 
     return (lhs_treedef == rhs_treedef) and all(
         [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]

@@ -23,7 +23,7 @@ def _tree_mutate(tree):
     """Enable mutable behavior for a treeclass instance"""
     if pytc.is_treeclass(tree):
         object.__setattr__(tree, "__immutable_pytree__", False)
-        for field_item in pytc.fields(tree).values():
+        for field_item in pytc.fields(tree):
             if hasattr(tree, field_item.name):
                 _tree_mutate(getattr(tree, field_item.name))
     return tree
@@ -33,7 +33,7 @@ def _tree_immutate(tree):
     """Enable immutable behavior for a treeclass instance"""
     if pytc.is_treeclass(tree):
         object.__setattr__(tree, "__immutable_pytree__", True)
-        for field_item in pytc.fields(tree).values():
+        for field_item in pytc.fields(tree):
             if hasattr(tree, field_item.name):
                 _tree_immutate(getattr(tree, field_item.name))
     return tree
@@ -113,7 +113,7 @@ def _append_field(
 
     def _callable_map(tree: PyTree, where: Callable[[Field, Any], bool]) -> PyTree:
         # filter based on a conditional callable
-        for field_item in pytc.fields(tree).values():
+        for field_item in pytc.fields(tree):
             node_item = getattr(tree, field_item.name)
 
             if pytc.is_treeclass(node_item):
@@ -131,7 +131,7 @@ def _append_field(
     def _mask_map(tree: PyTree, where: PyTree) -> PyTree:
         # filter based on a mask of the same type as `tree`
         for (lhs_field_item, rhs_field_item) in zip(
-            pytc.fields(tree).values(), pytc.fields(where).values()
+            pytc.fields(tree), pytc.fields(where)
         ):
             lhs_node_item = getattr(tree, lhs_field_item.name)
             rhs_node_item = getattr(where, rhs_field_item.name)
@@ -159,7 +159,7 @@ def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
     """remove a dataclass field from `__undeclared_fields__` added if some condition is met"""
 
     def _recurse(tree):
-        for field_item in pytc.fields(tree).values():
+        for field_item in pytc.fields(tree):
             node_item = getattr(tree, field_item.name)
             if pytc.is_treeclass(node_item):
                 _recurse(tree=node_item)

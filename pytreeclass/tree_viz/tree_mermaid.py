@@ -44,7 +44,7 @@ def _tree_mermaid(tree: PyTree):
 
         nonlocal FMT
 
-        for i, field_item in enumerate(pytc.fields(tree).values()):
+        for i, field_item in enumerate(pytc.fields(tree)):
 
             if not field_item.repr:
                 continue

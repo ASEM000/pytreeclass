@@ -54,7 +54,7 @@ def tree_box(tree, array=None):
         else:
             level_nodes = []
 
-            for field_item in pytc.fields(tree).values():
+            for field_item in pytc.fields(tree):
                 cur_node = getattr(tree, field_item.name)
                 level_nodes += (
                     [f"{recurse(cur_node,field_item.name)}"]

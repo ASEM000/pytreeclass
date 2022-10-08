@@ -160,7 +160,7 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
 
         nonlocal ROWS, COUNT, SIZE
 
-        for field_item in pytc.fields(tree).values():
+        for field_item in pytc.fields(tree):
 
             node_item = getattr(tree, field_item.name)
 

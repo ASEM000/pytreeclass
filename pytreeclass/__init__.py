@@ -1,3 +1,5 @@
+import functools as ft
+
 from pytreeclass import tree_util, tree_viz
 from pytreeclass._src.tree_util import (
     filter_nondiff,
@@ -19,9 +21,6 @@ from pytreeclass.treeclass import (
     is_treeclass_nondiff,
     treeclass,
 )
-
-
-import functools as ft 
 
 nondiff_field = ft.partial(field, nondiff=True)
 frozen_field = ft.partial(field, frozen=True)

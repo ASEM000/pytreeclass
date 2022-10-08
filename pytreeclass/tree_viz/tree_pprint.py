@@ -36,7 +36,7 @@ def tree_repr(tree, width: int = 60) -> str:
         nonlocal FMT
 
         leaves_count = len(pytc.fields(tree))
-        for i, field_item in enumerate(pytc.fields(tree).values()):
+        for i, field_item in enumerate(pytc.fields(tree)):
 
             if not field_item.repr:
                 continue
@@ -74,7 +74,7 @@ def tree_str(tree, width: int = 40) -> str:
 
         leaves_count = len(pytc.fields(tree))
 
-        for i, field_item in enumerate(pytc.fields(tree).values()):
+        for i, field_item in enumerate(pytc.fields(tree)):
 
             if not field_item.repr:
                 continue
@@ -169,7 +169,7 @@ def tree_diagram(tree: PyTree) -> str:
 
         leaves_count = len(pytc.fields(tree))
 
-        for i, fi in enumerate(pytc.fields(tree).values()):
+        for i, fi in enumerate(pytc.fields(tree)):
             recurse_field(fi, getattr(tree, fi.name), parent_level_count, leaves_count - i)  # fmt: skip
 
         FMT += "\t"
