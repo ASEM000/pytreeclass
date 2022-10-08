@@ -228,8 +228,7 @@ def _format_node_repr(node: Any, depth: int = 0) -> str:
     elif isinstance(node, Field):
         return _field_repr(node, depth)
 
-    else:
-        return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
+    return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
 
 
 def _format_node_str(node, depth: int = 0):
@@ -279,8 +278,7 @@ def _format_node_str(node, depth: int = 0):
     elif isinstance(node, Field):
         return _field_repr(node, depth)
 
-    else:
-        return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
+    return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
 
 
 def _format_node_diagram(node, *args, **kwargs):
@@ -293,5 +291,4 @@ def _format_node_diagram(node, *args, **kwargs):
     elif isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
         return _jax_numpy_repr(node)
 
-    else:
-        return f"{node!r}"
+    return f"{node!r}"

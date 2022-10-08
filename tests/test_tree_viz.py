@@ -142,12 +142,6 @@ def test_model_viz_frozen_field():
     )
 
     assert (
-        model.summary(array=x, compact=True)
-        # trunk-ignore(flake8/E501)
-        == "┌────┬──────┬─────────┬──────────────┬────────────┬────────────┐\n│Name│Type  │Param #  │Size          │Input       │Output      │\n├────┼──────┼─────────┼──────────────┼────────────┼────────────┤\n│l1  │Linear│256(0)   │1.00KB(0.00B) │f32[100,1]  │f32[100,128]│\n├────┼──────┼─────────┼──────────────┼────────────┼────────────┤\n│l2  │Linear│16,512(0)│64.50KB(0.00B)│f32[100,128]│f32[100,128]│\n├────┼──────┼─────────┼──────────────┼────────────┼────────────┤\n│l3  │Linear│129(0)   │516.00B(0.00B)│f32[100,128]│f32[100,1]  │\n└────┴──────┴─────────┴──────────────┴────────────┴────────────┘\nTotal count :\t16,897(0)\nDynamic count :\t16,897(0)\nFrozen count :\t0(0)\n----------------------------------------------------------------\nTotal size :\t66.00KB(0.00B)\nDynamic size :\t66.00KB(0.00B)\nFrozen size :\t0.00B(0.00B)\n================================================================"
-    )
-
-    assert (
         (tree_freeze(model).tree_diagram())
         # trunk-ignore(flake8/E501)
         == "StackedLinear\n    ├#─ l1=Linear\n    │   ├#─ weight=f32[1,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes='string'  \n    ├#─ l2=Linear\n    │   ├#─ weight=f32[128,128]\n    │   ├#─ bias=f32[1,128]\n    │   └#─ notes='string'  \n    └#─ l3=Linear\n        ├#─ weight=f32[128,1]\n        ├#─ bias=f32[1,1]\n        └#─ notes='string'      "
@@ -689,4 +683,38 @@ def test_field_repr():
     assert (
         t.__str__()
         == "Test(\n  a=Field('name=None','type=None','init=True','repr=True','compare=True')\n)"
+    )
+
+
+def test_summary_options():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: jnp.ndarray = jnp.array([1, 2, 3])
+        c: float = 1.0
+        d: Callable = lambda x: x
+
+    t = Test()
+    assert (
+        (t.summary(show_type=False))
+        # trunk-ignore(flake8/E501)
+        == "┌────┬───────┬─────────────┬───────────┐\n│Name│Param #│Size         │Config     │\n├────┼───────┼─────────────┼───────────┤\n│a   │0(1)   │0.00B(28.00B)│a=1        │\n├────┼───────┼─────────────┼───────────┤\n│b   │0(3)   │0.00B(12.00B)│b=i32[3]   │\n├────┼───────┼─────────────┼───────────┤\n│c   │1(0)   │24.00B(0.00B)│c=1.0      │\n├────┼───────┼─────────────┼───────────┤\n│d   │0(0)   │0.00B(0.00B) │d=Lambda(x)│\n└────┴───────┴─────────────┴───────────┘\nTotal count :\t1(4)\nDynamic count :\t1(4)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t24.00B(40.00B)\nDynamic size :\t24.00B(40.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
+    )
+
+    assert (
+        (t.summary(show_param=False))
+        # trunk-ignore(flake8/E501)
+        == "┌────┬───────────┬─────────────┬───────────┐\n│Name│Type       │Size         │Config     │\n├────┼───────────┼─────────────┼───────────┤\n│a   │int        │0.00B(28.00B)│a=1        │\n├────┼───────────┼─────────────┼───────────┤\n│b   │DeviceArray│0.00B(12.00B)│b=i32[3]   │\n├────┼───────────┼─────────────┼───────────┤\n│c   │float      │24.00B(0.00B)│c=1.0      │\n├────┼───────────┼─────────────┼───────────┤\n│d   │function   │0.00B(0.00B) │d=Lambda(x)│\n└────┴───────────┴─────────────┴───────────┘\nTotal count :\t1(4)\nDynamic count :\t1(4)\nFrozen count :\t0(0)\n--------------------------------------------\nTotal size :\t24.00B(40.00B)\nDynamic size :\t24.00B(40.00B)\nFrozen size :\t0.00B(0.00B)\n============================================"
+    )
+
+    assert (
+        (t.summary(show_size=False))
+        # trunk-ignore(flake8/E501)
+        == "┌────┬───────────┬───────┬───────────┐\n│Name│Type       │Param #│Config     │\n├────┼───────────┼───────┼───────────┤\n│a   │int        │0(1)   │a=1        │\n├────┼───────────┼───────┼───────────┤\n│b   │DeviceArray│0(3)   │b=i32[3]   │\n├────┼───────────┼───────┼───────────┤\n│c   │float      │1(0)   │c=1.0      │\n├────┼───────────┼───────┼───────────┤\n│d   │function   │0(0)   │d=Lambda(x)│\n└────┴───────────┴───────┴───────────┘\nTotal count :\t1(4)\nDynamic count :\t1(4)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t24.00B(40.00B)\nDynamic size :\t24.00B(40.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
+    )
+
+    assert (
+        (t.summary(show_config=False))
+        # trunk-ignore(flake8/E501)
+        == "┌────┬───────────┬───────┬─────────────┐\n│Name│Type       │Param #│Size         │\n├────┼───────────┼───────┼─────────────┤\n│a   │int        │0(1)   │0.00B(28.00B)│\n├────┼───────────┼───────┼─────────────┤\n│b   │DeviceArray│0(3)   │0.00B(12.00B)│\n├────┼───────────┼───────┼─────────────┤\n│c   │float      │1(0)   │24.00B(0.00B)│\n├────┼───────────┼───────┼─────────────┤\n│d   │function   │0(0)   │0.00B(0.00B) │\n└────┴───────────┴───────┴─────────────┘\nTotal count :\t1(4)\nDynamic count :\t1(4)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t24.00B(40.00B)\nDynamic size :\t24.00B(40.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
     )

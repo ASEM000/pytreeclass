@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import field
+from typing import Any
 
 import jax.numpy as jnp
 
@@ -19,33 +20,63 @@ from pytreeclass.tree_viz.utils import (
     _sequential_tree_shape_eval,
 )
 
+PyTree = Any
+
+
+def _bold_text(text: str) -> str:
+    return f"\033[1m{text}\033[0m"
+
 
 def _format_size(node_size, newline=False):
     """return formatted size from inexact(exact) complex number"""
     mark = "\n" if newline else ""
     order_kw = ["B", "KB", "MB", "GB"]
 
-    # define order of magnitude
-    real_size_order = int(math.log(node_size.real, 1024)) if node_size.real > 0 else 0
-    imag_size_order = int(math.log(node_size.imag, 1024)) if node_size.imag > 0 else 0
-    return (
-        f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
-        f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
-    )
+    if isinstance(node_size, complex):
+        # define order of magnitude
+        real_size_order = (
+            int(math.log(node_size.real, 1024)) if node_size.real > 0 else 0
+        )
+        imag_size_order = (
+            int(math.log(node_size.imag, 1024)) if node_size.imag > 0 else 0
+        )
+        return (
+            f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
+            f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
+        )
+
+    elif isinstance(node_size, (float, int)):
+        size_order = int(math.log(node_size, 1024)) if node_size > 0 else 0
+        return f"{(node_size)/(1024**size_order):.2f}{order_kw[size_order]}"
 
 
 def _format_count(node_count, newline=False):
     mark = "\n" if newline else ""
-    return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
+
+    if isinstance(node_count, complex):
+        return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
+    elif isinstance(node_count, (float, int)):
+        return f"{int(node_count):,}"
 
 
-def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
+def tree_summary(
+    tree: PyTree,
+    array: jnp.ndarray = None,
+    *,
+    show_type: bool = True,
+    show_param: bool = True,
+    show_size: bool = True,
+    show_config: bool = True,
+) -> str:
     """Prints a summary of the tree structure.
 
     Args:
         tree (PyTree): @treeclass decorated class.
         array (jnp.ndarray, optional): Input jax.numpy used to call the class. Defaults to None.
-        compact (bool, optional): If True, the summary will be printed in a compact format. Defaults to False.
+        show_type (bool, optional): Whether to print the type column. Defaults to True.
+        show_param (bool, optional): Whether to print the parameter column. Defaults to True.
+        show_size (bool, optional): Whether to print the size column. Defaults to True.
+        show_config (bool, optional): Whether to print the config column. Defaults to True.
 
     Example:
         @pytc.treeclass
@@ -54,27 +85,23 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
             b : jnp.ndarray = jnp.array([1,2,3])
             c : float = 1.0
 
+
         >>> print(tree_summary(Test()))
-        ┌────┬───────────┬───────┬────────┬────────┐
-        │Name│Type       │Param #│Size    │Config  │
-        ├────┼───────────┼───────┼────────┼────────┤
-        │a   │int        │0(1)   │0.00B   │a=0     │
-        │    │           │       │(24.00B)│        │
-        ├────┼───────────┼───────┼────────┼────────┤
-        │b   │DeviceArray│0(3)   │0.00B   │b=i32[3]│
-        │    │           │       │(12.00B)│        │
-        ├────┼───────────┼───────┼────────┼────────┤
-        │c   │float      │1(0)   │24.00B  │c=1.0   │
-        │    │           │       │(0.00B) │        │
-        └────┴───────────┴───────┴────────┴────────┘
-        Total count :	1(4)
-        Dynamic count :	1(4)
+        ┌────┬─────┬───────┬─────────────┬──────┐
+        │Name│Type │Param #│Size         │Config│
+        ├────┼─────┼───────┼─────────────┼──────┤
+        │a   │int  │0(1)   │0.00B(28.00B)│a=1   │
+        ├────┼─────┼───────┼─────────────┼──────┤
+        │b   │float│1(0)   │24.00B(0.00B)│b=2.0 │
+        └────┴─────┴───────┴─────────────┴──────┘
+        Total count :	1(1)
+        Dynamic count :	1(1)
         Frozen count :	0(0)
-        --------------------------------------------
-        Total size :	24.00B(36.00B)
-        Dynamic size :	24.00B(36.00B)
+        -----------------------------------------
+        Total size :	24.00B(28.00B)
+        Dynamic size :	24.00B(28.00B)
         Frozen size :	0.00B(0.00B)
-        ============================================
+        =========================================
 
     Note:
         values inside () defines the info about the non-inexact (i.e.) non-differentiable parameters.
@@ -123,16 +150,15 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
             count, size = _reduce_count_and_size(tree_unfreeze(node_item))
             dynamic, _ = _tree_structure(tree_unfreeze(node_item))
 
-            row = [
-                "/".join(name_path)
-                + f"{(os.linesep + '(frozen)' if pytc.is_frozen else '')}",
-                "/".join(type_path),
-                _format_count(count),
-                _format_size(size),
-            ]
-
-            if not compact:
-                row += ["\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()])]  # fmt: skip
+            row = ["/".join(name_path) + f"{(os.linesep + '(frozen)' if pytc.is_frozen else '')}"]  # fmt: skip
+            row += ["/".join(type_path)] if show_type else []
+            row += [_format_count(count)] if show_param else []
+            row += [_format_size(size)] if show_size else []
+            row += (
+                ["\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()])]
+                if show_config
+                else []
+            )
 
             ROWS.append(row)
 
@@ -142,14 +168,13 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
         else:
             pytc.is_frozen = field_item.metadata.get("frozen", False)
             count, size = _reduce_count_and_size(node_item)
-            row = [
-                "/".join(name_path) + f"{('(frozen)' if pytc.is_frozen else '')}",
-                "/".join(type_path),
-                _format_count(count),
-                _format_size(size),
-            ]
-            if not compact:
-                row += [f"{field_item.name}={_format_node(node_item)}"]  # fmt: skip
+
+            row = ["/".join(name_path) + f"{(os.linesep + '(frozen)' if pytc.is_frozen else '')}"]  # fmt: skip
+            row += ["/".join(type_path)] if show_type else []
+            row += [_format_count(count)] if show_param else []
+            row += [_format_size(size)] if show_size else []
+            row += [f"{field_item.name}={_format_node(node_item)}"] if show_config else []  # fmt: skip
+
             ROWS.append(row)
 
             # non-treeclass leaf inherit frozen state
@@ -191,13 +216,16 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
                         type_path=type_path + (node_item.__class__.__name__,),
                     )
 
-    if compact:
-        ROWS = [["Name", "Type ", "Param #", "Size "]]
-    else:
-        ROWS = [["Name", "Type ", "Param #", "Size ", "Config"]]
+    row = ["Name"]
+    row += ["Type "] if show_type else []
+    row += ["Param #"] if show_param else []
+    row += ["Size "] if show_size else []
+    row += ["Config"] if show_config else []
 
-    COUNT = [0, 0]
-    SIZE = [0, 0]
+    ROWS = [row]
+
+    COUNT = [complex(0), complex(0)]
+    SIZE = [complex(0), complex(0)]
 
     recurse(tree, name_path=(), type_path=())
 
@@ -223,4 +251,4 @@ def tree_summary(tree, array: jnp.ndarray = None, compact: bool = False) -> str:
         f"{'='*max([table_width,40])}"
     )
 
-    return layer_table + "\n" + param_summary
+    return layer_table + "\n" + (param_summary)

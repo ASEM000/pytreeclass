@@ -27,7 +27,7 @@ def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
 
     static, dynamic = _fieldDict(tree.__dict__), _fieldDict()
 
-    for field_item in pytc.fields(tree):  # .values():
+    for field_item in pytc.fields(tree):
         if not field_item.metadata.get("static", False):
             dynamic[field_item.name] = static.pop(field_item.name)
 
@@ -42,29 +42,14 @@ class _treeBase:
                 object.__setattr__(self, field_item.name, field_item.default)
         return self
 
-    def tree_flatten(self):
-        """Flatten rule for `jax.tree_flatten`
-
-        Returns:
-            Tuple of dynamic values and (dynamic keys,static dict)
-        """
+    def tree_flatten(self) -> tuple[Any, tuple[str, _fieldDict[str, Any]]]:
+        """Flatten rule for `jax.tree_flatten`"""
         dynamic, static = _tree_structure(self)
         return dynamic.values(), (dynamic.keys(), static)
 
     @classmethod
     def tree_unflatten(cls, treedef, leaves):
-        """Unflatten rule for `jax.tree_unflatten`
-
-        Args:
-            treedef:
-                Pytree definition
-                includes Dynamic nodes keys , static dictionary
-            leaves:
-                Dynamic nodes values
-
-        Returns:
-            New class instance
-        """
+        """Unflatten rule for `jax.tree_unflatten`"""
         # using `object.__new__`` here is faster than using `cls.__new__`
         # as it avoids calling bases __new__ methods
         # moreover , in _treeBase.__new__ we declare `__undeclared_fields__`

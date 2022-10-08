@@ -52,11 +52,9 @@ def is_nondiff_field(field_item: dataclasses.Field) -> bool:
 
 
 def fields(tree):
-    return (
-        tree.__dataclass_fields__.values()
-        if len(tree.__undeclared_fields__) == 0
-        else {**tree.__dataclass_fields__, **tree.__undeclared_fields__}.values()
-    )
+    if len(tree.__undeclared_fields__) == 0:
+        return tree.__dataclass_fields__.values()
+    return {**tree.__dataclass_fields__, **tree.__undeclared_fields__}.values()
 
 
 def treeclass(*args, **kwargs):

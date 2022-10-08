@@ -21,12 +21,23 @@ class _treePretty:
         """pretty print pytree instance"""
         return tree_str(self, width=60)
 
-    def summary(self, array: jnp.ndarray = None, compact: bool = False) -> str:
+    def summary(
+        self,
+        array: jnp.ndarray = None,
+        *,
+        show_type: bool = True,
+        show_param: bool = True,
+        show_size: bool = True,
+        show_config: bool = True,
+    ) -> str:
         """print a summary of the pytree instance
 
         Args:
             array (jnp.ndarray, optional): Input jax.numpy used to call the class. Defaults to None.
-            compact (bool, optional): If True, the summary will be printed in a compact format. Defaults to False.
+            show_type (bool, optional): Whether to print the type column. Defaults to True.
+            show_param (bool, optional): Whether to print the parameter column. Defaults to True.
+            show_size (bool, optional): Whether to print the size column. Defaults to True.
+            show_config (bool, optional): Whether to print the config column. Defaults to True.
 
         Example:
             >>> import pytreeclass as pytc
@@ -36,25 +47,30 @@ class _treePretty:
             ...     b: float = 2.0
             >>> a = A()
             >>> print(a.summary())
-            ┌────┬─────┬───────┬────────┬──────┐
-            │Name│Type │Param #│Size    │Config│
-            ├────┼─────┼───────┼────────┼──────┤
-            │a   │int  │0(1)   │0.00B   │a=1   │
-            │    │     │       │(28.00B)│      │
-            ├────┼─────┼───────┼────────┼──────┤
-            │b   │float│1(0)   │24.00B  │b=2.0 │
-            │    │     │       │(0.00B) │      │
-            └────┴─────┴───────┴────────┴──────┘
-            Total count :   1(1)
-            Dynamic count : 1(1)
-            Frozen count :  0(0)
-            ----------------------------------------
-            Total size :    24.00B(28.00B)
-            Dynamic size :  24.00B(28.00B)
-            Frozen size :   0.00B(0.00B)
-            ========================================
+            ┌────┬─────┬───────┬─────────────┬──────┐
+            │Name│Type │Param #│Size         │Config│
+            ├────┼─────┼───────┼─────────────┼──────┤
+            │a   │int  │0(1)   │0.00B(28.00B)│a=1   │
+            ├────┼─────┼───────┼─────────────┼──────┤
+            │b   │float│1(0)   │24.00B(0.00B)│b=2.0 │
+            └────┴─────┴───────┴─────────────┴──────┘
+            Total count :	1(1)
+            Dynamic count :	1(1)
+            Frozen count :	0(0)
+            -----------------------------------------
+            Total size :	24.00B(28.00B)
+            Dynamic size :	24.00B(28.00B)
+            Frozen size :	0.00B(0.00B)
+            =========================================
         """
-        return tree_summary(self, array, compact)
+        return tree_summary(
+            self,
+            array=array,
+            show_type=show_type,
+            show_param=show_param,
+            show_size=show_size,
+            show_config=show_config,
+        )
 
     def tree_diagram(self) -> str:
         """Print a diagram of the pytree instance

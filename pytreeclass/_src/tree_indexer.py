@@ -218,7 +218,10 @@ def _str_nested_indexer(tree, where):
             if name == "at":
                 return _strNestedIndexer(tree=tree, where=nested_self.where)
 
-            raise AttributeError(f"{name} is not a valid attribute of {nested_self}")
+            raise AttributeError(
+                f"{name} is not a valid attribute of {nested_self}\n"
+                f"Did you mean to use .at[{name!r}]?"
+            )
 
     return _strNestedIndexer(tree=tree, where=where)
 
@@ -239,7 +242,10 @@ def _pytree_nested_indexer(tree, where):
             if name == "at":
                 return _pyTreeNestedIndexer(tree=tree, where=nested_self.where)
 
-            raise AttributeError(f"{name} is not a valid attribute of {nested_self}")
+            raise AttributeError(
+                f"{name} is not a valid attribute of {nested_self}\n"
+                f"Did you mean to use .at[{name!r}]?"
+            )
 
     return _pyTreeNestedIndexer(tree=tree, where=where)
 
@@ -261,7 +267,16 @@ def _at_indexer(tree):
                 return tree.at[tree == tree]
 
             raise NotImplementedError(
-                f"Indexing with {type(where)} is not implemented."
+                f"Indexing with {type(where)} is not implemented.\n"
+                "Example of supported indexing:\n\n"
+                "@pytc.treeclass\n"
+                f"class {tree.__class__.__name__}:\n"
+                "    ...\n\n"
+                f">>> tree = {tree.__class__.__name__}(...)\n"
+                "# indexing by boolean pytree\n"
+                ">>> tree.at[tree > 0].get()\n\n"
+                "# indexing by string\n"
+                ">>> tree.at[`field_name`].get()"
             )
 
     return _atIndexer()
