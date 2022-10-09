@@ -23,10 +23,6 @@ from pytreeclass.tree_viz.utils import (
 PyTree = Any
 
 
-def _bold_text(text: str) -> str:
-    return f"\033[1m{text}\033[0m"
-
-
 def _format_size(node_size, newline=False):
     """return formatted size from inexact(exact) complex number"""
     mark = "\n" if newline else ""

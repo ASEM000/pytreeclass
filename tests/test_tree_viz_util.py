@@ -10,6 +10,7 @@ from pytreeclass.tree_viz.node_pprint import (
     _format_node_str,
     _func_repr,
 )
+from pytreeclass.tree_viz.tree_summary import _format_count, _format_size
 
 
 def test__vbox():
@@ -32,3 +33,12 @@ def test_func_repr():
     assert _format_node_str(jtu.Partial(jax.nn.relu)) == "Partial(relu(*args,**kwargs))"
     assert (_format_node_diagram(jtu.Partial(jax.nn.relu)) == "Partial(relu(*args,**kwargs))")  # fmt: skip
     assert (_func_repr(jax.nn.initializers.he_normal) == "he_normal(in_axis,out_axis,batch_axis,dtype)")  # fmt: skip
+
+
+def test_format_count():
+    assert _format_count(complex(1000, 2)) == "1,000(2)"
+    assert _format_count(complex(1000, 0)) == "1,000(0)"
+    assert _format_count((1000)) == "1,000"
+
+    assert _format_size(1000) == "1000.00B"
+    assert _format_size(complex(1000, 2)) == "1000.00B(2.00B)"
