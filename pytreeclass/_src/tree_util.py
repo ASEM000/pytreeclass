@@ -67,28 +67,6 @@ def _mutable(func):
 # filtering nondifferentiable fields
 
 
-def _is_nondiff(item: Any) -> bool:
-    """check if tree is non-differentiable"""
-
-    def _is_nondiff_item(node: Any):
-        """check if node is non-differentiable"""
-        # differentiable types
-        if isinstance(node, (float, complex, src.tree_base._treeBase)):
-            return False
-
-        # differentiable array
-        elif isinstance(node, jnp.ndarray) and jnp.issubdtype(node.dtype, jnp.inexact):
-            return False
-
-        return True
-
-    if isinstance(item, Iterable):
-        # if an iterable has at least one non-differentiable item
-        # then the whole iterable is non-differentiable
-        return any([_is_nondiff_item(item) for item in jtu.tree_leaves(item)])
-    return _is_nondiff_item(item)
-
-
 def _append_field(
     tree: PyTree,
     where: Callable[[Field, Any], bool] | PyTree,

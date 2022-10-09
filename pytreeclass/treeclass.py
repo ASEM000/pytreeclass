@@ -99,12 +99,7 @@ def treeclass(*args, **kwargs):
         attrs_vals = (immutable_setter, False, MappingProxyType({}))
         new_cls = type(cls.__name__, bases, dict(zip(attrs_keys, attrs_vals)))  # fmt: skip
 
-        # temporarily mutate the tree instance to execute the __init__ method
-        # without raising `__immutable_treeclass__` error
-        # then restore the tree original immutable behavior after the function is called
-        # _mutable can be applied to any class method that is decorated with @treeclass
-        # to temporarily make the class mutable
-        # however, it is not recommended to use it outside of __init__ method
+        # temporarily make the class mutable during class creation
         new_cls.__init__ = _mutable(new_cls.__init__)
 
         return jax.tree_util.register_pytree_node_class(new_cls)

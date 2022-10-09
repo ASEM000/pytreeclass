@@ -28,8 +28,7 @@ def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
         return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
     elif isinstance(rhs, type(None)):  # unary operator
         return jtu.tree_map(func, lhs, is_leaf=is_leaf)
-    else:
-        raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
+    raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
 
 
 def _append_math_op(func):
@@ -120,8 +119,7 @@ def _append_math_eq_ne(func):
             return _field_boolean_map(lambda x, y: func(y, where), self)
         elif isinstance(where, dict):
             return _field_boolean_map(lambda x, y: func(x.metadata, where), self)
-        else:
-            raise NotImplementedError(f"rhs of type {type(where)} is not implemented.")
+        raise NotImplementedError(f"rhs of type {type(where)} is not implemented.")
 
     return wrapper
 
@@ -136,8 +134,7 @@ def _tree_hash(tree):
         elif isinstance(node, set):
             # jtu.tree_map does not traverse sets
             return frozenset(node)
-        else:
-            return node
+        return node
 
     return hash(
         (*jtu.tree_map(_hash_node, jtu.tree_leaves(tree)), jtu.tree_structure(tree))
