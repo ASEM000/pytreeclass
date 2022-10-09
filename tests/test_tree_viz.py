@@ -718,3 +718,19 @@ def test_summary_options():
         # trunk-ignore(flake8/E501)
         == "┌────┬───────────┬───────┬─────────────┐\n│Name│Type       │Param #│Size         │\n├────┼───────────┼───────┼─────────────┤\n│a   │int        │0(1)   │0.00B(28.00B)│\n├────┼───────────┼───────┼─────────────┤\n│b   │DeviceArray│0(3)   │0.00B(12.00B)│\n├────┼───────────┼───────┼─────────────┤\n│c   │float      │1(0)   │24.00B(0.00B)│\n├────┼───────────┼───────┼─────────────┤\n│d   │function   │0(0)   │0.00B(0.00B) │\n└────┴───────────┴───────┴─────────────┘\nTotal count :\t1(4)\nDynamic count :\t1(4)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t24.00B(40.00B)\nDynamic size :\t24.00B(40.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
     )
+
+
+def test_summary_expanding_containers():
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+
+    @pytc.treeclass
+    class Test:
+        a: int = (1, L0())
+
+    assert (
+        Test().summary(show_config=False)
+        # trunk-ignore(flake8/E501)
+        == "┌──────┬─────────┬───────┬─────────────┐\n│Name  │Type     │Param #│Size         │\n├──────┼─────────┼───────┼─────────────┤\n│a/a[0]│tuple/int│0(1)   │0.00B(28.00B)│\n├──────┼─────────┼───────┼─────────────┤\n│a/a[1]│tuple/L0 │0(1)   │0.00B(28.00B)│\n└──────┴─────────┴───────┴─────────────┘\nTotal count :\t0(2)\nDynamic count :\t0(2)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t0.00B(56.00B)\nDynamic size :\t0.00B(56.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
+    )
