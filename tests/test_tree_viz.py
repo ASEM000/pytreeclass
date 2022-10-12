@@ -734,3 +734,15 @@ def test_summary_expanding_containers():
         # trunk-ignore(flake8/E501)
         == "┌──────┬─────────┬───────┬─────────────┐\n│Name  │Type     │Param #│Size         │\n├──────┼─────────┼───────┼─────────────┤\n│a/a[0]│tuple/int│0(1)   │0.00B(28.00B)│\n├──────┼─────────┼───────┼─────────────┤\n│a/a[1]│tuple/L0 │0(1)   │0.00B(28.00B)│\n└──────┴─────────┴───────┴─────────────┘\nTotal count :\t0(2)\nDynamic count :\t0(2)\nFrozen count :\t0(0)\n----------------------------------------\nTotal size :\t0.00B(56.00B)\nDynamic size :\t0.00B(56.00B)\nFrozen size :\t0.00B(0.00B)\n========================================"
     )
+
+
+def test_mermaid():
+    @pytc.treeclass
+    class L0:
+        a: int = pytc.nondiff_field(default=1)
+
+    @pytc.treeclass
+    class Test:
+        a: int = (1, L0())
+
+    assert pytc.tree_viz.tree_mermaid(Test())

@@ -174,10 +174,8 @@ def _field_repr(node: Field, depth: int) -> str:
     attrs += [f"hash={node.hash}"] if node.hash is not None else []
     attrs += [f"compare={node.compare}"]
     attrs += [f"metadata={node.metadata}"] if node.metadata != {} else []
-    string = (",").join(
-        f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in attrs
-    )
-    return _format_width("Field(" + (string) + ")")
+    string = (',').join(f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in attrs)  # fmt: skip
+    return _format_width(f"Field({string})")
 
 
 def _format_node_repr(node: Any, depth: int = 0) -> str:

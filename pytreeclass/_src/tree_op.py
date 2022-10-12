@@ -101,7 +101,7 @@ def _field_boolean_map(
 
     return jtu.tree_unflatten(
         treedef=jtu.tree_structure(tree, is_leaf=_is_leaf),
-        leaves=tuple(_traverse(tree=tree)),
+        leaves=_traverse(tree=tree),
     )
 
 

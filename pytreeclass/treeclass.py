@@ -28,12 +28,16 @@ def field(
     Args:
         nondiff: if True, the field will not be differentiated
         frozen: if True, the field will be frozen
+        name: name of the field. Will be inferred from the variable name if its assigned to a class attribute.
+        type: type of the field. Will be inferred from the variable type if its assigned to a class attribute.
         **kwargs: additional arguments to pass to dataclasses.field
     """
     metadata = kwargs.pop("metadata", {})
-    metadata["nondiff"] = nondiff
-    metadata["frozen"] = frozen
-    metadata["static"] = nondiff or frozen
+    if nondiff is True:
+        metadata["nondiff"] = metadata["static"] = True
+    elif frozen is True:
+        metadata["frozen"] = metadata["static"] = True
+
     return dataclasses.field(metadata=metadata, **kwargs)
 
 
@@ -54,7 +58,7 @@ def is_nondiff_field(field_item: dataclasses.Field) -> bool:
 def fields(tree):
     if len(tree.__undeclared_fields__) == 0:
         return tree.__dataclass_fields__.values()
-    return {**tree.__dataclass_fields__, **tree.__undeclared_fields__}.values()
+    return tuple({**tree.__dataclass_fields__, **tree.__undeclared_fields__}.values())
 
 
 def treeclass(*args, **kwargs):
