@@ -57,9 +57,9 @@ The package aims to achieve _two goals_:
 
 ```python
 import jax
-from jax import numpy as jnp
+import jax.numpy as jnp 
 import pytreeclass as pytc
-import matplotlib.pyplot as plt
+import pytreeclass.tree_util as ptu
 
 @pytc.treeclass
 class Linear :
@@ -242,9 +242,7 @@ flowchart LR
 
 ```python
 # freeze l1
-from pytreeclass.tree_util import tree_freeze
-
-model = model.at["l1"].set(tree_freeze(model.l1))
+model = model.at["l1"].set(ptu.tree_freeze(model.l1))
 
 # Set negative_values in l2 to 0
 filtered_l2 =  model.l2.at[model.l2<0].set(0)
