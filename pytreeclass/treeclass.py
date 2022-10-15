@@ -83,25 +83,31 @@ def treeclass(*args, **kwargs):
             new_fields = {**tree.__undeclared_fields__, **{key: field_value}}  # fmt: skip
             object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
 
+    def immutable_delattr(tree, key: str) -> None:
+        if tree.__immutable_pytree__:
+            raise ImmutableInstanceError(f"Cannot delete {key}.")
+        object.__delattr__(tree, key)
+
     def class_wrapper(cls):
 
         if "__setattr__" in vars(cls):
-            raise AttributeError("`treeclass` cannot be applied to class with `__setattr__` method.")  # fmt: skip
+            msg = f"Cannot use @treeclass on {cls.__name__} because it already has a __setattr__ method."
+            raise AttributeError(msg)
 
-        dCls = dataclasses.dataclass(
-            init="__init__" not in vars(cls),
-            repr=False,  # repr is handled by _treePretty
-            eq=False,  # eq is handled by _treeOpBase
-            unsafe_hash=False,  # hash is handled by _treeOpBase
-            order=False,  # order is handled by _treeOpBase
-            frozen=False,  # frozen is `immutable_setter`
-        )(cls)
+        if "__delattr__" in vars(cls):
+            msg = f"Cannot use @treeclass on {cls.__name__} because it already has a __delattr__ method."
+            raise AttributeError(msg)
 
-        bases = (dCls, _treeIndexer, _treeOp, _treePretty, _treeBase)
+        dcls_keys = ("init", "repr", "eq", "order", "unsafe_hash", "frozen")
+        dcls_vals = ("__init__" not in vars(cls), False, False, False, False, False)
+        dcls = dataclasses.dataclass(**dict(zip(dcls_keys, dcls_vals)))(cls)
 
-        attrs_keys = ("__setattr__", "__immutable_pytree__", "__undeclared_fields__")
-        attrs_vals = (immutable_setter, False, MappingProxyType({}))
-        new_cls = type(cls.__name__, bases, dict(zip(attrs_keys, attrs_vals)))  # fmt: skip
+        attrs_keys = ("__setattr__", "__delattr__", "__immutable_pytree__", "__undeclared_fields__")  # fmt: skip
+        attrs_vals = (immutable_setter, immutable_delattr, True, MappingProxyType({}))
+        attrs = dict(zip(attrs_keys, attrs_vals))
+
+        bases = (dcls, _treeBase, _treeIndexer, _treeOp, _treePretty)
+        new_cls = type(cls.__name__, bases, attrs)
 
         # temporarily make the class mutable during class creation
         new_cls.__init__ = _mutable(new_cls.__init__)

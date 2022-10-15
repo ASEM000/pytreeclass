@@ -6,6 +6,7 @@ from jax import numpy as jnp
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_util import tree_copy
+from pytreeclass.treeclass import ImmutableInstanceError
 
 
 def test_hash():
@@ -105,3 +106,16 @@ def test_copy():
     assert copy.copy(t).a == 1
     assert copy.copy(t).b == 3
     assert copy.copy(t).c == 5
+
+
+def test_delattr():
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+        b: int = 3
+        c: int = 5
+
+    t = L0()
+
+    with pytest.raises(ImmutableInstanceError):
+        del t.a
