@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools as ft
 from collections.abc import Iterable
 from dataclasses import Field, field
-from types import FunctionType, MappingProxyType
+from types import FunctionType
 from typing import Any, Callable
 
 import jax.numpy as jnp
@@ -22,7 +22,7 @@ def tree_copy(tree):
 def _tree_mutate(tree):
     """Enable mutable behavior for a treeclass instance"""
     if pytc.is_treeclass(tree):
-        object.__setattr__(tree, "__immutable_pytree__", False)
+        object.__setattr__(tree, "__immutable_treeclass__", False)
         for field_item in pytc.fields(tree):
             if hasattr(tree, field_item.name):
                 _tree_mutate(getattr(tree, field_item.name))
@@ -32,7 +32,7 @@ def _tree_mutate(tree):
 def _tree_immutate(tree):
     """Enable immutable behavior for a treeclass instance"""
     if pytc.is_treeclass(tree):
-        object.__setattr__(tree, "__immutable_pytree__", True)
+        object.__setattr__(tree, "__immutable_treeclass__", True)
         for field_item in pytc.fields(tree):
             if hasattr(tree, field_item.name):
                 _tree_immutate(getattr(tree, field_item.name))
@@ -72,7 +72,7 @@ def _append_field(
     where: Callable[[Field, Any], bool] | PyTree,
     replacing_field: Field = field,
 ) -> PyTree:
-    """append a dataclass field to a treeclass `__undeclared_fields__`
+    """append a dataclass field to a treeclass `__treeclass_fields__`
 
     Args:
         tree (PyTree): tree to append field to
@@ -83,8 +83,8 @@ def _append_field(
         This is the base mechanism for controlling the static/dynamic behavior of a treeclass instance.
 
         during the `tree_flatten`, tree_fields are the combination of
-        {__dataclass_fields__, __undeclared_fields__} this means that a field defined
-        in `__undeclared_fields__` with the same name as in __dataclass_fields__
+        {__dataclass_fields__, __treeclass_fields__} this means that a field defined
+        in `__treeclass_fields__` with the same name as in __dataclass_fields__
         will override its properties, this is useful if you want to change the metadata
         of a field but don't want to change the original field definition defined in the class.
     """
@@ -101,8 +101,8 @@ def _append_field(
                 new_field = replacing_field(repr=field_item.repr)
                 object.__setattr__(new_field, "name", field_item.name)
                 object.__setattr__(new_field, "type", field_item.type)
-                new_fields = {**tree.__undeclared_fields__, **{field_item.name: new_field}}  # fmt: skip
-                object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
+                new_fields = {**tree.__treeclass_fields__, **{field_item.name: new_field}}  # fmt: skip
+                object.__setattr__(tree, "__treeclass_fields__", new_fields)
 
         return tree
 
@@ -121,8 +121,8 @@ def _append_field(
                 new_field = replacing_field(repr=lhs_field_item.repr)
                 object.__setattr__(new_field, "name", lhs_field_item.name)
                 object.__setattr__(new_field, "type", lhs_field_item.type)
-                new_fields = {**tree.__undeclared_fields__, **{lhs_field_item.name: new_field}}  # fmt: skip
-                object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
+                new_fields = {**tree.__treeclass_fields__, **{lhs_field_item.name: new_field}}  # fmt: skip
+                object.__setattr__(tree, "__treeclass_fields__", new_fields)  # fmt: skip
 
         return tree
 
@@ -134,7 +134,7 @@ def _append_field(
 
 
 def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
-    """remove a dataclass field from `__undeclared_fields__` added if some condition is met"""
+    """remove a dataclass field from `__treeclass_fields__` added if some condition is met"""
 
     def _recurse(tree):
         for field_item in pytc.fields(tree):
@@ -142,9 +142,9 @@ def _unappend_field(tree: PyTree, cond: Callable[[Field], bool]) -> PyTree:
             if pytc.is_treeclass(node_item):
                 _recurse(tree=node_item)
             elif cond(field_item):
-                new_fields = dict(tree.__undeclared_fields__)
+                new_fields = dict(tree.__treeclass_fields__)
                 new_fields.pop(field_item.name)
-                object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
+                object.__setattr__(tree, "__treeclass_fields__", new_fields)  # fmt: skip
         return tree
 
     return _recurse(tree_copy(tree))
@@ -177,7 +177,7 @@ def filter_nondiff(
 
 
 def unfilter_nondiff(tree):
-    return _unappend_field(tree, pytc.is_nondiff_field)
+    return _unappend_field(tree, pytc.is_field_nondiff)
 
 
 def tree_freeze(
@@ -190,4 +190,4 @@ def tree_freeze(
 
 
 def tree_unfreeze(tree):
-    return _unappend_field(tree, pytc.is_frozen_field)
+    return _unappend_field(tree, pytc.is_field_frozen)

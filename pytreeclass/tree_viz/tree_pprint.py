@@ -18,9 +18,9 @@ PyTree = Any
 def _marker(field_item: Field, node_item: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item"""
     # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if pytc.is_nondiff_field(field_item) or pytc.is_treeclass_nondiff(node_item):
+    if pytc.is_field_nondiff(field_item) or pytc.is_treeclass_nondiff(node_item):
         return "*"
-    elif pytc.is_frozen_field(field_item) or pytc.is_treeclass_frozen(node_item):
+    elif pytc.is_field_frozen(field_item) or pytc.is_treeclass_frozen(node_item):
         return "#"
     else:
         return default
@@ -135,10 +135,10 @@ def tree_diagram(tree: PyTree) -> str:
 
             for i, layer in enumerate(node_item):
 
-                if pytc.is_frozen_field(field_item):
-                    new_field = src.misc.field(frozen=True)
-                elif pytc.is_nondiff_field(field_item):
-                    new_field = src.misc.field(nondiff=True)
+                if pytc.is_field_frozen(field_item):
+                    new_field = pytc.field(frozen=True)
+                elif pytc.is_field_nondiff(field_item):
+                    new_field = pytc.field(nondiff=True)
                 else:
                     new_field = field()
 
