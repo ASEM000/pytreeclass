@@ -29,6 +29,9 @@ def field(
         type: type of the field. Will be inferred from the variable type if its assigned to a class attribute.
         **kwargs: additional arguments to pass to dataclasses.field
     """
+    if frozen and nondiff:
+        raise ValueError("Cannot be both frozen and nondiff")
+
     metadata = kwargs.pop("metadata", {})
     if nondiff is True:
         metadata["nondiff"] = metadata["static"] = True
