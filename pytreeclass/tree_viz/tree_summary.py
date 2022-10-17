@@ -128,7 +128,7 @@ def tree_summary(
         ):
             # expand container if any item is a `treeclass`
             for i, layer in enumerate(node_item):
-                new_field = field(metadata={"frozen": pytc.is_frozen_field(field_item)})
+                new_field = field(metadata={"frozen": pytc.is_field_frozen(field_item)})
                 object.__setattr__(new_field, "name", f"{field_item.name}[{i}]")
                 object.__setattr__(new_field, "type", type(layer))
 
@@ -141,12 +141,12 @@ def tree_summary(
 
         elif isinstance(node_item, src.tree_base._treeBase):
             # a module is considred frozen if all it's parameters are frozen
-            pytc.is_frozen = field_item.metadata.get("frozen", False)
-            pytc.is_frozen = pytc.is_frozen or pytc.is_treeclass_frozen(node_item)
+            is_frozen = field_item.metadata.get("frozen", False)
+            is_frozen = is_frozen or pytc.is_treeclass_frozen(node_item)
             count, size = _reduce_count_and_size(tree_unfreeze(node_item))
             dynamic, _ = _tree_structure(tree_unfreeze(node_item))
 
-            row = ["/".join(name_path) + f"{(os.linesep + '(frozen)' if pytc.is_frozen else '')}"]  # fmt: skip
+            row = ["/".join(name_path) + f"{(os.linesep + '(frozen)' if is_frozen else '')}"]  # fmt: skip
             row += ["/".join(type_path)] if show_type else []
             row += [_format_count(count)] if show_param else []
             row += [_format_size(size)] if show_size else []
@@ -158,14 +158,14 @@ def tree_summary(
 
             ROWS.append(row)
 
-            COUNT[1 if pytc.is_frozen else 0] += count
-            SIZE[1 if pytc.is_frozen else 0] += size
+            COUNT[1 if is_frozen else 0] += count
+            SIZE[1 if is_frozen else 0] += size
 
         else:
-            pytc.is_frozen = field_item.metadata.get("frozen", False)
+            is_frozen = field_item.metadata.get("frozen", False)
             count, size = _reduce_count_and_size(node_item)
 
-            row = ["/".join(name_path) + f"{(os.linesep + '(frozen)' if pytc.is_frozen else '')}"]  # fmt: skip
+            row = ["/".join(name_path) + f"{(os.linesep + '(frozen)' if is_frozen else '')}"]  # fmt: skip
             row += ["/".join(type_path)] if show_type else []
             row += [_format_count(count)] if show_param else []
             row += [_format_size(size)] if show_size else []
@@ -174,8 +174,8 @@ def tree_summary(
             ROWS.append(row)
 
             # non-treeclass leaf inherit frozen state
-            COUNT[1 if pytc.is_frozen else 0] += count
-            SIZE[1 if pytc.is_frozen else 0] += size
+            COUNT[1 if is_frozen else 0] += count
+            SIZE[1 if is_frozen else 0] += size
 
     def recurse(tree, name_path, type_path):
 

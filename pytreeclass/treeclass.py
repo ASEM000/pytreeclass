@@ -3,7 +3,6 @@ from __future__ import annotations
 # from dataclasses import dataclass, field
 import dataclasses
 import inspect
-from types import MappingProxyType
 from typing import Any
 
 import jax
@@ -16,9 +15,7 @@ from pytreeclass._src.tree_op import _treeOp
 from pytreeclass._src.tree_pretty import _treePretty
 from pytreeclass._src.tree_util import _mutable
 
-
-class ImmutableInstanceError(Exception):
-    pass
+# field related ------------------------------------------------------------------------------------------------------ #
 
 
 def field(
@@ -41,89 +38,112 @@ def field(
     return dataclasses.field(metadata=metadata, **kwargs)
 
 
-def is_frozen_field(field_item: dataclasses.Field) -> bool:
+def fields(tree):
+    if len(tree.__treeclass_fields__) == 0:
+        return tree.__dataclass_fields__.values()
+    return tuple({**tree.__dataclass_fields__, **tree.__treeclass_fields__}.values())
+
+
+def is_field_frozen(field_item: dataclasses.Field) -> bool:
     """check if field is frozen"""
     return isinstance(field_item, dataclasses.Field) and field_item.metadata.get(
         "frozen", False
     )
 
 
-def is_nondiff_field(field_item: dataclasses.Field) -> bool:
+def is_field_nondiff(field_item: dataclasses.Field) -> bool:
     """check if field is strictly static"""
     return isinstance(field_item, dataclasses.Field) and field_item.metadata.get(
         "nondiff", False
     )
 
 
-def fields(tree):
-    if len(tree.__undeclared_fields__) == 0:
-        return tree.__dataclass_fields__.values()
-    return tuple({**tree.__dataclass_fields__, **tree.__undeclared_fields__}.values())
+# frozen methods ----------------------------------------------------------------------------------------------------- #
+class ImmutableInstanceError(Exception):
+    pass
 
 
-def treeclass(*args, **kwargs):
-    def immutable_setter(tree, key: str, value: Any) -> None:
+def _immutable_setter(tree, key: str, value: Any) -> None:
 
-        if tree.__immutable_pytree__:
-            msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
-            raise ImmutableInstanceError(msg)
+    if is_treeclass_immutable(tree):
+        msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
+        raise ImmutableInstanceError(msg)
 
-        object.__setattr__(tree, key, value)
+    object.__setattr__(tree, key, value)
 
-        if (isinstance(value, _treeBase)) and (
-            key not in [f.name for f in fields(tree)]
-        ):
-            # create field
-            field_value = field()
+    if (isinstance(value, _treeBase)) and (key not in [f.name for f in fields(tree)]):
+        # create field
+        field_item = field()
 
-            object.__setattr__(field_value, "name", key)
-            object.__setattr__(field_value, "type", type(value))
+        object.__setattr__(field_item, "name", key)
+        object.__setattr__(field_item, "type", type(value))
 
-            # register it to class
-            new_fields = {**tree.__undeclared_fields__, **{key: field_value}}  # fmt: skip
-            object.__setattr__(tree, "__undeclared_fields__", MappingProxyType(new_fields))  # fmt: skip
+        # register it to class
+        new_fields = {**tree.__treeclass_fields__, **{key: field_item}}
+        object.__setattr__(tree, "__treeclass_fields__", new_fields)
 
-    def immutable_delattr(tree, key: str) -> None:
-        if tree.__immutable_pytree__:
-            raise ImmutableInstanceError(f"Cannot delete {key}.")
-        object.__delattr__(tree, key)
 
-    def class_wrapper(cls):
+def _immutable_delattr(tree, key: str) -> None:
+    if is_treeclass_immutable(tree):
+        raise ImmutableInstanceError(f"Cannot delete {key}.")
+    object.__delattr__(tree, key)
 
-        if "__setattr__" in vars(cls):
-            msg = f"Cannot overwrite attribute __setattr__ on class {cls.__name__}"
-            raise TypeError(msg)
 
-        if "__delattr__" in vars(cls):
-            msg = f"Cannot overwrite attribute __delattr__ on class {cls.__name__}"
-            raise TypeError(msg)
+# treeclass related ---------------------------------------------------------------------------------------------------#
 
-        dcls_keys = ("init", "repr", "eq", "order", "unsafe_hash", "frozen")
-        dcls_vals = ("__init__" not in vars(cls), False, False, False, False, False)
-        dcls = dataclasses.dataclass(**dict(zip(dcls_keys, dcls_vals)))(cls)
 
-        attrs_keys = ("__setattr__", "__delattr__", "__immutable_pytree__", "__undeclared_fields__")  # fmt: skip
-        attrs_vals = (immutable_setter, immutable_delattr, True, MappingProxyType({}))
-        attrs = dict(zip(attrs_keys, attrs_vals))
+def _check_and_return_cls(cls):
+    if not inspect.isclass(cls):
+        msg = f"Input must be of `class` type. Found {cls}."
+        raise TypeError(msg)
 
-        bases = (dcls, _treeBase, _treeIndexer, _treeOp, _treePretty)
-        new_cls = type(cls.__name__, bases, attrs)
+    if "__setattr__" in vars(cls):
+        msg = f"Cannot overwrite attribute __setattr__ on class {cls.__name__}"
+        raise TypeError(msg)
 
-        # temporarily make the class mutable during class creation
-        new_cls.__init__ = _mutable(new_cls.__init__)
+    if "__delattr__" in vars(cls):
+        msg = f"Cannot overwrite attribute __delattr__ on class {cls.__name__}"
+        raise TypeError(msg)
 
-        return jax.tree_util.register_pytree_node_class(new_cls)
+    return cls
 
-    if len(args) == 1 and inspect.isclass(args[0]):
-        # no args are passed to the decorator (i.e. @treeclass)
-        return class_wrapper(args[0])
 
-    raise TypeError(f"`treeclass` input must be of `class` type. Found {(*args, *kwargs)}.")  # fmt: skip
+def treeclass(cls):
+    """Decorator to make a class a treeclass"""
+
+    dcls = dataclasses.dataclass(
+        init="__init__" not in vars(cls),  # if __init__ is defined, do not overwrite it
+        repr=False,  # repr is handled by _treePretty
+        eq=False,  # eq is handled by _treeOp
+        order=False,  # order is handled by _treeOp
+        unsafe_hash=False,  # unsafe_hash is handled by _treeOp
+        frozen=False,  # frozen is handled by _immutable_setter/_immutable_delattr
+    )(_check_and_return_cls(cls))
+
+    attrs = dict(
+        __setattr__=_immutable_setter,  # disable direct attribute setting unless __immutable_treeclass__ is False
+        __delattr__=_immutable_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False
+        __treeclass_fields__=dict(),  # fields that are not in dataclass
+        __immutable_treeclass__=True,  # flag to disable direct attribute setting/deletion
+    )
+
+    bases = (dcls, _treeBase, _treeIndexer, _treeOp, _treePretty)
+    new_cls = type(cls.__name__, bases, attrs)
+
+    # temporarily make the class mutable during class creation
+    new_cls.__init__ = _mutable(new_cls.__init__)
+
+    return jax.tree_util.register_pytree_node_class(new_cls)
+
+
+def is_treeclass_immutable(tree):
+    """assert if a treeclass is immutable"""
+    return is_treeclass(tree) and tree.__immutable_treeclass__
 
 
 def is_treeclass(tree):
     """check if a class is treeclass"""
-    return hasattr(tree, "__immutable_pytree__")
+    return hasattr(tree, "__immutable_treeclass__")
 
 
 def is_treeclass_frozen(tree):
@@ -131,7 +151,7 @@ def is_treeclass_frozen(tree):
     if is_treeclass(tree):
         field_items = fields(tree)
         if len(field_items) > 0:
-            return all(is_frozen_field(f) for f in field_items)
+            return all(is_field_frozen(f) for f in field_items)
     return False
 
 
@@ -140,7 +160,7 @@ def is_treeclass_nondiff(tree):
     if is_treeclass(tree):
         field_items = fields(tree)
         if len(field_items) > 0:
-            return all(is_nondiff_field(f) for f in field_items)
+            return all(is_field_nondiff(f) for f in field_items)
     return False
 
 

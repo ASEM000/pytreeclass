@@ -27,9 +27,9 @@ def _marker(field_item: Field, node_item: Any, default: str = "--") -> str:
         str: marker character.
     """
     # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if pytc.is_nondiff_field(field_item) or pytc.is_treeclass_nondiff(node_item):
+    if pytc.is_field_nondiff(field_item) or pytc.is_treeclass_nondiff(node_item):
         return "--x"
-    elif pytc.is_frozen_field(field_item) or pytc.is_treeclass_frozen(node_item):
+    elif pytc.is_field_frozen(field_item) or pytc.is_treeclass_frozen(node_item):
         return "-..-"
     return default
 
@@ -57,7 +57,7 @@ def _tree_mermaid(tree: PyTree):
 
         for i, field_item in enumerate(pytc.fields(tree)):
 
-            if not field_item.repr or (pytc.is_nondiff_field(field_item)):
+            if not field_item.repr or (pytc.is_field_nondiff(field_item)):
                 continue
 
             node_item = getattr(tree, field_item.name)

@@ -52,10 +52,10 @@ class _treeBase:
         """Unflatten rule for `jax.tree_unflatten`"""
         # using `object.__new__`` here is faster than using `cls.__new__`
         # as it avoids calling bases __new__ methods
-        # moreover , in _treeBase.__new__ we declare `__undeclared_fields__`
+        # moreover , in _treeBase.__new__ we declare `__treeclass_fields__`
         # however, using obejct we will not have this attribute,
         # so we need to add these attributes in the static, that updates the `self.__dict__``
-        # since we already have to pass `__undeclared_fields__` through flatten/unflatten
+        # since we already have to pass `__treeclass_fields__` through flatten/unflatten
         # this approach creates the attribute once.
         self = object.__new__(cls)
 

@@ -10,8 +10,8 @@ from pytreeclass._src.tree_util import (
 from pytreeclass.treeclass import (
     field,
     fields,
-    is_frozen_field,
-    is_nondiff_field,
+    is_field_frozen,
+    is_field_nondiff,
     is_treeclass,
     is_treeclass_equal,
     is_treeclass_frozen,
@@ -36,8 +36,8 @@ __all__ = (
     "filter_nondiff",
     "unfilter_nondiff",
     "field",
-    "is_frozen_field",
-    "is_nondiff_field",
+    "is_field_frozen",
+    "is_field_nondiff",
     "fields",
     "is_treeclass",
     "is_treeclass_equal",
@@ -51,4 +51,4 @@ __all__ = (
     "static_field",
 )
 
-__version__ = "0.1.10"
+__version__ = "0.1.11"
