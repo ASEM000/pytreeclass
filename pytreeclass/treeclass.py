@@ -91,12 +91,12 @@ def treeclass(*args, **kwargs):
     def class_wrapper(cls):
 
         if "__setattr__" in vars(cls):
-            msg = f"Cannot use @treeclass on {cls.__name__} because it already has a __setattr__ method."
-            raise AttributeError(msg)
+            msg = f"Cannot overwrite attribute __setattr__ on class {cls.__name__}"
+            raise TypeError(msg)
 
         if "__delattr__" in vars(cls):
-            msg = f"Cannot use @treeclass on {cls.__name__} because it already has a __delattr__ method."
-            raise AttributeError(msg)
+            msg = f"Cannot overwrite attribute __delattr__ on class {cls.__name__}"
+            raise TypeError(msg)
 
         dcls_keys = ("init", "repr", "eq", "order", "unsafe_hash", "frozen")
         dcls_vals = ("__init__" not in vars(cls), False, False, False, False, False)
