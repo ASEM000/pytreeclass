@@ -11,8 +11,10 @@ import pytreeclass as pytc
 
 
 class _fieldDict(dict):
-    """A dict used for `__pytree_structure__` attribute of a treeclass instance"""
+    """A dict used for `__treeclass_structure__` attribute of a treeclass instance"""
 
+    # using a regular dict will cause the following error:
+    # ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
@@ -24,7 +26,6 @@ def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
     # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
     # not seen by JAX computations. the scanning is done if the instance is not frozen.
     # otherwise the cached values are returned.
-
     static, dynamic = _fieldDict(tree.__dict__), _fieldDict()
 
     for field_item in pytc.fields(tree):

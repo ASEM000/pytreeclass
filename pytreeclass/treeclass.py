@@ -96,14 +96,17 @@ def _immutable_delattr(tree, key: str) -> None:
 
 
 def _check_and_return_cls(cls):
+    # check if the input is a class
     if not inspect.isclass(cls):
         msg = f"Input must be of `class` type. Found {cls}."
         raise TypeError(msg)
 
+    # check if the class does not have setattr
     if "__setattr__" in vars(cls):
         msg = f"Cannot overwrite attribute __setattr__ on class {cls.__name__}"
         raise TypeError(msg)
 
+    # check if the class does not have delattr
     if "__delattr__" in vars(cls):
         msg = f"Cannot overwrite attribute __delattr__ on class {cls.__name__}"
         raise TypeError(msg)

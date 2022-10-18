@@ -17,14 +17,15 @@ PyTree = Any
 
 
 def _at_get(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
+    if not isinstance(where, type(tree)):
+        raise NotImplementedError(f"where type = {type(where)} is not implemented.")
+
     def _lhs_get(lhs: Any, where: Any):
         """Get pytree node  value"""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return lhs[jnp.where(where)]
         return lhs if where else None
 
-    if not isinstance(where, type(tree)):
-        raise NotImplementedError(f"Get where type = {type(where)} is not implemented.")
     return jtu.tree_map(_lhs_get, tree, where, is_leaf=is_leaf)
 
 
@@ -34,14 +35,15 @@ def _at_set(
     set_value: bool | int | float | complex | jnp.ndarray,
     is_leaf: Callable[[Any], bool],
 ):
+    if not isinstance(where, type(tree)):
+        raise NotImplementedError(f"where type = {type(where)} is not implemented.")
+
     def _lhs_set(lhs: Any, where: Any):
         """Set pytree node value."""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return jnp.where(where, set_value, lhs)
         return set_value if (where is True or where is None) else lhs
 
-    if not isinstance(where, type(tree)):
-        raise NotImplementedError(f"Set where type = {type(where)} is not implemented.")
     return jtu.tree_map(_lhs_set, tree, where, is_leaf=is_leaf)
 
 
@@ -51,18 +53,15 @@ def _at_apply(
     func: Callable[[Any], Any],
     is_leaf: Callable[[Any], bool],
 ):
+    if not isinstance(where, type(tree)):
+        raise NotImplementedError(f"where type = {type(where)} is not implemented.")
+
     def _lhs_apply(lhs: Any, where: bool):
         """Set pytree node"""
-
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return jnp.where(where, func(lhs), lhs)
-
         return func(lhs) if (where is True or where is None) else lhs
 
-    if not isinstance(where, type(tree)):
-        raise NotImplementedError(
-            f"Apply where type = {type(where)} is not implemented."
-        )
     return jtu.tree_map(_lhs_apply, tree, where, is_leaf=is_leaf)
 
 
@@ -78,9 +77,7 @@ def _at_reduce(
 ):
 
     if not isinstance(where, type(tree)):
-        raise NotImplementedError(
-            f"Reduce tree type = {type(tree)} is not implemented."
-        )
+        raise NotImplementedError(f"tree type = {type(tree)} is not implemented.")
     return jtu.tree_reduce(func, tree.at[where].get(is_leaf=is_leaf), initializer)
 
 
