@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import functools as ft
 import operator as op
+import re
 from dataclasses import Field
 from typing import Any, Callable, Generator
 
@@ -142,12 +143,25 @@ def _tree_hash(tree):
 
 
 def _eq(lhs, rhs):
-    # (x == int)  <-> isinstance(x,int)
-    return isinstance(lhs, rhs) if isinstance(rhs, type) else op.eq(lhs, rhs)
+    if isinstance(rhs, type):
+        # rhs is a type (tree == int ) will perform a instance check
+        return isinstance(lhs, rhs)
+    elif isinstance(rhs, str):
+        # rhs is a string for (tree == "a") will perform a field name check using regex
+        found = re.findall(rhs, lhs)
+        return len(found) > 0 and found[0] == lhs
+    return op.eq(lhs, rhs)
 
 
 def _ne(lhs, rhs):
-    return not isinstance(lhs, rhs) if isinstance(rhs, type) else op.ne(lhs, rhs)
+    if isinstance(rhs, type):
+        # rhs is a type (tree == int ) will perform a instance check
+        return not isinstance(lhs, rhs)
+    elif isinstance(rhs, str):
+        # rhs is a string for (tree == "a") will perform a field name check using regex
+        found = re.findall(rhs, lhs)
+        return len(found) == 0 or found[0] != lhs
+    return op.ne(lhs, rhs)
 
 
 class _treeOp:
