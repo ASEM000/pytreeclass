@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # from dataclasses import dataclass, field
 import dataclasses
+import functools as ft
 import inspect
 from typing import Any
 
@@ -13,9 +14,7 @@ from pytreeclass._src.tree_base import _treeBase
 from pytreeclass._src.tree_indexer import _treeIndexer
 from pytreeclass._src.tree_op import _treeOp
 from pytreeclass._src.tree_pretty import _treePretty
-from pytreeclass._src.tree_util import _mutable
-
-# field related ------------------------------------------------------------------------------------------------------ #
+from pytreeclass._src.tree_util import _tree_immutate
 
 
 def field(
@@ -61,61 +60,63 @@ def is_field_nondiff(field_item: dataclasses.Field) -> bool:
     )
 
 
-# frozen methods ----------------------------------------------------------------------------------------------------- #
 class ImmutableInstanceError(Exception):
     pass
 
 
-def _immutable_setter(tree, key: str, value: Any) -> None:
-
-    if is_treeclass_immutable(tree):
-        msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
-        raise ImmutableInstanceError(msg)
-
-    object.__setattr__(tree, key, value)
-
-    if (isinstance(value, _treeBase)) and (key not in [f.name for f in fields(tree)]):
-        # create field
-        field_item = field()
-
-        object.__setattr__(field_item, "name", key)
-        object.__setattr__(field_item, "type", type(value))
-
-        # register it to class
-        new_fields = {**tree.__treeclass_fields__, **{key: field_item}}
-        object.__setattr__(tree, "__treeclass_fields__", new_fields)
-
-
-def _immutable_delattr(tree, key: str) -> None:
-    if is_treeclass_immutable(tree):
-        raise ImmutableInstanceError(f"Cannot delete {key}.")
-    object.__delattr__(tree, key)
-
-
-# treeclass related ---------------------------------------------------------------------------------------------------#
-
-
-def _check_and_return_cls(cls):
-    # check if the input is a class
-    if not inspect.isclass(cls):
-        msg = f"Input must be of `class` type. Found {cls}."
-        raise TypeError(msg)
-
-    # check if the class does not have setattr
-    if "__setattr__" in vars(cls):
-        msg = f"Cannot overwrite attribute __setattr__ on class {cls.__name__}"
-        raise TypeError(msg)
-
-    # check if the class does not have delattr
-    if "__delattr__" in vars(cls):
-        msg = f"Cannot overwrite attribute __delattr__ on class {cls.__name__}"
-        raise TypeError(msg)
-
-    return cls
-
-
 def treeclass(cls):
     """Decorator to make a class a treeclass"""
+
+    def _immutable_setter(tree, key: str, value: Any) -> None:
+
+        if is_treeclass_immutable(tree):
+            msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
+            raise ImmutableInstanceError(msg)
+
+        object.__setattr__(tree, key, value)
+
+        if is_treeclass(value) and (key not in [f.name for f in fields(tree)]):
+            # create field
+            field_item = field()
+
+            object.__setattr__(field_item, "name", key)
+            object.__setattr__(field_item, "type", type(value))
+
+            # register it to class
+            new_fields = {**tree.__treeclass_fields__, **{key: field_item}}
+            object.__setattr__(tree, "__treeclass_fields__", new_fields)
+
+    def _immutable_delattr(tree, key: str) -> None:
+        if is_treeclass_immutable(tree):
+            raise ImmutableInstanceError(f"Cannot delete {key}.")
+        object.__delattr__(tree, key)
+
+    def _init_wrapper(cls_init):
+        @ft.wraps(cls_init)
+        def _immutable_init(self, *args, **kwargs):
+            output = cls_init(self, *args, **kwargs)
+            self = _tree_immutate(tree=self)
+            return output
+
+        return _immutable_init
+
+    def _check_and_return_cls(cls):
+        # check if the input is a class
+        if not inspect.isclass(cls):
+            msg = f"Input must be of `class` type. Found {cls}."
+            raise TypeError(msg)
+
+        # check if the class does not have setattr
+        if "__setattr__" in vars(cls):
+            msg = f"Cannot overwrite attribute __setattr__ on class {cls.__name__}"
+            raise TypeError(msg)
+
+        # check if the class does not have delattr
+        if "__delattr__" in vars(cls):
+            msg = f"Cannot overwrite attribute __delattr__ on class {cls.__name__}"
+            raise TypeError(msg)
+
+        return cls
 
     dcls = dataclasses.dataclass(
         init="__init__" not in vars(cls),  # if __init__ is defined, do not overwrite it
@@ -130,14 +131,14 @@ def treeclass(cls):
         __setattr__=_immutable_setter,  # disable direct attribute setting unless __immutable_treeclass__ is False
         __delattr__=_immutable_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False
         __treeclass_fields__=dict(),  # fields that are not in dataclass
-        __immutable_treeclass__=True,  # flag to disable direct attribute setting/deletion
+        __immutable_treeclass__=False,  # flag to control setattr/delattr. will be set to True after init
     )
 
     bases = (dcls, _treeBase, _treeIndexer, _treeOp, _treePretty)
     new_cls = type(cls.__name__, bases, attrs)
 
-    # temporarily make the class mutable during class creation
-    new_cls.__init__ = _mutable(new_cls.__init__)
+    # execute init then set `__immutable_treeclass__` to True
+    new_cls.__init__ = _init_wrapper(new_cls.__init__)
 
     return jax.tree_util.register_pytree_node_class(new_cls)
 
