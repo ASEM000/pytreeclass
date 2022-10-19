@@ -2,7 +2,6 @@ from __future__ import annotations
 
 # from dataclasses import dataclass, field
 import dataclasses
-import functools as ft
 import inspect
 from typing import Any
 
@@ -14,7 +13,7 @@ from pytreeclass._src.tree_base import _treeBase
 from pytreeclass._src.tree_indexer import _treeIndexer
 from pytreeclass._src.tree_op import _treeOp
 from pytreeclass._src.tree_pretty import _treePretty
-from pytreeclass._src.tree_util import _tree_immutate
+from pytreeclass._src.tree_util import _mutable
 
 
 def field(
@@ -75,6 +74,9 @@ def treeclass(cls):
 
         object.__setattr__(tree, key, value)
 
+        # add instance variables to __treeclass_fields__ if
+        # it's already an instance of `treeclass`
+        # this avoids the need to define fields in the class definition
         if is_treeclass(value) and (key not in [f.name for f in fields(tree)]):
             # create field
             field_item = field()
@@ -90,15 +92,6 @@ def treeclass(cls):
         if is_treeclass_immutable(tree):
             raise ImmutableInstanceError(f"Cannot delete {key}.")
         object.__delattr__(tree, key)
-
-    def _init_wrapper(cls_init):
-        @ft.wraps(cls_init)
-        def _immutable_init(self, *args, **kwargs):
-            output = cls_init(self, *args, **kwargs)
-            self = _tree_immutate(tree=self)
-            return output
-
-        return _immutable_init
 
     def _check_and_return_cls(cls):
         # check if the input is a class
@@ -131,14 +124,14 @@ def treeclass(cls):
         __setattr__=_immutable_setter,  # disable direct attribute setting unless __immutable_treeclass__ is False
         __delattr__=_immutable_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False
         __treeclass_fields__=dict(),  # fields that are not in dataclass
-        __immutable_treeclass__=False,  # flag to control setattr/delattr. will be set to True after init
+        __immutable_treeclass__=True,  # flag to control setattr/delattr behavior.false if the class is mutable
     )
 
     bases = (dcls, _treeBase, _treeIndexer, _treeOp, _treePretty)
     new_cls = type(cls.__name__, bases, attrs)
 
-    # execute init then set `__immutable_treeclass__` to True
-    new_cls.__init__ = _init_wrapper(new_cls.__init__)
+    # execute init in mutable mode
+    new_cls.__init__ = _mutable(new_cls.__init__)
 
     return jax.tree_util.register_pytree_node_class(new_cls)
 

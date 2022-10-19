@@ -15,6 +15,7 @@ from pytreeclass.treeclass import (
     is_treeclass,
     is_treeclass_equal,
     is_treeclass_frozen,
+    is_treeclass_immutable,
     is_treeclass_leaf,
     is_treeclass_leaf_bool,
     is_treeclass_non_leaf,
@@ -46,9 +47,10 @@ __all__ = (
     "is_treeclass_leaf",
     "is_treeclass_non_leaf",
     "is_treeclass_nondiff",
+    "is_treeclass_immutable",
     "nondiff_field",
     "frozen_field",
     "static_field",
 )
 
-__version__ = "0.1.12"
+__version__ = "0.1.13"
