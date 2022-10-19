@@ -273,7 +273,7 @@ StackedLinear
 `PyTreeClass` offers four means of filtering:
 
 1. Filter by value
-2. Filter by field name
+2. Filter by field name (regex based )
 3. Filter by field type
 4. Filter by field metadata.
 
