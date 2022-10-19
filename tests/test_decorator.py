@@ -5,7 +5,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import tree_copy
+from pytreeclass._src.tree_util import _mutable, tree_copy
 from pytreeclass.treeclass import ImmutableInstanceError
 
 
@@ -126,3 +126,19 @@ def test_delattr():
         class L1:
             def __delattr__(self, name):
                 pass
+
+    @pytc.treeclass
+    class L2:
+        a: int = 1
+
+        @_mutable
+        def delete(self, name):
+            del self.a
+
+    t = L2()
+    t.delete("a")
+
+
+def test_field():
+    with pytest.raises(ValueError):
+        pytc.field(nondiff=True, frozen=True)
