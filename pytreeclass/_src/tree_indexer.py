@@ -41,7 +41,13 @@ def _at_set(
     def _lhs_set(lhs: Any, where: Any):
         """Set pytree node value."""
         if isinstance(lhs, (Tracer, jnp.ndarray)):
-            return jnp.where(where, set_value, lhs)
+            # check if the set_value is a valid type to be broadcasted to ndarray
+            # otherwise, do not broadcast the set_value to the lhs
+            # but instead, set the set_value to the whole lhs
+            if jnp.isscalar(set_value):
+                return jnp.where(where, set_value, lhs)
+            return set_value
+
         return set_value if (where is True or where is None) else lhs
 
     return jtu.tree_map(_lhs_set, tree, where, is_leaf=is_leaf)

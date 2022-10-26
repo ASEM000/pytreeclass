@@ -156,8 +156,7 @@ def test_freezing_with_ops():
             self.x = x
 
     t = Test(jnp.array([1, 2, 3]))
-    with pytest.raises(TypeError):
-        assert pytc.is_treeclass_equal(t.at[...].set(None), Test(x=None))
+    assert pytc.is_treeclass_equal(t.at[...].set(None), Test(x=None))
 
     @pytc.treeclass
     class t0:

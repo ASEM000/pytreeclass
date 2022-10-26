@@ -53,4 +53,4 @@ __all__ = (
     "static_field",
 )
 
-__version__ = "0.1.13"
+__version__ = "0.1.14"
