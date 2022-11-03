@@ -2,18 +2,16 @@ from __future__ import annotations
 
 # from dataclasses import dataclass, field
 import dataclasses
-import inspect
 from typing import Any
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from pytreeclass._src.tree_base import _treeBase
 from pytreeclass._src.tree_indexer import _treeIndexer
 from pytreeclass._src.tree_op import _treeOp
 from pytreeclass._src.tree_pretty import _treePretty
-from pytreeclass._src.tree_util import _mutable
+from pytreeclass._src.tree_util import _fieldDict, _mutable, _tree_structure
 
 
 def field(
@@ -63,77 +61,78 @@ class ImmutableInstanceError(Exception):
     pass
 
 
+def _setter(tree, key: str, value: Any) -> None:
+    if is_treeclass_immutable(tree):
+        msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
+        raise ImmutableInstanceError(msg)
+
+    object.__setattr__(tree, key, value)
+    # add instance variables to __treeclass_fields__ if
+    # it's already an instance of `treeclass`
+    # this avoids the need to define fields in the class definition
+    if is_treeclass(value) and (key not in [f.name for f in fields(tree)]):
+        # create field
+        field_item = field()
+        object.__setattr__(field_item, "name", key)
+        object.__setattr__(field_item, "type", type(value))
+        # register it to class
+        new_fields = {**tree.__treeclass_fields__, **{key: field_item}}
+        object.__setattr__(tree, "__treeclass_fields__", new_fields)
+
+
+def _delattr(tree, key: str) -> None:
+    if is_treeclass_immutable(tree):
+        raise ImmutableInstanceError(f"Cannot delete {key}.")
+    object.__delattr__(tree, key)
+
+
+def _new(cls, *args, **kwargs):
+    tree = object.__new__(cls)
+    for field_item in dataclasses.fields(tree):
+        if field_item.default is not dataclasses.MISSING:
+            object.__setattr__(tree, field_item.name, field_item.default)
+    return tree
+
+
+def _flatten(tree) -> tuple[Any, tuple[str, _fieldDict[str, Any]]]:
+    """Flatten rule for `jax.tree_flatten`"""
+    dynamic, static = _tree_structure(tree)
+    return dynamic.values(), (dynamic.keys(), static)
+
+
+def _unflatten(cls, treedef, leaves):
+    """Unflatten rule for `jax.tree_unflatten`"""
+    tree = object.__new__(cls)
+    # update the instance values with the retrieved dynamic and static values
+    tree.__dict__.update(dict(zip(treedef[0], leaves)))
+    tree.__dict__.update(treedef[1])
+    return tree
+
+
 def treeclass(cls):
     """Decorator to make a class a treeclass"""
-
-    def _immutable_setter(tree, key: str, value: Any) -> None:
-
-        if is_treeclass_immutable(tree):
-            msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
-            raise ImmutableInstanceError(msg)
-
-        object.__setattr__(tree, key, value)
-
-        # add instance variables to __treeclass_fields__ if
-        # it's already an instance of `treeclass`
-        # this avoids the need to define fields in the class definition
-        if is_treeclass(value) and (key not in [f.name for f in fields(tree)]):
-            # create field
-            field_item = field()
-
-            object.__setattr__(field_item, "name", key)
-            object.__setattr__(field_item, "type", type(value))
-
-            # register it to class
-            new_fields = {**tree.__treeclass_fields__, **{key: field_item}}
-            object.__setattr__(tree, "__treeclass_fields__", new_fields)
-
-    def _immutable_delattr(tree, key: str) -> None:
-        if is_treeclass_immutable(tree):
-            raise ImmutableInstanceError(f"Cannot delete {key}.")
-        object.__delattr__(tree, key)
-
-    def _check_and_return_cls(cls):
-        # check if the input is a class
-        if not inspect.isclass(cls):
-            msg = f"Input must be of `class` type. Found {cls}."
-            raise TypeError(msg)
-
-        # check if the class does not have setattr
-        if "__setattr__" in vars(cls):
-            msg = f"Cannot overwrite attribute __setattr__ on class {cls.__name__}"
-            raise TypeError(msg)
-
-        # check if the class does not have delattr
-        if "__delattr__" in vars(cls):
-            msg = f"Cannot overwrite attribute __delattr__ on class {cls.__name__}"
-            raise TypeError(msg)
-
-        return cls
-
     dcls = dataclasses.dataclass(
         init="__init__" not in vars(cls),  # if __init__ is defined, do not overwrite it
         repr=False,  # repr is handled by _treePretty
         eq=False,  # eq is handled by _treeOp
         order=False,  # order is handled by _treeOp
         unsafe_hash=False,  # unsafe_hash is handled by _treeOp
-        frozen=False,  # frozen is handled by _immutable_setter/_immutable_delattr
-    )(_check_and_return_cls(cls))
+        frozen=True,  # frozen is handled by _setter/_delattr
+    )(cls)
 
     attrs = dict(
-        __setattr__=_immutable_setter,  # disable direct attribute setting unless __immutable_treeclass__ is False
-        __delattr__=_immutable_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False
+        __new__=_new,  # overwrite __new__ to initialize instance variables
+        __init__=_mutable(cls.__init__),  # make it mutable during initialization
+        __setattr__=_setter,  # disable direct attribute setting unless __immutable_treeclass__ is False
+        __delattr__=_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False
         __treeclass_fields__=dict(),  # fields that are not in dataclass
         __immutable_treeclass__=True,  # flag to control setattr/delattr behavior.false if the class is mutable
+        tree_flatten=_flatten,  # jax.tree_util.tree_flatten rule
+        tree_unflatten=classmethod(_unflatten),  # jax.tree_util.tree_unflatten rule
     )
 
-    bases = (dcls, _treeBase, _treeIndexer, _treeOp, _treePretty)
-    new_cls = type(cls.__name__, bases, attrs)
-
-    # execute init in mutable mode
-    new_cls.__init__ = _mutable(new_cls.__init__)
-
-    return jax.tree_util.register_pytree_node_class(new_cls)
+    dcls = type(cls.__name__, (dcls, _treeIndexer, _treeOp, _treePretty), attrs)
+    return jax.tree_util.register_pytree_node_class(dcls)
 
 
 def is_treeclass_immutable(tree):

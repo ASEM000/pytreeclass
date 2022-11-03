@@ -4,7 +4,6 @@ from dataclasses import Field, field
 from typing import Any
 
 import pytreeclass as pytc
-import pytreeclass._src as src
 from pytreeclass.tree_viz.node_pprint import (
     _format_node_diagram,
     _format_node_repr,
@@ -46,7 +45,7 @@ def tree_repr(tree, width: int = 60) -> str:
             endl = "" if i == (leaves_count - 1) else ","
             FMT += "\n" + "\t" * depth
 
-            if isinstance(node_item, src.tree_base._treeBase):
+            if pytc.is_treeclass(node_item):
                 FMT += f"{mark}{field_item.name}={node_item.__class__.__name__}("
                 cursor = len(FMT)  # capture children repr
                 recurse(tree=node_item, depth=depth + 1)
@@ -84,7 +83,7 @@ def tree_str(tree, width: int = 40) -> str:
             endl = "" if i == (leaves_count - 1) else ","
             FMT += "\n" + "\t" * depth
 
-            if isinstance(node_item, src.tree_base._treeBase):
+            if pytc.is_treeclass(node_item):
                 FMT += f"{mark}{field_item.name}={node_item.__class__.__name__}" + "("
                 cursor = len(FMT)
                 recurse(tree=node_item, depth=depth + 1)
@@ -116,7 +115,7 @@ def tree_diagram(tree: PyTree) -> str:
         if not field_item.repr:
             return
 
-        if isinstance(node_item, src.tree_base._treeBase):
+        if pytc.is_treeclass(node_item):
             mark = _marker(field_item, node_item, default="─")
             layer_class_name = node_item.__class__.__name__
             is_last_field = node_index == 1

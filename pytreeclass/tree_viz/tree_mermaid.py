@@ -5,7 +5,6 @@ from dataclasses import Field
 from typing import Any
 
 import pytreeclass as pytc
-import pytreeclass._src as src
 from pytreeclass.tree_viz.node_pprint import _format_node_diagram
 from pytreeclass.tree_viz.tree_export import _generate_mermaid_link
 from pytreeclass.tree_viz.tree_summary import (
@@ -74,7 +73,7 @@ def _tree_mermaid(tree: PyTree):
                 size = _format_size(size.real)
             cur_id = node_id((depth, i, prev_id))
 
-            if isinstance(node_item, src.tree_base._treeBase):
+            if pytc.is_treeclass(node_item):
                 mark = _marker(field_item, node_item, default="--->")
                 FMT += f"\n\tid{prev_id} {mark} "
                 FMT += f'|"{(count)}<br>{(size)}"| '

@@ -71,13 +71,13 @@ def test_overriding_setattr():
                 super().__setattr__(name, value)
 
 
-def test_nonclass_input():
+# def test_nonclass_input():
 
-    with pytest.raises(TypeError):
+#     with pytest.raises(TypeError):
 
-        @pytc.treeclass
-        def f(x):
-            return x
+#         @pytc.treeclass
+#         def f(x):
+#             return x
 
 
 def test_registering_state():

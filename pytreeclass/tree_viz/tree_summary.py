@@ -8,11 +8,9 @@ from typing import Any
 import jax.numpy as jnp
 
 import pytreeclass as pytc
-import pytreeclass._src as src
-from pytreeclass._src.tree_base import _tree_structure
 
 # from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import tree_unfreeze
+from pytreeclass._src.tree_util import _tree_structure, tree_unfreeze
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
@@ -139,7 +137,7 @@ def tree_summary(
                     type_path=type_path + (layer.__class__.__name__,),
                 )
 
-        elif isinstance(node_item, src.tree_base._treeBase):
+        elif pytc.is_treeclass(node_item):
             # a module is considred frozen if all it's parameters are frozen
             is_frozen = field_item.metadata.get("frozen", False)
             is_frozen = is_frozen or pytc.is_treeclass_frozen(node_item)

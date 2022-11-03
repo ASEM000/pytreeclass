@@ -57,7 +57,7 @@ The package aims to achieve _two goals_:
 
 ```python
 import jax
-import jax.numpy as jnp 
+import jax.numpy as jnp
 import pytreeclass as pytc
 import pytreeclass.tree_util as ptu
 
@@ -486,19 +486,17 @@ StackedLinear(
 
 #### Marking fields non-differentiable ✨ _NEW_ ✨
 
-
 <details>
 <summary>
 Automatically marking fields non-differentiable
 </summary>
 
-
 In the following code example, we train a model with differentiable and non-differentiable fields.
-Using  `jax.grad` will throw an error, however to circumvent this we use `pytc.filter_nondiff` to filter out any non-differentiable field.
+Using `jax.grad` will throw an error, however to circumvent this we use `pytc.filter_nondiff` to filter out any non-differentiable field.
 
 ```python
 
-import pytreeclass as pytc 
+import pytreeclass as pytc
 import jax.numpy as jnp
 import jax
 from typing import  Callable
@@ -575,8 +573,8 @@ print(model)
 # )
 
 ```
-</details>
 
+</details>
 
 <details>
 
@@ -588,7 +586,7 @@ In the following example, let's say we want to train only the field `b` and mark
 ```python
 
 new_model = pytc.filter_nondiff(model, model != "b")
-# we can see all fields except `b` are marked with 
+# we can see all fields except `b` are marked with
 # `*` to mark non-differentiable.
 print(new_model)
 
@@ -622,9 +620,7 @@ print(unfiltered_model)
 
 ```
 
-
 </details>
-
 
 ## 📜 Stateful computations<a id="StatefulComputation"></a>
 
@@ -711,6 +707,4 @@ The following is a comparison of `PyTreeClass`, `Treex`, and `Equinox` for an id
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 
 - [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
-- [Equinox](https://github.com/patrick-kidger/equinox)
-- [Treex](https://github.com/cgarciae/treex)
-- [tree-math](https://github.com/google/tree-math)
+- [Treex](https://github.com/cgarciae/treex), [Equinox](https://github.com/patrick-kidger/equinox), [tree-math](https://github.com/google/tree-math), [TensorFlow](https://www.tensorflow.org), [PyTorch](https://pytorch.org)

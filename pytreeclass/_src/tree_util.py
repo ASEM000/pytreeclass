@@ -10,9 +10,33 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 import pytreeclass as pytc
-import pytreeclass._src as src
 
 PyTree = Any
+
+
+class _fieldDict(dict):
+    """A dict used for `__treeclass_structure__` attribute of a treeclass instance"""
+
+    # using a regular dict will cause the following error:
+    # ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+
+def _tree_structure(tree) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return dynamic and static fields of the pytree instance"""
+    # this function classifies tree vars into trainable/untrainable dict items
+    # and returns a tuple of two dicts (dynamic, static)
+    # that mark the tree leaves seen by JAX computations and the static(tree structure) that are
+    # not seen by JAX computations. the scanning is done if the instance is not frozen.
+    # otherwise the cached values are returned.
+    static, dynamic = _fieldDict(tree.__dict__), _fieldDict()
+
+    for field_item in pytc.fields(tree):
+        if not field_item.metadata.get("static", False):
+            dynamic[field_item.name] = static.pop(field_item.name)
+
+    return (dynamic, static)
 
 
 def tree_copy(tree):
@@ -154,7 +178,7 @@ def filter_nondiff(
     tree: PyTree, where: PyTree | Callable[[Field, Any], bool] = None
 ) -> PyTree:
     def _is_nondiff_item(node: Any):
-        if isinstance(node, (float, complex, src.tree_base._treeBase)):
+        if isinstance(node, (float, complex)) or pytc.is_treeclass(node):
             # differentiable types
             return False
 

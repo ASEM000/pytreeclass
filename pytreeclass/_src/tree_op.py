@@ -42,10 +42,7 @@ def _append_math_op(func):
     return wrapper
 
 
-def _field_boolean_map(
-    cond: Callable[[Field, Any], bool],
-    tree: PyTree,
-) -> PyTree:
+def _field_boolean_map(cond: Callable[[Field, Any], bool], tree: PyTree) -> PyTree:
     """Set node True if cond(field, value) is True, otherwise set node False
 
     Args:
@@ -64,7 +61,7 @@ def _field_boolean_map(
             jnp.ones_like(leaf).astype(jnp.bool_)
             if isinstance(leaf, jnp.ndarray)
             else True
-            for leaf in jtu.tree_leaves(node, is_leaf=_is_leaf)
+            for leaf in jtu.tree_leaves(node, is_leaf=lambda x: x is None)
         ]
 
     def _false_leaves(node: Any) -> list[bool, ...]:
@@ -72,11 +69,8 @@ def _field_boolean_map(
             jnp.zeros_like(leaf).astype(jnp.bool_)
             if isinstance(leaf, jnp.ndarray)
             else False
-            for leaf in jtu.tree_leaves(node, is_leaf=_is_leaf)
+            for leaf in jtu.tree_leaves(node, is_leaf=lambda x: x is None)
         ]
-
-    def _is_leaf(node: Any) -> bool:
-        return node is None
 
     def _traverse(tree) -> Generator[Any, ...]:
         """traverse the tree and yield the applied function on the field and node"""
@@ -101,7 +95,7 @@ def _field_boolean_map(
             )
 
     return jtu.tree_unflatten(
-        treedef=jtu.tree_structure(tree, is_leaf=_is_leaf),
+        treedef=jtu.tree_structure(tree, is_leaf=lambda x: x is None),
         leaves=_traverse(tree=tree),
     )
 
@@ -111,7 +105,6 @@ def _append_math_eq_ne(func):
 
     @ft.wraps(func)
     def wrapper(self, where):
-
         if isinstance(where, (int, float, complex, bool, type(self), Tracer, jnp.ndarray)):  # fmt: skip
             return _dispatched_op_tree_map(func, self, where)
         elif isinstance(where, str):
