@@ -167,11 +167,11 @@ class _strIndexer:
     def apply(self, func):
         return self.tree.at[self.where].set(func(self.tree.at[self.where].get()))
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *a, **k):
         # x.at[method_name]() -> returns value and new_tree
         tree = _tree_mutate(tree_copy(self.tree))
         method = getattr(tree, self.where)
-        value = method(*args, **kwargs)
+        value = method(*a, **k)
         tree = _tree_immutate(tree)
         return value, tree
 

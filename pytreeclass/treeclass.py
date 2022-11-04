@@ -14,27 +14,25 @@ from pytreeclass._src.tree_pretty import _treePretty
 from pytreeclass._src.tree_util import _fieldDict, _mutable, _tree_structure
 
 
-def field(
-    *, nondiff: bool = False, frozen: bool = False, **kwargs
-) -> dataclasses.Field:
+def field(*, nondiff: bool = False, frozen: bool = False, **k) -> dataclasses.Field:
     """Similar to dataclasses.field but with additional arguments
     Args:
         nondiff: if True, the field will not be differentiated
         frozen: if True, the field will be frozen
         name: name of the field. Will be inferred from the variable name if its assigned to a class attribute.
         type: type of the field. Will be inferred from the variable type if its assigned to a class attribute.
-        **kwargs: additional arguments to pass to dataclasses.field
+        **k: additional arguments to pass to dataclasses.field
     """
     if frozen and nondiff:
         raise ValueError("Cannot be both frozen and nondiff")
 
-    metadata = kwargs.pop("metadata", {})
+    metadata = k.pop("metadata", {})
     if nondiff is True:
         metadata["nondiff"] = metadata["static"] = True
     elif frozen is True:
         metadata["frozen"] = metadata["static"] = True
 
-    return dataclasses.field(metadata=metadata, **kwargs)
+    return dataclasses.field(metadata=metadata, **k)
 
 
 def fields(tree):
@@ -61,7 +59,7 @@ class ImmutableInstanceError(Exception):
     pass
 
 
-def _setter(tree, key: str, value: Any) -> None:
+def _setattr(tree, key: str, value: Any) -> None:
     if is_treeclass_immutable(tree):
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise ImmutableInstanceError(msg)
@@ -86,7 +84,7 @@ def _delattr(tree, key: str) -> None:
     object.__delattr__(tree, key)
 
 
-def _new(cls, *args, **kwargs):
+def _new(cls, *a, **k):
     tree = object.__new__(cls)
     for field_item in dataclasses.fields(tree):
         if field_item.default is not dataclasses.MISSING:
@@ -123,7 +121,7 @@ def treeclass(cls):
     attrs = dict(
         __new__=_new,  # overwrite __new__ to initialize instance variables
         __init__=_mutable(cls.__init__),  # make it mutable during initialization
-        __setattr__=_setter,  # disable direct attribute setting unless __immutable_treeclass__ is False
+        __setattr__=_setattr,  # disable direct attribute setting unless __immutable_treeclass__ is False
         __delattr__=_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False
         __treeclass_fields__=dict(),  # fields that are not in dataclass
         __immutable_treeclass__=True,  # flag to control setattr/delattr behavior.false if the class is mutable

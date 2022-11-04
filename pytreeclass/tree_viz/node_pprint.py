@@ -279,7 +279,7 @@ def _format_node_str(node, depth: int = 0):
     return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
 
 
-def _format_node_diagram(node, *args, **kwargs):
+def _format_node_diagram(node, *a, **k):
     if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
         return _func_repr(node)
 

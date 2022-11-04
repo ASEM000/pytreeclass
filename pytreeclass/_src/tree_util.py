@@ -79,9 +79,9 @@ def _mutable(func):
     ), f"`mutable` can only be applied to methods. Found{type(func)}"
 
     @ft.wraps(func)
-    def mutable_method(self, *args, **kwargs):
+    def mutable_method(self, *a, **k):
         self = _tree_mutate(tree=self)
-        output = func(self, *args, **kwargs)
+        output = func(self, *a, **k)
         self = _tree_immutate(tree=self)
         return output
 
