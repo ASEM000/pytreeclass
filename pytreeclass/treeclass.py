@@ -65,17 +65,16 @@ def _setattr(tree, key: str, value: Any) -> None:
         raise ImmutableInstanceError(msg)
 
     object.__setattr__(tree, key, value)
-    # add instance variables to __treeclass_fields__ if
-    # it's already an instance of `treeclass`
-    # this avoids the need to define fields in the class definition
+
     if is_treeclass(value) and (key not in [f.name for f in fields(tree)]):
-        # create field
         field_item = field()
-        object.__setattr__(field_item, "name", key)
-        object.__setattr__(field_item, "type", type(value))
-        # register it to class
-        new_fields = {**tree.__treeclass_fields__, **{key: field_item}}
-        object.__setattr__(tree, "__treeclass_fields__", new_fields)
+        for k, v in zip(
+            ("name", "type", "_field_type"), (key, type(value), dataclasses._FIELD)
+        ):
+            object.__setattr__(field_item, k, v)
+
+        # register it to dataclass fields
+        tree.__dataclass_fields__[key] = field_item
 
 
 def _delattr(tree, key: str) -> None:
