@@ -1,18 +1,18 @@
 from __future__ import annotations
 
+import dataclasses
 import math
-import os
-from dataclasses import field
 from typing import Any
 
 import jax.numpy as jnp
 
 import pytreeclass as pytc
+import pytreeclass._src.dataclass_util as dcu
 
 # from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import _tree_structure, tree_unfreeze
+from pytreeclass._src.tree_util import _tree_structure
 from pytreeclass.tree_viz.box_drawing import _table
-from pytreeclass.tree_viz.node_pprint import _format_node_repr
+from pytreeclass.tree_viz.node_pprint import _format_node_extended_repr
 from pytreeclass.tree_viz.utils import (
     _reduce_count_and_size,
     _sequential_tree_shape_eval,
@@ -28,16 +28,11 @@ def _format_size(node_size, newline=False):
 
     if isinstance(node_size, complex):
         # define order of magnitude
-        real_size_order = (
-            int(math.log(node_size.real, 1024)) if node_size.real > 0 else 0
-        )
-        imag_size_order = (
-            int(math.log(node_size.imag, 1024)) if node_size.imag > 0 else 0
-        )
-        return (
-            f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
-            f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
-        )
+        real_size_order = int(math.log(max(node_size.real, 1), 1024))
+        imag_size_order = int(math.log(max(node_size.imag, 1), 1024))
+        fmt = f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
+        fmt += f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
+        return fmt
 
     elif isinstance(node_size, (float, int)):
         size_order = int(math.log(node_size, 1024)) if node_size > 0 else 0
@@ -65,12 +60,12 @@ def tree_summary(
     """Prints a summary of the tree structure.
 
     Args:
-        tree (PyTree): @treeclass decorated class.
-        array (jnp.ndarray, optional): Input jax.numpy used to call the class. Defaults to None.
-        show_type (bool, optional): Whether to print the type column. Defaults to True.
-        show_param (bool, optional): Whether to print the parameter column. Defaults to True.
-        show_size (bool, optional): Whether to print the size column. Defaults to True.
-        show_config (bool, optional): Whether to print the config column. Defaults to True.
+        tree: dataclass decorated class.
+        array: Input jax.numpy used to call the class. Defaults to None.
+        show_type: Whether to print the type column. Defaults to True.
+        show_param: Whether to print the parameter column. Defaults to True.
+        show_size: Whether to print the size column. Defaults to True.
+        show_config: Whether to print the config column. Defaults to True.
 
     Example:
         @pytc.treeclass
@@ -79,23 +74,24 @@ def tree_summary(
             b : jnp.ndarray = jnp.array([1,2,3])
             c : float = 1.0
 
-
         >>> print(tree_summary(Test()))
-        ┌────┬─────┬───────┬─────────────┬──────┐
-        │Name│Type │Param #│Size         │Config│
-        ├────┼─────┼───────┼─────────────┼──────┤
-        │a   │int  │0(1)   │0.00B(28.00B)│a=1   │
-        ├────┼─────┼───────┼─────────────┼──────┤
-        │b   │float│1(0)   │24.00B(0.00B)│b=2.0 │
-        └────┴─────┴───────┴─────────────┴──────┘
-        Total count :	1(1)
-        Dynamic count :	1(1)
-        Frozen count :	0(0)
-        -----------------------------------------
-        Total size :	24.00B(28.00B)
-        Dynamic size :	24.00B(28.00B)
-        Frozen size :	0.00B(0.00B)
-        =========================================
+        ┌────┬───────────┬───────┬─────────────┬────────┐
+        │Name│Type       │Param #│Size         │Config  │
+        ├────┼───────────┼───────┼─────────────┼────────┤
+        │a   │int        │0(1)   │0.00B(24.00B)│a=0     │
+        ├────┼───────────┼───────┼─────────────┼────────┤
+        │b   │DeviceArray│0(3)   │0.00B(12.00B)│b=i32[3]│
+        ├────┼───────────┼───────┼─────────────┼────────┤
+        │c   │float      │1(0)   │24.00B(0.00B)│c=1.0   │
+        └────┴───────────┴───────┴─────────────┴────────┘
+        Total count:	1(4)
+        Trainable count:1(4)
+        Frozen count:	0(0)
+        -------------------------------------------------
+        Total size:	24.00B(36.00B)
+        Trainable size:	24.00B(36.00B)
+        Frozen size:	0.00B(0.00B)
+        =================================================
 
     Note:
         values inside () defines the info about the non-inexact (i.e.) non-differentiable parameters.
@@ -105,9 +101,10 @@ def tree_summary(
     Returns:
         str: Summary of the tree structure.
     """
-    _format_node = lambda node: _format_node_repr(node, depth=0).expandtabs(1)
+    _format_node = lambda node: _format_node_extended_repr(node, depth=0).expandtabs(1)
 
     if array is not None:
+        # run through the tree to get the shape of the tree
         shape = _sequential_tree_shape_eval(tree, array)
         indim_shape, outdim_shape = shape[:-1], shape[1:]
 
@@ -119,16 +116,26 @@ def tree_summary(
         nonlocal ROWS, COUNT, SIZE
 
         if not field_item.repr:
+            # skip the current field if field(repr=False)
             return
 
         if isinstance(node_item, (list, tuple)) and any(
-            pytc.is_treeclass(leaf) for leaf in node_item
+            dataclasses.is_dataclass(leaf) for leaf in node_item
         ):
-            # expand container if any item is a `treeclass`
+            # case of a leaf container
+            # expand container if any item is a `dataclass`
             for i, layer in enumerate(node_item):
-                new_field = field(metadata={"frozen": pytc.is_field_frozen(field_item)})
+
+                if dcu.is_field_frozen(field_item):
+                    # all the items in the container are frozen if the container is frozen
+                    new_field = dataclasses.field(metadata={"static": "frozen"})
+                else:
+                    # create a new field for each item in the container
+                    new_field = dataclasses.field()
+
                 object.__setattr__(new_field, "name", f"{field_item.name}[{i}]")
                 object.__setattr__(new_field, "type", type(layer))
+                object.__setattr__(new_field, "_field_type", dataclasses._FIELD)
 
                 recurse_field(
                     field_item=new_field,
@@ -137,33 +144,49 @@ def tree_summary(
                     type_path=type_path + (layer.__class__.__name__,),
                 )
 
-        elif pytc.is_treeclass(node_item):
-            # a module is considred frozen if all it's parameters are frozen
-            is_frozen = field_item.metadata.get("frozen", False)
-            is_frozen = is_frozen or pytc.is_treeclass_frozen(node_item)
-            count, size = _reduce_count_and_size(tree_unfreeze(node_item))
-            dynamic, _ = _tree_structure(tree_unfreeze(node_item))
+        elif dataclasses.is_dataclass(node_item):
+            # check if the node is frozen or it all the fields are frozen
+            is_frozen = dcu.is_field_frozen(field_item)
+            is_frozen = is_frozen or dcu.is_dataclass_fields_frozen(node_item)
+            dynamic, _ = _tree_structure(pytc.tree_unfilter(node_item))
+            count, size = _reduce_count_and_size(pytc.tree_unfilter(node_item))
 
-            row = ["/".join(name_path) + f"{(os.linesep + '(frozen)' if is_frozen else '')}"]  # fmt: skip
+            if is_frozen:
+                row = ["/".join(name_path) + "\n(frozen)"]
+            else:
+                row = ["/".join(name_path)]
+
             row += ["/".join(type_path)] if show_type else []
             row += [_format_count(count)] if show_param else []
             row += [_format_size(size)] if show_size else []
-            row += (
-                ["\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()])]
-                if show_config
-                else []
-            )
+
+            if show_config:
+                row += [
+                    "\n".join([f"{k}={_format_node(v)}" for k, v in dynamic.items()])
+                ]
+            else:
+                row += []
 
             ROWS.append(row)
 
-            COUNT[1 if is_frozen else 0] += count
-            SIZE[1 if is_frozen else 0] += size
+            for field_item in dataclasses.fields(node_item):
+                is_frozen = dcu.is_field_frozen(field_item)
+                COUNT[1 if is_frozen else 0] += count
+                SIZE[1 if is_frozen else 0] += size
 
         else:
-            is_frozen = field_item.metadata.get("frozen", False)
+            # case of a leaf parameter
+            if dcu.is_field_nondiff(field_item):
+                return
+
+            is_nondiff = dcu.is_field_frozen(field_item)
             count, size = _reduce_count_and_size(node_item)
 
-            row = ["/".join(name_path) + f"{(os.linesep + '(frozen)' if is_frozen else '')}"]  # fmt: skip
+            if is_nondiff:
+                row = ["/".join(name_path) + "(frozen)"]
+            else:
+                row = ["/".join(name_path)]
+
             row += ["/".join(type_path)] if show_type else []
             row += [_format_count(count)] if show_param else []
             row += [_format_size(size)] if show_size else []
@@ -172,22 +195,23 @@ def tree_summary(
             ROWS.append(row)
 
             # non-treeclass leaf inherit frozen state
-            COUNT[1 if is_frozen else 0] += count
-            SIZE[1 if is_frozen else 0] += size
+            COUNT[1 if is_nondiff else 0] += count
+            SIZE[1 if is_nondiff else 0] += size
 
     def recurse(tree, name_path, type_path):
 
         nonlocal ROWS, COUNT, SIZE
 
-        for field_item in pytc.fields(tree):
-
+        for field_item in dataclasses.fields(tree):
             node_item = getattr(tree, field_item.name)
 
-            if pytc.is_treeclass_non_leaf(node_item):
-                # recurse if the field is a treeclass
-                # the recursion passes the frozen state of the current node
-                # name_path,type_path (i.e. location of the ndoe in the tree)
-                # for instance a path "L1/L0" defines a class L0 with L1 parent
+            # non-leaf dataclass
+            if dataclasses.is_dataclass(node_item) and any(
+                [
+                    dataclasses.is_dataclass(getattr(node_item, field_item.name))
+                    for field_item in dataclasses.fields(node_item)
+                ]
+            ):
                 recurse(
                     tree=node_item,
                     name_path=name_path + (field_item.name,),
@@ -195,14 +219,8 @@ def tree_summary(
                 )
 
             else:
-
-                pytc.is_static = field_item.metadata.get("static", False)
-                pytc.is_static = pytc.is_static and not field_item.metadata.get(
-                    "frozen", False
-                )
-
-                # skip if the field is static and not frozen
-                if not (pytc.is_static):
+                # skip nondiff fields
+                if not dcu.is_field_nondiff(field_item):
                     recurse_field(
                         field_item=field_item,
                         node_item=node_item,
@@ -235,13 +253,13 @@ def tree_summary(
     table_width = len(layer_table.split("\n")[0])
 
     param_summary = (
-        f"Total count :\t{_format_count(sum(COUNT))}\n"
-        f"Dynamic count :\t{_format_count(COUNT[0])}\n"
-        f"Frozen count :\t{_format_count(COUNT[1])}\n"
+        f"Total count:\t{_format_count(sum(COUNT))}\n"
+        f"Trainable count:{_format_count(COUNT[0])}\n"
+        f"Frozen count:\t{_format_count(COUNT[1])}\n"
         f"{'-'*max([table_width,40])}\n"
-        f"Total size :\t{_format_size(sum(SIZE))}\n"
-        f"Dynamic size :\t{_format_size(SIZE[0])}\n"
-        f"Frozen size :\t{_format_size(SIZE[1])}\n"
+        f"Total size:\t{_format_size(sum(SIZE))}\n"
+        f"Trainable size:\t{_format_size(SIZE[0])}\n"
+        f"Frozen size:\t{_format_size(SIZE[1])}\n"
         f"{'='*max([table_width,40])}"
     )
 

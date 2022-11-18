@@ -1,3 +1,4 @@
+import dataclasses
 from typing import Any
 
 import jax.numpy as jnp
@@ -5,9 +6,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import tree_freeze, tree_unfreeze
-from pytreeclass.tree_viz.tree_pprint import tree_diagram
-from pytreeclass.treeclass import ImmutableInstanceError
+from pytreeclass._src.tree_filter import tree_filter, tree_unfilter
 
 
 def test_freezing_unfreezing():
@@ -17,8 +16,8 @@ def test_freezing_unfreezing():
         b: int
 
     a = A(1, 2)
-    b = tree_freeze(a)
-    c = tree_unfreeze(a)
+    b = tree_filter(a, where=a == a)
+    c = tree_unfilter(a)
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
@@ -40,8 +39,8 @@ def test_freezing_unfreezing():
         b: int
 
     a = A(1, 2)
-    b = tree_freeze(a)
-    c = tree_unfreeze(a)
+    b = tree_filter(a, where=a == a)
+    c = tree_unfilter(a)
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
@@ -59,13 +58,13 @@ def test_freezing_unfreezing():
     class l2:
         c: l1 = l1()
 
-    t = tree_freeze(l2())
+    t = tree_filter(l2(), where=l2() == l2())
 
     assert jtu.tree_leaves(t) == []
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
 
-    tt = tree_unfreeze(t)
+    tt = tree_unfilter(t, where=lambda _: True)
     assert jtu.tree_leaves(tt) != []
     assert jtu.tree_leaves(tt.c) != []
     assert jtu.tree_leaves(tt.c.b) != []
@@ -80,7 +79,7 @@ def test_freezing_unfreezing():
         def __init__(self):
             self.c = l1()
 
-    t = tree_freeze(l2())
+    t = tree_filter(l2(), where=l2() == l2())
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
 
@@ -125,24 +124,23 @@ def test_freezing_with_ops():
     t = Test()
     assert jtu.tree_leaves(t) == [1]
 
-    with pytest.raises(ImmutableInstanceError):
-        tree_freeze(t).a = 1
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        tree_filter(t, where=t == t).a = 1
 
-    with pytest.raises(ImmutableInstanceError):
-        tree_unfreeze(t).a = 1
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        tree_unfilter(t).a = 1
 
     hash(t)
 
     t = Test()
-    tree_unfreeze(t)
-    tree_freeze(t)
-    assert pytc.is_treeclass_frozen(t) is False
+    tree_unfilter(t, where=t == t)
+    tree_filter(t, where=t == t)
 
     @pytc.treeclass
     class Test:
         a: int
 
-    t = tree_freeze(Test(100))
+    t = tree_filter(Test(100), where=Test(100) == Test(100))
 
     assert pytc.is_treeclass_equal(t.at[...].set(0), t)
     assert pytc.is_treeclass_equal(t.at[...].apply(lambda x: x + 1), t)
@@ -167,13 +165,15 @@ def test_freezing_with_ops():
         a: int = t0()
 
     t = t1()
-    assert pytc.is_treeclass_equal(tree_unfreeze(tree_freeze(t)), t)
+    assert pytc.is_treeclass_equal(tree_unfilter(tree_filter(t, where=t == t)), t)
 
     @pytc.treeclass
     class t2:
         a: int = t1()
 
-    assert pytc.is_treeclass_equal(tree_unfreeze(tree_freeze(t2())), t2())
+    assert pytc.is_treeclass_equal(
+        tree_unfilter(tree_filter(t2(), where=t2() == t2())), t2()
+    )
 
 
 def test_freeze_diagram():
@@ -188,22 +188,10 @@ def test_freeze_diagram():
         d: A = A(1, 2)
 
     a = B()
-    a = a.at["d"].set(tree_freeze(a.d))
-    assert pytc.is_treeclass_frozen(a.d) is True
-    assert (
-        tree_diagram(a)
-    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
-    assert (
-        a.tree_diagram()
-    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
-
+    a = a.at["d"].set(tree_filter(a.d, where=lambda _: True))
     a = B()
 
-    a = a.at["d"].set(tree_freeze(a.d))  # = a.d.freeze()
-    assert pytc.is_treeclass_frozen(a.d) is True
-    assert (
-        tree_diagram(a)
-    ) == "B\n    ├── c=3\n    └#─ d=A\n        ├#─ a=1\n        └#─ b=2     "
+    a = a.at["d"].set(tree_filter(a.d, where=lambda _: True))  # = a.d.freeze()
 
 
 def test_freeze_mask():
@@ -215,7 +203,7 @@ def test_freeze_mask():
 
     t = Test()
 
-    assert jtu.tree_leaves(tree_freeze(t, t == "a")) == [2, 3.0]
-    assert jtu.tree_leaves(tree_freeze(t, t == "b")) == [1, 3.0]
-    assert jtu.tree_leaves(tree_freeze(t, t == "c")) == [1, 2]
-    assert jtu.tree_leaves(tree_freeze(t, t == t)) == []
+    assert jtu.tree_leaves(tree_filter(t, where=t == "a")) == [2, 3.0]
+    assert jtu.tree_leaves(tree_filter(t, where=t == "b")) == [1, 3.0]
+    assert jtu.tree_leaves(tree_filter(t, where=t == "c")) == [1, 2]
+    assert jtu.tree_leaves(tree_filter(t, where=t == t)) == []

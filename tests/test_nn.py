@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import filter_nondiff, unfilter_nondiff
 
 
 def test_nn():
@@ -209,7 +208,7 @@ def test_filter_nondiff():
         value, grads = jax.value_and_grad(loss_func)(model, x, y)
         return value, model - 1e-3 * grads
 
-    filtered_model = filter_nondiff(model)
+    filtered_model = pytc.tree_filter(model)
 
     for _ in range(1, 10_001):
         value, filtered_model = update(filtered_model, x, y)
@@ -217,4 +216,6 @@ def test_filter_nondiff():
     np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
 
     X = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
-    assert jtu.tree_leaves(X) == jtu.tree_leaves(unfilter_nondiff(filter_nondiff(X)))
+    assert jtu.tree_leaves(X) == jtu.tree_leaves(
+        pytc.tree_unfilter(pytc.tree_filter(X))
+    )

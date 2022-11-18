@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools as ft
 import operator as op
 import re
@@ -15,7 +16,6 @@ import jax.tree_util as jtu
 import numpy as np
 from jax.core import Tracer
 
-import pytreeclass as pytc
 from pytreeclass._src.tree_util import tree_copy
 
 PyTree = Any
@@ -42,6 +42,22 @@ def _append_math_op(func):
     return wrapper
 
 
+def _true_leaves(node: Any) -> list[bool, ...]:
+    return [
+        jnp.ones_like(leaf).astype(jnp.bool_) if isinstance(leaf, jnp.ndarray) else True
+        for leaf in jtu.tree_leaves(node, is_leaf=lambda x: x is None)
+    ]
+
+
+def _false_leaves(node: Any) -> list[bool, ...]:
+    return [
+        jnp.zeros_like(leaf).astype(jnp.bool_)
+        if isinstance(leaf, jnp.ndarray)
+        else False
+        for leaf in jtu.tree_leaves(node, is_leaf=lambda x: x is None)
+    ]
+
+
 def _field_boolean_map(cond: Callable[[Field, Any], bool], tree: PyTree) -> PyTree:
     """Set node True if cond(field, value) is True, otherwise set node False
 
@@ -55,23 +71,6 @@ def _field_boolean_map(cond: Callable[[Field, Any], bool], tree: PyTree) -> PyTr
     """
     # this is the function responsible for the boolean mapping of
     # `node_type`, `field_name`, and `field_metadata` comparisons.
-
-    def _true_leaves(node: Any) -> list[bool, ...]:
-        return [
-            jnp.ones_like(leaf).astype(jnp.bool_)
-            if isinstance(leaf, jnp.ndarray)
-            else True
-            for leaf in jtu.tree_leaves(node, is_leaf=lambda x: x is None)
-        ]
-
-    def _false_leaves(node: Any) -> list[bool, ...]:
-        return [
-            jnp.zeros_like(leaf).astype(jnp.bool_)
-            if isinstance(leaf, jnp.ndarray)
-            else False
-            for leaf in jtu.tree_leaves(node, is_leaf=lambda x: x is None)
-        ]
-
     def _traverse(tree) -> Generator[Any, ...]:
         """traverse the tree and yield the applied function on the field and node"""
         # We check each level of the tree not tree leaves,
@@ -84,13 +83,13 @@ def _field_boolean_map(cond: Callable[[Field, Any], bool], tree: PyTree) -> PyTr
 
         for field_item, node_item in (
             [f, getattr(tree, f.name)]
-            for f in pytc.fields(tree)
+            for f in dataclasses.fields(tree)
             if not f.metadata.get("static", False)
         ):
 
             yield from _true_leaves(node_item) if cond(field_item, node_item) else (
                 _traverse(node_item)
-                if pytc.is_treeclass(node_item)
+                if dataclasses.is_dataclass(node_item)
                 else _false_leaves(node_item)
             )
 

@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.core import Tracer
 
-import pytreeclass as pytc
+import pytreeclass._src.dataclass_util as dcu
 from pytreeclass._src.tree_util import _tree_immutate, _tree_mutate, tree_copy
 
 PyTree = Any
@@ -94,7 +94,7 @@ class _pyTreeIndexer:
 
     def __post_init__(self):
         assert all(
-            pytc.is_treeclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(self.where)
+            dcu.is_dataclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(self.where)
         ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(self.where)}"
 
     def get(self, is_leaf: Callable[[Any], bool] = None):

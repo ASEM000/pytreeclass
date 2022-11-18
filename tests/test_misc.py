@@ -6,7 +6,6 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import filter_nondiff, unfilter_nondiff
 
 
 def test_filter_nondiff():
@@ -18,9 +17,9 @@ def test_filter_nondiff():
     t = Test()
 
     assert jtu.tree_leaves(t) == ["a"]
-    assert jtu.tree_leaves(filter_nondiff(t)) == []
-    assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t))) == ["a"]
-    assert pytc.is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t)))
+    assert jtu.tree_leaves(pytc.tree_filter(t)) == []
+    assert jtu.tree_leaves(pytc.tree_unfilter(pytc.tree_filter(t))) == ["a"]
+    assert pytc.is_treeclass_equal(t, pytc.tree_unfilter(pytc.tree_filter(t)))
 
     @pytc.treeclass
     class T0:
@@ -29,14 +28,18 @@ def test_filter_nondiff():
     t = T0()
 
     assert jtu.tree_leaves(t) == ["a"]
-    assert jtu.tree_leaves(filter_nondiff(t)) == []
-    assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t))) == ["a"]
-    assert pytc.is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t)))
+    assert jtu.tree_leaves(pytc.tree_filter(t)) == []
+    assert jtu.tree_leaves(pytc.tree_unfilter(pytc.tree_filter(t))) == ["a"]
+    assert pytc.is_treeclass_equal(t, pytc.tree_unfilter(pytc.tree_filter(t)))
 
     assert jtu.tree_leaves(t) == ["a"]
-    assert jtu.tree_leaves(filter_nondiff(t, t == t)) == []
-    assert jtu.tree_leaves(unfilter_nondiff(filter_nondiff(t, t == t))) == ["a"]
-    assert pytc.is_treeclass_equal(t, unfilter_nondiff(filter_nondiff(t, t == t)))
+    assert jtu.tree_leaves(pytc.tree_filter(t, where=t == t)) == []
+    assert jtu.tree_leaves(pytc.tree_unfilter(pytc.tree_filter(t, where=t == t))) == [
+        "a"
+    ]
+    assert pytc.is_treeclass_equal(
+        t, pytc.tree_unfilter(pytc.tree_filter(t, where=t == t))
+    )
 
 
 def test_filter_nondiff_func():
@@ -63,7 +66,7 @@ def test_filter_nondiff_func():
     print(model)
     # Test(a=1.0,b=2,c=3,act=tanh(x))
 
-    model = filter_nondiff(model)
+    model = pytc.tree_filter(model)
     # print(f"{model!r}")
     # Test(a=1.0,*b=2,*c=3,*act=tanh(x))
 
@@ -98,8 +101,12 @@ def test_filter_nondiff_with_mask():
 
     t = L2()
 
-    t = t.at["d"].at["d"].set(filter_nondiff(t.d.d, where=L0(a=True, b=True, c=False)))
+    t = (
+        t.at["d"]
+        .at["d"]
+        .set(pytc.tree_filter(t.d.d, where=L0(a=True, b=True, c=False)))
+    )
     assert jtu.tree_leaves(t) == [10, 20, 30, 1, 2, 3, 3]
 
     with pytest.raises(TypeError):
-        filter_nondiff(t, where=t.d)
+        pytc.tree_filter(t, where=t.d)

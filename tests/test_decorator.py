@@ -1,4 +1,5 @@
 import copy
+import dataclasses
 
 import jax.tree_util as jtu
 import pytest
@@ -6,7 +7,6 @@ from jax import numpy as jnp
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_util import _mutable, tree_copy
-from pytreeclass.treeclass import ImmutableInstanceError
 
 
 def test_hash():
@@ -117,7 +117,7 @@ def test_delattr():
 
     t = L0()
 
-    with pytest.raises(ImmutableInstanceError):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         del t.a
 
     with pytest.raises(TypeError):
@@ -137,8 +137,3 @@ def test_delattr():
 
     t = L2()
     t.delete("a")
-
-
-def test_field():
-    with pytest.raises(ValueError):
-        pytc.field(nondiff=True, frozen=True)

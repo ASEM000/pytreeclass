@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import dataclasses
 import sys
 from typing import Any
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
+import numpy as np
 
-import pytreeclass as pytc
 from pytreeclass._src.tree_util import _tree_structure
 
 
@@ -17,7 +18,7 @@ def _sequential_tree_shape_eval(tree, array):
 
     # all dynamic/static leaves
     all_leaves = (*dyanmic.values(), *static.values())
-    leaves = [leaf for leaf in all_leaves if pytc.is_treeclass(leaf)]
+    leaves = [leaf for leaf in all_leaves if dataclasses.is_dataclass(leaf)]
 
     shape = [jax.eval_shape(lambda x: x, array)]
     for leave in leaves:
@@ -43,9 +44,9 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
         complex: Complex number of (inexact, exact) parameters for count/size
     """
 
-    if isinstance(node, jnp.ndarray):
+    if isinstance(node, (jnp.ndarray, np.ndarray)):
 
-        if jnp.issubdtype(node, jnp.inexact):
+        if jnp.issubdtype(node.dtype, jnp.inexact):
             # inexact(trainable) array
             count = complex(int(jnp.array(node.shape).prod()), 0)
             size = complex(int(node.nbytes), 0)
