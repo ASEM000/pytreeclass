@@ -2,16 +2,9 @@ from __future__ import annotations
 
 import inspect
 import math
-from dataclasses import MISSING, Field
-from types import FunctionType
 from typing import Any, Callable
 
-import jax
-import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy as np
-from jax._src.custom_derivatives import custom_jvp
-from jaxlib.xla_extension import CompiledFunction
 
 
 def _format_width(string, width=60):
@@ -22,17 +15,17 @@ def _format_width(string, width=60):
     return string.replace("\n", "").replace("\t", "")
 
 
-def _jax_numpy_repr(node: jnp.ndarray | np.ndarray) -> str:
-    """Replace jnp.ndarray repr with short hand notation for type and shape
+def _numpy_repr(node: np.ndarray) -> str:
+    """Replace np.ndarray repr with short hand notation for type and shape
 
     Args:
-        node (jnp.ndarray): jax numpy array
+        node: numpy array
 
     Returns:
         str: short hand notation for type and shape
 
     Example:
-        >>> _jax_numpy_repr(jnp.ones((2,3)))
+        >>> _numpy_repr(np.ones((2,3)))
         'f32[2,3]'
     """
     shape = (
@@ -42,11 +35,11 @@ def _jax_numpy_repr(node: jnp.ndarray | np.ndarray) -> str:
         .replace(" ", ",")
     )
 
-    if issubclass(node.dtype.type, jnp.integer):
+    if issubclass(node.dtype.type, np.integer):
         dtype = f"{node.dtype}".replace("int", "i")
-    elif issubclass(node.dtype.type, jnp.floating):
+    elif issubclass(node.dtype.type, np.floating):
         dtype = f"{node.dtype}".replace("float", "f")
-    elif issubclass(node.dtype.type, jnp.complexfloating):
+    elif issubclass(node.dtype.type, np.complexfloating):
         dtype = f"{node.dtype}".replace("complex", "c")
     else:
         dtype = f"{node.dtype}"
@@ -54,48 +47,35 @@ def _jax_numpy_repr(node: jnp.ndarray | np.ndarray) -> str:
     return f"{dtype}{shape}"
 
 
-def _jax_numpy_extended_repr(node: jnp.ndarray | np.ndarray) -> str:
-    """Replace jnp.ndarray repr with short hand notation for type and shape
-    Adds information about min, max, mean, and std
+def _numpy_extended_repr(node: np.ndarray) -> str:
+    """Adds information about min, max, mean, and std to _numpy_repr
+    This function is inspired by https://github.com/xl0/lovely-jax
 
     Args:
-        node (jnp.ndarray): jax numpy array
+        node: numpy array
 
     Returns:
         str: short hand notation for type and shape
 
     Example:
-        >>> _jax_numpy_extended_repr(jnp.ones((2,3)))
-        ''f32[2,3]∈[1.00,1.00]<μ=1.00,σ=0.00>''
+        >>> _numpy_extended_repr(np.ones((2,3)))
+        f64[2,3]<∈[1.00,1.00],μ≈1.00,σ≈0.00>
     """
-    shape = (
-        f"{node.shape}".replace(",", "")
-        .replace("(", "[")
-        .replace(")", "]")
-        .replace(" ", ",")
-    )
-
-    if issubclass(node.dtype.type, jnp.number):
-        low, high = jnp.min(node), jnp.max(node)
+    shape_dtype = _numpy_repr(node)
+    if issubclass(node.dtype.type, np.number):
+        low, high = np.min(node), np.max(node)
         interval = "(" if math.isinf(low) else "["
-        std, mean = jnp.std(node), jnp.mean(node)
-
-        if issubclass(node.dtype.type, jnp.integer):
-            dtype = f"{node.dtype}".replace("int", "i")
-            interval += f"{low},{high}"
-        elif issubclass(node.dtype.type, jnp.floating):
-            dtype = f"{node.dtype}".replace("float", "f")
-            interval += f"{low:.2f},{high:.2f}"
-        elif issubclass(node.dtype.type, jnp.complexfloating):
-            dtype = f"{node.dtype}".replace("complex", "c")
-            interval += f"{low:.2f},{high:.2f}"
-
+        std, mean = np.std(node), np.mean(node)
+        interval += (
+            f"{low},{high}"
+            if issubclass(node.dtype.type, np.integer)
+            else f"{low:.2f},{high:.2f}"
+        )
         interval += ")" if math.isinf(high) else "]"
         interval = interval.replace("inf", "∞")
-        return f"{dtype}{shape}∈{interval}<μ={mean:.2f},σ={std:.2f}>"
+        return f"{shape_dtype}<∈{interval},μ≈{mean:.2f},σ≈{std:.2f}>"
 
-    dtype = f"{node.dtype}"
-    return f"{dtype}{shape}"
+    return shape_dtype
 
 
 def _func_repr(func: Callable) -> str:
@@ -127,66 +107,56 @@ def _func_repr(func: Callable) -> str:
 
 
 def _list_repr(node: list, depth: int) -> str:
-    string = (",\n" + "\t" * (depth + 1)).join(
-        f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
-    )
-
-    fmt = "[\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "]"
+    fmt = (f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node)
+    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "[\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "]"
     return _format_width(fmt)
 
 
 def _list_str(node: list, depth: int) -> str:
-    string = (",\n" + "\t" * (depth + 1)).join(
-        f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
-    )
-
-    fmt = "[\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "]"
+    fmt = (f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node)
+    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "[\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "]"
     return _format_width(fmt)
 
 
 def _tuple_repr(node: tuple, depth: int) -> str:
-    string = (",\n" + "\t" * (depth + 1)).join(
-        f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
-    )
-    fmt = "(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
+    fmt = (f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node)
+    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
     return _format_width(fmt)
 
 
 def _tuple_str(node: tuple, depth: int) -> str:
-    string = (",\n" + "\t" * (depth + 1)).join(
-        f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
-    )
-
-    fmt = "(\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + ")"
+    fmt = (f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node)
+    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
     return _format_width(fmt)
 
 
 def _set_repr(node: set, depth: int) -> str:
-    string = (",\n" + "\t" * (depth + 1)).join(
-        f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node
-    )
-    fmt = "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+    fmt = (f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node)
+    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt)
 
 
 def _set_str(node: set, depth: int) -> str:
-    string = (",\n" + "\t" * (depth + 1)).join(
-        f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node
-    )
-    fmt = "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+    fmt = (f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node)
+    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt)
 
 
 def _dict_repr(node: dict, depth: int) -> str:
-    string = (",\n" + "\t" * (depth + 1)).join(
-        f"{k}:{_format_node_repr(v,depth=depth+1)}" for k, v in node.items()
-    )
-    fmt = "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+    fmt = (f"{k}:{_format_node_repr(v,depth=depth+1)}" for k, v in node.items())
+    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt)
 
 
 def _dict_str(node: dict, depth: int) -> str:
-    string = (",\n" + "\t" * (depth + 1)).join(
+    fmt = (
         f"{k}:{_format_node_str(v,depth=depth+1)}"
         if "\n" not in f"{v!s}"
         else f"{k}:"
@@ -195,30 +165,19 @@ def _dict_str(node: dict, depth: int) -> str:
         + f"{_format_width(_format_node_str(v,depth=depth+1))}"
         for k, v in node.items()
     )
-    fmt = "{\n" + "\t" * (depth + 1) + (string) + "\n" + "\t" * (depth) + "}"
+
+    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt)
 
 
-def _field_repr(node: Field, depth: int) -> str:
-    attrs = [f"name={node.name}"]
-    attrs += [f"type={node.type}"]
-    attrs += [f"default={node.default}"] if node.default is not MISSING else []
-    attrs += [f"default_factory={node.default_factory}"] if node.default_factory is not MISSING else []  # fmt: skip
-    attrs += [f"init={node.init}"]
-    attrs += [f"repr={node.repr}"]
-    attrs += [f"hash={node.hash}"] if node.hash is not None else []
-    attrs += [f"compare={node.compare}"]
-    attrs += [f"metadata={node.metadata}"] if node.metadata != {} else []
-    string = (',').join(f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in attrs)  # fmt: skip
-    return _format_width(f"Field({string})")
-
-
-def _format_node_repr(node: Any, depth: int = 0) -> str:
+def _format_node_repr(node: Any, depth: int = 0, stats: bool = False) -> str:
     """pretty printer for a node
 
     Args:
-        node (Any): node to be printed
-        depth (int, optional): indentation depth. Defaults to 0.
+        node: node to be printed
+        depth: indentation depth. Defaults to 0.
+        stats: print stats of arrays. Defaults to False.
 
     Returns:
         str: pretty printed node
@@ -237,14 +196,13 @@ def _format_node_repr(node: Any, depth: int = 0) -> str:
         }
     """
 
-    if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
+    if isinstance(node, (Callable)):
+        if hasattr(node, "func"):
+            return f"Partial({_func_repr(node.func)})"
         return _func_repr(node)
 
-    elif isinstance(node, jtu.Partial):
-        return f"Partial({_func_repr(node.func)})"
-
-    elif isinstance(node, (np.ndarray, jnp.ndarray, jax.ShapeDtypeStruct)):
-        return _jax_numpy_repr(node)
+    elif hasattr(node, "shape") and hasattr(node, "dtype"):
+        return _numpy_extended_repr(node) if stats else _numpy_repr(node)
 
     elif isinstance(node, list):
         return _list_repr(node, depth)
@@ -257,9 +215,6 @@ def _format_node_repr(node: Any, depth: int = 0) -> str:
 
     elif isinstance(node, dict):
         return _dict_repr(node, depth)
-
-    elif isinstance(node, Field):
-        return _field_repr(node, depth)
 
     return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
 
@@ -290,11 +245,10 @@ def _format_node_str(node, depth: int = 0):
         }
     """
 
-    if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
+    if isinstance(node, Callable):
+        if hasattr(node, "func"):
+            return f"Partial({_func_repr(node.func)})"
         return _func_repr(node)
-
-    elif isinstance(node, jtu.Partial):
-        return f"Partial({_func_repr(node.func)})"
 
     elif isinstance(node, list):
         return _list_str(node, depth)
@@ -308,26 +262,4 @@ def _format_node_str(node, depth: int = 0):
     elif isinstance(node, dict):
         return _dict_str(node, depth)
 
-    elif isinstance(node, Field):
-        return _field_repr(node, depth)
-
     return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
-
-
-def _format_node_extended_repr(node: Any, depth: int = 0) -> str:
-    if isinstance(node, (jnp.ndarray, np.ndarray)):
-        return _jax_numpy_extended_repr(node)
-    return _format_node_repr(node, depth)
-
-
-def _format_node_diagram(node, *a, **k):
-    if isinstance(node, (CompiledFunction, custom_jvp, FunctionType)):
-        return _func_repr(node)
-
-    elif isinstance(node, jtu.Partial):
-        return f"Partial({_func_repr(node.func)})"
-
-    elif isinstance(node, (jnp.ndarray, jax.ShapeDtypeStruct)):
-        return _jax_numpy_repr(node)
-
-    return f"{node!r}"

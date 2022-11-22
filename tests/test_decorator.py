@@ -6,7 +6,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import _mutable, tree_copy
+from pytreeclass._src.dataclass_util import _mutable
 
 
 def test_hash():
@@ -88,7 +88,7 @@ def test_registering_state():
             self.b = 20
 
     t = L0()
-    tt = tree_copy(t)
+    tt = copy.copy(t)
 
     assert tt.a == 10
     assert tt.b == 20

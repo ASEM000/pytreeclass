@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import dataclasses
+import dataclasses as dc
 import math
 from typing import Any
 
@@ -10,9 +10,9 @@ import pytreeclass as pytc
 import pytreeclass._src.dataclass_util as dcu
 
 # from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.tree_util import _tree_structure
+from pytreeclass._src.dataclass_util import _dataclass_structure
 from pytreeclass.tree_viz.box_drawing import _table
-from pytreeclass.tree_viz.node_pprint import _format_node_extended_repr
+from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
     _reduce_count_and_size,
     _sequential_tree_shape_eval,
@@ -74,7 +74,7 @@ def tree_summary(
             b : jnp.ndarray = jnp.array([1,2,3])
             c : float = 1.0
 
-        >>> print(tree_summary(Test()))
+        >>> print(tree_summary(Test(config=True)))
         ┌────┬───────────┬───────┬─────────────┬─────────────────────────────┐
         │Name│Type       │Param #│Size         │Config                       │
         ├────┼───────────┼───────┼─────────────┼─────────────────────────────┤
@@ -101,7 +101,7 @@ def tree_summary(
     Returns:
         str: Summary of the tree structure.
     """
-    _format_node = lambda node: _format_node_extended_repr(node, depth=0).expandtabs(1)
+    _format_node = lambda node: _format_node_repr(node).expandtabs(1)
 
     if array is not None:
         # run through the tree to get the shape of the tree
@@ -120,7 +120,7 @@ def tree_summary(
             return
 
         if isinstance(node_item, (list, tuple)) and any(
-            dataclasses.is_dataclass(leaf) for leaf in node_item
+            dc.is_dataclass(leaf) for leaf in node_item
         ):
             # case of a leaf container
             # expand container if any item is a `dataclass`
@@ -128,14 +128,14 @@ def tree_summary(
 
                 if dcu.is_field_frozen(field_item):
                     # all the items in the container are frozen if the container is frozen
-                    new_field = dataclasses.field(metadata={"static": "frozen"})
+                    new_field = dc.field(metadata={"static": "frozen"})
                 else:
                     # create a new field for each item in the container
-                    new_field = dataclasses.field()
+                    new_field = dc.field()
 
                 object.__setattr__(new_field, "name", f"{field_item.name}[{i}]")
                 object.__setattr__(new_field, "type", type(layer))
-                object.__setattr__(new_field, "_field_type", dataclasses._FIELD)
+                object.__setattr__(new_field, "_field_type", dc._FIELD)
 
                 recurse_field(
                     field_item=new_field,
@@ -144,11 +144,11 @@ def tree_summary(
                     type_path=type_path + (layer.__class__.__name__,),
                 )
 
-        elif dataclasses.is_dataclass(node_item):
+        elif dc.is_dataclass(node_item):
             # check if the node is frozen or it all the fields are frozen
             is_frozen = dcu.is_field_frozen(field_item)
             is_frozen = is_frozen or dcu.is_dataclass_fields_frozen(node_item)
-            dynamic, _ = _tree_structure(pytc.tree_unfilter(node_item))
+            dynamic, _ = _dataclass_structure(pytc.tree_unfilter(node_item))
             count, size = _reduce_count_and_size(pytc.tree_unfilter(node_item))
 
             if is_frozen:
@@ -169,7 +169,7 @@ def tree_summary(
 
             ROWS.append(row)
 
-            for field_item in dataclasses.fields(node_item):
+            for field_item in dc.fields(node_item):
                 is_frozen = dcu.is_field_frozen(field_item)
                 COUNT[1 if is_frozen else 0] += count
                 SIZE[1 if is_frozen else 0] += size
@@ -202,7 +202,7 @@ def tree_summary(
 
         nonlocal ROWS, COUNT, SIZE
 
-        for field_item in dataclasses.fields(tree):
+        for field_item in dc.fields(tree):
             node_item = getattr(tree, field_item.name)
 
             # non-leaf dataclass

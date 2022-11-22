@@ -4,19 +4,15 @@
 
 from __future__ import annotations
 
-import dataclasses
+import dataclasses as dc
 import functools as ft
 import operator as op
 import re
-from dataclasses import Field
 from typing import Any, Callable, Generator
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
-import numpy as np
 from jax.core import Tracer
-
-from pytreeclass._src.tree_util import tree_copy
 
 PyTree = Any
 
@@ -58,7 +54,7 @@ def _false_leaves(node: Any) -> list[bool, ...]:
     ]
 
 
-def _field_boolean_map(cond: Callable[[Field, Any], bool], tree: PyTree) -> PyTree:
+def _field_boolean_map(cond: Callable[[dc.Field, Any], bool], tree: PyTree) -> PyTree:
     """Set node True if cond(field, value) is True, otherwise set node False
 
     Args:
@@ -83,13 +79,13 @@ def _field_boolean_map(cond: Callable[[Field, Any], bool], tree: PyTree) -> PyTr
 
         for field_item, node_item in (
             [f, getattr(tree, f.name)]
-            for f in dataclasses.fields(tree)
+            for f in dc.fields(tree)
             if not f.metadata.get("static", False)
         ):
 
             yield from _true_leaves(node_item) if cond(field_item, node_item) else (
                 _traverse(node_item)
-                if dataclasses.is_dataclass(node_item)
+                if dc.is_dataclass(node_item)
                 else _false_leaves(node_item)
             )
 
@@ -117,23 +113,6 @@ def _append_math_eq_ne(func):
     return wrapper
 
 
-def _tree_hash(tree):
-    """Return a hash of the tree"""
-
-    def _hash_node(node):
-        """hash the leaves of the tree"""
-        if isinstance(node, jnp.ndarray):
-            return np.array(node).tobytes()
-        elif isinstance(node, set):
-            # jtu.tree_map does not traverse sets
-            return frozenset(node)
-        return node
-
-    return hash(
-        (*jtu.tree_map(_hash_node, jtu.tree_leaves(tree)), jtu.tree_structure(tree))
-    )
-
-
 def _eq(lhs, rhs):
     if isinstance(rhs, type):
         # rhs is a type (tree == int ) will perform a instance check
@@ -154,38 +133,3 @@ def _ne(lhs, rhs):
         found = re.findall(rhs, lhs)
         return len(found) == 0 or found[0] != lhs
     return op.ne(lhs, rhs)
-
-
-class _treeOp:
-
-    __hash__ = _tree_hash
-    __copy__ = tree_copy
-    __abs__ = _append_math_op(op.abs)
-    __add__ = _append_math_op(op.add)
-    __radd__ = _append_math_op(op.add)
-    __and__ = _append_math_op(op.and_)
-    __rand__ = _append_math_op(op.and_)
-    __eq__ = _append_math_eq_ne(_eq)
-    __floordiv__ = _append_math_op(op.floordiv)
-    __ge__ = _append_math_op(op.ge)
-    __gt__ = _append_math_op(op.gt)
-    __inv__ = _append_math_op(op.inv)
-    __invert__ = _append_math_op(op.invert)
-    __le__ = _append_math_op(op.le)
-    __lshift__ = _append_math_op(op.lshift)
-    __lt__ = _append_math_op(op.lt)
-    __matmul__ = _append_math_op(op.matmul)
-    __mod__ = _append_math_op(op.mod)
-    __mul__ = _append_math_op(op.mul)
-    __rmul__ = _append_math_op(op.mul)
-    __ne__ = _append_math_eq_ne(_ne)
-    __neg__ = _append_math_op(op.neg)
-    __not__ = _append_math_op(op.not_)
-    __or__ = _append_math_op(op.or_)
-    __pos__ = _append_math_op(op.pos)
-    __pow__ = _append_math_op(op.pow)
-    __rshift__ = _append_math_op(op.rshift)
-    __sub__ = _append_math_op(op.sub)
-    __rsub__ = _append_math_op(op.sub)
-    __truediv__ = _append_math_op(op.truediv)
-    __xor__ = _append_math_op(op.xor)

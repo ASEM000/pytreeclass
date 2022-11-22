@@ -6,10 +6,10 @@ from pytreeclass._src.dataclass_util import (
     is_dataclass_fields_frozen,
     is_dataclass_fields_nondiff,
     is_dataclass_leaf,
-    is_dataclass_leaf_bool,
     is_dataclass_non_leaf,
     is_field_frozen,
     is_field_nondiff,
+    is_leaf_bool,
 )
 
 
@@ -39,7 +39,7 @@ def test_is_dataclass():
     class Test:
         a: bool = True
 
-    assert is_dataclass_leaf_bool(Test().a) is True
+    assert is_leaf_bool(Test().a) is True
     assert is_dataclass_leaf(Test()) is True
 
     @dataclasses.dataclass

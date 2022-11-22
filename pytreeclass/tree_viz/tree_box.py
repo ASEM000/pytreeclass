@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import dataclasses
+import dataclasses as dc
 
 import pytreeclass as pytc
 import pytreeclass._src.dataclass_util as dcu
@@ -61,7 +61,7 @@ def tree_box(tree, array=None):
                 cur_node = getattr(tree, field_item.name)
                 level_nodes += (
                     [f"{recurse(cur_node,field_item.name)}"]
-                    if dataclasses.is_dataclass(cur_node)
+                    if dc.is_dataclass(cur_node)
                     else [_vbox(f"{field_item.name}={_format_node_repr(cur_node,0)}")]
                 )
 

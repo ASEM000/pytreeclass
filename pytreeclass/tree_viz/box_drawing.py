@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+from itertools import chain
 from typing import Any, Sequence
-
-import jax.tree_util as jtu
 
 
 def _hbox(*text):
@@ -58,7 +57,8 @@ def _vbox(*text: tuple[str, ...]) -> str:
     """
 
     max_width = (
-        max(jtu.tree_leaves([[len(t) for t in item.split("\n")] for item in text])) + 0
+        max(chain.from_iterable([[len(t) for t in item.split("\n")] for item in text]))
+        + 0
     )
 
     top = f"┌{'─'*max_width}┐"

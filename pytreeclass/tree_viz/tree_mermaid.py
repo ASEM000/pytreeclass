@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import ctypes
-import dataclasses
+import dataclasses as dc
 from dataclasses import Field
 from typing import Any
 
 import pytreeclass as pytc
 import pytreeclass._src.dataclass_util as dcu
-from pytreeclass.tree_viz.node_pprint import _format_node_diagram
+from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.tree_export import _generate_mermaid_link
 from pytreeclass.tree_viz.tree_summary import (
     _format_count,
@@ -49,7 +49,7 @@ def _tree_mermaid(tree: PyTree):
         return ctypes.c_size_t(hash(input)).value
 
     def recurse(tree, depth, prev_id):
-        if not dataclasses.is_dataclass(tree):
+        if not dc.is_dataclass(tree):
             return
 
         nonlocal FMT
@@ -75,7 +75,7 @@ def _tree_mermaid(tree: PyTree):
                 size = _format_size(size.real)
             cur_id = node_id((depth, i, prev_id))
 
-            if dataclasses.is_dataclass(node_item):
+            if dc.is_dataclass(node_item):
                 mark = _marker(field_item, node_item, default="--->")
                 FMT += f"\n\tid{prev_id} {mark} "
                 FMT += f'|"{(count)}<br>{(size)}"| '
@@ -85,7 +85,7 @@ def _tree_mermaid(tree: PyTree):
                 mark = _marker(field_item, node_item, default="----")
                 FMT += f"\n\tid{prev_id} {mark} "
                 FMT += f'|"{(count)}<br>{(size)}"| '
-                FMT += f'id{cur_id}["{_bold_text(field_item.name)}<br>{_format_node_diagram(node_item)}"]'
+                FMT += f'id{cur_id}["{_bold_text(field_item.name)}<br>{_format_node_repr(node_item)}"]'
 
         prev_id = cur_id
 

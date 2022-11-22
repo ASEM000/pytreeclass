@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import copy
+import dataclasses as dc
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any, Sequence
 
 import jax.numpy as jnp
@@ -11,7 +12,7 @@ import jax.tree_util as jtu
 from jax.core import Tracer
 
 import pytreeclass._src.dataclass_util as dcu
-from pytreeclass._src.tree_util import _tree_immutate, _tree_mutate, tree_copy
+from pytreeclass._src.dataclass_util import _dataclass_freeze, _dataclass_unfreeze
 
 PyTree = Any
 
@@ -87,15 +88,14 @@ def _at_reduce(
     return jtu.tree_reduce(func, tree.at[where].get(is_leaf=is_leaf), initializer)
 
 
-@dataclass(eq=False, frozen=True)
+@dc.dataclass(eq=False, frozen=True)
 class _pyTreeIndexer:
     tree: PyTree
     where: PyTree
 
     def __post_init__(self):
-        assert all(
-            dcu.is_dataclass_leaf_bool(leaf) for leaf in jtu.tree_leaves(self.where)
-        ), f"All tree leaves must be boolean.Found {jtu.tree_leaves(self.where)}"
+        msg = f"All tree leaves must be boolean.Found {jtu.tree_leaves(self.where)}"
+        assert all(dcu.is_leaf_bool(leaf) for leaf in jtu.tree_leaves(self.where)), msg
 
     def get(self, is_leaf: Callable[[Any], bool] = None):
         return _at_get(self.tree, self.where, is_leaf=is_leaf)
@@ -151,7 +151,7 @@ def _setter(item: Any, path: Sequence[str], value: Any):
     return _setter(item, path[:-1], parent) if len(path) > 1 else item
 
 
-@dataclass(eq=False, frozen=True)
+@dc.dataclass(eq=False, frozen=True)
 class _strIndexer:
     tree: PyTree
     where: str
@@ -162,17 +162,17 @@ class _strIndexer:
 
     def set(self, set_value):
         # x.at["a"].set(value) returns a new tree with x.a = value
-        return _setter(tree_copy(self.tree), self.where.split("."), set_value)
+        return _setter(copy.copy(self.tree), self.where.split("."), set_value)
 
     def apply(self, func):
         return self.tree.at[self.where].set(func(self.tree.at[self.where].get()))
 
     def __call__(self, *a, **k):
         # x.at[method_name]() -> returns value and new_tree
-        tree = _tree_mutate(tree_copy(self.tree))
+        tree = _dataclass_unfreeze(copy.copy(self.tree))
         method = getattr(tree, self.where)
         value = method(*a, **k)
-        tree = _tree_immutate(tree)
+        tree = _dataclass_freeze(tree)
         return value, tree
 
     def __repr__(self):
@@ -257,9 +257,3 @@ def _at_indexer(tree):
             )
 
     return _atIndexer()
-
-
-class _treeIndexer:
-    @property
-    def at(self):
-        return _at_indexer(tree=self)

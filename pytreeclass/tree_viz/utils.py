@@ -1,24 +1,33 @@
 from __future__ import annotations
 
-import dataclasses
+import dataclasses as dc
 import sys
 from typing import Any
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_util import _tree_structure
+import pytreeclass._src.dataclass_util as dcu
+
+
+def _marker(field_item: dc.Field, node_item: Any, default: str = "") -> str:
+    """return the suitable marker given the field and node item"""
+    # '*' for non-diff
+    if dcu.is_field_nondiff(field_item) or dcu.is_dataclass_fields_nondiff(node_item):
+        return "*"
+    elif dcu.is_field_frozen(field_item) or dcu.is_dataclass_fields_frozen(node_item):
+        return "#"
+    return default
 
 
 def _sequential_tree_shape_eval(tree, array):
     """Evaluate shape propagation of assumed sequential modules"""
-    dyanmic, static = _tree_structure(tree)
+    dyanmic, static = dcu._dataclass_structure(tree)
 
     # all dynamic/static leaves
     all_leaves = (*dyanmic.values(), *static.values())
-    leaves = [leaf for leaf in all_leaves if dataclasses.is_dataclass(leaf)]
+    leaves = [leaf for leaf in all_leaves if dc.is_dataclass(leaf)]
 
     shape = [jax.eval_shape(lambda x: x, array)]
     for leave in leaves:
@@ -34,7 +43,7 @@ def _reduce_count_and_size(leaf):
         rhs_count, rhs_size = _node_count_and_size(node)
         return (lhs_count + rhs_count, lhs_size + rhs_size)
 
-    return jtu.tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
+    return dcu.dataclass_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
 
 
 def _node_count_and_size(node: Any) -> tuple[complex, complex]:
