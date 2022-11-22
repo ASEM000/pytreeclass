@@ -101,4 +101,4 @@ def test__node_count_and_size():
     with pytest.raises(dataclasses.FrozenInstanceError):
         xx.a = 1
 
-    assert _node_count_and_size("string") == (complex(0, 0), complex(0, 0))
+    assert _node_count_and_size("string") == (complex(0, 1), complex(0, 55))
