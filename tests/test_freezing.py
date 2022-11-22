@@ -23,6 +23,7 @@ def test_freezing_unfreezing():
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
     assert jtu.tree_leaves(c) == [1, 2]
+    assert jtu.tree_leaves(d) == [1, 2]
 
     @pytc.treeclass
     class A:

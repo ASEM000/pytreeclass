@@ -65,8 +65,9 @@ def _node_count_and_size(node: Any) -> tuple[complex, complex]:
         count = complex(0, 1)
         size = complex(0, sys.getsizeof(node))
         return count, size
+
     else:
-        count = complex(0, 0)
-        size = complex(0, 0)
+        count = complex(0, 1)
+        size = complex(0, sys.getsizeof(node))
 
     return count, size
