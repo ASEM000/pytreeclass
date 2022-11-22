@@ -206,12 +206,7 @@ def tree_summary(
             node_item = getattr(tree, field_item.name)
 
             # non-leaf dataclass
-            if dataclasses.is_dataclass(node_item) and any(
-                [
-                    dataclasses.is_dataclass(getattr(node_item, field_item.name))
-                    for field_item in dataclasses.fields(node_item)
-                ]
-            ):
+            if dcu.is_dataclass_non_leaf(node_item):
                 recurse(
                     tree=node_item,
                     name_path=name_path + (field_item.name,),

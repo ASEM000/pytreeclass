@@ -18,6 +18,7 @@ def test_freezing_unfreezing():
     a = A(1, 2)
     b = tree_filter(a, where=a == a)
     c = tree_unfilter(a)
+    d = tree_unfilter(a, where=a == a)
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
