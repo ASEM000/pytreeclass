@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import dataclasses as dc
 from collections.abc import Callable
+from types import EllipsisType
 from typing import Any, Sequence
 
 import jax.numpy as jnp
@@ -18,11 +19,11 @@ PyTree = Any
 
 
 def _at_get(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
-    if not isinstance(where, type(tree)):
-        raise NotImplementedError(f"where type = {type(where)} is not implemented.")
-
     def _lhs_get(lhs: Any, where: Any):
         """Get pytree node  value"""
+        if not (dcu.is_leaf_bool(where) or where is None):
+            raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
+
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return lhs[jnp.where(where)]
         return lhs if where else None
@@ -36,11 +37,11 @@ def _at_set(
     set_value: bool | int | float | complex | jnp.ndarray,
     is_leaf: Callable[[Any], bool],
 ):
-    if not isinstance(where, type(tree)):
-        raise NotImplementedError(f"where type = {type(where)} is not implemented.")
-
     def _lhs_set(lhs: Any, where: Any):
         """Set pytree node value."""
+        if not (dcu.is_leaf_bool(where) or where is None):
+            raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
+
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             # check if the set_value is a valid type to be broadcasted to ndarray
             # otherwise, do not broadcast the set_value to the lhs
@@ -60,11 +61,11 @@ def _at_apply(
     func: Callable[[Any], Any],
     is_leaf: Callable[[Any], bool],
 ):
-    if not isinstance(where, type(tree)):
-        raise NotImplementedError(f"where type = {type(where)} is not implemented.")
-
     def _lhs_apply(lhs: Any, where: bool):
         """Set pytree node"""
+        if not (dcu.is_leaf_bool(where) or where is None):
+            raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
+
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return jnp.where(where, func(lhs), lhs)
         return func(lhs) if (where is True or where is None) else lhs
@@ -82,9 +83,6 @@ def _at_reduce(
     is_leaf: Callable[[Any], bool],
     initializer: Any,
 ):
-
-    if not isinstance(where, type(tree)):
-        raise NotImplementedError(f"tree type = {type(tree)} is not implemented.")
     return jtu.tree_reduce(func, tree.at[where].get(is_leaf=is_leaf), initializer)
 
 
@@ -92,10 +90,6 @@ def _at_reduce(
 class _pyTreeIndexer:
     tree: PyTree
     where: PyTree
-
-    def __post_init__(self):
-        msg = f"All tree leaves must be boolean.Found {jtu.tree_leaves(self.where)}"
-        assert all(dcu.is_leaf_bool(leaf) for leaf in jtu.tree_leaves(self.where)), msg
 
     def get(self, is_leaf: Callable[[Any], bool] = None):
         return _at_get(self.tree, self.where, is_leaf=is_leaf)
@@ -109,11 +103,11 @@ class _pyTreeIndexer:
     def reduce(self, func, is_leaf: Callable[[Any], bool] = None, initializer=0):
         return _at_reduce(self.tree, self.where, func, is_leaf, initializer)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"where={self.where!r}"
 
-    def __str__(self):
-        return f"where={self.where!s}"
+    def __str__(self) -> str:
+        return f"where={self.where}"
 
 
 def _getter(item: Any, path: Sequence[str]):
@@ -175,11 +169,11 @@ class _strIndexer:
         tree = _dataclass_freeze(tree)
         return value, tree
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"where={self.where!r}"
 
-    def __str__(self):
-        return f"where={self.where!s}"
+    def __str__(self) -> str:
+        return f"where={self.where}"
 
 
 def _str_nested_indexer(tree, where):
@@ -238,7 +232,7 @@ def _at_indexer(tree):
                 # indexing by boolean pytree
                 return _pytree_nested_indexer(tree=tree, where=where)
 
-            elif isinstance(where, type(Ellipsis)):
+            elif isinstance(where, EllipsisType):
                 # Ellipsis as an alias for all elements
                 # model.at[model == model ] <--> model.at[...]
                 return tree.at[tree == tree]
