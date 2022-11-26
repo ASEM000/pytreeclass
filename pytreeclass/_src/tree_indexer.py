@@ -6,7 +6,6 @@ import copy
 import dataclasses as dc
 import functools as ft
 from collections.abc import Callable
-from types import EllipsisType
 from typing import Any, Sequence
 
 import jax.numpy as jnp
@@ -17,6 +16,7 @@ import pytreeclass._src.dataclass_util as dcu
 from pytreeclass._src.dataclass_util import _dataclass_freeze, _dataclass_unfreeze
 
 PyTree = Any
+EllipsisType = type(Ellipsis)
 
 
 def _at_get(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
@@ -57,7 +57,7 @@ def _at_set(
         # set_value leaf is set to tree leaf according to where leaf
         return jtu.tree_map(_lhs_set, set_value, tree, where, is_leaf=is_leaf)
 
-    # set_value is broadcasted to the tree leaf
+    # set_value is broadcasted to tree leaves
     _lhs_set = ft.partial(_lhs_set, set_value)
     return jtu.tree_map(_lhs_set, tree, where, is_leaf=is_leaf)
 

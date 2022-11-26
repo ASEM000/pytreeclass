@@ -19,11 +19,14 @@ PyTree = Any
 
 def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
     """`jtu.tree_map` for unary/binary operators broadcasting"""
+    # if rhs is a tree of the same type as lhs then we use the tree_map to apply the operator leaf-wise
     if isinstance(rhs, type(lhs)):
         return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
+    # if rhs is a scalar then we use the tree_map to apply the operator with broadcasting the rhs
     elif isinstance(rhs, (Tracer, jnp.ndarray, int, float, complex, bool, str)):
         return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
-    elif isinstance(rhs, type(None)):  # unary operator
+    # if rhs is None , then we apply the operator to the tree leaves (i.e. unary operation)
+    elif isinstance(rhs, type(None)):
         return jtu.tree_map(func, lhs, is_leaf=is_leaf)
     raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
 
@@ -115,7 +118,7 @@ def _append_math_eq_ne(func):
 
 def _eq(lhs, rhs):
     if isinstance(rhs, type):
-        # rhs is a type (tree == int ) will perform a instance check
+        # rhs is a type (tree == int ) will perform a instance check leaf-wise
         return isinstance(lhs, rhs)
     elif isinstance(rhs, str):
         # rhs is a string for (tree == "a") will perform a field name check using regex

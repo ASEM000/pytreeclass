@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import dataclasses
+import dataclasses as dc
 import operator as op
 from typing import Any, Callable, Iterable
 
@@ -18,34 +18,34 @@ PyTree = Any
 
 
 def _setattr(tree, key: str, value: Any) -> None:
-    if tree.__dataclass_params__.frozen:
+    if getattr(tree.__dataclass_params__, "frozen"):
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
-        raise dataclasses.FrozenInstanceError(msg)
+        raise dc.FrozenInstanceError(msg)
 
     object.__setattr__(tree, key, value)
 
-    if dataclasses.is_dataclass(value) and (
-        key not in [f.name for f in dataclasses.fields(tree)]
+    if dc.is_dataclass(value) and (
+        key not in [f.name for f in dc.fields(tree)]
     ):
-        field_item = dataclasses.field()
+        field_item = dc.field()
         object.__setattr__(field_item, "name", key)
         object.__setattr__(field_item, "type", type(value))
-        object.__setattr__(field_item, "_field_type", dataclasses._FIELD)
+        object.__setattr__(field_item, "_field_type", dc._FIELD)
 
         # register it to dataclass fields
         tree.__dataclass_fields__[key] = field_item
 
 
 def _delattr(tree, key: str) -> None:
-    if tree.__dataclass_params__.frozen:
-        raise dataclasses.FrozenInstanceError(f"Cannot delete {key}.")
+    if getattr(tree.__dataclass_params__, "frozen"):
+        raise dc.FrozenInstanceError(f"Cannot delete {key}.")
     object.__delattr__(tree, key)
 
 
 def _new(cls, *a, **k):
     tree = object.__new__(cls)
 
-    _params = dataclasses._DataclassParams(
+    _params = dc._DataclassParams(
         init=tree.__dataclass_params__.init,
         repr=tree.__dataclass_params__.repr,
         eq=tree.__dataclass_params__.eq,
@@ -56,15 +56,15 @@ def _new(cls, *a, **k):
 
     _dataclass_fields = {
         field_item.name: dcu.field_copy(field_item)
-        for field_item in dataclasses.fields(tree)
+        for field_item in dc.fields(tree)
     }
 
-    object.__setattr__(tree, "__dataclass_params__", _params)
-    object.__setattr__(tree, "__dataclass_fields__", _dataclass_fields)
+    setattr(tree, "__dataclass_params__", _params)
+    setattr(tree, "__dataclass_fields__", _dataclass_fields)
 
-    for field_item in dataclasses.fields(tree):
-        if field_item.default is not dataclasses.MISSING:
-            object.__setattr__(tree, field_item.name, field_item.default)
+    for field_item in dc.fields(tree):
+        if field_item.default is not dc.MISSING:
+            setattr(tree, field_item.name, field_item.default)
     return tree
 
 
@@ -106,7 +106,7 @@ def _unflatten(cls, treedef, leaves):
 
 def treeclass(cls):
     """Decorator to make a class a treeclass"""
-    dcls = dataclasses.dataclass(
+    dcls = dc.dataclass(
         init="__init__" not in vars(cls),  # if __init__ is defined, do not overwrite it
         repr=False,  # repr is handled by _treePretty
         eq=False,  # eq is handled by _treeOp
@@ -116,7 +116,7 @@ def treeclass(cls):
     )(cls)
 
     attrs = dict(
-        __new__=_new,  # overwrite __new__ to initialize instance variables
+        __new__=_mutable(_new),  # overwrite __new__ to initialize instance variables
         __init__=_mutable(cls.__init__),  # make it mutable during initialization
         __setattr__=_setattr,  # disable direct attribute setting unless __immutable_treeclass__ is False
         __delattr__=_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False
@@ -181,7 +181,7 @@ def is_nondiff(item: Any) -> bool:
     """Check if a node is non-differentiable."""
 
     def _is_nondiff_item(node: Any):
-        if isinstance(node, (float, complex)) or dataclasses.is_dataclass(node):
+        if isinstance(node, (float, complex)) or dc.is_dataclass(node):
             return False
         elif isinstance(node, jnp.ndarray) and jnp.issubdtype(node.dtype, jnp.inexact):
             return False
