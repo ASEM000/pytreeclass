@@ -6,6 +6,7 @@ from typing import Any
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 import numpy as np
 
 import pytreeclass._src.dataclass_util as dcu
@@ -43,7 +44,7 @@ def _reduce_count_and_size(leaf):
         rhs_count, rhs_size = _node_count_and_size(node)
         return (lhs_count + rhs_count, lhs_size + rhs_size)
 
-    return dcu.dataclass_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
+    return jtu.tree_reduce(reduce_func, leaf, (complex(0, 0), complex(0, 0)))
 
 
 def _node_count_and_size(node: Any) -> tuple[complex, complex]:

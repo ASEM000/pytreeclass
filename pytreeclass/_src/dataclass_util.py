@@ -4,7 +4,7 @@ import copy
 import dataclasses as dc
 import functools as ft
 from types import FunctionType
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
@@ -160,32 +160,6 @@ def is_dataclass_leaf(tree):
 
 def is_dataclass_non_leaf(tree):
     return dc.is_dataclass(tree) and not is_dataclass_leaf(tree)
-
-
-def dataclass_leaves(tree):
-    """return all leaves of a dataclass"""
-
-    def _recurse(tree):
-        for node_item in (
-            [f, getattr(tree, f.name)]
-            for f in dc.fields(tree)
-            if not f.metadata.get("static", False)
-        ):
-            if dc.is_dataclass(node_item):
-                yield from _recurse(node_item)
-            else:
-                yield node_item
-
-    if dc.is_dataclass(tree):
-        return list(_recurse(tree))
-    raise TypeError("tree must be a dataclass")
-
-
-def dataclass_reduce(function: Callable, tree: Any, initializer: Any = None):
-    """reduce a dataclass tree. Similar to jtu.tree_reduce but for dataclasses"""
-    if initializer is None:
-        return ft.reduce(function, dataclass_leaves(tree))
-    return ft.reduce(function, dataclass_leaves(tree), initializer)
 
 
 def dataclass_filter(tree: PyTree, where: PyTree | FunctionType):
