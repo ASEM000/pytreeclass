@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses as dc
+import functools as ft
 from collections.abc import Callable
 from types import EllipsisType
 from typing import Any, Sequence
@@ -37,7 +38,7 @@ def _at_set(
     set_value: bool | int | float | complex | jnp.ndarray,
     is_leaf: Callable[[Any], bool],
 ):
-    def _lhs_set(lhs: Any, where: Any):
+    def _lhs_set(set_value: Any, lhs: Any, where: Any):
         """Set pytree node value."""
         if not (dcu.is_leaf_bool(where) or where is None):
             raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
@@ -52,6 +53,12 @@ def _at_set(
 
         return set_value if (where is True or where is None) else lhs
 
+    if isinstance(set_value, type(tree)):
+        # set_value leaf is set to tree leaf according to where leaf
+        return jtu.tree_map(_lhs_set, set_value, tree, where, is_leaf=is_leaf)
+
+    # set_value is broadcasted to the tree leaf
+    _lhs_set = ft.partial(_lhs_set, set_value)
     return jtu.tree_map(_lhs_set, tree, where, is_leaf=is_leaf)
 
 

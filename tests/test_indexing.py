@@ -6,12 +6,10 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 import jax.tree_util as jtu
-import numpy as np
 import numpy.testing as npt
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_indexer import _at_apply, _at_get, _at_reduce, _at_set
 
 
 @pytc.treeclass
@@ -196,6 +194,13 @@ def test_setter_by_val():
     lhs = t.at[t == "a"].set(100)
     rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
     assert pytc.is_treeclass_equal(lhs, rhs)
+
+    tt = L2(100, 200, 300, L1(10, 20, 30, L0(10, 20, 30)))
+    lhs = t.at[t == t].set(tt)
+    assert pytc.is_treeclass_equal(lhs, tt)
+
+    lhs = t.at[t == "a"].set(tt)
+    assert pytc.is_treeclass_equal(lhs, L2(100, 20, 30, L1(10, 2, 3, L0(10, 2, 3))))
 
 
 def test_setter_by_param():
@@ -619,38 +624,6 @@ def test_reduce_and_its_derivatives():
             lambda x, y: x * jnp.product(y), initializer=1
         )
     ) == 0.84782064
-
-
-def test_not_implemented():
-    @pytc.treeclass
-    class Test:
-        a: int = 1
-
-    t = Test()
-
-    # with pytest.raises(NotImplementedError):
-    #     _at_get(t == t, 3, None)
-
-    # with pytest.raises(NotImplementedError):
-    #     _at_set(t == t, 3, 3, None)
-
-    # with pytest.raises(NotImplementedError):
-    #     _at_reduce(t == t, lambda x: x, 3, None, 0)
-
-    # with pytest.raises(NotImplementedError):
-    #     _at_apply(t == t, lambda x: x, 3, None)
-
-    # with pytest.raises(NotImplementedError):
-    #     _at_get(t == t, np.array([1, 2, 3]), None)
-
-    # with pytest.raises(NotImplementedError):
-    #     _at_set(t == t, 3, np.array([1, 2, 3]), None)
-
-    # with pytest.raises(NotImplementedError):
-    #     _at_reduce(t == t, lambda x: x, np.array([1, 2, 3]), None, 0)
-
-    # with pytest.raises(NotImplementedError):
-    #     _at_apply(t == t, lambda x: x, np.array([1, 2, 3]), None)
 
 
 def test_is_leaf():
