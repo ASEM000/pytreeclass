@@ -13,7 +13,7 @@ import jax.tree_util as jtu
 from jax.core import Tracer
 
 import pytreeclass._src.dataclass_util as dcu
-from pytreeclass._src.dataclass_util import _dataclass_freeze, _dataclass_unfreeze
+from pytreeclass._src.dataclass_util import _set_dataclass_frozen
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
@@ -170,10 +170,10 @@ class _strIndexer:
 
     def __call__(self, *a, **k):
         # x.at[method_name]() -> returns value and new_tree
-        tree = _dataclass_unfreeze(copy.copy(self.tree))
+        tree = _set_dataclass_frozen(copy.copy(self.tree), frozen=False)
         method = getattr(tree, self.where)
         value = method(*a, **k)
-        tree = _dataclass_freeze(tree)
+        tree = _set_dataclass_frozen(tree, frozen=True)
         return value, tree
 
     def __repr__(self) -> str:

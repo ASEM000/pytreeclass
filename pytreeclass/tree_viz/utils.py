@@ -9,16 +9,67 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
+import pytreeclass as pytc
 import pytreeclass._src.dataclass_util as dcu
+
+
+def is_dataclass_fields_nondiff(tree):
+    """assert if a dataclass is static"""
+    if dc.is_dataclass(tree):
+        field_items = dc.fields(tree)
+        if len(field_items) > 0:
+            return all(isinstance(f, pytc.NonDiffField) for f in field_items)
+    return False
+
+
+def is_dataclass_fields_frozen(tree):
+    """assert if a dataclass is static"""
+    if dc.is_dataclass(tree):
+        field_items = dc.fields(tree)
+        if len(field_items) > 0:
+            return all(isinstance(f, pytc.FrozenField) for f in field_items)
+    return False
+
+
+def _mermaid_marker(field_item: dc.Field, node_item: Any, default: str = "--") -> str:
+    """return the suitable marker given the field and node item
+
+    Args:
+        field_item (Field): field item of the pytree node
+        node_item (Any): node item
+        default (str, optional): default marker. Defaults to "".
+
+    Returns:
+        str: marker character.
+    """
+    # for now, we only have two markers '*' for non-diff and '#' for frozen
+    if isinstance(field_item, pytc.FrozenField) or is_dataclass_fields_frozen(
+        node_item
+    ):
+        return "-..-"
+
+    if isinstance(field_item, pytc.NonDiffField) or is_dataclass_fields_nondiff(
+        node_item
+    ):
+        return "--x"
+
+    return default
 
 
 def _marker(field_item: dc.Field, node_item: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item"""
     # '*' for non-diff
-    if dcu.is_field_nondiff(field_item) or dcu.is_dataclass_fields_nondiff(node_item):
-        return "*"
-    elif dcu.is_field_frozen(field_item) or dcu.is_dataclass_fields_frozen(node_item):
+
+    if isinstance(field_item, pytc.FrozenField) or is_dataclass_fields_frozen(
+        node_item
+    ):
         return "#"
+
+    if isinstance(field_item, pytc.NonDiffField) or is_dataclass_fields_nondiff(
+        node_item
+    ):
+        return "*"
+
     return default
 
 

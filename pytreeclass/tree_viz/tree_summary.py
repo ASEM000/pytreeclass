@@ -10,7 +10,6 @@ import pytreeclass as pytc
 import pytreeclass._src.dataclass_util as dcu
 
 # from pytreeclass._src.dispatch import dispatch
-from pytreeclass._src.dataclass_util import _dataclass_structure
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
@@ -126,7 +125,7 @@ def tree_summary(
             # expand container if any item is a `dataclass`
             for i, layer in enumerate(node_item):
 
-                if dcu.is_field_frozen(field_item):
+                if isinstance(field_item, pytc.FrozenField):
                     # all the items in the container are frozen if the container is frozen
                     new_field = dc.field(metadata={"static": "frozen"})
                 else:
@@ -146,9 +145,15 @@ def tree_summary(
 
         elif dc.is_dataclass(node_item):
             # check if the node is frozen or it all the fields are frozen
-            is_frozen = dcu.is_field_frozen(field_item)
+            is_frozen = isinstance(field_item, pytc.FrozenField)
             is_frozen = is_frozen or dcu.is_dataclass_fields_frozen(node_item)
-            dynamic, _ = _dataclass_structure(pytc.tree_unfilter(node_item))
+
+            dynamic = {
+                f.name: getattr(node_item, f.name)
+                for f in dc.fields(node_item)
+                if not isinstance(field_item, (pytc.NonDiffField, pytc.FrozenField))
+            }
+
             count, size = _reduce_count_and_size(pytc.tree_unfilter(node_item))
 
             if is_frozen:

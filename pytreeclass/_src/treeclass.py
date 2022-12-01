@@ -1,20 +1,29 @@
 from __future__ import annotations
 
+import copy
 import dataclasses as dc
 import operator as op
+from types import FunctionType
 from typing import Any, Callable, Iterable
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-import pytreeclass._src.dataclass_util as dcu
-from pytreeclass._src.dataclass_util import _dataclass_structure, _fieldDict, _mutable
+from pytreeclass._src.dataclass_util import _mutable
 from pytreeclass._src.tree_indexer import _at_indexer
 from pytreeclass._src.tree_op import _append_math_eq_ne, _append_math_op, _eq, _ne
 from pytreeclass.tree_viz.tree_pprint import tree_repr, tree_str
 
 PyTree = Any
+
+
+class NonDiffField(dc.Field):
+    pass
+
+
+class FrozenField(NonDiffField):
+    pass
 
 
 def _setattr(tree, key: str, value: Any) -> None:
@@ -24,9 +33,7 @@ def _setattr(tree, key: str, value: Any) -> None:
 
     object.__setattr__(tree, key, value)
 
-    if dc.is_dataclass(value) and (
-        key not in [f.name for f in dc.fields(tree)]
-    ):
+    if dc.is_dataclass(value) and (key not in [f.name for f in dc.fields(tree)]):
         field_item = dc.field()
         object.__setattr__(field_item, "name", key)
         object.__setattr__(field_item, "type", type(value))
@@ -54,13 +61,8 @@ def _new(cls, *a, **k):
         frozen=tree.__dataclass_params__.frozen,
     )
 
-    _dataclass_fields = {
-        field_item.name: dcu.field_copy(field_item)
-        for field_item in dc.fields(tree)
-    }
-
     setattr(tree, "__dataclass_params__", _params)
-    setattr(tree, "__dataclass_fields__", _dataclass_fields)
+    setattr(tree, "__dataclass_fields__", {f.name: f for f in dc.fields(tree)})
 
     for field_item in dc.fields(tree):
         if field_item.default is not dc.MISSING:
@@ -73,7 +75,7 @@ def _hash(tree):
 
     def _hash_node(node):
         """hash the leaves of the tree"""
-        if isinstance(node, jnp.ndarray):
+        if isinstance(node, (jnp.ndarray, np.ndarray)):
             return np.array(node).tobytes()
         elif isinstance(node, set):
             # jtu.tree_map does not traverse sets
@@ -89,9 +91,21 @@ def _copy(tree):
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
 
-def _flatten(tree) -> tuple[Any, tuple[str, _fieldDict[str, Any]]]:
+class _MetaDict(dict):
+    # see https://github.com/google/jax/issues/13027
+    __hash__ = _hash
+    __eq__ = lambda x, y: x.__dict__ == y.__dict__
+
+
+def _flatten(tree) -> tuple[Any, tuple[str, _MetaDict[str, Any]]]:
     """Flatten rule for `jax.tree_flatten`"""
-    dynamic, static = _dataclass_structure(tree)
+
+    static, dynamic = _MetaDict(tree.__dict__), dict()
+
+    for field_item in dc.fields(tree):
+        if not isinstance(field_item, NonDiffField):
+            dynamic[field_item.name] = static.pop(field_item.name)
+
     return dynamic.values(), (dynamic.keys(), static)
 
 
@@ -177,15 +191,82 @@ def is_treeclass_equal(lhs, rhs):
     )
 
 
+@_mutable
+def _tree_filter(tree: PyTree, where: PyTree | FunctionType, filter: bool):
+    def _filter(tree: PyTree, where: PyTree):
+        _dataclass_fields = dict(tree.__dataclass_fields__)
+
+        for name in _dataclass_fields:
+            node_item = getattr(tree, name)
+
+            if dc.is_dataclass(node_item):
+                where = getattr(where, name) if isinstance(where, type(tree)) else where
+                _filter(tree=node_item, where=where)
+
+            else:
+
+                if isinstance(where, type(tree)):
+                    node_where = getattr(where, name)
+                else:
+                    node_where = where(node_item)
+
+                if (
+                    isinstance(node_where, bool)
+                    or (hasattr(node_where, "dtype") and node_where.dtype == "bool")
+                ) and np.all(node_where):
+
+                    field_item = _dataclass_fields[name]
+                    field_name, field_type = field_item.name, field_item.type
+
+                    field_params = dict(
+                        default=field_item.default,
+                        default_factory=field_item.default_factory,
+                        init=field_item.init,
+                        repr=field_item.repr,
+                        hash=field_item.hash,
+                        compare=field_item.compare,
+                        metadata=field_item.metadata,
+                    )
+
+                    if "kw_only" in dir(field_item):
+                        field_params.update(kw_only=field_item.kw_only)
+
+                    if filter:
+                        if not isinstance(field_item, NonDiffField):
+                            # convert to a frozen field
+                            field_item = FrozenField(**field_params)
+                            object.__setattr__(field_item, "name", field_name)
+                            object.__setattr__(field_item, "type", field_type)
+                            object.__setattr__(field_item, "_field_type", dc._FIELD)
+
+                    else:
+                        if isinstance(field_item, FrozenField):
+                            # convert to a default field
+                            field_item = dc.Field(**field_params)
+                            object.__setattr__(field_item, "name", field_name)
+                            object.__setattr__(field_item, "type", field_type)
+                            object.__setattr__(field_item, "_field_type", dc._FIELD)
+
+                    _dataclass_fields[name] = field_item
+
+        setattr(tree, "__dataclass_fields__", _dataclass_fields)
+        return tree
+
+    if isinstance(where, FunctionType) or isinstance(where, type(tree)):
+        return _filter(copy.copy(tree), where)
+    raise TypeError("Where must be of same type as `tree`  or a `Callable`")
+
+
 def is_nondiff(item: Any) -> bool:
     """Check if a node is non-differentiable."""
 
     def _is_nondiff_item(node: Any):
-        if isinstance(node, (float, complex)) or dc.is_dataclass(node):
+        if (
+            (hasattr(node, "dtype") and jnp.issubdtype(node.dtype, jnp.inexact))
+            or isinstance(node, (float, complex))
+            or dc.is_dataclass(node)
+        ):
             return False
-        elif isinstance(node, jnp.ndarray) and jnp.issubdtype(node.dtype, jnp.inexact):
-            return False
-
         return True
 
     if isinstance(item, Iterable):
@@ -202,7 +283,9 @@ def tree_filter(tree: PyTree, *, where: Callable[[Any], bool] | PyTree = None):
         tree: The tree to filter.
         where: A callable function or a pytree of booleans. Defaults to filtering non-differentiable nodes.
     """
-    return dcu.dataclass_filter(tree, where=(where or is_nondiff))
+    if not dc.is_dataclass(tree):
+        raise TypeError("Tree must be a dataclass")
+    return _tree_filter(tree, where=(where or is_nondiff), filter=True)
 
 
 def tree_unfilter(tree: PyTree, *, where: Callable[[Any], bool] | PyTree = None):
@@ -212,4 +295,6 @@ def tree_unfilter(tree: PyTree, *, where: Callable[[Any], bool] | PyTree = None)
         tree: The tree to unfilter.
         where: A callable function or a pytree of booleans. Defaults to unfiltering all nodes.
     """
-    return dcu.dataclass_unfilter(tree, where=(where or (lambda _: True)))
+    if not dc.is_dataclass(tree):
+        raise TypeError("Tree must be a dataclass")
+    return _tree_filter(tree, where=(where or (lambda _: True)), filter=False)

@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import ctypes
 import dataclasses as dc
-from dataclasses import Field
 from typing import Any
 
 import pytreeclass as pytc
-import pytreeclass._src.dataclass_util as dcu
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.tree_export import _generate_mermaid_link
 from pytreeclass.tree_viz.tree_summary import (
@@ -14,26 +12,9 @@ from pytreeclass.tree_viz.tree_summary import (
     _format_size,
     _reduce_count_and_size,
 )
+from pytreeclass.tree_viz.utils import _mermaid_marker
 
-
-def _marker(field_item: Field, node_item: Any, default: str = "--") -> str:
-    """return the suitable marker given the field and node item
-
-    Args:
-        field_item (Field): field item of the pytree node
-        node_item (Any): node item
-        default (str, optional): default marker. Defaults to "".
-
-    Returns:
-        str: marker character.
-    """
-    # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if pytc.is_field_nondiff(field_item) or dcu.is_dataclass_fields_nondiff(node_item):
-        return "--x"
-    elif pytc.is_field_frozen(field_item) or dcu.is_dataclass_fields_frozen(node_item):
-        return "-..-"
-    return default
-
+_marker = _mermaid_marker
 
 PyTree = Any
 
