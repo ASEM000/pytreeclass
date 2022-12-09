@@ -16,7 +16,9 @@ from pytreeclass.tree_viz.utils import (
     _is_dataclass_fields_frozen,
     _reduce_count_and_size,
     _sequential_tree_shape_eval,
+    _is_dataclass_leaf
 )
+
 
 PyTree = Any
 

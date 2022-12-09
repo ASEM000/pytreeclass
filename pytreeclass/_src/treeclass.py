@@ -311,7 +311,7 @@ def _tree_filter(tree: PyTree, where: PyTree | FunctionType, filter: bool) -> Py
                     else:
                         # transform the field to a default field iff it is a FrozenField
                         # in essence we want to undo the filtering, so we need to convert the filtered fields
-                        # (i.e. FrozenFields) to default fields (i.e. dc.Field)
+                        # (i.e. FrozenField) to default fields (i.e. dc.Field)
                         if isinstance(field_item, FrozenField):
                             # convert to a default field
                             field_item = dc.Field(**field_params)

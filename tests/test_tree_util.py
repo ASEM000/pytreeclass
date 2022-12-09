@@ -36,11 +36,11 @@ class Test2:
     b: Test = Test()
 
 
-def test_is_dataclass_leaf():
-    assert dcu.is_dataclass_leaf(a) is True
-    assert all(dcu.is_dataclass_leaf(bi) for bi in b) is False
-    assert dcu.is_dataclass_leaf(Test2()) is False
-    assert dcu.is_dataclass_leaf(Test2().b) is True
+# def test_is_dataclass_leaf():
+#     assert dcu.is_dataclass_leaf(a) is True
+#     assert all(dcu.is_dataclass_leaf(bi) for bi in b) is False
+#     assert dcu.is_dataclass_leaf(Test2()) is False
+#     assert dcu.is_dataclass_leaf(Test2().b) is True
 
 
 # def test_is_dataclass_fields_frozen():
