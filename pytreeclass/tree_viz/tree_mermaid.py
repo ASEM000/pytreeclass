@@ -12,9 +12,7 @@ from pytreeclass.tree_viz.tree_summary import (
     _format_size,
     _reduce_count_and_size,
 )
-from pytreeclass.tree_viz.utils import _mermaid_marker
-
-_marker = _mermaid_marker
+from pytreeclass.tree_viz.utils import _mermaid_marker as _marker
 
 PyTree = Any
 

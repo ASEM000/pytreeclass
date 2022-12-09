@@ -12,17 +12,23 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.core import Tracer
 
-import pytreeclass._src.dataclass_util as dcu
 from pytreeclass._src.dataclass_util import _set_dataclass_frozen
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
 
 
+def _is_leaf_bool(node):
+    """assert if a dataclass leaf is boolean (for boolen indexing)"""
+    if hasattr(node, "dtype"):
+        return node.dtype == "bool"
+    return isinstance(node, bool)
+
+
 def _at_get(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
     def _lhs_get(lhs: Any, where: Any):
         """Get pytree node  value"""
-        if not (dcu.is_leaf_bool(where) or where is None):
+        if not (_is_leaf_bool(where) or where is None):
             raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
 
         if isinstance(lhs, (Tracer, jnp.ndarray)):
@@ -40,7 +46,7 @@ def _at_set(
 ):
     def _lhs_set(set_value: Any, lhs: Any, where: Any):
         """Set pytree node value."""
-        if not (dcu.is_leaf_bool(where) or where is None):
+        if not (_is_leaf_bool(where) or where is None):
             raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
 
         if isinstance(lhs, (Tracer, jnp.ndarray)):
@@ -70,7 +76,7 @@ def _at_apply(
 ):
     def _lhs_apply(lhs: Any, where: bool):
         """Set pytree node"""
-        if not (dcu.is_leaf_bool(where) or where is None):
+        if not (_is_leaf_bool(where) or where is None):
             raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
 
         if isinstance(lhs, (Tracer, jnp.ndarray)):

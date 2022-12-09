@@ -78,24 +78,3 @@ def field(
         return pytc.NonDiffField(**args)
 
     return dc.Field(**args)
-
-
-def is_leaf_bool(node):
-    """assert if a dataclass leaf is boolean (for boolen indexing)"""
-    if hasattr(node, "dtype"):
-        return node.dtype == "bool"
-    return isinstance(node, bool)
-
-
-def is_dataclass_leaf(tree):
-    """assert if a node is dataclass leaf"""
-    if dc.is_dataclass(tree):
-
-        return dc.is_dataclass(tree) and not any(
-            [dc.is_dataclass(getattr(tree, fi.name)) for fi in dc.fields(tree)]
-        )
-    return False
-
-
-def is_dataclass_non_leaf(tree):
-    return dc.is_dataclass(tree) and not is_dataclass_leaf(tree)

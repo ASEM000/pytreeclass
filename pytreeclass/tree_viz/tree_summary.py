@@ -13,6 +13,7 @@ import pytreeclass._src.dataclass_util as dcu
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
+    _is_dataclass_fields_frozen,
     _reduce_count_and_size,
     _sequential_tree_shape_eval,
 )
@@ -146,7 +147,7 @@ def tree_summary(
         elif dc.is_dataclass(node_item):
             # check if the node is frozen or it all the fields are frozen
             is_frozen = isinstance(field_item, pytc.FrozenField)
-            is_frozen = is_frozen or dcu.is_dataclass_fields_frozen(node_item)
+            is_frozen = is_frozen or _is_dataclass_fields_frozen(node_item)
 
             dynamic = {
                 f.name: getattr(node_item, f.name)

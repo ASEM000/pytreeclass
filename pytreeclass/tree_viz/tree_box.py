@@ -3,10 +3,9 @@ from __future__ import annotations
 import dataclasses as dc
 
 import pytreeclass as pytc
-import pytreeclass._src.dataclass_util as dcu
 from pytreeclass.tree_viz.box_drawing import _layer_box, _vbox
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
-from pytreeclass.tree_viz.utils import _sequential_tree_shape_eval
+from pytreeclass.tree_viz.utils import _is_dataclass_leaf, _sequential_tree_shape_eval
 
 
 def tree_box(tree, array=None):
@@ -42,7 +41,7 @@ def tree_box(tree, array=None):
 
         nonlocal shapes
 
-        if dcu.is_dataclass_leaf(tree):
+        if _is_dataclass_leaf(tree):
             frozen_stmt = "(Frozen)"  # if pytc.is_treeclass_fields_frozen(tree) else ""
             box = _layer_box(
                 f"{tree.__class__.__name__}[{parent_name}]{frozen_stmt}",

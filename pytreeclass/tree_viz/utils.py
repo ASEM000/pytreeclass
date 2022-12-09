@@ -13,7 +13,7 @@ import pytreeclass as pytc
 import pytreeclass._src.dataclass_util as dcu
 
 
-def is_dataclass_fields_nondiff(tree):
+def _is_dataclass_fields_nondiff(tree):
     """assert if a dataclass is static"""
     if dc.is_dataclass(tree):
         field_items = dc.fields(tree)
@@ -22,13 +22,27 @@ def is_dataclass_fields_nondiff(tree):
     return False
 
 
-def is_dataclass_fields_frozen(tree):
+def _is_dataclass_fields_frozen(tree):
     """assert if a dataclass is static"""
     if dc.is_dataclass(tree):
         field_items = dc.fields(tree)
         if len(field_items) > 0:
             return all(isinstance(f, pytc.FrozenField) for f in field_items)
     return False
+
+
+def _is_dataclass_leaf(tree):
+    """assert if a node is dataclass leaf"""
+    if dc.is_dataclass(tree):
+
+        return dc.is_dataclass(tree) and not any(
+            [dc.is_dataclass(getattr(tree, fi.name)) for fi in dc.fields(tree)]
+        )
+    return False
+
+
+def _is_dataclass_non_leaf(tree):
+    return dc.is_dataclass(tree) and not _is_dataclass_leaf(tree)
 
 
 def _mermaid_marker(field_item: dc.Field, node_item: Any, default: str = "--") -> str:
@@ -43,12 +57,12 @@ def _mermaid_marker(field_item: dc.Field, node_item: Any, default: str = "--") -
         str: marker character.
     """
     # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if isinstance(field_item, pytc.FrozenField) or is_dataclass_fields_frozen(
+    if isinstance(field_item, pytc.FrozenField) or _is_dataclass_fields_frozen(
         node_item
     ):
         return "-..-"
 
-    if isinstance(field_item, pytc.NonDiffField) or is_dataclass_fields_nondiff(
+    if isinstance(field_item, pytc.NonDiffField) or _is_dataclass_fields_nondiff(
         node_item
     ):
         return "--x"
@@ -60,12 +74,12 @@ def _marker(field_item: dc.Field, node_item: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item"""
     # '*' for non-diff
 
-    if isinstance(field_item, pytc.FrozenField) or is_dataclass_fields_frozen(
+    if isinstance(field_item, pytc.FrozenField) or _is_dataclass_fields_frozen(
         node_item
     ):
         return "#"
 
-    if isinstance(field_item, pytc.NonDiffField) or is_dataclass_fields_nondiff(
+    if isinstance(field_item, pytc.NonDiffField) or _is_dataclass_fields_nondiff(
         node_item
     ):
         return "*"
