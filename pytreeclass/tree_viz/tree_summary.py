@@ -14,11 +14,10 @@ from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
     _is_dataclass_fields_frozen,
+    _is_dataclass_leaf,
     _reduce_count_and_size,
     _sequential_tree_shape_eval,
-    _is_dataclass_leaf
 )
-
 
 PyTree = Any
 

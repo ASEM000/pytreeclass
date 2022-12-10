@@ -294,6 +294,9 @@ def test_apply_and_its_derivatives():
     rhs = init.at[...].apply(lambda x: (x + 1) * 10)
     assert pytc.is_treeclass_equal(lhs, rhs)
 
+    with pytest.raises(TypeError):
+        init.at[init].apply(lambda x: (x + 1) * 10)
+
     @pytc.treeclass
     class L0:
         a: int = 1

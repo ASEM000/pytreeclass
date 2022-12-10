@@ -5,7 +5,6 @@ import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
-import pytreeclass._src.dataclass_util as dcu
 from pytreeclass.tree_viz.utils import _node_count_and_size
 
 # def test_is_frozen():

@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import copy
 import dataclasses as dc
+import functools as ft
 import operator as op
-from types import FunctionType
-from typing import Any, Callable, Iterable
+import re
+from typing import Any, Callable, Generator
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
+from jax.core import Tracer
 
 from pytreeclass._src.dataclass_util import _mutable
 from pytreeclass._src.tree_indexer import _at_indexer
-from pytreeclass._src.tree_op import _append_math_eq_ne, _append_math_op, _eq, _ne
 from pytreeclass.tree_viz.tree_pprint import tree_repr, tree_str
 
 PyTree = Any
@@ -166,6 +166,126 @@ def _unflatten(cls, treedef, leaves):
     return tree
 
 
+def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
+    """`jtu.tree_map` for unary/binary operators broadcasting"""
+    # if rhs is a tree of the same type as lhs then we use the tree_map to apply the operator leaf-wise
+    if isinstance(rhs, type(lhs)):
+        return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
+    # if rhs is a scalar then we use the tree_map to apply the operator with broadcasting the rhs
+    elif isinstance(rhs, (Tracer, jnp.ndarray, int, float, complex, bool, str)):
+        return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
+    # if rhs is None , then we apply the operator to the tree leaves (i.e. unary operation)
+    elif isinstance(rhs, type(None)):
+        return jtu.tree_map(func, lhs, is_leaf=is_leaf)
+    raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
+
+
+def _append_math_op(func):
+    """binary and unary magic operations"""
+
+    @ft.wraps(func)
+    def wrapper(self, rhs=None):
+        return _dispatched_op_tree_map(func, self, rhs)
+
+    return wrapper
+
+
+def _append_math_eq_ne(func):
+    """Append eq/ne operations"""
+
+    def _boolean_map(cond: Callable[[dc.Field, Any], bool], tree: PyTree) -> PyTree:
+        """Set node True if cond(field, value) is True, otherwise set node False
+
+        Args:
+            cond (Callable[[Field, Any], bool]): Condition function applied to each field
+            tree (PyTree): _description_
+            is_leaf (Callable[[Any], bool] | None, optional): is_leaf. Defaults to None.
+
+        Returns:
+            PyTree: boolean mapped tree
+        """
+
+        def _true_leaves(node: Any) -> list[bool, ...]:
+            return [
+                jnp.ones_like(leaf).astype(jnp.bool_)
+                if isinstance(leaf, jnp.ndarray)
+                else True
+                for leaf in jtu.tree_leaves(node, is_leaf=lambda x: x is None)
+            ]
+
+        def _false_leaves(node: Any) -> list[bool, ...]:
+            return [
+                jnp.zeros_like(leaf).astype(jnp.bool_)
+                if isinstance(leaf, jnp.ndarray)
+                else False
+                for leaf in jtu.tree_leaves(node, is_leaf=lambda x: x is None)
+            ]
+
+        # this is the function responsible for the boolean mapping of
+        # `node_type`, `field_name`, and `field_metadata` comparisons.
+        def _traverse(tree) -> Generator[Any, ...]:
+            """traverse the tree and yield the applied function on the field and node"""
+            # We check each level of the tree not tree leaves,
+            # this is because, if a condition is met at a parent tree
+            # then the entire subtree is marked by a `True` subtree of the same structure.
+            # for example let `Test` be a pytreeclass wrapped class
+            # >>> tree = Test(a=1, b=Test(c=2,d=3))
+            # if we  check a field name == "b", then the entire subtree at b is marked True
+            # however if we get the tree_leaves of the tree, `b` will not be visible to the condition.
+
+            for field_item, node_item in (
+                [f, getattr(tree, f.name)]
+                for f in dc.fields(tree)
+                if not isinstance(f, NonDiffField)
+            ):
+                yield from _true_leaves(node_item) if cond(field_item, node_item) else (
+                    _traverse(node_item)
+                    if dc.is_dataclass(node_item)
+                    else _false_leaves(node_item)
+                )
+
+        return jtu.tree_unflatten(
+            treedef=jtu.tree_structure(tree, is_leaf=lambda x: x is None),
+            leaves=_traverse(tree=tree),
+        )
+
+    @ft.wraps(func)
+    def wrapper(self, where):
+        if isinstance(where, (int, float, complex, bool, type(self), Tracer, jnp.ndarray)):  # fmt: skip
+            return _dispatched_op_tree_map(func, self, where)
+        elif isinstance(where, str):
+            return _boolean_map(lambda x, y: func(x.name, where), self)
+        elif isinstance(where, type):
+            return _boolean_map(lambda x, y: func(y, where), self)
+        elif isinstance(where, dict):
+            return _boolean_map(lambda x, y: func(x.metadata, where), self)
+        raise NotImplementedError(f"rhs of type {type(where)} is not implemented.")
+
+    return wrapper
+
+
+def _eq(lhs, rhs):
+    if isinstance(rhs, type):
+        # rhs is a type (tree == int ) will perform a instance check leaf-wise
+        return isinstance(lhs, rhs)
+    elif isinstance(rhs, str):
+        # rhs is a string for (tree == "a") will perform a field name check using regex
+        found = re.findall(rhs, lhs)
+        return len(found) > 0 and found[0] == lhs
+    return op.eq(lhs, rhs)
+
+
+def _ne(lhs, rhs):
+    if isinstance(rhs, type):
+        # rhs is a type (tree == int ) will perform a instance check
+        return not isinstance(lhs, rhs)
+    elif isinstance(rhs, str):
+        # rhs is a string for (tree == "a") will perform a field name check using regex
+        found = re.findall(rhs, lhs)
+        return len(found) == 0 or found[0] != lhs
+    return op.ne(lhs, rhs)
+
+
 def treeclass(cls):
     """Decorator to make a class a treeclass"""
     dcls = dc.dataclass(
@@ -237,141 +357,3 @@ def is_treeclass_equal(lhs, rhs):
     return (lhs_treedef == rhs_treedef) and all(
         [is_node_equal(lhs_leaves[i], rhs_leaves[i]) for i in range(len(lhs_leaves))]
     )
-
-
-@_mutable
-def _tree_filter(tree: PyTree, where: PyTree | FunctionType, filter: bool) -> PyTree:
-    """Filter a tree based on a where condition.
-
-    Args:
-        tree: The tree to filter.
-        where: The where condition.
-        filter: If True filter the tree, else undo the filtering
-
-    Returns:
-        The filtered tree.
-    """
-
-    def _filter(tree: PyTree, where: PyTree):
-        _dataclass_fields = dict(tree.__dataclass_fields__)
-
-        for name in _dataclass_fields:
-            node_item = getattr(tree, name)
-
-            if dc.is_dataclass(node_item):
-                # in case of non-leaf recurse deeper
-                where = getattr(where, name) if isinstance(where, type(tree)) else where
-                _filter(tree=node_item, where=where)
-
-            else:
-                # leaf case
-                # where can be either a bool tree leaf of a function
-                if isinstance(where, type(tree)):
-                    node_where = getattr(where, name)
-                else:
-                    # where is a function
-                    node_where = where(node_item)
-
-                # check if the where condition is a bool tree leaf
-                # or a bool array and if all elements are True
-                if (
-                    isinstance(node_where, bool)
-                    or (hasattr(node_where, "dtype") and node_where.dtype == "bool")
-                ) and np.all(node_where):
-
-                    # if the where condition is True, then we need to filter/undo the filtering
-                    field_item = _dataclass_fields[name]
-                    field_name, field_type = field_item.name, field_item.type
-
-                    # extract the field parameters to create a new field
-                    # either frozen-> non-frozen or non-frozen -> frozen
-                    field_params = dict(
-                        default=field_item.default,
-                        default_factory=field_item.default_factory,
-                        init=field_item.init,
-                        repr=field_item.repr,
-                        hash=field_item.hash,
-                        compare=field_item.compare,
-                        metadata=field_item.metadata,
-                    )
-
-                    # change this once py requirement is 3.10+
-                    if "kw_only" in dir(field_item):
-                        field_params.update(kw_only=field_item.kw_only)
-
-                    if filter:
-                        # transform the field to a frozen field iff it is not a NonDiffField
-                        if not isinstance(field_item, NonDiffField):
-                            # convert to a frozen field
-                            field_item = FrozenField(**field_params)
-                            object.__setattr__(field_item, "name", field_name)
-                            object.__setattr__(field_item, "type", field_type)
-                            object.__setattr__(field_item, "_field_type", dc._FIELD)
-
-                    else:
-                        # transform the field to a default field iff it is a FrozenField
-                        # in essence we want to undo the filtering, so we need to convert the filtered fields
-                        # (i.e. FrozenField) to default fields (i.e. dc.Field)
-                        if isinstance(field_item, FrozenField):
-                            # convert to a default field
-                            field_item = dc.Field(**field_params)
-                            object.__setattr__(field_item, "name", field_name)
-                            object.__setattr__(field_item, "type", field_type)
-                            object.__setattr__(field_item, "_field_type", dc._FIELD)
-
-                    # update the fields dict
-                    _dataclass_fields[name] = field_item
-
-        # update the tree fields of the tree at the current level
-        setattr(tree, "__dataclass_fields__", _dataclass_fields)
-        return tree
-
-    # check if where is a callable or a tree of the same type as tree
-    # inside the _filter function we will check if where is a tree leafs are bools
-    if isinstance(where, FunctionType) or isinstance(where, type(tree)):
-        # we got to copy the tree to avoid mutating the original tree
-        return _filter(copy.copy(tree), where)
-    raise TypeError("Where must be of same type as `tree`  or a `Callable`")
-
-
-def is_nondiff(item: Any) -> bool:
-    """Check if a node is non-differentiable."""
-
-    def _is_nondiff_item(node: Any):
-        if (
-            (hasattr(node, "dtype") and jnp.issubdtype(node.dtype, jnp.inexact))
-            or isinstance(node, (float, complex))
-            or dc.is_dataclass(node)
-        ):
-            return False
-        return True
-
-    if isinstance(item, Iterable):
-        # if an iterable has at least one non-differentiable item
-        # then the whole iterable is non-differentiable
-        return any([_is_nondiff_item(item) for item in jtu.tree_leaves(item)])
-    return _is_nondiff_item(item)
-
-
-def tree_filter(tree: PyTree, *, where: Callable[[Any], bool] | PyTree = None):
-    """Filter a tree based on a callable function or a pytree of booleans.
-
-    Args:
-        tree: The tree to filter.
-        where: A callable function or a pytree of booleans. Defaults to filtering non-differentiable nodes.
-    """
-    if not dc.is_dataclass(tree):
-        raise TypeError("Tree must be a dataclass")
-    return _tree_filter(tree, where=(where or is_nondiff), filter=True)
-
-
-def tree_unfilter(tree: PyTree, *, where: Callable[[Any], bool] | PyTree = None):
-    """Unfilter a tree based on a callable function or a pytree of booleans.
-
-    Args:
-        tree: The tree to unfilter.
-        where: A callable function or a pytree of booleans. Defaults to unfiltering all nodes.
-    """
-    if not dc.is_dataclass(tree):
-        raise TypeError("Tree must be a dataclass")
-    return _tree_filter(tree, where=(where or (lambda _: True)), filter=False)
