@@ -6,13 +6,6 @@ import pytest
 import pytreeclass as pytc
 from pytreeclass._src.treeclass import _dispatched_op_tree_map
 
-# @pytc.treeclass
-# class Test:
-#     a: float
-#     b: float
-#     c: float
-#     name: str = pytc.nondiff_field()
-
 
 def test_ops():
     @pytc.treeclass

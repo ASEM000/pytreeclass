@@ -1,12 +1,55 @@
 import copy
-import dataclasses
+import dataclasses as dc
 
 import jax.tree_util as jtu
+import numpy.testing as npt
 import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
 from pytreeclass._src.dataclass_util import _mutable
+
+
+def test_field():
+
+    with pytest.raises(ValueError):
+        pytc.field(default=1, default_factory=lambda: 1)
+
+    assert pytc.field(default=1).default == 1
+
+
+def test_field_nondiff():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    test = Test()
+
+    @pytc.treeclass
+    class Test:
+        a: jnp.ndarray = jnp.array([1, 2, 3])
+        b: jnp.ndarray = jnp.array([4, 5, 6])
+
+    test = Test()
+
+    @pytc.treeclass
+    class Test:
+        a: jnp.ndarray = pytc.field(nondiff=True, default=jnp.array([1, 2, 3]))
+        b: jnp.ndarray = pytc.field(nondiff=True, default=jnp.array([4, 5, 6]))
+
+    test = Test()
+
+    assert jtu.tree_leaves(test) == []
+
+    @pytc.treeclass
+    class Test:
+        a: jnp.ndarray = pytc.field(nondiff=True, default=jnp.array([1, 2, 3]))
+        b: jnp.ndarray = jnp.array([4, 5, 6])
+
+    test = Test()
+    npt.assert_allclose(jtu.tree_leaves(test)[0], jnp.array([4, 5, 6]))
 
 
 def test_hash():
@@ -71,15 +114,6 @@ def test_overriding_setattr():
                 super().__setattr__(name, value)
 
 
-# def test_nonclass_input():
-
-#     with pytest.raises(TypeError):
-
-#         @pytc.treeclass
-#         def f(x):
-#             return x
-
-
 def test_registering_state():
     @pytc.treeclass
     class L0:
@@ -117,7 +151,7 @@ def test_delattr():
 
     t = L0()
 
-    with pytest.raises(dataclasses.FrozenInstanceError):
+    with pytest.raises(dc.FrozenInstanceError):
         del t.a
 
     with pytest.raises(TypeError):

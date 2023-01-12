@@ -29,6 +29,42 @@ class FrozenField(NonDiffField):
     pass
 
 
+def field(
+    *,
+    nondiff: bool = False,
+    default=dc.MISSING,
+    default_factory=dc.MISSING,
+    init=True,
+    repr=True,
+    hash=None,
+    compare=True,
+    metadata=None,
+    kw_only=dc.MISSING,
+):
+    """dataclass field with additional `nondiff` flag"""
+
+    if default is not dc.MISSING and default_factory is not dc.MISSING:
+        raise ValueError("cannot specify both default and default_factory")
+
+    args = dict(
+        default=default,
+        default_factory=default_factory,
+        init=init,
+        repr=repr,
+        hash=hash,
+        compare=compare,
+        metadata=metadata,
+    )
+
+    if "kw_only" in dir(dc.Field):
+        args.update(kw_only=kw_only)
+
+    if nondiff:
+        return NonDiffField(**args)
+
+    return dc.Field(**args)
+
+
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
     """set the attribute of the tree
 

@@ -1,9 +1,9 @@
 from pytreeclass import tree_viz
-from pytreeclass._src.dataclass_util import field
-from pytreeclass._src.tree_filter import is_nondiff, tree_filter, tree_unfilter
+from pytreeclass._src.dataclass_util import is_nondiff, tree_filter, tree_unfilter
 from pytreeclass._src.treeclass import (
     FrozenField,
     NonDiffField,
+    field,
     is_treeclass_equal,
     treeclass,
 )
