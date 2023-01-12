@@ -206,7 +206,4 @@ def test_freeze_mask():
 
     t = Test()
 
-    assert jtu.tree_leaves(pytc.tree_filter(t, where=t == "a")) == [2, 3.0]
-    assert jtu.tree_leaves(pytc.tree_filter(t, where=t == "b")) == [1, 3.0]
-    assert jtu.tree_leaves(pytc.tree_filter(t, where=t == "c")) == [1, 2]
     assert jtu.tree_leaves(pytc.tree_filter(t, where=t == t)) == []

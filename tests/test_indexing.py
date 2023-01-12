@@ -4,9 +4,7 @@ from dataclasses import field
 
 import jax
 import jax.numpy as jnp
-import jax.random as jr
 import jax.tree_util as jtu
-import numpy.testing as npt
 import pytest
 
 import pytreeclass as pytc
@@ -91,50 +89,12 @@ def test_getter_by_param():
         d: L1 = L1()
 
     t = L2()
-    lhs = t.at[t == "a"].get()
-    rhs = L2(10, None, None, L1(1, None, None, L0(1, None, None)))
-    assert pytc.is_treeclass_equal(lhs, rhs)
 
     with pytest.raises(AttributeError):
         t.at["s"].get()
 
     with pytest.raises(AttributeError):
         t.at["s"].apply(lambda _: 100)
-
-
-def test_getter_by_metadata():
-    @pytc.treeclass
-    class Test:
-        a: float = field(metadata={"name": "a"})
-        b: float = field(metadata={"name": "b"})
-        c: float = field(metadata={"name": "c"})
-        d: jnp.ndarray = field(metadata={"name": "d"})
-        name: str = pytc.field(nondiff=True)
-
-    @pytc.treeclass
-    class L0:
-        a: int = field(default=1, metadata={"name": "a"})
-        b: int = 2
-        c: int = 3
-
-    @pytc.treeclass
-    class L1:
-        a: int = field(default=1, metadata={"name": "a"})
-        b: int = 2
-        c: int = 3
-        d: L0 = L0()
-
-    @pytc.treeclass
-    class L2:
-        a: int = field(default=10, metadata={"name": "a"})
-        b: int = 20
-        c: int = 30
-        d: L1 = L1()
-
-    t = L2()
-    lhs = t.at[t == {"name": "a"}].get()
-    rhs = L2(10, None, None, L1(1, None, None, L0(1, None, None)))
-    assert pytc.is_treeclass_equal(lhs, rhs)
 
 
 def test_setter_by_val():
@@ -191,73 +151,10 @@ def test_setter_by_val():
         d: L1 = L1()
 
     t = L2()
-    lhs = t.at[t == "a"].set(100)
-    rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
-    assert pytc.is_treeclass_equal(lhs, rhs)
 
     tt = L2(100, 200, 300, L1(10, 20, 30, L0(10, 20, 30)))
     lhs = t.at[t == t].set(tt)
     assert pytc.is_treeclass_equal(lhs, tt)
-
-    lhs = t.at[t == "a"].set(tt)
-    assert pytc.is_treeclass_equal(lhs, L2(100, 20, 30, L1(10, 2, 3, L0(10, 2, 3))))
-
-
-def test_setter_by_param():
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
-
-    B = A.at[A == "a"].set(0)
-    assert pytc.is_treeclass_equal(
-        B, Test(0, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
-    )
-
-    B = A.at[(A == "a") | (A == "b")].set(0)
-    assert pytc.is_treeclass_equal(B, Test(0, 0, 30, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
-    B = A.at[(A == "a") | (A == "b") | (A == "c")].set(0)
-    assert pytc.is_treeclass_equal(B, Test(0, 0, 0, jnp.array([1, 2, 3, 4, 5]), ("A")))
-
-
-def test_setter_by_metadata():
-    @pytc.treeclass
-    class Test:
-        a: float = field(metadata={"name": "a"})
-        b: float = field(metadata={"name": "b"})
-        c: float = field(metadata={"name": "c"})
-        d: jnp.ndarray = field(metadata={"name": "d"})
-        name: str
-
-    @pytc.treeclass
-    class L0:
-        a: int = field(default=1, metadata={"name": "a"})
-        b: int = 2
-        c: int = 3
-
-    @pytc.treeclass
-    class L1:
-        a: int = field(default=1, metadata={"name": "a"})
-        b: int = 2
-        c: int = 3
-        d: L0 = L0()
-
-    @pytc.treeclass
-    class L2:
-        a: int = field(default=10, metadata={"name": "a"})
-        b: int = 20
-        c: int = 30
-        d: L1 = L1()
-
-    t = L2()
-    lhs = t.at[t == {"name": "a"}].set(100)
-    rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    @pytc.treeclass
-    class T:
-        a: jnp.ndarray
-
-    t = T(True)
-    assert pytc.is_treeclass_equal(t.at[t == bool].set(False), T(a=False))
 
 
 def test_apply_and_its_derivatives():
@@ -317,11 +214,6 @@ def test_apply_and_its_derivatives():
         c: int = 30
         d: L1 = L1()
 
-    t = L2()
-    lhs = t.at[t == "a"].apply(lambda _: 100)
-    rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
     rhs = init.at[init == init].apply(lambda x: x + 1)
     assert pytc.is_treeclass_equal(lhs, rhs)
@@ -375,136 +267,6 @@ def test_apply_and_its_derivatives():
 
     lhs = A(1, 4, jnp.array([1, 4, 3, 4, 5]))
     rhs = init.at[init == 2].apply(lambda x: x * 2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    # by param
-
-    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: x**2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(20, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: (x + 1) * 10)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(0.5, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: x / 2.0)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: jnp.minimum(x, 1))
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(4, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: jnp.maximum(x, 4))
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: x**2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(2, 2, jnp.array([1, 2, 3, 4, 5]))
-    rhs = init.at[init == "a"].apply(lambda x: x * 2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    #
-    lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
-    rhs = init.at[init != "a"].apply(lambda x: x**2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(1, 3, jnp.array([2, 3, 4, 5, 6]))
-    rhs = init.at[init != "a"].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(1, 30, jnp.array([20, 30, 40, 50, 60]))
-    rhs = init.at[init != "a"].apply(lambda x: (x + 1) * 10)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(1, 3, jnp.array([2, 3, 4, 5, 6]))
-    rhs = init.at[init != "a"].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    lhs = A(1, 1, jnp.array([0.5, 1, 1.5, 2, 2.5]))
-    rhs = init.at[init != "a"].apply(lambda x: x / 2.0)
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    @pytc.treeclass
-    class Test:
-        a: float = field(metadata={"name": "a"})
-        b: float = field(metadata={"name": "b"})
-        c: float = field(metadata={"name": "c"})
-        d: jnp.ndarray = field(metadata={"name": "d"})
-        name: str = pytc.field(nondiff=True)
-
-    A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
-
-    B = A.at[A != {"name": "a"}].apply(lambda _: 100)
-    assert pytc.is_treeclass_equal(
-        B, Test(10, 100, 100, jnp.array([100, 100, 100, 100, 100]), ("A"))
-    )
-
-    @pytc.treeclass
-    class L0:
-        a: int = field(default=1, metadata={"name": "a"})
-        b: int = 2
-        c: int = 3
-
-    @pytc.treeclass
-    class L1:
-        a: int = field(default=1, metadata={"name": "a"})
-        b: int = 2
-        c: int = 3
-        d: L0 = L0()
-
-    @pytc.treeclass
-    class L2:
-        a: int = field(default=10, metadata={"name": "a"})
-        b: int = 20
-        c: int = 30
-        d: L1 = L1()
-
-    t = L2()
-    lhs = t.at[t == {"name": "a"}].apply(lambda _: 100)
-    rhs = L2(100, 20, 30, L1(100, 2, 3, L0(100, 2, 3)))
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    t = L2()
-    lhs = t.at[t != {"name": "a"}].apply(lambda _: 100)
-    rhs = L2(10, 100, 100, L1(100, 100, 100, L0(100, 100, 100)))
-
-    assert pytc.is_treeclass_equal(lhs, rhs)
-
-    @pytc.treeclass
-    class L0:
-        a: int = 1
-        b: int = 2
-        c: int = 3
-
-    @pytc.treeclass
-    class L1:
-        a: int = 1
-        b: int = 2
-        c: int = 3
-        d: L0 = L0()
-
-    @pytc.treeclass
-    class L2:
-        a: int = 10
-        b: int = 20
-        c: int = 30
-        d: L1 = field(default=L1(), metadata={"name": "d"})
-
-    t = L2()
-    lhs = t.at[t == {"name": "d"}].apply(lambda _: 100)
-    rhs = L2(10, 20, 30, L1(100, 100, 100, L0(100, 100, 100)))
     assert pytc.is_treeclass_equal(lhs, rhs)
 
 
@@ -589,45 +351,6 @@ def test_reduce_and_its_derivatives():
         model.at[model > 0].reduce(lambda x, y: x * jnp.product(y), initializer=1)
     ) == 1.8088213
 
-    assert (model.at[model == "l1"].reduce(lambda x, y: x + jnp.sum(y))) == 2.8428133
-    assert (
-        model.at[model == "l1"].reduce(lambda x, y: x * jnp.product(y), initializer=1)
-    ) == -3.4602268
-
-    assert (
-        model.at[model == Linear].reduce(
-            lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=jnp.inf
-        )
-    ) == -2.8383057
-    assert (
-        model.at[model == Linear].reduce(
-            lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
-        )
-    ) == 1.3969219
-    assert (model.at[model == Linear].reduce(lambda x, y: x + jnp.sum(y))) == 3.3538322
-    assert (
-        model.at[model == Linear].reduce(lambda x, y: x * jnp.product(y), initializer=1)
-    ) == 0.84782064
-
-    assert (
-        model.at[model == jnp.ndarray].reduce(
-            lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=jnp.inf
-        )
-    ) == -2.8383057
-    assert (
-        model.at[model == jnp.ndarray].reduce(
-            lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
-        )
-    ) == 1.3969219
-    assert (
-        model.at[model == jnp.ndarray].reduce(lambda x, y: x + jnp.sum(y))
-    ) == 3.3538322
-    assert (
-        model.at[model == jnp.ndarray].reduce(
-            lambda x, y: x * jnp.product(y), initializer=1
-        )
-    ) == 0.84782064
-
 
 def test_is_leaf():
     @pytc.treeclass
@@ -643,62 +366,6 @@ def test_is_leaf():
     assert pytc.is_treeclass_equal(
         t.at[...].apply(lambda x: 10, is_leaf=lambda x: x is None),
         Test([10, 10, 10, 10]),
-    )
-
-
-def test_masking():
-    @pytc.treeclass
-    class Linear:
-        weight: jnp.ndarray
-        bias: jnp.ndarray
-
-        def __init__(self, key, in_dim, out_dim):
-            self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
-                2 / in_dim
-            )
-            self.bias = jnp.ones((1, out_dim))
-
-        def __call__(self, x):
-            return x @ self.weight + self.bias
-
-    @pytc.treeclass
-    class Dropout:
-        p: float
-        eval: bool | None
-
-        def __init__(self, p: float = 0.5, eval: bool | None = None):
-            """p : probability of an element to be zeroed out"""
-            self.p = p
-            self.eval = eval
-
-        def __call__(self, x, *, key=jr.PRNGKey(0)):
-            return (
-                x
-                if (self.eval is True)
-                else jnp.where(
-                    jr.bernoulli(key, (1 - self.p), x.shape), x / (1 - self.p), 0
-                )
-            )
-
-    @pytc.treeclass
-    class LinearWithDropout:
-        def __init__(self):
-            self.l1 = Linear(key=jr.PRNGKey(0), in_dim=1, out_dim=5)
-            self.d1 = Dropout(p=1.0)  # zero out all elements
-
-        def __call__(self, x):
-            x = self.l1(x)
-            x = self.d1(x)
-            return x
-
-    model = LinearWithDropout()
-    npt.assert_allclose(model(jnp.ones((1, 1))), jnp.array([[0.0, 0.0, 0.0, 0.0, 0.0]]))
-
-    mask = model == "eval"
-    model_no_dropout = model.at[mask].set(True, is_leaf=lambda x: x is None)
-    npt.assert_allclose(
-        model_no_dropout(jnp.ones((1, 1))),
-        jnp.array([[1.2656513, -0.8149204, 0.61661845, 2.7664368, 1.3457328]]),
     )
 
 
@@ -808,9 +475,6 @@ def test_composed_at():
     t = Test()
 
     assert pytc.is_treeclass_equal(t.at[t > 0].at[t < 0].get(), Test(jnp.array([])))
-    assert pytc.is_treeclass_equal(
-        t.at[t > 0].at[t == "a"].get(), Test(jnp.array([1, 2, 3, 4, 5]))
-    )
 
     with pytest.raises(AttributeError):
         t.at[t > 0].bet
@@ -841,10 +505,6 @@ def test_not_equal():
 
     t = Test()
 
-    assert pytc.is_treeclass_equal(t.at[t == int].set(10), Test(a=10, b=1.0))
-
-    assert pytc.is_treeclass_equal(t.at[t != int].set(10.0), Test(a=1, b=10.0))
-
     assert pytc.is_treeclass_equal(t.at[t != 10].set(10.0), Test(a=10.0, b=10.0))
 
 
@@ -855,7 +515,3 @@ def test_iterable_node():
 
     t = Test([1, 2, 3, 4])
     assert pytc.is_treeclass_equal(t.at[...].set(True), Test([True, True, True, True]))
-    assert pytc.is_treeclass_equal(
-        t.at[t == "a"].set(True), Test([True, True, True, True])
-    )
-    assert pytc.is_treeclass_equal(t.at[t != "a"].set(True), Test([1, 2, 3, 4]))

@@ -85,28 +85,3 @@ def test_dispatched_tree_map():
             ...
 
         _dispatched_op_tree_map(lambda x, y: x, 1, A())
-
-
-def test_at_str_regex():
-    @pytc.treeclass
-    class Test:
-        a_conv: int = 0
-        b_conv: jnp.ndarray = jnp.array([1, 2, 3])
-        c: tuple[int, ...] = (1, 2, 3)
-
-    t = Test()
-
-    t = t == r".*conv"
-    assert pytc.is_treeclass_equal(
-        t, Test(True, jnp.array([True, True, True]), (False, False, False))
-    )
-
-    t = t != r".*conv"
-    assert pytc.is_treeclass_equal(
-        t, Test(False, jnp.array([False, False, False]), (True, True, True))
-    )
-
-    t = t == r"c"
-    assert pytc.is_treeclass_equal(
-        t, Test(False, jnp.array([False, False, False]), (True, True, True))
-    )
