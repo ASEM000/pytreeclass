@@ -4,7 +4,6 @@ import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.treeclass import _dispatched_op_tree_map
 
 
 def test_ops():
@@ -68,13 +67,3 @@ def test_op_errors():
 
     with pytest.raises(NotImplementedError):
         A == (1,)
-
-
-def test_dispatched_tree_map():
-
-    with pytest.raises(NotImplementedError):
-
-        class A:
-            ...
-
-        _dispatched_op_tree_map(lambda x, y: x, 1, A())

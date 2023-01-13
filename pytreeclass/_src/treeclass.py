@@ -41,7 +41,13 @@ def field(
     metadata=None,
     kw_only=dc.MISSING,
 ):
-    """dataclass field with additional `nondiff` flag"""
+    """dataclass field with additional `nondiff` flag
+
+    Example:
+        >>> @dataclass
+        ... class Foo:
+        ...     x: int = field(nondiff=True)
+    """
 
     if default is not dc.MISSING and default_factory is not dc.MISSING:
         raise ValueError("cannot specify both default and default_factory")
@@ -59,7 +65,7 @@ def field(
     if "kw_only" in dir(dc.Field):
         args.update(kw_only=kw_only)
 
-    if nondiff:
+    if nondiff is True:
         return NonDiffField(**args)
 
     return dc.Field(**args)
@@ -119,6 +125,7 @@ def _delattr(tree, key: str) -> None:
     object.__delattr__(tree, key)
 
 
+@_mutable
 def _new(cls, *a, **k) -> PyTree:
     """custom __new__ for treeclass
 
@@ -201,32 +208,48 @@ def _unflatten(cls, treedef, leaves):
     return tree
 
 
-def _dispatched_op_tree_map(func, lhs, rhs=None, is_leaf=None):
-    """`jtu.tree_map` for unary/binary operators broadcasting"""
-    # if rhs is a tree of the same type as lhs then we use the tree_map to apply the operator leaf-wise
-    if isinstance(rhs, type(lhs)):
-        return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
-    # if rhs is a scalar then we use the tree_map to apply the operator with broadcasting the rhs
-    elif isinstance(rhs, (Tracer, jnp.ndarray, int, float, complex, bool, str)):
-        return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
-    # if rhs is None , then we apply the operator to the tree leaves (i.e. unary operation)
-    elif isinstance(rhs, type(None)):
-        return jtu.tree_map(func, lhs, is_leaf=is_leaf)
-    raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
-
-
 def _append_math_op(func):
     """binary and unary magic operations"""
 
     @ft.wraps(func)
-    def wrapper(self, rhs=None):
-        return _dispatched_op_tree_map(func, self, rhs)
+    def wrapper(lhs, rhs=None, is_leaf=None):
+        """`jtu.tree_map` for unary/binary operators broadcasting"""
+        # if rhs is a tree of the same type as lhs then we use the tree_map to apply the operator leaf-wise
+        if isinstance(rhs, type(lhs)):
+            return jtu.tree_map(func, lhs, rhs, is_leaf=is_leaf)
+        # if rhs is a scalar then we use the tree_map to apply the operator with broadcasting the rhs
+        elif isinstance(rhs, (Tracer, jnp.ndarray, int, float, complex, bool, str)):
+            return jtu.tree_map(lambda x: func(x, rhs), lhs, is_leaf=is_leaf)
+        # if rhs is None , then we apply the operator to the tree leaves (i.e. unary operation)
+        elif isinstance(rhs, type(None)):
+            return jtu.tree_map(func, lhs, is_leaf=is_leaf)
+        raise NotImplementedError(f"rhs of type {type(rhs)} is not implemented.")
 
     return wrapper
 
 
-def treeclass(cls):
-    """Decorator to make a class a treeclass"""
+def treeclass(cls) -> PyTree:
+    """Decorator to convert a class to a `treeclass`
+
+    Example:
+        >>> @treeclass
+        ... class Tree:
+        ...     x: float
+        ...     y: float
+        ...     z: float
+        >>> tree = Tree(1, 2, 3)
+        >>> tree
+        Tree(x=1, y=2, z=3)
+
+    Args:
+        cls: class to be converted to a `treeclass`
+
+    Returns:
+        `treeclass` of the input class
+
+    Raises:
+        TypeError: if the input class is not a `class`
+    """
     dcls = dc.dataclass(
         init="__init__" not in vars(cls),  # if __init__ is defined, do not overwrite it
         repr=False,  # repr is handled by _treePretty
@@ -237,7 +260,7 @@ def treeclass(cls):
     )(cls)
 
     attrs = dict(
-        __new__=_mutable(_new),  # overwrite __new__ to initialize instance variables
+        __new__=_new,  # overwrite __new__ to initialize instance variables
         __init__=_mutable(cls.__init__),  # make it mutable during initialization
         __setattr__=_setattr,  # disable direct attribute setting unless __immutable_treeclass__ is False
         __delattr__=_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False

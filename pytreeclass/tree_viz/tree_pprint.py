@@ -13,7 +13,7 @@ from pytreeclass.tree_viz.utils import _marker
 PyTree = Any
 
 
-def _tree_pprint(tree, width: int = 80, kind="r") -> str:
+def _tree_pprint(tree, width: int = 80, kind="repr") -> str:
     """Prertty print `treeclass_leaves`"""
 
     def recurse(tree: PyTree, depth: int):
@@ -46,10 +46,10 @@ def _tree_pprint(tree, width: int = 80, kind="r") -> str:
             else:
                 FMT += f"{mark}{field_item.name}="
 
-                if kind == "r":
+                if kind == "repr":
                     FMT += f"{(_format_node_repr(node_item,depth))}"
 
-                elif kind == "s":
+                elif kind == "str":
                     if "\n" in f"{node_item!s}":
                         # in case of multiline string then indent all lines
                         FMT += "\n" + "\t" * (depth + 1)
@@ -68,9 +68,9 @@ def _tree_pprint(tree, width: int = 80, kind="r") -> str:
 
 def tree_repr(tree, width: int = 80) -> str:
     """Prertty print `treeclass_leaves`"""
-    return _tree_pprint(tree, width, kind="r")
+    return _tree_pprint(tree, width, kind="repr")
 
 
 def tree_str(tree, width: int = 80) -> str:
     """Prertty print `treeclass_leaves`"""
-    return _tree_pprint(tree, width, kind="s")
+    return _tree_pprint(tree, width, kind="str")
