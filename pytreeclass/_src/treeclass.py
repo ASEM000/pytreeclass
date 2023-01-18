@@ -3,43 +3,43 @@ from __future__ import annotations
 import dataclasses as dc
 import functools as ft
 import operator as op
-from typing import Any
+from typing import Any, Callable
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 from jax.core import Tracer
 
-from pytreeclass._src.dataclass_util import _mutable
 from pytreeclass._src.tree_indexer import _at_indexer
+from pytreeclass._src.utils import _mutable
 from pytreeclass.tree_viz.tree_pprint import tree_repr, tree_str
 
 PyTree = Any
 
 
 class NonDiffField(dc.Field):
-    # intended for non-differentiable fields that will
-    # be excluded from the tree flattening
+    """Intended for non-differentiable fields that will be excluded from the tree flattening"""
+
     pass
 
 
-class FrozenField(NonDiffField):
-    # intended for fields that will be excluded from the tree flattening
-    # by the `tree_filter`.
+class FilteredField(NonDiffField):
+    """Intended for fields that will be excluded from the tree flattening by the `tree_filter`."""
+
     pass
 
 
 def field(
     *,
     nondiff: bool = False,
-    default=dc.MISSING,
-    default_factory=dc.MISSING,
-    init=True,
-    repr=True,
-    hash=None,
-    compare=True,
-    metadata=None,
-    kw_only=dc.MISSING,
+    default: Any = dc.MISSING,
+    default_factory: Callable = dc.MISSING,
+    init: bool = True,
+    repr: bool = True,
+    hash: bool = None,
+    compare: bool = True,
+    metadata: dict = None,
+    kw_only: bool = dc.MISSING,
 ):
     """dataclass field with additional `nondiff` flag
 
@@ -47,6 +47,20 @@ def field(
         >>> @dataclass
         ... class Foo:
         ...     x: int = field(nondiff=True)
+
+    Args:
+        nondiff: if True, the field will be excluded from the tree flattening
+        default: default value of the field
+        default_factory: default factory of the field
+        init: if True, the field will be included in the __init__ method
+        repr: if True, the field will be included in the __repr__ method
+        hash: if True, the field will be included in the __hash__ method
+        compare: if True, the field will be included in the __eq__ method
+        metadata: metadata of the field
+        kw_only: if True, the field will be a keyword only argument
+
+    Note:
+        see flax.struct.field for more similar implementation of dataclass field
     """
 
     if default is not dc.MISSING and default_factory is not dc.MISSING:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses as dc
 from typing import Any
 
-import pytreeclass._src.dataclass_util as dcu
+import pytreeclass._src.utils as dcu
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import _marker
 

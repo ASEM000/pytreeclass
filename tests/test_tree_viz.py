@@ -62,7 +62,7 @@ r1f = pytc.tree_filter(r1)
 r2f = pytc.tree_filter(r2, where=lambda _: True)
 
 
-def test_repr():
+def test_tree_repr():
     assert (
         pytc.tree_unfilter(pytc.tree_filter(r1)).__repr__()
         == r1.__repr__()
@@ -83,7 +83,7 @@ def test_repr():
     )
 
 
-def test_str():
+def test_tree_str():
     assert (
         r1.__str__()
         # trunk-ignore(flake8/E501)
@@ -99,3 +99,7 @@ def test_str():
         # trunk-ignore(flake8/E501)
         == "Repr3(\n  l2=Linear(\n    weight=\n      [[1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       ...\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]],\n    bias=\n      [[1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1.]],\n    *notes=string\n  ),\n  l3=Linear(\n    weight=\n      [[1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       ...\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]],\n    bias=[[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]],\n    *notes=string\n  )\n)"
     )
+
+
+def test_tree_summary():
+    pass

@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.core import Tracer
 
-from pytreeclass._src.dataclass_util import _set_dataclass_frozen
+from pytreeclass._src.utils import _set_dataclass_frozen
 
 PyTree = Any
 EllipsisType = type(Ellipsis)

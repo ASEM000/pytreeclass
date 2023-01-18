@@ -1,51 +1,25 @@
 from __future__ import annotations
 
 import dataclasses as dc
-import math
 from typing import Any
 
 import jax.numpy as jnp
 
 import pytreeclass as pytc
-import pytreeclass._src.dataclass_util as dcu
+import pytreeclass._src.utils as dcu
 
 # from pytreeclass._src.dispatch import dispatch
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _format_node_repr
 from pytreeclass.tree_viz.utils import (
+    _format_count,
+    _format_size,
     _is_dataclass_fields_frozen,
     _reduce_count_and_size,
     _sequential_tree_shape_eval,
 )
 
 PyTree = Any
-
-
-def _format_size(node_size, newline=False):
-    """return formatted size from inexact(exact) complex number"""
-    mark = "\n" if newline else ""
-    order_kw = ["B", "KB", "MB", "GB"]
-
-    if isinstance(node_size, complex):
-        # define order of magnitude
-        real_size_order = int(math.log(max(node_size.real, 1), 1024))
-        imag_size_order = int(math.log(max(node_size.imag, 1), 1024))
-        fmt = f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
-        fmt += f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
-        return fmt
-
-    elif isinstance(node_size, (float, int)):
-        size_order = int(math.log(node_size, 1024)) if node_size > 0 else 0
-        return f"{(node_size)/(1024**size_order):.2f}{order_kw[size_order]}"
-
-
-def _format_count(node_count, newline=False):
-    mark = "\n" if newline else ""
-
-    if isinstance(node_count, complex):
-        return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
-    elif isinstance(node_count, (float, int)):
-        return f"{int(node_count):,}"
 
 
 def tree_summary(
@@ -122,13 +96,12 @@ def tree_summary(
         if isinstance(node_item, (list, tuple)) and any(
             dc.is_dataclass(leaf) for leaf in node_item
         ):
-            # case of a leaf container
-            # expand container if any item is a `dataclass`
+            # expand leaf container if any item inside the container is a `dataclass`
             for i, layer in enumerate(node_item):
 
-                if isinstance(field_item, pytc.FrozenField):
+                if isinstance(field_item, pytc.FilteredField):
                     # all the items in the container are frozen if the container is frozen
-                    new_field = dc.field(metadata={"static": "frozen"})
+                    new_field = pytc.FilteredField()
                 else:
                     # create a new field for each item in the container
                     new_field = dc.field()
@@ -145,14 +118,15 @@ def tree_summary(
                 )
 
         elif dc.is_dataclass(node_item):
+            # case for nested dataclass
             # check if the node is frozen or it all the fields are frozen
-            is_frozen = isinstance(field_item, pytc.FrozenField)
+            is_frozen = isinstance(field_item, pytc.FilteredField)
             is_frozen = is_frozen or _is_dataclass_fields_frozen(node_item)
 
             dynamic = {
                 f.name: getattr(node_item, f.name)
                 for f in dc.fields(node_item)
-                if not isinstance(field_item, (pytc.NonDiffField, pytc.FrozenField))
+                if not isinstance(field_item, (pytc.NonDiffField, pytc.FilteredField))
             }
 
             count, size = _reduce_count_and_size(pytc.tree_unfilter(node_item))
@@ -181,7 +155,7 @@ def tree_summary(
                 SIZE[1 if is_frozen else 0] += size
 
         else:
-            # case of a leaf parameter
+            # case of a non-dataclass/non-container leaf parameter
             if dcu.is_field_nondiff(field_item):
                 return
 

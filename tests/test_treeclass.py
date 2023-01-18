@@ -7,7 +7,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.dataclass_util import _mutable
+from pytreeclass._src.utils import _mutable
 
 
 def test_field():
