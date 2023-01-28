@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import dataclasses
 
+import jax.tree_util as jtu
 from jax import numpy as jnp
 
 import pytreeclass as pytc
+from pytreeclass.tree_viz import tree_diagram, tree_repr, tree_str, tree_summary
 
 
 @pytc.treeclass
@@ -58,48 +60,21 @@ r1 = Repr1()
 r2 = Repr2()
 r3 = Repr3(in_dim=128, out_dim=10)
 
-r1f = pytc.tree_filter(r1)
-r2f = pytc.tree_filter(r2, where=lambda _: True)
+mask = jtu.tree_map(pytc.is_nondiff, r1)
+r1f = r1.at[mask].apply(pytc.tree_freeze)
+
+mask = r2 == r2
+r2f = r2.at[mask].apply(pytc.tree_freeze)
 
 
-def test_tree_repr():
+def test_tree_diagram():
+
     assert (
-        pytc.tree_unfilter(pytc.tree_filter(r1)).__repr__()
-        == r1.__repr__()
-        # trunk-ignore(flake8/E501)
-        == "Repr1(\n  a=1,\n  b='string',\n  c=1.0,\n  d='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',\n  e=[\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10\n  ],\n  f={1,2,3},\n  g={\n    a:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',\n    b:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',\n    c:f32[5,5]\n  },\n  h=f32[5,1],\n  i=f32[1,6],\n  j=f32[1,1,4,5]\n)"
-    )
-    assert r2.__repr__() == "Repr2(a=f32[5,1],b=f32[1,1],c=f32[1,1,4,5])"
-    assert (
-        r3.__repr__()
-        # trunk-ignore(flake8/E501)
-        == "Repr3(\n  l2=Linear(weight=f32[128,128],bias=f32[1,128],*notes='string'),\n  l3=Linear(weight=f32[128,10],bias=f32[1,10],*notes='string')\n)"
+        tree_diagram(r1)
+        == "Repr1\n    ├── a:int=1\n    ├── b:str='string'\n    ├── c:float=1.0\n    ├── d:str='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n    ├── e:list\n    │   ├── [0]:int=10\n    │   ├── [1]:int=10\n    │   ├── [2]:int=10\n    │   ├── [3]:int=10\n    │   ├── [4]:int=10\n    │   ├── [5]:int=10\n    │   ├── [6]:int=10\n    │   ├── [7]:int=10\n    │   ├── [8]:int=10\n    │   ├── [9]:int=10\n    │   ├── [10]:int=10\n    │   ├── [11]:int=10\n    │   ├── [12]:int=10\n    │   ├── [13]:int=10\n    │   ├── [14]:int=10\n    │   ├── [15]:int=10\n    │   ├── [16]:int=10\n    │   ├── [17]:int=10\n    │   ├── [18]:int=10\n    │   ├── [19]:int=10\n    │   ├── [20]:int=10\n    │   ├── [21]:int=10\n    │   ├── [22]:int=10\n    │   ├── [23]:int=10\n    │   └── [24]:int=10 \n    ├── f:set={1,2,3}\n    ├── g:dict\n    │   ├-─ a:str='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n    │   ├-─ b:str='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'\n    │   └-─ c:DeviceArray=f32[5,5]∈[1.0,1.0]    \n    ├── h:DeviceArray=f32[5,1]∈[1.0,1.0]\n    ├── i:DeviceArray=f32[1,6]∈[1.0,1.0]\n    └── j:DeviceArray=f32[1,1,4,5]∈[1.0,1.0]    "
     )
 
     assert (
-        r1f.__repr__()
-        # trunk-ignore(flake8/E501)
-        == "Repr1(\n  #a=1,\n  #b='string',\n  c=1.0,\n  #d='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',\n  #e=[\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10\n  ],\n  #f={1,2,3},\n  #g={\n    a:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',\n    b:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',\n    c:f32[5,5]\n  },\n  h=f32[5,1],\n  i=f32[1,6],\n  j=f32[1,1,4,5]\n)"
+        tree_diagram(r2)
+        == "Repr2\n    ├── a:DeviceArray=f32[5,1]∈[1.0,1.0]\n    ├── b:DeviceArray=f32[1,1]∈[1.0,1.0]\n    └── c:DeviceArray=f32[1,1,4,5]∈[1.0,1.0]    "
     )
-
-
-def test_tree_str():
-    assert (
-        r1.__str__()
-        # trunk-ignore(flake8/E501)
-        == "Repr1(\n  a=1,\n  b=string,\n  c=1.0,\n  d=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n  e=[\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10,\n    10\n  ],\n  f={1,2,3},\n  g=\n    {\n      a:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n      b:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,\n      c:\n      [[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]\n    },\n  h=\n    [[1.]\n     [1.]\n     [1.]\n     [1.]\n     [1.]],\n  i=[[1. 1. 1. 1. 1. 1.]],\n  j=\n    [[[[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]]]\n)"
-    )
-    assert (
-        r2.__str__()
-        # trunk-ignore(flake8/E501)
-        == "Repr2(\n  a=\n    [[1.]\n     [1.]\n     [1.]\n     [1.]\n     [1.]],\n  b=[[1.]],\n  c=\n    [[[[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]]]\n)"
-    )
-    assert (
-        r3.__str__()
-        # trunk-ignore(flake8/E501)
-        == "Repr3(\n  l2=Linear(\n    weight=\n      [[1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       ...\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]],\n    bias=\n      [[1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1.]],\n    *notes=string\n  ),\n  l3=Linear(\n    weight=\n      [[1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       ...\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]],\n    bias=[[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]],\n    *notes=string\n  )\n)"
-    )
-
-
-def test_tree_summary():
-    pass

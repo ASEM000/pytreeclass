@@ -7,7 +7,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.utils import _mutable
+from pytreeclass._src.tree_freeze import _set_dataclass_frozen
 
 
 def test_field():
@@ -102,18 +102,6 @@ def test_subclassing():
     assert l1.sub(10) == 0
 
 
-def test_overriding_setattr():
-
-    with pytest.raises(TypeError):
-
-        @pytc.treeclass
-        class Test:
-            a: int = 1
-
-            def __setattr__(self, name, value):
-                super().__setattr__(name, value)
-
-
 def test_registering_state():
     @pytc.treeclass
     class L0:
@@ -154,20 +142,17 @@ def test_delattr():
     with pytest.raises(dc.FrozenInstanceError):
         del t.a
 
-    with pytest.raises(TypeError):
-
-        @pytc.treeclass
-        class L1:
-            def __delattr__(self, name):
-                pass
-
     @pytc.treeclass
     class L2:
         a: int = 1
 
-        @_mutable
         def delete(self, name):
             del self.a
 
     t = L2()
+    t = _set_dataclass_frozen(t, False)
     t.delete("a")
+
+    t = _set_dataclass_frozen(t, True)
+    with pytest.raises(dc.FrozenInstanceError):
+        t.delete("a")

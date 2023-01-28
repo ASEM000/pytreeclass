@@ -1,24 +1,21 @@
 from pytreeclass import tree_viz
-from pytreeclass._src.tree_filter_unfilter import tree_filter, tree_unfilter
-from pytreeclass._src.treeclass import (
-    FilteredField,
-    NonDiffField,
-    field,
-    is_treeclass_equal,
-    treeclass,
+from pytreeclass._src.tree_base import field, is_treeclass_equal, treeclass
+from pytreeclass._src.tree_freeze import (
+    is_frozen,
+    is_nondiff,
+    tree_freeze,
+    tree_unfreeze,
 )
-from pytreeclass._src.utils import is_nondiff
 
 __all__ = (
     "treeclass",
     "tree_viz",
     "field",
-    "tree_filter",
-    "tree_unfilter",
+    "tree_freeze",
+    "tree_unfreeze",
     "is_nondiff",
+    "is_frozen",
     "is_treeclass_equal",
-    "NonDiffField",
-    "FilteredField",
 )
 
 __version__ = "0.2.0b"

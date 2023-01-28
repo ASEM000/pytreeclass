@@ -85,7 +85,7 @@ def _vbox(*text: tuple[str, ...]) -> str:
     return formatted
 
 
-def _resolve_line(cols: Sequence[str, ...]) -> str:
+def _resolve_line(cols: Sequence[str]) -> str:
     """combine columns of single line by merging their borders
 
     Args:
@@ -145,7 +145,7 @@ def _resolve_line(cols: Sequence[str, ...]) -> str:
     return "".join(map(lambda x: "".join(x), cols))
 
 
-def _table(lines: Sequence[str, ...]) -> str:
+def _table(lines: Sequence[str]) -> str:
     """create a table with self aligning rows and cols
 
     Args:

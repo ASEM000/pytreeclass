@@ -1,32 +1,24 @@
 from __future__ import annotations
 
+import functools as ft
 import inspect
 import math
+from types import FunctionType
 from typing import Any, Callable
 
 import numpy as np
+from jax._src.custom_derivatives import custom_jvp
+from jaxlib.xla_extension import CompiledFunction
+
+from pytreeclass.tree_viz.tree_viz_util import _format_width
 
 
-def _format_width(string, width=60):
-    """strip newline/tab characters if less than max width"""
-    children_length = len(string) - string.count("\n") - string.count("\t")
-    if children_length > width:
-        return string
-    return string.replace("\n", "").replace("\t", "")
-
-
-def _numpy_repr(node: np.ndarray) -> str:
+def _numpy_pprint(node: np.ndarray, kind: str = "repr") -> str:
     """Replace np.ndarray repr with short hand notation for type and shape
 
-    Args:
-        node: numpy array
-
-    Returns:
-        str: short hand notation for type and shape
-
     Example:
-        >>> _numpy_repr(np.ones((2,3)))
-        'f32[2,3]'
+        >>> _numpy_pprint(np.ones((2,3)))
+        'f64[2,3]∈[1.0,1.0]'
     """
     shape = (
         f"{node.shape}".replace(",", "")
@@ -34,63 +26,50 @@ def _numpy_repr(node: np.ndarray) -> str:
         .replace(")", "]")
         .replace(" ", ",")
     )
-
     if issubclass(node.dtype.type, np.integer):
-        dtype = f"{node.dtype}".replace("int", "i")
+        base = f"{node.dtype}".replace("int", "i") + shape
     elif issubclass(node.dtype.type, np.floating):
-        dtype = f"{node.dtype}".replace("float", "f")
+        base = f"{node.dtype}".replace("float", "f") + shape
     elif issubclass(node.dtype.type, np.complexfloating):
-        dtype = f"{node.dtype}".replace("complex", "c")
+        base = f"{node.dtype}".replace("complex", "c") + shape
     else:
-        dtype = f"{node.dtype}"
+        base = f"{node.dtype}" + shape
 
-    return f"{dtype}{shape}"
+    """Extended repr for numpy array, with extended information"""
+    # this part of function is inspired by
+    # lovely-jax https://github.com/xl0/lovely-jax
 
-
-def _numpy_extended_repr(node: np.ndarray) -> str:
-    """Adds information about min, max, mean, and std to _numpy_repr
-    This function is inspired by https://github.com/xl0/lovely-jax
-
-    Args:
-        node: numpy array
-
-    Returns:
-        str: short hand notation for type and shape
-
-    Example:
-        >>> _numpy_extended_repr(np.ones((2,3)))
-        f64[2,3]<∈[1.00,1.00],μ≈1.00,σ≈0.00>
-    """
-    shape_dtype = _numpy_repr(node)
     if issubclass(node.dtype.type, np.number):
+        # get min, max, mean, std of node
         low, high = np.min(node), np.max(node)
+        # add brackets to indicate closed/open interval
         interval = "(" if math.isinf(low) else "["
-        std, mean = np.std(node), np.mean(node)
-        interval += (
-            f"{low},{high}"
-            if issubclass(node.dtype.type, np.integer)
-            else f"{low:.2f},{high:.2f}"
-        )
+        if issubclass(node.dtype.type, np.integer):
+            # if integer, round to nearest integer
+            interval += f"{low},{high}"
+        else:
+            # if float, round to 1 decimal place
+            interval += f"{low:.1f},{high:.1f}"
+
+        # add brackets to indicate closed/open interval
         interval += ")" if math.isinf(high) else "]"
+        # replace inf with infinity symbol
         interval = interval.replace("inf", "∞")
-        return f"{shape_dtype}<∈{interval},μ≈{mean:.2f},σ≈{std:.2f}>"
+        # return extended repr
+        return f"{base}∈{interval}"
 
-    return shape_dtype
+    if kind == "repr":
+        return base
+    raise ValueError(f"kind must be 'repr' got {kind}")
 
 
-def _func_repr(func: Callable) -> str:
+def _func_pprint(func: Callable) -> str:
     """Pretty print function
-
-    Args:
-        func (Callable): function to be printed
-
-    Returns:
-        str: pretty printed function
 
     Example:
         >>> def example(a: int, b=1, *c, d, e=2, **f) -> str:
             ...
-        >>> _func_repr(example)
+        >>> _func_pprint(example)
         "example(a,b,*c,d,e,**f)"
     """
     args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(func)
@@ -106,160 +85,89 @@ def _func_repr(func: Callable) -> str:
     return fmt
 
 
-def _list_repr(node: list, depth: int) -> str:
-    fmt = (f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node)
+def _node_pprint(node: Any, depth: int = 0, kind: str = "str") -> str:
+    if isinstance(node, (FunctionType, custom_jvp)):
+        return _func_pprint(node)
+
+    if isinstance(node, CompiledFunction):
+        # special case for jitted functions
+        return f"jit({_func_pprint(node.__wrapped__)})"
+
+    if isinstance(node, ft.partial):
+        # applies for partial functions including `jtu.Partial`
+        return f"Partial({_func_pprint(node.func)})"
+
+    if hasattr(node, "shape") and hasattr(node, "dtype") and kind == "repr":
+        # works for numpy arrays, jax arrays
+        return _numpy_pprint(node, kind)
+
+    if isinstance(node, list):
+        return _list_pprint(node, depth, kind=kind)
+
+    if isinstance(node, tuple):
+        return _tuple_pprint(node, depth, kind=kind)
+
+    if isinstance(node, set):
+        return _set_pprint(node, depth, kind=kind)
+
+    if isinstance(node, dict):
+        return _dict_pprint(node, depth, kind=kind)
+
+    if kind == "repr":
+        fmt = f"{node!r}"
+    elif kind in ["str"]:
+        fmt = f"{node!s}"
+    else:
+        raise ValueError(f"kind must be 'repr', 'str' or 'extended_repr', got {kind}")
+
+    return ("\n" + "\t" * (depth)).join(fmt.split("\n"))
+
+
+_printer_map = {
+    "repr": lambda node, depth: _node_pprint(node, depth, kind="repr"),
+    "str": lambda node, depth: _node_pprint(node, depth, kind="str"),
+}
+
+
+def _list_pprint(node: list, depth: int, kind: str = "repr") -> str:
+    """Pretty print a list"""
+    printer = _printer_map[kind]
+    fmt = (f"{_format_width(printer(v,depth=depth+1))}" for v in node)
     fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
     fmt = "[\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "]"
     return _format_width(fmt)
 
 
-def _list_str(node: list, depth: int) -> str:
-    fmt = (f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node)
-    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
-    fmt = "[\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "]"
-    return _format_width(fmt)
-
-
-def _tuple_repr(node: tuple, depth: int) -> str:
-    fmt = (f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node)
+def _tuple_pprint(node: list, depth: int, kind: str = "repr") -> str:
+    """Pretty print a list"""
+    printer = _printer_map[kind]
+    fmt = (f"{_format_width(printer(v,depth=depth+1))}" for v in node)
     fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
     fmt = "(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
     return _format_width(fmt)
 
 
-def _tuple_str(node: tuple, depth: int) -> str:
-    fmt = (f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node)
-    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
-    fmt = "(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
-    return _format_width(fmt)
-
-
-def _set_repr(node: set, depth: int) -> str:
-    fmt = (f"{_format_width(_format_node_repr(v,depth=depth+1))}" for v in node)
+def _set_pprint(node: list, depth: int, kind: str = "repr") -> str:
+    """Pretty print a list"""
+    printer = _printer_map[kind]
+    fmt = (f"{_format_width(printer(v,depth=depth+1))}" for v in node)
     fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
     fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt)
 
 
-def _set_str(node: set, depth: int) -> str:
-    fmt = (f"{_format_width(_format_node_str(v,depth=depth+1))}" for v in node)
-    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
-    fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
-    return _format_width(fmt)
-
-
-def _dict_repr(node: dict, depth: int) -> str:
-    fmt = (f"{k}:{_format_node_repr(v,depth=depth+1)}" for k, v in node.items())
-    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
-    fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
-    return _format_width(fmt)
-
-
-def _dict_str(node: dict, depth: int) -> str:
+def _dict_pprint(node: dict, depth: int, kind: str = "repr") -> str:
+    printer = _printer_map[kind]
     fmt = (
-        f"{k}:{_format_node_str(v,depth=depth+1)}"
+        f"{k}:{printer(v,depth=depth+1)}"
         if "\n" not in f"{v!s}"
         else f"{k}:"
         + "\n"
         + "\t" * (depth + 1)
-        + f"{_format_width(_format_node_str(v,depth=depth+1))}"
+        + f"{_format_width(printer(v,depth=depth+1))}"
         for k, v in node.items()
     )
 
     fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
     fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt)
-
-
-def _format_node_repr(node: Any, depth: int = 0, stats: bool = False) -> str:
-    """pretty printer for a node
-
-    Args:
-        node: node to be printed
-        depth: indentation depth. Defaults to 0.
-        stats: print stats of arrays. Defaults to False.
-
-    Returns:
-        str: pretty printed node
-
-    Examples:
-
-        >>> print(_format_node_repr(dict(a=1, b=2, c=3, d= "x"*5), depth=0))
-        {a:1,b:2,c:3,d:'xxxxx'}
-
-        >>> print(_format_node_repr(dict(a=1, b=2, c=3, d= "x"*40), depth=0))
-        {
-            a:1,
-            b:2,
-            c:3,
-            d:'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-        }
-    """
-
-    if isinstance(node, (Callable)):
-        if hasattr(node, "func"):
-            return f"Partial({_func_repr(node.func)})"
-        return _func_repr(node)
-
-    elif hasattr(node, "shape") and hasattr(node, "dtype"):
-        return _numpy_extended_repr(node) if stats else _numpy_repr(node)
-
-    elif isinstance(node, list):
-        return _list_repr(node, depth)
-
-    elif isinstance(node, tuple):
-        return _tuple_repr(node, depth)
-
-    elif isinstance(node, set):
-        return _set_repr(node, depth)
-
-    elif isinstance(node, dict):
-        return _dict_repr(node, depth)
-
-    return ("\n" + "\t" * (depth)).join(f"{node!r}".split("\n"))
-
-
-def _format_node_str(node, depth: int = 0):
-    """
-    Pretty printer for a node, differs from `_format_node_repr` in that
-    it calls !s instead of !r
-
-    Args:
-        node (Any): node to be printed
-        depth (int, optional): indentation depth. Defaults to 0.
-
-    Returns:
-        str: pretty printed node
-
-    Examples:
-
-        >>> print(_format_node_repr(dict(a=1, b=2, c=3, d= "x"*5), depth=0))
-        {a:1,b:2,c:3,d:'xxxxx'}
-
-        >>> print(_format_node_repr(dict(a=1, b=2, c=3, d= "x"*40), depth=0))
-        {
-            a:1,
-            b:2,
-            c:3,
-            d:'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-        }
-    """
-
-    if isinstance(node, Callable):
-        if hasattr(node, "func"):
-            return f"Partial({_func_repr(node.func)})"
-        return _func_repr(node)
-
-    elif isinstance(node, list):
-        return _list_str(node, depth)
-
-    elif isinstance(node, tuple):
-        return _tuple_str(node, depth)
-
-    elif isinstance(node, set):
-        return _set_str(node, depth)
-
-    elif isinstance(node, dict):
-        return _dict_str(node, depth)
-
-    return ("\n" + "\t" * (depth)).join(f"{node!s}".split("\n"))
