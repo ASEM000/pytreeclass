@@ -11,7 +11,7 @@ from pytreeclass._src.tree_freeze import (
     _FrozenWrapper,
     _NonDiffField,
     _set_dataclass_frozen,
-    _UnfrozenWrapper,
+    _unwrap,
 )
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
@@ -64,18 +64,18 @@ def field(
         metadata: metadata of the field
         kw_only: if True, the field will be keyword only
     """
-    params = dict(
-        default=default,
-        default_factory=default_factory,
-        init=init,
-        repr=repr,
-        hash=hash,
-        compare=compare,
-        metadata=metadata,
-    )
+    params = dict()
+
+    params.update(default=default)
+    params.update(default_factory=default_factory)
+    params.update(init=init)
+    params.update(repr=repr)
+    params.update(hash=hash)
+    params.update(compare=compare)
+    params.update(metadata=metadata)
 
     if "kw_only" in dir(dc.Field):
-        params["kw_only"] = kw_only
+        params.update(kw_only=kw_only)
 
     if default is not dc.MISSING and default_factory is not dc.MISSING:
         raise ValueError("cannot specify both default and default_factory")
@@ -133,11 +133,6 @@ def _init_wrapper(init_func):
     return init
 
 
-def _copy(tree: PyTree) -> PyTree:
-    """Return a copy of the tree"""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
-
-
 def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     """Flatten rule for `jax.tree_flatten`"""
     # in essence anything not declared as a dataclass fields will be considered static
@@ -147,25 +142,17 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
 
     for field in static[_FIELDS].values():
         if isinstance(field, _NonDiffField):
-            # permenantly non-differentiable fields case
+            # non differentiable fields as metadata
             continue
 
-        if not isinstance(field, _FrozenWrapper):
-            # non-wrapper differentiable fields case
-            dynamic[field.name] = static.pop(field.name)
-            continue
-
-        # handle wrappers
-        # expose the `_FrozenWrapper` to `tree_unflatten by moving the wrapper
-        static[_FIELDS][field.name] = field.__wrapped__
-        if isinstance(static[field.name], _UnfrozenWrapper):
-            # `_UnfrozenWrapper` value and `_FrozenWrapper` field case
-            # this is the case encountered when unfreezing a tree
-            dynamic[field.name] = static.pop(field.name).__wrapped__
-        else:
-            # frozen value and frozen field -> move wrapper to value
-            # _FrozenWrapper cause an error if the value inside is jnp.array
+        if isinstance(field, _FrozenWrapper):
+            # expose static fields as static leaves (FrozenWrapper)
+            static[_FIELDS][field.name] = _unwrap(field)
             dynamic[field.name] = _FrozenWrapper(static.pop(field.name))
+            continue
+
+        # expose dynamic fields as dynamic leaves
+        dynamic[field.name] = static.pop(field.name)
 
     return dynamic.values(), (dynamic.keys(), static)
 
@@ -176,37 +163,18 @@ def _unflatten(cls, treedef, leaves):
     static = treedef[1]
     dynamic = dict(zip(treedef[0], leaves))
 
-    # handle wrappers
-    # a wrapper is used in `tree_freeze`/`tree_unfreeze` to mark a leaf as frozen/unfrozen
-    for field in static[_FIELDS].values():
-        if field.name in dynamic:
-            # dynamic fields case
-            if isinstance(dynamic[field.name], _FrozenWrapper):
-                # this is the case where `tree_freeze` is applied to a leaf
-                # thus we move the frozen wrapper from leaf to the corresponding field
-                dynamic[field.name] = dynamic[field.name].__wrapped__
-                static[_FIELDS][field.name] = _FrozenWrapper(field)
-
-            elif isinstance(dynamic[field.name], _UnfrozenWrapper):
-                # this is the case where `tree_unfreeze` is applied to a leaf (redunant)
-                dynamic[field.name] = dynamic[field.name].__wrapped__
-            continue
-
-        # static fields case
-        if isinstance(static[field.name], _FrozenWrapper):
-            # `tree_freeze` is applied to a static leaf node by .at[] methods (redunant)
-            static[field.name] = static[field.name].__wrapped__
-        elif isinstance(static[field.name], _UnfrozenWrapper):
-            # `tree_unfreeze` is applied to a static leaf node by .at[] methods
-            static[field.name] = static[field.name].__wrapped__
-            static[_FIELDS][field.name] = field.__wrapped__
+    for name in dynamic:
+        if isinstance(dynamic[name], _FrozenWrapper):
+            # convert frozen value (static leaf) -> frozen field (to metadata)
+            dynamic[name] = _unwrap(dynamic[name])
+            static[_FIELDS][name] = _FrozenWrapper(static[_FIELDS][name])
 
     tree.__dict__.update(static)
     tree.__dict__.update(dynamic)
     return tree
 
 
-def treeclass(cls):
+def treeclass(cls=None, *, eq: bool = True, repr: bool = True):
     """Decorator to convert a class to a `treeclass`
 
     Example:
@@ -221,6 +189,8 @@ def treeclass(cls):
 
     Args:
         cls: class to be converted to a `treeclass`
+        eq: if `True` the `treeclass` math operations will be applied leaf-wise
+        repr: if `True` the `treeclass` will have a `__repr__`/ `__str__` method
 
     Returns:
         `treeclass` of the input class
@@ -228,26 +198,45 @@ def treeclass(cls):
     Raises:
         TypeError: if the input class is not a `class`
     """
-    dcls = dc.dataclass(init=("__init__" not in vars(cls)), repr=False, eq=False)(cls)
-    params = getattr(dcls, _PARAMS)
-    params = _DataclassParams(**{k: getattr(params, k) for k in _PARAMS_SLOTS})
-    fields = dcls.__dict__.get(_FIELDS)
 
-    attrs = dict(
-        __new__=_new_wrapper(dcls.__new__, params, fields),
-        __init__=_init_wrapper(dcls.__init__),  # make it mutable during initialization
-        __setattr__=_setattr,  # disable direct attribute setting unless __immutable_treeclass__ is False
-        __delattr__=_delattr,  # disable direct attribute deletion unless __immutable_treeclass__ is False
-        __repr__=tree_repr,  # pretty print the tree representation
-        __str__=tree_str,  # pretty print the tree
-        __copy__=_copy,  # copy the tree
-        tree_flatten=_flatten,  # jax.tree_util.tree_flatten rule
-        tree_unflatten=classmethod(_unflatten),  # jax.tree_util.tree_unflatten rule
-    )
+    def decorator(cls, eq, repr):
 
-    dcls = type(cls.__name__, (dcls, _TreeAtIndexer, _TreeOperator), attrs)
+        init = "__init__" not in vars(cls)
+        dcls = dc.dataclass(init=init, repr=False, eq=False)(cls)
+        params = getattr(dcls, _PARAMS)
+        params = _DataclassParams(**{k: getattr(params, k) for k in _PARAMS_SLOTS})
+        fields = dcls.__dict__.get(_FIELDS)
 
-    return jtu.register_pytree_node_class(dcls)
+        attrs = dict()
+
+        # initialize class
+        attrs.update(__new__=_new_wrapper(dcls.__new__, params, fields))
+        attrs.update(__init__=_init_wrapper(dcls.__init__))
+
+        # immutable methods
+        attrs.update(__setattr__=_setattr)
+        attrs.update(__delattr__=_delattr)
+
+        # jax flatten/unflatten rules
+        attrs.update(tree_flatten=_flatten)
+        attrs.update(tree_unflatten=classmethod(_unflatten))
+
+        if repr is True:
+            attrs.update(__repr__=tree_repr)
+            attrs.update(__str__=tree_str)
+
+        # decide class bases based on kwargs
+        bases = (dcls, _TreeAtIndexer)
+        bases += (_TreeOperator,) if eq else ()
+
+        dcls = type(cls.__name__, bases, attrs)
+
+        # register the class to jax pytree
+        return jtu.register_pytree_node_class(dcls)
+
+    if cls is None:
+        return lambda cls: decorator(cls, eq, repr)  # @treeclass
+    return decorator(cls, eq, repr)  # @treeclass(...)
 
 
 def is_treeclass(cls_or_instance):
@@ -258,15 +247,11 @@ def is_treeclass(cls_or_instance):
 
     if isinstance(cls_or_instance, type):
         # check if the input is a class
-        # then check if the class is a subclass of `_TreeAtIndexer` and `_TreeOperator`
-        return issubclass(cls_or_instance, _TreeAtIndexer) and issubclass(
-            cls_or_instance, _TreeOperator
-        )
+        # then check if the class is a subclass of `_TreeAtIndexer`
+        return issubclass(cls_or_instance, _TreeAtIndexer)
 
-    # finally check if the input is an instance of `_TreeAtIndexer` and `_TreeOperator`
-    return isinstance(cls_or_instance, _TreeAtIndexer) and isinstance(
-        cls_or_instance, _TreeOperator
-    )
+    # finally check if the input is an instance of `_TreeAtIndexer`
+    return isinstance(cls_or_instance, _TreeAtIndexer)
 
 
 def is_treeclass_equal(lhs, rhs):

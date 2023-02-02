@@ -12,16 +12,6 @@ PyTree = Any
 
 _PARAMS = "__dataclass_params__"
 
-__all__ = (
-    "is_frozen",
-    "is_nondiff",
-    "tree_freeze",
-    "tree_unfreeze",
-    "_set_dataclass_frozen",
-    "FrozenWrapper",
-    "UnfrozenWrapper",
-)
-
 
 def _set_dataclass_frozen(tree: PyTree, frozen: bool):
     def freeze_step(tree: PyTree, frozen: bool) -> PyTree:
@@ -82,11 +72,11 @@ class _FrozenWrapper(_Wrapper):
         return (None,), _Wrapper(self.__wrapped__)
 
     @classmethod
-    def tree_unflatten(cls, treedef, _):
+    def tree_unflatten(cls, treedef, leaves):
         return cls(treedef.__wrapped__)
 
     def __repr__(self):
-        return f"#{self.__wrapped__!r}"
+        return f"FrozenWrapper({self.__wrapped__!r})"
 
 
 @jtu.register_pytree_node_class
@@ -96,10 +86,17 @@ class _UnfrozenWrapper(_Wrapper):
 
     @classmethod
     def tree_unflatten(cls, _, leaves):
-        return cls(leaves[0])
+        # a one time marker to indicate that a certain field
+        # needs to be unwrapped.
+        return _UnfrozenWrapper(leaves[0])
 
     def __repr__(self):
         return f"UnfrozenWrapper({self.__wrapped__!r})"
+
+
+def _unwrap(node: _Wrapper) -> PyTree:
+    """Unwrap a tree"""
+    return node.__wrapped__
 
 
 def is_frozen(tree: PyTree) -> bool:
@@ -119,7 +116,12 @@ def tree_unfreeze(x: PyTree) -> PyTree:
     # the problem here is that, unlike `tree_freeze` this function
     # can not be used inside a `jtu.tree_map` **without** specifying
     # `is_leaf` as it will traverse the whole tree and miss the wrapper mark
-    return jtu.tree_map(_UnfrozenWrapper, x, is_leaf=is_frozen)
+    def map_func(node: Any):
+        if isinstance(node, _FrozenWrapper):
+            return _unwrap(node)
+        return node
+
+    return jtu.tree_map(map_func, x, is_leaf=is_frozen)
 
 
 def is_nondiff(item: Any) -> bool:

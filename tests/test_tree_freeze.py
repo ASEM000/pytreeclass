@@ -203,9 +203,9 @@ def test_freeze_nondiff():
 
     assert jtu.tree_leaves(t) == ["a"]
     assert jtu.tree_leaves(pytc.tree_freeze(t)) == []
-    assert jtu.tree_leaves((pytc.tree_freeze(t)).at["b"].apply(pytc.tree_unfreeze)) == [
-        "a"
-    ]
+    assert jtu.tree_leaves(
+        (pytc.tree_freeze(t)).at["b"].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)
+    ) == ["a"]
 
     @pytc.treeclass
     class T0:
@@ -303,10 +303,10 @@ def test_tree_unfreeze():
     unfrozen_tree = frozen_tree.at[mask].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [2, 3]
 
-    unfrozen_tree = frozen_tree.at["a"].apply(pytc.tree_unfreeze)
+    unfrozen_tree = frozen_tree.at["a"].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [1]
 
-    unfrozen_tree = frozen_tree.at["b"].apply(pytc.tree_unfreeze)
+    unfrozen_tree = frozen_tree.at["b"].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [2, 3]
 
 
@@ -329,7 +329,7 @@ def test_tree_freeze_unfreeze():
     assert jtu.tree_leaves(unfrozen_tree) == [1, 2, 3]
 
     frozen_tree = tree.at["a"].apply(pytc.tree_freeze)
-    unfrozen_tree = frozen_tree.at["a"].apply(pytc.tree_unfreeze)
+    unfrozen_tree = frozen_tree.at["a"].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [1, 2, 3]
 
 

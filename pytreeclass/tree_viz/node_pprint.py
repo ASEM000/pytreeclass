@@ -35,7 +35,7 @@ def _numpy_pprint(node: np.ndarray, kind: str = "repr") -> str:
     else:
         base = f"{node.dtype}" + shape
 
-    """Extended repr for numpy array, with extended information"""
+    # Extended repr for numpy array, with extended information
     # this part of function is inspired by
     # lovely-jax https://github.com/xl0/lovely-jax
 
@@ -44,19 +44,21 @@ def _numpy_pprint(node: np.ndarray, kind: str = "repr") -> str:
         low, high = np.min(node), np.max(node)
         # add brackets to indicate closed/open interval
         interval = "(" if math.isinf(low) else "["
-        if issubclass(node.dtype.type, np.integer):
-            # if integer, round to nearest integer
-            interval += f"{low},{high}"
-        else:
-            # if float, round to 1 decimal place
-            interval += f"{low:.1f},{high:.1f}"
+        # if issubclass(node.dtype.type, np.integer):
+        # if integer, round to nearest integer
+        interval += (
+            f"{low},{high}"
+            if issubclass(node.dtype.type, np.integer)
+            else f"{low:.1f},{high:.1f}"
+        )
 
+        mean, std = np.mean(node), np.std(node)
         # add brackets to indicate closed/open interval
         interval += ")" if math.isinf(high) else "]"
         # replace inf with infinity symbol
         interval = interval.replace("inf", "∞")
         # return extended repr
-        return f"{base}∈{interval}"
+        return f"{base} ∈{interval} μ={mean:.1f} σ={std:.1f}"
 
     if kind == "repr":
         return base

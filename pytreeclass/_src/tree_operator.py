@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 import operator as op
+from typing import Any
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -9,6 +10,8 @@ import numpy as np
 from jax.core import Tracer
 
 """A wrapper around a tree that allows to use the tree leaves as if they were scalars."""
+
+PyTree = Any
 
 
 def _hash_node(node):
@@ -26,6 +29,11 @@ def _hash_node(node):
 def _hash(tree):
     hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
     return hash((*hashed, jtu.tree_structure(tree)))
+
+
+def _copy(tree: PyTree) -> PyTree:
+    """Return a copy of the tree"""
+    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
 
 def _append_math_op(func):
@@ -71,6 +79,7 @@ class _TreeOperator:
         Tree(a=2)
     """
 
+    __copy__ = _copy  # copy the tree
     __hash__ = _hash  # hash the tree
     __abs__ = _append_math_op(op.abs)  # abs the tree leaves
     __add__ = _append_math_op(op.add)  # add to the tree leaves

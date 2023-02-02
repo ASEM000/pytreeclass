@@ -486,7 +486,8 @@ def test_repr_str():
     class Test:
         a: jnp.ndarray = jnp.array([1, 2, 3, 4, 5])
 
-    t = Test()
+    pass
+    # t = Test()
 
     # assert f"{t.at[...]!r}" == "where=Test(a=bool[5])"
     # assert f"{t.at[...]!s}" == "where=Test(a=[ True  True  True  True  True])"

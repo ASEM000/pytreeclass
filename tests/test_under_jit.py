@@ -76,7 +76,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.at["l2"].set(pytc.tree_freeze(model.l2))
+        model = model.at["l2"].apply(pytc.tree_freeze)
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
