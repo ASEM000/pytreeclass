@@ -1,5 +1,5 @@
 from pytreeclass import tree_viz
-from pytreeclass._src.tree_base import field, is_treeclass_equal, treeclass
+from pytreeclass._src.tree_base import field, is_tree_equal, treeclass
 from pytreeclass._src.tree_freeze import (
     is_frozen,
     is_nondiff,
@@ -16,7 +16,7 @@ __all__ = (
     "tree_unfreeze",
     "is_nondiff",
     "is_frozen",
-    "is_treeclass_equal",
+    "is_tree_equal",
     "bmap",
 )
 

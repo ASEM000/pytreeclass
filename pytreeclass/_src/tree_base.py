@@ -251,8 +251,8 @@ def is_treeclass(cls_or_instance):
     return isinstance(cls_or_instance, _TreeAtIndexer)
 
 
-def is_treeclass_equal(lhs, rhs):
-    """Assert if two treeclasses are equal"""
+def is_tree_equal(lhs, rhs):
+    """Assert if two pytrees are equal"""
     lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
     rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
 

@@ -42,7 +42,7 @@ def test_getter_by_val():
         e=level1(a=2, b=20, c=jnp.array([])),
     )
 
-    assert pytc.is_treeclass_equal(B, C)
+    assert pytc.is_tree_equal(B, C)
 
     B = A.at[(A > 0) & (A < 5)].get()
     C = level2(
@@ -50,7 +50,7 @@ def test_getter_by_val():
         e=level1(a=2, b=None, c=jnp.array([])),
     )
 
-    assert pytc.is_treeclass_equal(B, C)
+    assert pytc.is_tree_equal(B, C)
 
     B = A.at[A == 0].get()
     C = level2(
@@ -58,7 +58,7 @@ def test_getter_by_val():
         e=level1(a=None, b=None, c=jnp.array([])),
     )
 
-    assert pytc.is_treeclass_equal(B, C)
+    assert pytc.is_tree_equal(B, C)
 
     with pytest.raises(TypeError):
         B = A.at[A].get()
@@ -120,7 +120,7 @@ def test_setter_by_val():
         e=level1(a=2, b=20, c=jnp.array([100, 100, 100, 100, 100])),
     )
 
-    assert pytc.is_treeclass_equal(B, C)
+    assert pytc.is_tree_equal(B, C)
 
     A = Test(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
 
@@ -154,7 +154,7 @@ def test_setter_by_val():
 
     tt = L2(100, 200, 300, L1(10, 20, 30, L0(10, 20, 30)))
     lhs = t.at[t == t].set(tt)
-    assert pytc.is_treeclass_equal(lhs, tt)
+    assert pytc.is_tree_equal(lhs, tt)
 
 
 def test_apply_and_its_derivatives():
@@ -169,27 +169,27 @@ def test_apply_and_its_derivatives():
     # By boolean pytree
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
     rhs = init.at[init == init].apply(lambda x: x**2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
     rhs = init.at[...].apply(lambda x: x**2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
     rhs = init.at[init == init].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
     rhs = init.at[...].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(20, 30, jnp.array([20, 30, 40, 50, 60]))
     rhs = init.at[init == init].apply(lambda x: (x + 1) * 10)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(20, 30, jnp.array([20, 30, 40, 50, 60]))
     rhs = init.at[...].apply(lambda x: (x + 1) * 10)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     with pytest.raises(TypeError):
         init.at[init].apply(lambda x: (x + 1) * 10)
@@ -216,58 +216,58 @@ def test_apply_and_its_derivatives():
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
     rhs = init.at[init == init].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
     rhs = init.at[...].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(0.5, 1.0, jnp.array([0.5, 1.0, 1.5, 2.0, 2.5]))
     rhs = init.at[init == init].apply(lambda x: x / 2.0)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(0.5, 1.0, jnp.array([0.5, 1.0, 1.5, 2.0, 2.5]))
     rhs = init.at[...].apply(lambda x: x / 2.0)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(1, 1, jnp.array([1, 1, 1, 1, 1]))
     rhs = init.at[init == init].apply(lambda x: jnp.minimum(x, 1))
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(4, 4, jnp.array([4, 4, 4, 4, 5]))
     rhs = init.at[init == init].apply(lambda x: jnp.maximum(x, 4))
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(4, 4, jnp.array([4, 4, 4, 4, 5]))
     rhs = init.at[...].apply(lambda x: jnp.maximum(x, 4))
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
     rhs = init.at[init == init].apply(lambda x: x**2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(1, 4, jnp.array([1, 4, 9, 16, 25]))
     rhs = init.at[...].apply(lambda x: x**2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(1, 2, jnp.array([1, 2, 3, 16, 25]))
     rhs = init.at[init > 3].apply(lambda x: x**2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
     rhs = init.at[init > 0].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     rhs = init.at[init > 100].apply(lambda x: (x + 1) * 10)
-    assert pytc.is_treeclass_equal(init, rhs)
+    assert pytc.is_tree_equal(init, rhs)
 
     lhs = A(2, 3, jnp.array([2, 3, 4, 5, 6]))
     rhs = init.at[init > 0].apply(lambda x: x + 1)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = A(1, 4, jnp.array([1, 4, 3, 4, 5]))
     rhs = init.at[init == 2].apply(lambda x: x * 2)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
 
 def test_reduce():
@@ -357,11 +357,11 @@ def test_is_leaf():
 
     t = Test([1, 2, 3, None])
 
-    assert pytc.is_treeclass_equal(
+    assert pytc.is_tree_equal(
         t.at[...].set(10, is_leaf=lambda x: x is None), Test([10, 10, 10, 10])
     )
 
-    assert pytc.is_treeclass_equal(
+    assert pytc.is_tree_equal(
         t.at[...].apply(lambda x: 10, is_leaf=lambda x: x is None),
         Test([10, 10, 10, 10]),
     )
@@ -398,9 +398,9 @@ def test_attribute_set():
     t = Test()
     t.at["a"].set(10)
 
-    assert pytc.is_treeclass_equal(t, Test())
-    assert pytc.is_treeclass_equal(t.at["a"].set(10), Test(10, l0()))
-    assert pytc.is_treeclass_equal(t.at["b"].at["a"].set(100), Test(1, l0(100)))
+    assert pytc.is_tree_equal(t, Test())
+    assert pytc.is_tree_equal(t.at["a"].set(10), Test(10, l0()))
+    assert pytc.is_tree_equal(t.at["b"].at["a"].set(100), Test(1, l0(100)))
 
     with pytest.raises(AttributeError):
         t.at["c"].set(10)
@@ -422,11 +422,9 @@ def test_attribute_apply():
     t = Test()
     t.at["a"].apply(lambda _: 10)
 
-    assert pytc.is_treeclass_equal(t, Test())
-    assert pytc.is_treeclass_equal(t.at["a"].apply(lambda _: 10), Test(10))
-    assert pytc.is_treeclass_equal(
-        t.at["b"].at["a"].apply(lambda _: 100), Test(1, l0(100))
-    )
+    assert pytc.is_tree_equal(t, Test())
+    assert pytc.is_tree_equal(t.at["a"].apply(lambda _: 10), Test(10))
+    assert pytc.is_tree_equal(t.at["b"].at["a"].apply(lambda _: 100), Test(1, l0(100)))
 
     with pytest.raises(AttributeError):
         t.at["c"].apply(lambda _: 10)
@@ -442,7 +440,7 @@ def test_method_call():
 
     t = Test()
 
-    assert pytc.is_treeclass_equal(t.at["increment"]()[1], Test(2))
+    assert pytc.is_tree_equal(t.at["increment"]()[1], Test(2))
 
     with pytest.raises(AttributeError):
         t.at["bla"]()
@@ -472,7 +470,7 @@ def test_composed_at():
 
     t = Test()
 
-    assert pytc.is_treeclass_equal(t.at[t > 0].at[t < 0].get(), Test(jnp.array([])))
+    assert pytc.is_tree_equal(t.at[t > 0].at[t < 0].get(), Test(jnp.array([])))
 
     with pytest.raises(AttributeError):
         t.at[t > 0].bet
@@ -504,7 +502,7 @@ def test_not_equal():
 
     t = Test()
 
-    assert pytc.is_treeclass_equal(t.at[t != 10].set(10.0), Test(a=10.0, b=10.0))
+    assert pytc.is_tree_equal(t.at[t != 10].set(10.0), Test(a=10.0, b=10.0))
 
 
 def test_iterable_node():
@@ -513,4 +511,19 @@ def test_iterable_node():
         a: int
 
     t = Test([1, 2, 3, 4])
-    assert pytc.is_treeclass_equal(t.at[...].set(True), Test([True, True, True, True]))
+    assert pytc.is_tree_equal(t.at[...].set(True), Test([True, True, True, True]))
+
+
+def test_at_set_apply_is_leaf():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: int = 2
+
+    t = Test()
+
+    with pytest.raises(AttributeError):
+        t.at["a"].set(10, is_leaf=lambda x: isinstance(x, Test))
+
+    with pytest.raises(AttributeError):
+        t.at[""].set(10)

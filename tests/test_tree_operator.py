@@ -18,19 +18,19 @@ def test_bmap():
     rhs = Test(a=(1, 0, 0), b=(0, 0, 0), c=jnp.array([1, 0, 0]), d=1)
 
     lhs = pytc.bmap(jnp.where)(tree > 1, 0, tree)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = pytc.bmap(jnp.where)(tree > 1, 0, y=tree)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = pytc.bmap(jnp.where)(tree > 1, x=0, y=tree)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = pytc.bmap(jnp.where)(tree > 1, x=0, y=tree)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = pytc.bmap(jnp.where)(condition=tree > 1, x=0, y=tree)
-    assert pytc.is_treeclass_equal(lhs, rhs)
+    assert pytc.is_tree_equal(lhs, rhs)
 
 
 def test_math_operations():
@@ -95,3 +95,21 @@ def test_math_operations_errors():
 
     with pytest.raises(TypeError):
         A == (1,)
+
+
+def test_hash_node():
+    @pytc.treeclass
+    class Test:
+        a: jnp.ndarray
+        b: dict
+        c: set
+
+        def __init__(self):
+            self.a = jnp.array([1, 2, 3])
+            self.b = {"a": 1, "b": 2}
+            self.c = {1, 2, 3}
+
+    A = Test()
+    B = Test()
+
+    assert hash(A) == hash(B)

@@ -146,9 +146,6 @@ def _get_child(item: Any, path: list[str]) -> Any:
 
 
 def _get_parent_node_and_child_name(tree: Any, path: list[str]) -> tuple[Any, str]:
-    # helper function to get the parent and attribute name of a path
-    if len(path) == 0:
-        raise ValueError("path must have at least one element")
     if len(path) == 1:
         return (tree, path[0])
     return _get_parent_node_and_child_name(getattr(tree, path[0]), path[1:])

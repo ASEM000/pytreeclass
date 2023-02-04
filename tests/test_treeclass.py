@@ -7,6 +7,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
+from pytreeclass._src.tree_base import _DataclassParams
 from pytreeclass._src.tree_freeze import _set_dataclass_frozen
 
 
@@ -156,3 +157,58 @@ def test_delattr():
     t = _set_dataclass_frozen(t, True)
     with pytest.raises(dc.FrozenInstanceError):
         t.delete("a")
+
+
+def test_dataclass_params():
+    a = _DataclassParams(*((False,) * 6))
+    b = _DataclassParams(*((False,) * 6))
+
+    assert a == b
+
+    b = _DataclassParams(*((True,) * 6))
+
+    assert a != b
+
+
+def test_treeclass_decorator_arguments():
+    @pytc.treeclass(repr=False)
+    class Test:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    assert "__repr__" not in Test.__dict__
+
+    @pytc.treeclass(eq=False)
+    class Test:
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    with pytest.raises(TypeError):
+        Test() + 1
+
+
+def test_is_tree_equal():
+
+    assert pytc.is_tree_equal(1, 1)
+    assert pytc.is_tree_equal(1, 2) is False
+    assert pytc.is_tree_equal(1, 2.0) is False
+    assert pytc.is_tree_equal([1, 2], [1, 2])
+
+    @pytc.treeclass
+    class Test1:
+        a: int = 1
+
+    @pytc.treeclass
+    class Test2:
+        a: jnp.ndarray = jnp.array([1, 2, 3])
+
+    assert pytc.is_tree_equal(Test1(), Test2()) is False
+
+    @pytc.treeclass
+    class Test3:
+        a: int = 1
+        b: int = 2
+
+    assert pytc.is_tree_equal(Test1(), Test3()) is False

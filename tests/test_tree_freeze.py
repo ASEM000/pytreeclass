@@ -138,9 +138,9 @@ def test_freeze_with_ops():
 
     t = pytc.tree_freeze(Test(100))
 
-    assert pytc.is_treeclass_equal(t.at[...].set(0), t)
-    assert pytc.is_treeclass_equal(t.at[...].apply(lambda x: x + 1), t)
-    assert pytc.is_treeclass_equal(t.at[...].reduce(jnp.sin), 0.0)
+    assert pytc.is_tree_equal(t.at[...].set(0), t)
+    assert pytc.is_tree_equal(t.at[...].apply(lambda x: x + 1), t)
+    assert pytc.is_tree_equal(t.at[...].reduce(jnp.sin), 0.0)
 
     @pytc.treeclass
     class Test:
@@ -150,7 +150,7 @@ def test_freeze_with_ops():
             self.x = x
 
     t = Test(jnp.array([1, 2, 3]))
-    assert pytc.is_treeclass_equal(t.at[...].set(None), Test(x=None))
+    assert pytc.is_tree_equal(t.at[...].set(None), Test(x=None))
 
     @pytc.treeclass
     class t0:
@@ -371,3 +371,12 @@ def test_freeze_nondiff_func():
 def test_wrapper():
     # only apply last wrapper
     assert _FrozenWrapper(_FrozenWrapper(1)) == _FrozenWrapper(1)
+
+    lhs = _FrozenWrapper(1)
+    # test getter
+    assert lhs.__wrapped__ == 1
+
+    # comparison with the wrapped object
+    assert lhs != 1
+    # hash of the wrapped object
+    assert hash(lhs) == hash(1)

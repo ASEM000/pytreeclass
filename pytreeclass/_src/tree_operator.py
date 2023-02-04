@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import copy
 import functools as ft
 import hashlib
 import inspect
 import operator as op
-from itertools import islice
 from typing import Any, Callable
 
 import jax.tree_util as jtu
@@ -40,7 +38,7 @@ def _copy(tree: PyTree) -> PyTree:
 
 @ft.lru_cache(maxsize=None)
 def _transform_to_kwds_func(func: Callable) -> Callable:
-    """ Convert a function to a all keyword accepting function to use `functools.partial` on any arg
+    """Convert a function to a all keyword accepting function to use `functools.partial` on any arg
 
     Args:
         func : the function to be transformed to a all keyword args function
