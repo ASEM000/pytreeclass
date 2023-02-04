@@ -116,7 +116,7 @@ def tree_diagram(tree: PyTree) -> str:
             │   └── [2]:A
             │       ├── x:int=10
             │       └── y:tuple=(20,30)
-            ├── d:DeviceArray=i32[3]∈[1,3]
+            ├── d:Array=i32[3]∈[1,3]
             └── e:tuple=(1,2,3)
     """
 
@@ -354,7 +354,15 @@ def tree_mermaid(tree: PyTree):
                 continue
 
             FMT += f"\n\tid{prev_id} {mark} "
-            FMT += f'|"{(count)}<br>{(size)}"| '
+
+            # add count and size of children
+            if mark == "-..-":
+                FMT += f'|"(frozen) {(count)}<br>{(size)}"| '  # add count and size of children for frozen leaves
+            elif mark == "--x":
+                FMT += ""  # no count or size for frozen leaves
+            elif mark == "--->" or mark == "---":
+                FMT += f'|"{(count)}<br>{(size)}"| '
+
             FMT += f'id{cur_id}["{bold_text(name)}:{type}={_node_pprint(value, kind="repr")}"]'
 
         prev_id = cur_id
