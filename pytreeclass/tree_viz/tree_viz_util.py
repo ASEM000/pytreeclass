@@ -68,7 +68,7 @@ def _format_count(node_count, newline=False):
     raise TypeError(f"node_count must be int or float, got {type(node_count)}")
 
 
-def _is_dcls_fields_nondiff(tree):
+def _is_children_nondiff(tree):
     """assert if a dataclass is static"""
     if dc.is_dataclass(tree):
         fields = dc.fields(tree)
@@ -77,12 +77,16 @@ def _is_dcls_fields_nondiff(tree):
     return False
 
 
-def _is_dcls_fields_filtered(tree):
+def is_children_frozen(tree):
     """assert if a dataclass is static"""
     if dc.is_dataclass(tree):
         fields = dc.fields(tree)
         if len(fields) > 0:
-            return all(isinstance(f, _FrozenWrapper) for f in fields)
+            if all(isinstance(f, _FrozenWrapper) for f in fields):
+                return True
+            if all(isinstance(getattr(tree, f.name),_FrozenWrapper) for f in fields):
+                return True
+
     return False
 
 
@@ -112,10 +116,14 @@ def _mermaid_marker(field_item: dc.Field, node: Any, default: str = "--") -> str
         str: marker character.
     """
     # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if isinstance(field_item, _FrozenWrapper) or _is_dcls_fields_filtered(node):
+    if (
+        isinstance(field_item, _FrozenWrapper)
+        or is_children_frozen(node)
+        or isinstance(node, _FrozenWrapper)
+    ):
         return "-..-"
 
-    if isinstance(field_item, _NonDiffField) or _is_dcls_fields_nondiff(node):
+    if isinstance(field_item, _NonDiffField) or _is_children_nondiff(node):
         return "--x"
 
     return default
@@ -125,10 +133,10 @@ def _marker(field_item: dc.Field, node: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item"""
     # '*' for non-diff
 
-    if isinstance(field_item, _FrozenWrapper) or _is_dcls_fields_filtered(node):
+    if isinstance(field_item, _FrozenWrapper) or is_children_frozen(node):
         return "#"
 
-    if isinstance(field_item, _NonDiffField) or _is_dcls_fields_nondiff(node):
+    if isinstance(field_item, _NonDiffField) or _is_children_nondiff(node):
         return "*"
 
     return default

@@ -15,6 +15,7 @@ from pytreeclass.tree_viz.tree_viz_util import (
     _format_size,
     _format_width,
     _marker,
+    _mermaid_marker,
     tree_trace,
 )
 
@@ -312,7 +313,7 @@ def tree_mermaid(tree: PyTree):
             fields = [f for f in dc.fields(tree) if f.repr]
             names = (f.name for f in fields)
             values = (getattr(tree, f.name) for f in fields)
-            marks = (_marker(f, getattr(tree, f.name), default="--->") for f in fields)
+            marks = (_mermaid_marker(f, getattr(tree, f.name), default="--->") for f in fields)  # fmt: skip
 
         elif isinstance(tree, (list, tuple)) and expand:
             # expand lists and tuples
@@ -348,14 +349,14 @@ def tree_mermaid(tree: PyTree):
 
                 FMT += f"\n\tid{prev_id} {mark} "
                 FMT += f'|"{(count)}<br>{(size)}"| '  # add count and size of children
-                FMT += f'id{cur_id}("{bold_text(name) }:{type}={value.__class__.__name__}")'
+                FMT += f'id{cur_id}("{bold_text(name) }:{type}")'
                 recurse(tree=value, depth=depth + 1, prev_id=cur_id, expand=True)
                 continue
 
             mark = "----"
             FMT += f"\n\tid{prev_id} {mark} "
             FMT += f'|"{(count)}<br>{(size)}"| '
-            FMT += f'id{cur_id}["{bold_text(name)}:{type}={_node_pprint(value)}"]'
+            FMT += f'id{cur_id}["{bold_text(name)}:{type}={_node_pprint(value, kind="repr")}"]'
 
         prev_id = cur_id
 
