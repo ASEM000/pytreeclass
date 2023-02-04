@@ -169,6 +169,8 @@ def test_dataclass_params():
 
     assert a != b
 
+    assert a != "a"
+
 
 def test_treeclass_decorator_arguments():
     @pytc.treeclass(repr=False)
@@ -205,6 +207,8 @@ def test_is_tree_equal():
         a: jnp.ndarray = jnp.array([1, 2, 3])
 
     assert pytc.is_tree_equal(Test1(), Test2()) is False
+
+    assert pytc.is_tree_equal(jnp.array([1, 2, 3]), jnp.array([1, 2, 3])) is False
 
     @pytc.treeclass
     class Test3:

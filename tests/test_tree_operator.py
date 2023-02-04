@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest
 
 import pytreeclass as pytc
-
+from pytreeclass._src.tree_freeze import _hash_node
 
 def test_bmap():
     @pytc.treeclass
@@ -31,6 +31,15 @@ def test_bmap():
 
     lhs = pytc.bmap(jnp.where)(condition=tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
+
+
+    with pytest.raises(ValueError):
+        pytc.bmap(lambda *x: x)(tree)
+    
+    with pytest.raises(ValueError):
+        @pytc.bmap
+        def func(**k):
+            return 0
 
 
 def test_math_operations():
@@ -98,18 +107,7 @@ def test_math_operations_errors():
 
 
 def test_hash_node():
-    @pytc.treeclass
-    class Test:
-        a: jnp.ndarray
-        b: dict
-        c: set
-
-        def __init__(self):
-            self.a = jnp.array([1, 2, 3])
-            self.b = {"a": 1, "b": 2}
-            self.c = {1, 2, 3}
-
-    A = Test()
-    B = Test()
-
-    assert hash(A) == hash(B)
+    assert _hash_node([1,2,3])
+    assert _hash_node(jnp.array([1,2,3]))
+    assert _hash_node({1,2,3})   
+    assert _hash_node({"a":1})

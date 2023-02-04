@@ -138,8 +138,6 @@ def _get_child(item: Any, path: list[str]) -> Any:
     # this function gets a certain attribute value based on a
     # sequence of strings.
     # for example _getter(item , ["a", "b", "c"]) is equivalent to item.a.b.c
-    if len(path) == 0:
-        raise ValueError("path must have at least one element")
     if len(path) == 1:
         return getattr(item, path[0])
     return _get_child(getattr(item, path[0]), path[1:])

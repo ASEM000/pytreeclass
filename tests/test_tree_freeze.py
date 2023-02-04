@@ -375,6 +375,7 @@ def test_wrapper():
     lhs = _FrozenWrapper(1)
     # test getter
     assert lhs.__wrapped__ == 1
+    assert lhs.__wrapped__
 
     # comparison with the wrapped object
     assert lhs != 1

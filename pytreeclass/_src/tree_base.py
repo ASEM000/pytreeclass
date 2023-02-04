@@ -239,18 +239,6 @@ def treeclass(cls=None, *, eq: bool = True, repr: bool = True):
     return decorator(cls, eq, repr)  # @treeclass(...)
 
 
-def is_treeclass(cls_or_instance):
-    """Check if the input is a `treeclass`"""
-    if not dc.is_dataclass(cls_or_instance):
-        # treeclass must be a dataclass
-        return False
-
-    if isinstance(cls_or_instance, type):
-        return issubclass(cls_or_instance, _TreeAtIndexer)
-
-    return isinstance(cls_or_instance, _TreeAtIndexer)
-
-
 def is_tree_equal(lhs, rhs):
     """Assert if two pytrees are equal"""
     lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
