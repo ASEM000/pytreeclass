@@ -104,7 +104,7 @@ def tree_diagram(tree: PyTree) -> str:
         ...     a: int = 10
         ...     b: tuple = (20,30, A())  # will be expanded as it continas a dataclass in it
         ...     c: int = dc.field(default=40, repr=False) # will be skipped as repr=False
-        ...     d: jnp.ndarray = jnp.array([1,2,3])
+        ...     d: jnp.ndarray = dc.field(defaualt_factory=lambda: jnp.array([1,2,3]))
         ...     e: tuple = (1,2,3)
 
         >>> print(tree_diagram(B()))
@@ -353,7 +353,6 @@ def tree_mermaid(tree: PyTree):
                 recurse(tree=value, depth=depth + 1, prev_id=cur_id, expand=True)
                 continue
 
-            mark = "----"
             FMT += f"\n\tid{prev_id} {mark} "
             FMT += f'|"{(count)}<br>{(size)}"| '
             FMT += f'id{cur_id}["{bold_text(name)}:{type}={_node_pprint(value, kind="repr")}"]'

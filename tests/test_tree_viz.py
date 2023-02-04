@@ -94,7 +94,7 @@ class Repr3:
         self.l3 = Linear(in_dim=128, out_dim=out_dim)
 
 
-@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason="requires python <3.11")
 def test_tree_repr():
     assert (
         tree_repr(r1)
@@ -127,7 +127,7 @@ def test_tree_repr():
     )
 
 
-@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason="requires python <3.11")
 def test_tree_str():
 
     assert (
@@ -159,7 +159,7 @@ def test_tree_str():
     )
 
 
-@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason="requires python <3.11")
 def test_tree_diagram():
 
     assert (
@@ -190,7 +190,7 @@ def test_tree_diagram():
     )
 
 
-@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason="requires python <3.11")
 def test_tree_summary():
 
     assert tree_summary(r1, depth=0) == (
@@ -229,7 +229,7 @@ def test_tree_summary():
     )
 
 
-@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason="requires python <3.11")
 def test_tree_mermaid():
     assert (
         tree_mermaid(r1)
