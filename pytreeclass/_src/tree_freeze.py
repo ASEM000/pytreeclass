@@ -66,6 +66,10 @@ class _Wrapper:
 
 @jtu.register_pytree_node_class
 class _FrozenWrapper(_Wrapper):
+    "Wrapper for frozen tree leaf"
+    # in essence this is a wrapper for a tree leaf to make it appear as a leaf to jax.tree_util
+    # but it is not editable (i.e. it is frozen)
+
     def tree_flatten(self):
         # Wrapping the metadata to ensure its hashability and equality
         # https://github.com/google/jax/issues/13027
@@ -77,21 +81,6 @@ class _FrozenWrapper(_Wrapper):
 
     def __repr__(self):
         return f"FrozenWrapper({self.__wrapped__!r})"
-
-
-@jtu.register_pytree_node_class
-class _UnfrozenWrapper(_Wrapper):
-    def tree_flatten(self):
-        return (self.__wrapped__,), (None,)
-
-    @classmethod
-    def tree_unflatten(cls, _, leaves):
-        # a one time marker to indicate that a certain field
-        # needs to be unwrapped.
-        return _UnfrozenWrapper(leaves[0])
-
-    def __repr__(self):
-        return f"UnfrozenWrapper({self.__wrapped__!r})"
 
 
 def _unwrap(node: _Wrapper) -> PyTree:

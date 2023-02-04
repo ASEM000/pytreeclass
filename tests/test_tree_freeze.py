@@ -7,7 +7,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_freeze import _FrozenWrapper, _UnfrozenWrapper
+from pytreeclass._src.tree_freeze import _FrozenWrapper
 
 
 def test_freeze_unfreeze():
@@ -371,6 +371,3 @@ def test_freeze_nondiff_func():
 def test_wrapper():
     # only apply last wrapper
     assert _FrozenWrapper(_FrozenWrapper(1)) == _FrozenWrapper(1)
-    assert _UnfrozenWrapper(_UnfrozenWrapper(1)) == _UnfrozenWrapper(1)
-    assert _FrozenWrapper(_UnfrozenWrapper(1)) == _FrozenWrapper(1)
-    assert _UnfrozenWrapper(_FrozenWrapper(1)) == _UnfrozenWrapper(1)

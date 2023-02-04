@@ -79,19 +79,19 @@ def _at_apply_pytree(
         if not (_is_leaf_bool(where) or where is None):
             raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
 
-        if isinstance(lhs, (Tracer, jnp.ndarray)):
-            # check if the `set_value` is a valid type for `jnp.where` (i.e. can replace single array content)
-            # otherwise , do not broadcast the `set_value` to the lhs
-            # but instead, set the `set_value` to the whole lhs if all array elements are True
-            try:
-                # the function should have a scalar output or array output with the same shape as the input
-                # unlike `set`, I think instead of evaluating the function and check for the output shape
-                # its better to try using `jnp.where` and catch the error
-                return jnp.where(where, func(lhs), lhs)
-            except TypeError:
-                return func(lhs) if jnp.all(where) else lhs
+        if not isinstance(lhs, (Tracer, jnp.ndarray)):
+            return func(lhs) if (where is True or where is None) else lhs
 
-        return func(lhs) if (where is True or where is None) else lhs
+        # check if the `set_value` is a valid type for `jnp.where` (i.e. can replace single array content)
+        # otherwise , do not broadcast the `set_value` to the lhs
+        # but instead, set the `set_value` to the whole lhs if all array elements are True
+        try:
+            # the function should have a scalar output or array output with the same shape as the input
+            # unlike `set`, I think instead of evaluating the function and check for the output shape
+            # its better to try using `jnp.where` and catch the error
+            return jnp.where(where, func(lhs), lhs)
+        except TypeError:
+            return func(lhs) if jnp.all(where) else lhs
 
     return jtu.tree_map(_lhs_apply, tree, where, is_leaf=is_leaf)
 
@@ -133,7 +133,7 @@ class PyTreeIndexer:
         return f"where={self.where}"
 
 
-def _at_get_str(item: Any, path: list[str]):
+def _get_child(item: Any, path: list[str]) -> Any:
     """recursive getter"""
     # this function gets a certain attribute value based on a
     # sequence of strings.
@@ -142,91 +142,102 @@ def _at_get_str(item: Any, path: list[str]):
         raise ValueError("path must have at least one element")
     if len(path) == 1:
         return getattr(item, path[0])
-    return _at_get_str(getattr(item, path[0]), path[1:])
+    return _get_child(getattr(item, path[0]), path[1:])
 
 
-def _at_set_apply_str(
-    at_func,
+def _get_parent_node_and_child_name(tree: Any, path: list[str]) -> tuple[Any, str]:
+    # helper function to get the parent and attribute name of a path
+    if len(path) == 0:
+        raise ValueError("path must have at least one element")
+    if len(path) == 1:
+        return (tree, path[0])
+    return _get_parent_node_and_child_name(getattr(tree, path[0]), path[1:])
+
+
+def _check_structure_mismatch(tree, attr_name: str):
+    if hasattr(tree, attr_name):
+        return
+
+    msg = f"Error in retrieving `{attr_name}` from parent subtree {tree}.\n"
+    msg += "This is likely due to reducing the parent subtree to a single leaf node.\n"
+    msg += "This can happen if `is_leaf` is defined to reduce the parent subtree to a single leaf node.\n"
+    raise AttributeError(msg)
+
+
+def _at_set_str(
+    tree: PyTree,
+    path: list[str],
+    set_value: Any,
+    is_leaf: Callable[[Any], bool] = None,
+):
+    """Applies a function to a certain attribute of a tree based on a path using jax.tree_map and a mask."""
+    # In essence this function retrieves the direct parent of the attribute
+    # and applies the function to the attribute using a mask, that is False for all except at the attribute
+
+    def recurse(path: list[str], value: Any, depth: int = 0):
+        parent, child_name = _get_parent_node_and_child_name(tree, path)
+
+        if not hasattr(parent, child_name):
+            raise AttributeError(f"{child_name} is not a valid attribute of {parent}")
+
+        if depth > 0:
+            # non-leaf parent case setting the connection between the parent and the child
+            setattr(parent, child_name, value)
+            return tree if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
+
+        # leaf parent case
+        # create a mask that is True for the attribute and False for the rest
+        parent_mask = jtu.tree_map(lambda _: False, parent, is_leaf=is_leaf)
+
+        # check if parent subtree has not been reduced to a single leaf node
+        _check_structure_mismatch(parent_mask, child_name)
+
+        # masking the parent = False, and child = True
+        child_mask = getattr(parent_mask, child_name)
+        child_mask = jtu.tree_map(lambda _: True, child_mask)
+        setattr(parent_mask, child_name, child_mask)
+        parent = _at_set_pytree(parent, parent_mask, set_value, is_leaf=is_leaf)
+        return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
+
+    return recurse(path, set_value, depth=0)
+
+
+def _at_apply_str(
     tree: PyTree,
     path: list[str],
     func: Callable,
     is_leaf: Callable[[Any], bool] = None,
 ):
-    """
-    Applies a function to a certain attribute of a tree based on a path using jax.tree_map and a mask.
+    """Applies a function to a certain attribute of a tree based on a path using jax.tree_map and a mask."""
+    # In essence this function retrieves the direct parent of the attribute
+    # and applies the function to the attribute using a mask, that is False for all except at the attribute
 
-    In essence this function retrieves the direct parent of the attribute
-    and applies the function to the attribute using a mask, that is False for all except at the attribute
+    def recurse(path: list[str], value: Any, depth: int = 0):
+        parent, child_name = _get_parent_node_and_child_name(tree, path)
 
-    Args:
-        tree: The tree to apply the function to.
-        path: The path to the attribute to apply the function to.
-        func: The function to apply to the attribute.
-        is_leaf: A function that determines if a node is a leaf node.
-        at_func: _at_set or _at_apply
-    """
+        if not hasattr(parent, child_name):
+            raise AttributeError(f"{child_name} is not a valid attribute of {parent}")
 
-    def _get_parent_attr(tree, path: list[str]):
-        # helper function to get the parent and attribute name of a path
-        if len(path) == 0:
-            raise ValueError("path must have at least one element")
-        if len(path) == 1:
-            return (tree, path[0])
-        return _get_parent_attr(getattr(tree, path[0]), path[1:])
+        if depth > 0:
+            # non-leaf parent case setting the connection between the parent and the child
+            setattr(parent, child_name, value)
+            return tree if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
-    def _recurse_applier(path: list[str], value: Any, depth: int = 0):
+        # leaf parent case
+        # create a mask that is True for the attribute and False for the rest
+        parent_mask = jtu.tree_map(lambda _: False, parent, is_leaf=is_leaf)
 
-        parent, attr = _get_parent_attr(tree, path)
+        # check if parent subtree has not been reduced to a single leaf node
+        _check_structure_mismatch(parent_mask, child_name)
 
-        if not hasattr(parent, attr):
-            msg = f"{attr} is not a valid attribute of {parent}"
-            raise AttributeError(msg)
+        # masking the parent = False, and child = True
+        child_mask = getattr(parent_mask, child_name)
+        child_mask = jtu.tree_map(lambda _: True, child_mask)
+        setattr(parent_mask, child_name, child_mask)
+        parent = _at_apply_pytree(parent, parent_mask, func, is_leaf=is_leaf)
+        return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
-        if depth == 0:
-            # leaf parent case
-            # create a mask that is True for the attribute and False for the rest
-            mask = jtu.tree_map(lambda _: False, parent, is_leaf=is_leaf)
-            child_mask = getattr(mask, attr)
-            child_mask = jtu.tree_map(lambda _: True, child_mask)
-            # masking the parent = False, and attribute = True
-            setattr(mask, attr, child_mask)
-
-            # we reuse the `_at_apply_pytree`/`_at_str_pytree`
-            # function to apply the function using jtu.tree_map
-            parent = at_func(parent, mask, func, is_leaf=is_leaf)
-
-            if len(path) == 1:
-                # if parent is the original tree, then we
-                return parent
-
-            # check if parent subtree has not been reduced to a single leaf node
-            if not hasattr(parent, attr):
-                msg = f"Error in retrieving {attr} from parent subtree {parent}.\n"
-                msg += "This is likely due to reducing the parent subtree to a single leaf node.\n"
-                msg += "This can happen if is_leaf is defined to reduce the parent subtree to a single leaf node.\n"
-                msg += f"Parent subtree =\t{parent}\n".expandtabs(2)
-                msg += f"Reduced subtree =\t{parent}".expandtabs(2)
-                raise AttributeError(msg)
-
-        else:
-            # non-leaf parent case setting the connection with the child
-            setattr(parent, attr, value)
-
-        if len(path) == 1:
-            return tree
-        return _recurse_applier(path[:-1], parent, depth=depth + 1)
-
-    return _recurse_applier(path, func, depth=0)
-
-
-def _at_set_str(tree: PyTree, path: list[str], value: Any):
-    """Sets a certain attribute of a tree based on a path"""
-    return _at_set_apply_str(_at_set_pytree, tree, path, value)
-
-
-def _at_apply_str(tree: PyTree, path: list[str], func: Any, is_leaf: bool = None):
-    """Applies a function to a certain attribute of a tree based on a path"""
-    return _at_set_apply_str(_at_apply_pytree, tree, path, func, is_leaf=is_leaf)
+    return recurse(path, func, depth=0)
 
 
 @dc.dataclass(eq=False, frozen=True)
@@ -236,14 +247,14 @@ class StrIndexer:
 
     def get(self):
         # x.at["a"].get() returns x.a
-        return _at_get_str(self.tree, self.where.split("."))
+        return _get_child(self.tree, self.where.split("."))
 
-    def set(self, set_value):
+    def set(self, set_value, *, is_leaf: Callable[[Any], bool] = None):
         # x.at["a"].set(value) returns a new tree with x.a = value
         # unlike [...].set with mask, this **does not preserve** the tree structure
         tree = _set_dataclass_frozen(copy(self.tree), frozen=False)
         where = self.where.split(".")
-        tree = _at_set_str(tree, where, set_value)
+        tree = _at_set_str(tree, where, set_value, is_leaf=is_leaf)
         tree = _set_dataclass_frozen(tree, frozen=True)
         return tree
 
@@ -276,11 +287,11 @@ def _str_nested_indexer(tree, where):
         def __getitem__(nested_self, nested_where: list[str]):
             # check if nested_where is a valid attribute of the current node before
             # proceeding to the next level and to give a more informative error message
-            if hasattr(_at_get_str(tree, nested_self.where.split(".")), nested_where):
+            if hasattr(_get_child(tree, nested_self.where.split(".")), nested_where):
                 nested_where = nested_self.where + "." + nested_where
                 return StrNestedIndexer(tree=tree, where=nested_where)
 
-            msg = f"{nested_where} is not a valid attribute of {_at_get_str(tree, nested_self.where)}"
+            msg = f"{nested_where} is not a valid attribute of {_get_child(tree, nested_self.where)}"
             raise AttributeError(msg)
 
         def __getattr__(nested_self, name):
@@ -290,10 +301,9 @@ def _str_nested_indexer(tree, where):
                 # pass the current tree and the current path to the next `.at`
                 return StrNestedIndexer(tree=tree, where=nested_self.where)
 
-            raise AttributeError(
-                f"{name} is not a valid attribute of {nested_self}\n"
-                f"Did you mean to use .at[{name!r}]?"
-            )
+            msg = f"{name} is not a valid attribute of {nested_self}\n"
+            msg += f"Did you mean to use .at[{name!r}]?"
+            raise AttributeError(msg)
 
     return StrNestedIndexer(tree=tree, where=where)
 
@@ -313,10 +323,9 @@ def _pytree_nested_indexer(tree, where):
                 # pass the current where condition to the next level
                 return PyTreeNestedIndexer(tree=tree, where=nested_self.where)
 
-            raise AttributeError(
-                f"{name} is not a valid attribute of {nested_self}\n"
-                f"Did you mean to use .at[{name!r}]?"
-            )
+            msg = f"{name} is not a valid attribute of {nested_self}\n"
+            msg += f"Did you mean to use .at[{name!r}]?"
+            raise AttributeError(msg)
 
     return PyTreeNestedIndexer(tree=tree, where=where)
 
@@ -327,11 +336,11 @@ def _at_indexer(tree):
             if isinstance(where, str):
                 return _str_nested_indexer(tree=tree, where=where)
 
-            elif isinstance(where, type(tree)):
+            if isinstance(where, type(tree)):
                 # indexing by boolean pytree
                 return _pytree_nested_indexer(tree=tree, where=where)
 
-            elif isinstance(where, EllipsisType):
+            if isinstance(where, EllipsisType):
                 # Ellipsis as an alias for all elements
                 # model.at[model == model ] <--> model.at[...]
                 return tree.at[tree == tree]

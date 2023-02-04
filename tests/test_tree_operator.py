@@ -6,7 +6,34 @@ import pytest
 import pytreeclass as pytc
 
 
-def test_ops():
+def test_bmap():
+    @pytc.treeclass
+    class Test:
+        a: tuple[int] = (1, 2, 3)
+        b: tuple[int] = (4, 5, 6)
+        c: jnp.ndarray = jnp.array([1, 2, 3])
+        d: int = 1
+
+    tree = Test()
+    rhs = Test(a=(1, 0, 0), b=(0, 0, 0), c=jnp.array([1, 0, 0]), d=1)
+
+    lhs = pytc.bmap(jnp.where)(tree > 1, 0, tree)
+    assert pytc.is_treeclass_equal(lhs, rhs)
+
+    lhs = pytc.bmap(jnp.where)(tree > 1, 0, y=tree)
+    assert pytc.is_treeclass_equal(lhs, rhs)
+
+    lhs = pytc.bmap(jnp.where)(tree > 1, x=0, y=tree)
+    assert pytc.is_treeclass_equal(lhs, rhs)
+
+    lhs = pytc.bmap(jnp.where)(tree > 1, x=0, y=tree)
+    assert pytc.is_treeclass_equal(lhs, rhs)
+
+    lhs = pytc.bmap(jnp.where)(condition=tree > 1, x=0, y=tree)
+    assert pytc.is_treeclass_equal(lhs, rhs)
+
+
+def test_math_operations():
     @pytc.treeclass
     class Test:
         a: float
@@ -52,18 +79,19 @@ def test_ops():
     assert ~A == Test(~10, ~20, ("A"))
 
 
-def test_op_errors():
+def test_math_operations_errors():
     @pytc.treeclass
     class Test:
         a: float
         b: float
         c: float
         name: str = pytc.field(nondiff=True)
+        d: jnp.ndarray = jnp.array([1, 2, 3])
 
     A = Test(10, 20, 30, ("A"))
 
     with pytest.raises(TypeError):
         A + "s"
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(TypeError):
         A == (1,)

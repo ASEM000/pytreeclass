@@ -151,7 +151,7 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
             dynamic[field.name] = _FrozenWrapper(static.pop(field.name))
             continue
 
-        # expose dynamic fields as dynamic leaves
+        # expose normal fields as dynamic leaves
         dynamic[field.name] = static.pop(field.name)
 
     return dynamic.values(), (dynamic.keys(), static)
@@ -217,7 +217,7 @@ def treeclass(cls=None, *, eq: bool = True, repr: bool = True):
         attrs.update(__setattr__=_setattr)
         attrs.update(__delattr__=_delattr)
 
-        # jax flatten/unflatten rules
+        # JAX flatten/unflatten rules
         attrs.update(tree_flatten=_flatten)
         attrs.update(tree_unflatten=classmethod(_unflatten))
 
@@ -246,11 +246,8 @@ def is_treeclass(cls_or_instance):
         return False
 
     if isinstance(cls_or_instance, type):
-        # check if the input is a class
-        # then check if the class is a subclass of `_TreeAtIndexer`
         return issubclass(cls_or_instance, _TreeAtIndexer)
 
-    # finally check if the input is an instance of `_TreeAtIndexer`
     return isinstance(cls_or_instance, _TreeAtIndexer)
 
 

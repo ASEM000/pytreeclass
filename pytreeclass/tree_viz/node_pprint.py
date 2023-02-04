@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses as dc
 import functools as ft
 import inspect
 import math
@@ -58,7 +59,7 @@ def _numpy_pprint(node: np.ndarray, kind: str = "repr") -> str:
         # replace inf with infinity symbol
         interval = interval.replace("inf", "∞")
         # return extended repr
-        return f"{base} ∈{interval} μ={mean:.1f} σ={std:.1f}"
+        return f"{base} ∈{interval} μ(σ)={mean:.1f}({std:.1f})"
 
     if kind == "repr":
         return base
@@ -102,6 +103,12 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "str") -> str:
     if hasattr(node, "shape") and hasattr(node, "dtype") and kind == "repr":
         # works for numpy arrays, jax arrays
         return _numpy_pprint(node, kind)
+
+    if hasattr(node, "_fields") and hasattr(node, "_asdict"):
+        return f"namedtuple({_dict_pprint(node._asdict(), depth, kind=kind)})"
+
+    if dc.is_dataclass(node):
+        return f"dataclass({_dict_pprint(node.asdict(node), depth, kind=kind)})"
 
     if isinstance(node, list):
         return _list_pprint(node, depth, kind=kind)

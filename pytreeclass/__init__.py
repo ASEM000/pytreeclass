@@ -6,6 +6,7 @@ from pytreeclass._src.tree_freeze import (
     tree_freeze,
     tree_unfreeze,
 )
+from pytreeclass._src.tree_operator import bmap
 
 __all__ = (
     "treeclass",
@@ -16,6 +17,7 @@ __all__ = (
     "is_nondiff",
     "is_frozen",
     "is_treeclass_equal",
+    "bmap",
 )
 
 __version__ = "0.2.0b"
