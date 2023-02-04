@@ -18,6 +18,8 @@ from pytreeclass.tree_viz.tree_viz_util import (
     tree_trace,
 )
 
+""" Pretty print pytress"""
+
 PyTree = Any
 
 __all__ = ("tree_diagram", "tree_repr", "tree_str", "tree_summary")
@@ -197,44 +199,44 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
     Example:
         >>> # Traverse only the first level of the tree
         >>> print(tree_summary((1,(2,(3,4))),depth=1))
-        ┌────┬─────┬──────┬──────┬───────────────┬──────┐
-        │Name│Type │Leaf #│Size  │Config         │Frozen│
-        ├────┼─────┼──────┼──────┼───────────────┼──────┤
-        │[0] │int  │1     │28.00B│[0]=1          │False │
-        ├────┼─────┼──────┼──────┼───────────────┼──────┤
-        │[1] │tuple│3     │84.00B│[1]=(2, (3, 4))│False │
-        └────┴─────┴──────┴──────┴───────────────┴──────┘
+        ┌────┬─────┬──────┬──────┬─────────────┐
+        │Name│Type │Leaf #│Size  │Config       │
+        ├────┼─────┼──────┼──────┼─────────────┤
+        │[0] │int  │1     │28.00B│[0]=1        │
+        ├────┼─────┼──────┼──────┼─────────────┤
+        │[1] │tuple│3     │84.00B│[1]=(2,(3,4))│
+        └────┴─────┴──────┴──────┴─────────────┘
         Total leaf count:       4
         Non-frozen leaf count:  4
         Frozen leaf count:      0
-        -------------------------------------------------
+        ----------------------------------------
         Total leaf size:        112.00B
         Non-frozen leaf size:   112.00B
         Frozen leaf size:       0.00B
-        =================================================
+        ========================================
 
         >>> # Traverse two levels of the tree
         >>> print(tree_summary((1,(2,(3,4))),depth=2))
-        ┌──────┬─────┬──────┬──────┬─────────────┬──────┐
-        │Name  │Type │Leaf #│Size  │Config       │Frozen│
-        ├──────┼─────┼──────┼──────┼─────────────┼──────┤
-        │[0]   │int  │1     │28.00B│[0]=1        │False │
-        ├──────┼─────┼──────┼──────┼─────────────┼──────┤
-        │[1][0]│int  │1     │28.00B│[1][0]=2     │False │
-        ├──────┼─────┼──────┼──────┼─────────────┼──────┤
-        │[1][1]│tuple│2     │56.00B│[1][1]=(3, 4)│False │
-        └──────┴─────┴──────┴──────┴─────────────┴──────┘
+        ┌──────┬─────┬──────┬──────┬────────────┐
+        │Name  │Type │Leaf #│Size  │Config      │
+        ├──────┼─────┼──────┼──────┼────────────┤
+        │[0]   │int  │1     │28.00B│[0]=1       │
+        ├──────┼─────┼──────┼──────┼────────────┤
+        │[1][0]│int  │1     │28.00B│[1][0]=2    │
+        ├──────┼─────┼──────┼──────┼────────────┤
+        │[1][1]│tuple│2     │56.00B│[1][1]=(3,4)│
+        └──────┴─────┴──────┴──────┴────────────┘
         Total leaf count:       4
         Non-frozen leaf count:  4
         Frozen leaf count:      0
-        -------------------------------------------------
+        -----------------------------------------
         Total leaf size:        112.00B
         Non-frozen leaf size:   112.00B
         Frozen leaf size:       0.00B
-        =================================================
+        =========================================
 
     """
-    ROWS = [["Name", "Type ", "Leaf #", "Size ", "Config", "Frozen"]]
+    ROWS = [["Name", "Type ", "Leaf #", "Size ", "Config"]]
     COUNT = [complex(0), complex(0)]  # non-frozen, frozen
     SIZE = [complex(0), complex(0)]
 
@@ -242,11 +244,13 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
         # `tree_trace` returns a list of `NodeInfo` objects that contain the
         # leaves info at the specified depth
         row = [info.path]  # name
-        row += [f"{info.node.__class__.__name__}"]  # type
-        row += [_format_count(info.count.real + info.count.imag)]  # leaf count
-        row += [_format_size(info.size.real + info.size.imag)]  # size
-        row += [f"{info.path.split('.')[-1]}={_node_pprint(info.node, kind='repr')}"]
-        row += [str(info.frozen)]  # frozen
+        row += [f"{info.node.__class__.__name__}" + ("(Frozen)" if info.frozen else "")]
+        row += [_format_count(info.count.real + info.count.imag)]
+        row += [_format_size(info.size.real + info.size.imag)]
+        row += [
+            f"{info.path.split('.')[-1]}={_node_pprint(info.node, kind='repr').expandtabs(1)}"
+        ]
+        # row += [str(info.frozen)]  # frozen
         ROWS += [row]
         COUNT[int(info.frozen)] += info.count
         SIZE[int(info.frozen)] += info.size

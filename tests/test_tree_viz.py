@@ -1,80 +1,208 @@
-# from __future__ import annotations
+from __future__ import annotations
 
-# import dataclasses
+import dataclasses as dc
 
-# import jax.tree_util as jtu
-# from jax import numpy as jnp
+import jax.tree_util as jtu
+from jax import numpy as jnp
 
-# import pytreeclass as pytc
-# from pytreeclass.tree_viz import tree_diagram, tree_repr, tree_str, tree_summary
-
-
-# @pytc.treeclass
-# class Repr1:
-#     a: int = 1
-#     b: str = "string"
-#     c: float = 1.0
-#     d: tuple = "a" * 50
-#     e: list = None
-#     f: set = None
-#     g: dict = None
-#     h: jnp.ndarray = jnp.ones((5, 1))
-#     i: jnp.ndarray = jnp.ones((1, 6))
-#     j: jnp.ndarray = jnp.ones((1, 1, 4, 5))
-
-#     def __post_init__(self):
-#         self.e = [10] * 25
-#         self.f = {1, 2, 3}
-#         self.g = {"a": "a" * 50, "b": "b" * 50, "c": jnp.ones([5, 5])}
+import pytreeclass as pytc
+from pytreeclass.tree_viz import tree_diagram, tree_repr, tree_str, tree_summary
 
 
-# @pytc.treeclass
-# class Repr2:
-#     a: jnp.ndarray = jnp.ones((5, 1))
-#     b: jnp.ndarray = jnp.ones((1, 1))
-#     c: jnp.ndarray = jnp.ones((1, 1, 4, 5))
+@pytc.treeclass
+class Repr1:
+    a: int = 1
+    b: str = "string"
+    c: float = 1.0
+    d: tuple = "a" * 5
+    e: list = None
+    f: set = None
+    g: dict = None
+    h: jnp.ndarray = jnp.ones((5, 1))
+    i: jnp.ndarray = jnp.ones((1, 6))
+    j: jnp.ndarray = jnp.ones((1, 1, 4, 5))
+
+    def __post_init__(self):
+        self.e = [10] * 5
+        self.f = {1, 2, 3}
+        self.g = {"a": "a" * 50, "b": "b" * 50, "c": jnp.ones([5, 5])}
 
 
-# @pytc.treeclass
-# class Linear:
-#     weight: jnp.ndarray
-#     bias: jnp.ndarray
-#     notes: str = pytc.field(nondiff=True, default=("string"))
-
-#     def __init__(self, in_dim, out_dim):
-#         self.weight = jnp.ones((in_dim, out_dim))
-#         self.bias = jnp.ones((1, out_dim))
+@pytc.treeclass
+class Repr2:
+    a: jnp.ndarray = jnp.ones((5, 1))
+    b: jnp.ndarray = jnp.ones((1, 1))
+    c: jnp.ndarray = jnp.ones((1, 1, 4, 5))
 
 
-# @pytc.treeclass
-# class Repr3:
-#     l1: Linear = dataclasses.field(repr=False)
+@pytc.treeclass
+class Linear:
+    weight: jnp.ndarray
+    bias: jnp.ndarray
+    notes: str = pytc.field(nondiff=True, default=("string"))
 
-#     def __init__(self, in_dim, out_dim):
-#         self.l1 = Linear(in_dim=in_dim, out_dim=128)
-#         self.l2 = Linear(in_dim=128, out_dim=128)
-#         self.l3 = Linear(in_dim=128, out_dim=out_dim)
-
-
-# r1 = Repr1()
-# r2 = Repr2()
-# r3 = Repr3(in_dim=128, out_dim=10)
-
-# mask = jtu.tree_map(pytc.is_nondiff, r1)
-# r1f = r1.at[mask].apply(pytc.tree_freeze)
-
-# mask = r2 == r2
-# r2f = r2.at[mask].apply(pytc.tree_freeze)
+    def __init__(self, in_dim, out_dim):
+        self.weight = jnp.ones((in_dim, out_dim))
+        self.bias = jnp.ones((1, out_dim))
 
 
-# def test_tree_diagram():
+@pytc.treeclass
+class Repr3:
+    l1: Linear = dc.field(repr=False)
 
-#     assert (
-#         tree_diagram(r1)
-#         == "Repr1\n    ├── a:int=1\n    ├── b:str='string'\n    ├── c:float=1.0\n    ├── d:str='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n    ├── e:list\n    │   ├── [0]:int=10\n    │   ├── [1]:int=10\n    │   ├── [2]:int=10\n    │   ├── [3]:int=10\n    │   ├── [4]:int=10\n    │   ├── [5]:int=10\n    │   ├── [6]:int=10\n    │   ├── [7]:int=10\n    │   ├── [8]:int=10\n    │   ├── [9]:int=10\n    │   ├── [10]:int=10\n    │   ├── [11]:int=10\n    │   ├── [12]:int=10\n    │   ├── [13]:int=10\n    │   ├── [14]:int=10\n    │   ├── [15]:int=10\n    │   ├── [16]:int=10\n    │   ├── [17]:int=10\n    │   ├── [18]:int=10\n    │   ├── [19]:int=10\n    │   ├── [20]:int=10\n    │   ├── [21]:int=10\n    │   ├── [22]:int=10\n    │   ├── [23]:int=10\n    │   └── [24]:int=10 \n    ├── f:set={1,2,3}\n    ├── g:dict\n    │   ├-─ a:str='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n    │   ├-─ b:str='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'\n    │   └-─ c:DeviceArray=f32[5,5]∈[1.0,1.0]    \n    ├── h:DeviceArray=f32[5,1]∈[1.0,1.0]\n    ├── i:DeviceArray=f32[1,6]∈[1.0,1.0]\n    └── j:DeviceArray=f32[1,1,4,5]∈[1.0,1.0]    "
-#     )
+    def __init__(self, in_dim, out_dim):
+        self.l1 = Linear(in_dim=in_dim, out_dim=128)
+        self.l2 = Linear(in_dim=128, out_dim=128)
+        self.l3 = Linear(in_dim=128, out_dim=out_dim)
 
-#     assert (
-#         tree_diagram(r2)
-#         == "Repr2\n    ├── a:DeviceArray=f32[5,1]∈[1.0,1.0]\n    ├── b:DeviceArray=f32[1,1]∈[1.0,1.0]\n    └── c:DeviceArray=f32[1,1,4,5]∈[1.0,1.0]    "
-#     )
+
+r1 = Repr1()
+r2 = Repr2()
+r3 = Repr3(in_dim=128, out_dim=10)
+
+mask = jtu.tree_map(pytc.is_nondiff, r1)
+r1f = r1.at[mask].apply(pytc.tree_freeze)
+
+mask = r2 == r2
+r2f = r2.at[mask].apply(pytc.tree_freeze)
+
+
+@pytc.treeclass
+class Repr3:
+    l1: Linear = dc.field(repr=False)
+
+    def __init__(self, in_dim, out_dim):
+        self.l1 = Linear(in_dim=in_dim, out_dim=128)
+        self.l2 = Linear(in_dim=128, out_dim=128)
+        self.l3 = Linear(in_dim=128, out_dim=out_dim)
+
+
+def test_tree_repr():
+    assert (
+        tree_repr(r1)
+        # trunk-ignore(flake8/E501)
+        == "Repr1(\n  a=1, \n  b='string', \n  c=1.0, \n  d='aaaaa', \n  e=[10,10,10,10,10], \n  f={1,2,3}, \n  g={\n    a:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',\n    b:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',\n    c:\n    f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n  }, \n  h=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n  i=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n  j=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n)"
+    )
+
+    assert (
+        tree_repr(r2)
+        # trunk-ignore(flake8/E501)
+        == "Repr2(\n  a=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n  b=f32[1,1] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n  c=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n)"
+    )
+
+    assert (
+        tree_repr(r3)
+        # trunk-ignore(flake8/E501)
+        == "Repr3(\n  l2=Linear(\n    weight=f32[128,128] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n    bias=f32[1,128] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n    *notes='string'\n  ), \n  l3=Linear(\n    weight=f32[128,10] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n    bias=f32[1,10] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n    *notes='string'\n  )\n)"
+    )
+
+    assert (
+        tree_repr(r1f)
+        # trunk-ignore(flake8/E501)
+        == "Repr1(\n  #a=1, \n  #b='string', \n  c=1.0, \n  #d='aaaaa', \n  e=[\n    FrozenWrapper(10),\n    FrozenWrapper(10),\n    FrozenWrapper(10),\n    FrozenWrapper(10),\n    FrozenWrapper(10)\n  ], \n  #f={1,2,3}, \n  g={\n    a:FrozenWrapper('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),\n    b:FrozenWrapper('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'),\n    c:\n    f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n  }, \n  h=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n  i=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n  j=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n)"
+    )
+
+    assert (
+        tree_repr(r2f)
+        # trunk-ignore(flake8/E501)
+        == "Repr2(\n  #a=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n  #b=f32[1,1] ∈[1.0,1.0] μ(σ)=1.0(0.0), \n  #c=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n)"
+    )
+
+
+def test_tree_str():
+
+    assert (
+        tree_str(r1)
+        # trunk-ignore(flake8/E501)
+        == "Repr1(\n  a=1, \n  b=string, \n  c=1.0, \n  d=aaaaa, \n  e=[10,10,10,10,10], \n  f={1,2,3}, \n  g=\n    {\n      a:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n      b:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,\n      c:\n      [[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]\n    }, \n  h=\n    [[1.]\n     [1.]\n     [1.]\n     [1.]\n     [1.]], \n  i=[[1. 1. 1. 1. 1. 1.]], \n  j=\n    [[[[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]]]\n)"
+    )
+    assert (
+        tree_str(r2)
+        # trunk-ignore(flake8/E501)
+        == "Repr2(\n  a=\n    [[1.]\n     [1.]\n     [1.]\n     [1.]\n     [1.]], \n  b=[[1.]], \n  c=\n    [[[[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]]]\n)"
+    )
+    assert (
+        tree_str(r3)
+        # trunk-ignore(flake8/E501)
+        == "Repr3(\n  l2=Linear(\n    weight=\n      [[1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       ...\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]], \n    bias=\n      [[1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.\n        1. 1. 1. 1. 1. 1. 1. 1.]], \n    *notes=string\n  ), \n  l3=Linear(\n    weight=\n      [[1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       ...\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]\n       [1. 1. 1. ... 1. 1. 1.]], \n    bias=[[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]], \n    *notes=string\n  )\n)"
+    )
+
+    assert (
+        tree_str(r1f)
+        # trunk-ignore(flake8/E501)
+        == "Repr1(\n  #a=1, \n  #b=string, \n  c=1.0, \n  #d=aaaaa, \n  e=[\n    FrozenWrapper(10),\n    FrozenWrapper(10),\n    FrozenWrapper(10),\n    FrozenWrapper(10),\n    FrozenWrapper(10)\n  ], \n  #f={1,2,3}, \n  g=\n    {\n      a:FrozenWrapper('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),\n      b:FrozenWrapper('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'),\n      c:\n      [[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]\n    }, \n  h=\n    [[1.]\n     [1.]\n     [1.]\n     [1.]\n     [1.]], \n  i=[[1. 1. 1. 1. 1. 1.]], \n  j=\n    [[[[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]]]\n)"
+    )
+
+    assert (
+        tree_str(r2f)
+        # trunk-ignore(flake8/E501)
+        == "Repr2(\n  #a=\n    [[1.]\n     [1.]\n     [1.]\n     [1.]\n     [1.]], \n  #b=[[1.]], \n  #c=\n    [[[[1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]\n       [1. 1. 1. 1. 1.]]]]\n)"
+    )
+
+
+def test_tree_diagram():
+
+    assert (
+        tree_diagram(r1)
+        # trunk-ignore(flake8/E501)
+        == "Repr1\n    ├── a:int=1\n    ├── b:str='string'\n    ├── c:float=1.0\n    ├── d:str='aaaaa'\n    ├── e:list=[10,10,10,10,10]\n    ├── f:set={1,2,3}\n    ├── g:dict\n    │   ├-─ a:str='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n    │   ├-─ b:str='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'\n    │   └-─ c:Array=f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   \n    ├── h:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    ├── i:Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    └── j:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   "
+    )
+    assert (
+        tree_diagram(r2)
+        # trunk-ignore(flake8/E501)
+        == "Repr2\n    ├── a:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    ├── b:Array=f32[1,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    └── c:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   "
+    )
+    assert (
+        tree_diagram(r3)
+        # trunk-ignore(flake8/E501)
+        == "Repr3\n    ├── l2:Linear\n    │   ├── weight:Array=f32[128,128] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    │   ├── bias:Array=f32[1,128] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    │   └*─ notes:str='string'  \n    └── l3:Linear\n        ├── weight:Array=f32[128,10] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n        ├── bias:Array=f32[1,10] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n        └*─ notes:str='string'      "
+    )
+
+    assert (
+        tree_diagram(r1f)
+        # trunk-ignore(flake8/E501)
+        == "Repr1\n    ├#─ a:int=1\n    ├#─ b:str='string'\n    ├── c:float=1.0\n    ├#─ d:str='aaaaa'\n    ├── e:list\n    │   ├── [0]:_FrozenWrapper=FrozenWrapper(10)\n    │   ├── [1]:_FrozenWrapper=FrozenWrapper(10)\n    │   ├── [2]:_FrozenWrapper=FrozenWrapper(10)\n    │   ├── [3]:_FrozenWrapper=FrozenWrapper(10)\n    │   └── [4]:_FrozenWrapper=FrozenWrapper(10)    \n    ├#─ f:set={1,2,3}\n    ├── g:dict\n    │   ├-─ a:_FrozenWrapper=FrozenWrapper('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')\n    │   ├-─ b:_FrozenWrapper=FrozenWrapper('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')\n    │   └-─ c:Array=f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   \n    ├── h:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    ├── i:Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    └── j:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   "
+    )
+    assert (
+        tree_diagram(r2f)
+        # trunk-ignore(flake8/E501)
+        == "Repr2\n    ├#─ a:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    ├#─ b:Array=f32[1,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    └#─ c:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   "
+    )
+
+
+def test_tree_summary():
+
+    assert tree_summary(r1, depth=0) == (
+        # trunk-ignore(flake8/E501)
+        "┌────┬─────┬──────┬───────┬───────────────────────────────────────────────────────────┐\n│Name│Type │Leaf #│Size   │Config                                                     │\n├────┼─────┼──────┼───────┼───────────────────────────────────────────────────────────┤\n│    │Repr1│68    │939.00B│=Repr1(                                                    │\n│    │     │      │       │  a=1,                                                     │\n│    │     │      │       │  b='string',                                              │\n│    │     │      │       │  c=1.0,                                                   │\n│    │     │      │       │  d='aaaaa',                                               │\n│    │     │      │       │  e=[10,10,10,10,10],                                      │\n│    │     │      │       │  f={1,2,3},                                               │\n│    │     │      │       │  g={                                                      │\n│    │     │      │       │    a:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',│\n│    │     │      │       │    b:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',│\n│    │     │      │       │    c:                                                     │\n│    │     │      │       │    f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)                      │\n│    │     │      │       │  },                                                       │\n│    │     │      │       │  h=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0),                     │\n│    │     │      │       │  i=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0),                     │\n│    │     │      │       │  j=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)                  │\n│    │     │      │       │)                                                          │\n└────┴─────┴──────┴───────┴───────────────────────────────────────────────────────────┘\nTotal leaf count:       68\nNon-frozen leaf count:  68\nFrozen leaf count:      0\n---------------------------------------------------------------------------------------\nTotal leaf size:        939.00B\nNon-frozen leaf size:   939.00B\nFrozen leaf size:       0.00B\n=======================================================================================\n"
+    )
+
+    assert tree_summary(r1, depth=1) == (
+        # trunk-ignore(flake8/E501)
+        "┌────┬─────┬──────┬───────┬────────────────────────────────────────────────────────┐\n│Name│Type │Leaf #│Size   │Config                                                  │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│a   │int  │1     │28.00B │a=1                                                     │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│b   │str  │1     │55.00B │b='string'                                              │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│c   │float│1     │24.00B │c=1.0                                                   │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│d   │str  │1     │54.00B │d='aaaaa'                                               │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│e   │list │5     │140.00B│e=[10,10,10,10,10]                                      │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│f   │set  │1     │216.00B│f={1,2,3}                                               │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│g   │dict │27    │298.00B│g={                                                     │\n│    │     │      │       │ a:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',│\n│    │     │      │       │ b:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',│\n│    │     │      │       │ c:                                                     │\n│    │     │      │       │ f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)                      │\n│    │     │      │       │}                                                       │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│h   │Array│5     │20.00B │h=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)                     │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│i   │Array│6     │24.00B │i=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)                     │\n├────┼─────┼──────┼───────┼────────────────────────────────────────────────────────┤\n│j   │Array│20    │80.00B │j=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)                 │\n└────┴─────┴──────┴───────┴────────────────────────────────────────────────────────┘\nTotal leaf count:       68\nNon-frozen leaf count:  68\nFrozen leaf count:      0\n------------------------------------------------------------------------------------\nTotal leaf size:        939.00B\nNon-frozen leaf size:   939.00B\nFrozen leaf size:       0.00B\n====================================================================================\n"
+    )
+
+    assert tree_summary(r1, depth=2) == (
+        # trunk-ignore(flake8/E501)
+        "┌────┬─────┬──────┬───────┬─────────────────────────────────────────────────────────┐\n│Name│Type │Leaf #│Size   │Config                                                   │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│a   │int  │1     │28.00B │a=1                                                      │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│b   │str  │1     │55.00B │b='string'                                               │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│c   │float│1     │24.00B │c=1.0                                                    │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│d   │str  │1     │54.00B │d='aaaaa'                                                │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│e[0]│int  │1     │28.00B │e[0]=10                                                  │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│e[1]│int  │1     │28.00B │e[1]=10                                                  │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│e[2]│int  │1     │28.00B │e[2]=10                                                  │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│e[3]│int  │1     │28.00B │e[3]=10                                                  │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│e[4]│int  │1     │28.00B │e[4]=10                                                  │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│f   │set  │1     │216.00B│f={1,2,3}                                                │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│g[a]│str  │1     │99.00B │g[a]='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'│\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│g[b]│str  │1     │99.00B │g[b]='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'│\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│g[c]│Array│25    │100.00B│g[c]=f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)                   │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│h   │Array│5     │20.00B │h=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)                      │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│i   │Array│6     │24.00B │i=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)                      │\n├────┼─────┼──────┼───────┼─────────────────────────────────────────────────────────┤\n│j   │Array│20    │80.00B │j=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)                  │\n└────┴─────┴──────┴───────┴─────────────────────────────────────────────────────────┘\nTotal leaf count:       68\nNon-frozen leaf count:  68\nFrozen leaf count:      0\n-------------------------------------------------------------------------------------\nTotal leaf size:        939.00B\nNon-frozen leaf size:   939.00B\nFrozen leaf size:       0.00B\n=====================================================================================\n"
+    )
+
+    assert tree_summary(r2) == (
+        # trunk-ignore(flake8/E501)
+        "┌────┬─────┬──────┬──────┬───────────────────────────────────────┐\n│Name│Type │Leaf #│Size  │Config                                 │\n├────┼─────┼──────┼──────┼───────────────────────────────────────┤\n│a   │Array│5     │20.00B│a=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)    │\n├────┼─────┼──────┼──────┼───────────────────────────────────────┤\n│b   │Array│1     │4.00B │b=f32[1,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)    │\n├────┼─────┼──────┼──────┼───────────────────────────────────────┤\n│c   │Array│20    │80.00B│c=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)│\n└────┴─────┴──────┴──────┴───────────────────────────────────────┘\nTotal leaf count:       26\nNon-frozen leaf count:  26\nFrozen leaf count:      0\n------------------------------------------------------------------\nTotal leaf size:        104.00B\nNon-frozen leaf size:   104.00B\nFrozen leaf size:       0.00B\n==================================================================\n"
+    )
+
+    assert tree_summary(r3) == (
+        # trunk-ignore(flake8/E501)
+        "┌─────────┬─────┬──────┬───────┬────────────────────────────────────────────┐\n│Name     │Type │Leaf #│Size   │Config                                      │\n├─────────┼─────┼──────┼───────┼────────────────────────────────────────────┤\n│l1.weight│Array│16,384│64.00KB│weight=f32[128,128] ∈[1.0,1.0] μ(σ)=1.0(0.0)│\n├─────────┼─────┼──────┼───────┼────────────────────────────────────────────┤\n│l1.bias  │Array│128   │512.00B│bias=f32[1,128] ∈[1.0,1.0] μ(σ)=1.0(0.0)    │\n├─────────┼─────┼──────┼───────┼────────────────────────────────────────────┤\n│l2.weight│Array│16,384│64.00KB│weight=f32[128,128] ∈[1.0,1.0] μ(σ)=1.0(0.0)│\n├─────────┼─────┼──────┼───────┼────────────────────────────────────────────┤\n│l2.bias  │Array│128   │512.00B│bias=f32[1,128] ∈[1.0,1.0] μ(σ)=1.0(0.0)    │\n├─────────┼─────┼──────┼───────┼────────────────────────────────────────────┤\n│l3.weight│Array│1,280 │5.00KB │weight=f32[128,10] ∈[1.0,1.0] μ(σ)=1.0(0.0) │\n├─────────┼─────┼──────┼───────┼────────────────────────────────────────────┤\n│l3.bias  │Array│10    │40.00B │bias=f32[1,10] ∈[1.0,1.0] μ(σ)=1.0(0.0)     │\n└─────────┴─────┴──────┴───────┴────────────────────────────────────────────┘\nTotal leaf count:       34,314\nNon-frozen leaf count:  34,314\nFrozen leaf count:      0\n-----------------------------------------------------------------------------\nTotal leaf size:        134.04KB\nNon-frozen leaf size:   134.04KB\nFrozen leaf size:       0.00B\n=============================================================================\n"
+    )
+
+    assert tree_summary(r1f) == (
+        # trunk-ignore(flake8/E501)
+        "┌────┬──────────────────────┬──────┬───────┬────────────────────────────────────────────────────────────────────────┐\n│Name│Type                  │Leaf #│Size   │Config                                                                  │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│a   │int(Frozen)           │1     │28.00B │a=1                                                                     │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│b   │str(Frozen)           │1     │55.00B │b='string'                                                              │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│c   │float                 │1     │24.00B │c=1.0                                                                   │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│d   │str(Frozen)           │1     │54.00B │d='aaaaa'                                                               │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│e[0]│_FrozenWrapper(Frozen)│1     │48.00B │e[0]=FrozenWrapper(10)                                                  │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│e[1]│_FrozenWrapper(Frozen)│1     │48.00B │e[1]=FrozenWrapper(10)                                                  │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│e[2]│_FrozenWrapper(Frozen)│1     │48.00B │e[2]=FrozenWrapper(10)                                                  │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│e[3]│_FrozenWrapper(Frozen)│1     │48.00B │e[3]=FrozenWrapper(10)                                                  │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│e[4]│_FrozenWrapper(Frozen)│1     │48.00B │e[4]=FrozenWrapper(10)                                                  │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│f   │set(Frozen)           │1     │216.00B│f={1,2,3}                                                               │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│g[a]│_FrozenWrapper(Frozen)│1     │48.00B │g[a]=FrozenWrapper('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')│\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│g[b]│_FrozenWrapper(Frozen)│1     │48.00B │g[b]=FrozenWrapper('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')│\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│g[c]│Array                 │25    │100.00B│g[c]=f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)                                  │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│h   │Array                 │5     │20.00B │h=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)                                     │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│i   │Array                 │6     │24.00B │i=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)                                     │\n├────┼──────────────────────┼──────┼───────┼────────────────────────────────────────────────────────────────────────┤\n│j   │Array                 │20    │80.00B │j=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)                                 │\n└────┴──────────────────────┴──────┴───────┴────────────────────────────────────────────────────────────────────────┘\nTotal leaf count:       68\nNon-frozen leaf count:  57\nFrozen leaf count:      11\n---------------------------------------------------------------------------------------------------------------------\nTotal leaf size:        937.00B\nNon-frozen leaf size:   248.00B\nFrozen leaf size:       689.00B\n=====================================================================================================================\n"
+    )
+
+    assert tree_summary(r2f) == (
+        # trunk-ignore(flake8/E501)
+        "┌────┬─────────────┬──────┬──────┬───────────────────────────────────────┐\n│Name│Type         │Leaf #│Size  │Config                                 │\n├────┼─────────────┼──────┼──────┼───────────────────────────────────────┤\n│a   │Array(Frozen)│5     │20.00B│a=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)    │\n├────┼─────────────┼──────┼──────┼───────────────────────────────────────┤\n│b   │Array(Frozen)│1     │4.00B │b=f32[1,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)    │\n├────┼─────────────┼──────┼──────┼───────────────────────────────────────┤\n│c   │Array(Frozen)│20    │80.00B│c=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)│\n└────┴─────────────┴──────┴──────┴───────────────────────────────────────┘\nTotal leaf count:       26\nNon-frozen leaf count:  0\nFrozen leaf count:      26\n--------------------------------------------------------------------------\nTotal leaf size:        104.00B\nNon-frozen leaf size:   0.00B\nFrozen leaf size:       104.00B\n==========================================================================\n"
+    )

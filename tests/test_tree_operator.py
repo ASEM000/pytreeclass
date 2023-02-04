@@ -6,6 +6,7 @@ import pytest
 import pytreeclass as pytc
 from pytreeclass._src.tree_freeze import _hash_node
 
+
 def test_bmap():
     @pytc.treeclass
     class Test:
@@ -32,11 +33,11 @@ def test_bmap():
     lhs = pytc.bmap(jnp.where)(condition=tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
-
     with pytest.raises(ValueError):
         pytc.bmap(lambda *x: x)(tree)
-    
+
     with pytest.raises(ValueError):
+
         @pytc.bmap
         def func(**k):
             return 0
@@ -107,7 +108,7 @@ def test_math_operations_errors():
 
 
 def test_hash_node():
-    assert _hash_node([1,2,3])
-    assert _hash_node(jnp.array([1,2,3]))
-    assert _hash_node({1,2,3})   
-    assert _hash_node({"a":1})
+    assert _hash_node([1, 2, 3])
+    assert _hash_node(jnp.array([1, 2, 3]))
+    assert _hash_node({1, 2, 3})
+    assert _hash_node({"a": 1})

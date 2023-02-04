@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses as dc
 import functools as ft
 import inspect
 import math
@@ -106,9 +105,6 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "str") -> str:
 
     if hasattr(node, "_fields") and hasattr(node, "_asdict"):
         return f"namedtuple({_dict_pprint(node._asdict(), depth, kind=kind)})"
-
-    if dc.is_dataclass(node):
-        return f"dataclass({_dict_pprint(node.asdict(node), depth, kind=kind)})"
 
     if isinstance(node, list):
         return _list_pprint(node, depth, kind=kind)
