@@ -208,7 +208,7 @@ def test_is_tree_equal():
 
     assert pytc.is_tree_equal(Test1(), Test2()) is False
 
-    assert pytc.is_tree_equal(jnp.array([1, 2, 3]), jnp.array([1, 2, 3])) is False
+    assert pytc.is_tree_equal(jnp.array([1, 2, 3]), jnp.array([1, 2, 3]))
 
     @pytc.treeclass
     class Test3:
