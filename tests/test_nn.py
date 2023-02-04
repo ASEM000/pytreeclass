@@ -164,11 +164,14 @@ def test_freeze_nondiff():
 
     @pytc.treeclass
     class StackedLinear:
-        name: str = "stack"
-        exact_array: jnp.ndarray = jnp.array([1, 2, 3])
-        bool_array: jnp.ndarray = jnp.array([True, True])
+        name: str
+        exact_array: jnp.ndarray
+        bool_array: jnp.ndarray
 
         def __init__(self, key, in_dim, out_dim, hidden_dim):
+            self.name = "stack"
+            self.exact_array = jnp.array([1, 2, 3])
+            self.bool_array = jnp.array([True, True])
 
             keys = jax.random.split(key, 3)
 

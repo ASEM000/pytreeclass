@@ -174,7 +174,7 @@ def _unflatten(cls, treedef, leaves):
     return tree
 
 
-def treeclass(cls=None, *, eq: bool = True, repr: bool = True):
+def treeclass(cls=None, *, order: bool = True, repr: bool = True):
     """Decorator to convert a class to a `treeclass`
 
     Example:
@@ -189,8 +189,9 @@ def treeclass(cls=None, *, eq: bool = True, repr: bool = True):
 
     Args:
         cls: class to be converted to a `treeclass`
-        eq: if `True` the `treeclass` math operations will be applied leaf-wise
-        repr: if `True` the `treeclass` will have a `__repr__`/ `__str__` method
+        order: if `True` the `treeclass` math operations will be applied leaf-wise (default: `True`)
+        repr: if `True` the `treeclass` will have a `__repr__`/ `__str__` method (default: `True`)
+        frozen: if `True` the `treeclass` will be immutable (default: `True`) - use with caution -
 
     Returns:
         `treeclass` of the input class
@@ -199,7 +200,7 @@ def treeclass(cls=None, *, eq: bool = True, repr: bool = True):
         TypeError: if the input class is not a `class`
     """
 
-    def decorator(cls, eq, repr):
+    def decorator(cls, order, repr):
 
         init = "__init__" not in vars(cls)
         dcls = dc.dataclass(init=init, repr=False, eq=False)(cls)
@@ -227,7 +228,7 @@ def treeclass(cls=None, *, eq: bool = True, repr: bool = True):
 
         # decide class bases based on kwargs
         bases = (dcls, _TreeAtIndexer)
-        bases += (_TreeOperator,) if eq else ()
+        bases += (_TreeOperator,) if order else ()
 
         dcls = type(cls.__name__, bases, attrs)
 
@@ -235,11 +236,11 @@ def treeclass(cls=None, *, eq: bool = True, repr: bool = True):
         return jtu.register_pytree_node_class(dcls)
 
     if cls is None:
-        return lambda cls: decorator(cls, eq, repr)  # @treeclass
-    return decorator(cls, eq, repr)  # @treeclass(...)
+        return lambda cls: decorator(cls, order, repr)  # @treeclass
+    return decorator(cls, order, repr)  # @treeclass(...)
 
 
-def is_tree_equal(lhs, rhs):
+def is_tree_equal(lhs: Any, rhs: Any) -> bool:
     """Assert if two pytrees are equal"""
     lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
     rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)

@@ -1,3 +1,5 @@
+import dataclasses as dc
+
 import jax
 import jax.tree_util as jtu
 import numpy.testing as npt
@@ -114,7 +116,7 @@ def test_ops_with_jit():
         a: int = 1
         b: int = 2
         c: int = 3
-        d: jnp.ndarray = jnp.array([1, 2, 3])
+        d: jnp.ndarray = dc.field(default_factory=lambda: jnp.array([1, 2, 3]))
 
     @jax.jit
     def getter(tree):

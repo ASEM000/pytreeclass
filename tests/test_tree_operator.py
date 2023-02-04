@@ -10,10 +10,16 @@ from pytreeclass._src.tree_freeze import _hash_node
 def test_bmap():
     @pytc.treeclass
     class Test:
-        a: tuple[int] = (1, 2, 3)
-        b: tuple[int] = (4, 5, 6)
-        c: jnp.ndarray = jnp.array([1, 2, 3])
-        d: int = 1
+        a: tuple[int]
+        b: tuple[int]
+        c: jnp.ndarray
+        d: int
+
+        def __init__(self, a=(1, 2, 3), b=(4, 5, 6), c=jnp.array([1, 2, 3]), d=1):
+            self.a = a
+            self.b = b
+            self.c = c
+            self.d = d
 
     tree = Test()
     rhs = Test(a=(1, 0, 0), b=(0, 0, 0), c=jnp.array([1, 0, 0]), d=1)
@@ -96,7 +102,10 @@ def test_math_operations_errors():
         b: float
         c: float
         name: str = pytc.field(nondiff=True)
-        d: jnp.ndarray = jnp.array([1, 2, 3])
+        d: jnp.ndarray = None
+
+        def __post_init__(self):
+            self.d = jnp.array([1, 2, 3])
 
     A = Test(10, 20, 30, ("A"))
 

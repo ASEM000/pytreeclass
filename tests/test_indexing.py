@@ -466,7 +466,10 @@ def test_method_call():
 def test_composed_at():
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = jnp.array([1, 2, 3, 4, 5])
+        a: jnp.ndarray
+
+        def __init__(self, a=jnp.array([1, 2, 3, 4, 5])) -> None:
+            self.a = a
 
     t = Test()
 
@@ -482,7 +485,10 @@ def test_composed_at():
 def test_repr_str():
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = jnp.array([1, 2, 3, 4, 5])
+        a: jnp.ndarray
+
+        def __init__(self) -> None:
+            self.a = jnp.array([1, 2, 3, 4, 5])
 
     pass
     # t = Test()

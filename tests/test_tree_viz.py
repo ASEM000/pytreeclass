@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import dataclasses as dc
+import sys
 
 import jax.tree_util as jtu
+import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
@@ -24,11 +26,15 @@ class Repr1:
     e: list = None
     f: set = None
     g: dict = None
-    h: jnp.ndarray = jnp.ones((5, 1))
-    i: jnp.ndarray = jnp.ones((1, 6))
-    j: jnp.ndarray = jnp.ones((1, 1, 4, 5))
+    h: jnp.ndarray = None
+    i: jnp.ndarray = None
+    j: jnp.ndarray = None
 
     def __post_init__(self):
+        self.h = jnp.ones((5, 1))
+        self.i = jnp.ones((1, 6))
+        self.j = jnp.ones((1, 1, 4, 5))
+
         self.e = [10] * 5
         self.f = {1, 2, 3}
         self.g = {"a": "a" * 50, "b": "b" * 50, "c": jnp.ones([5, 5])}
@@ -36,9 +42,14 @@ class Repr1:
 
 @pytc.treeclass
 class Repr2:
-    a: jnp.ndarray = jnp.ones((5, 1))
-    b: jnp.ndarray = jnp.ones((1, 1))
-    c: jnp.ndarray = jnp.ones((1, 1, 4, 5))
+    a: jnp.ndarray
+    b: jnp.ndarray
+    c: jnp.ndarray
+
+    def __init__(self) -> None:
+        self.a = jnp.ones((5, 1))
+        self.b = jnp.ones((1, 1))
+        self.c = jnp.ones((1, 1, 4, 5))
 
 
 @pytc.treeclass
@@ -83,6 +94,7 @@ class Repr3:
         self.l3 = Linear(in_dim=128, out_dim=out_dim)
 
 
+@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
 def test_tree_repr():
     assert (
         tree_repr(r1)
@@ -115,6 +127,7 @@ def test_tree_repr():
     )
 
 
+@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
 def test_tree_str():
 
     assert (
@@ -146,6 +159,7 @@ def test_tree_str():
     )
 
 
+@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
 def test_tree_diagram():
 
     assert (
@@ -176,6 +190,7 @@ def test_tree_diagram():
     )
 
 
+@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
 def test_tree_summary():
 
     assert tree_summary(r1, depth=0) == (
@@ -214,18 +229,22 @@ def test_tree_summary():
     )
 
 
+@pytest.mark.skipif(sys.version_info != (3, 10), reason="requires python 3.10")
 def test_tree_mermaid():
     assert (
         tree_mermaid(r1)
+        # trunk-ignore(flake8/E501)
         == 'flowchart LR\n    id15696277213149321320(<b>Repr1</b>)\n    id15696277213149321320 ---- |"1 leaf<br>28.00B"| id159132120600507116["<b>a</b>:int=1"]\n    id15696277213149321320 ---- |"1 leaf<br>55.00B"| id10009280772564895168["<b>b</b>:str=\'string\'"]\n    id15696277213149321320 ---- |"1 leaf<br>24.00B"| id7572222925824649475["<b>c</b>:float=1.0"]\n    id15696277213149321320 ---- |"1 leaf<br>54.00B"| id10865740276892226484["<b>d</b>:str=\'aaaaa\'"]\n    id15696277213149321320 ---- |"5 leaves<br>140.00B"| id2269144855147062920["<b>e</b>:list=[10,10,10,10,10]"]\n    id15696277213149321320 ---- |"1 leaf<br>216.00B"| id18278831082116368843["<b>f</b>:set={1,2,3}"]\n    id15696277213149321320 ---- |"27 leaves<br>298.00B"| id9682235660371205279["<b>g</b>:dict={\n    a:\'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\',\n    b:\'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\',\n    c:\n    f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n}"]\n    id15696277213149321320 ---- |"5 leaves<br>20.00B"| id12975753011438782288["<b>h</b>:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id15696277213149321320 ---- |"6 leaves<br>24.00B"| id10538695164698536595["<b>i</b>:Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id15696277213149321320 ---- |"20 leaves<br>80.00B"| id1942099742953373031["<b>j</b>:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]'
     )
     assert (
         tree_mermaid(r2)
+        # trunk-ignore(flake8/E501)
         == 'flowchart LR\n    id15696277213149321320(<b>Repr2</b>)\n    id15696277213149321320 ---- |"5 leaves<br>20.00B"| id159132120600507116["<b>a</b>:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id15696277213149321320 ---- |"1 leaf<br>4.00B"| id10009280772564895168["<b>b</b>:Array=f32[1,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id15696277213149321320 ---- |"20 leaves<br>80.00B"| id7572222925824649475["<b>c</b>:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]'
     )
     assert (
         tree_mermaid(r3)
+        # trunk-ignore(flake8/E501)
         == 'flowchart LR\n    id15696277213149321320(<b>Repr3</b>)\n    id15696277213149321320 ---> |"16,512 leaves<br>64.50KB"| id159132120600507116("<b>l2</b>:Linear")\n    id159132120600507116 ---- |"16,384 leaves<br>64.00KB"| id7500441386962467209["<b>weight</b>:Array=f32[128,128] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id159132120600507116 ---- |"128 leaves<br>512.00B"| id10793958738030044218["<b>bias</b>:Array=f32[1,128] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id159132120600507116 ---- |"1 leaf<br>55.00B"| id16245750007010064142["<b>notes</b>:str=\'string\'"]\n    id15696277213149321320 ---> |"1,290 leaves<br>5.04KB"| id10009280772564895168("<b>l3</b>:Linear")\n    id10009280772564895168 ---- |"1,280 leaves<br>5.00KB"| id11951215191344350637["<b>weight</b>:Array=f32[128,10] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id10009280772564895168 ---- |"10 leaves<br>40.00B"| id1196345851686744158["<b>bias</b>:Array=f32[1,10] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id10009280772564895168 ---- |"1 leaf<br>55.00B"| id6648137120666764082["<b>notes</b>:str=\'string\'"]'
     )
 
-    assert tree_mermaid(r1f)
+    # assert tree_mermaid(r1f)

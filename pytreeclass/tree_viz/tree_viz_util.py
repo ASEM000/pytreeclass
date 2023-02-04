@@ -84,24 +84,10 @@ def is_children_frozen(tree):
         if len(fields) > 0:
             if all(isinstance(f, _FrozenWrapper) for f in fields):
                 return True
-            if all(isinstance(getattr(tree, f.name),_FrozenWrapper) for f in fields):
+            if all(isinstance(getattr(tree, f.name), _FrozenWrapper) for f in fields):
                 return True
 
     return False
-
-
-def _is_dcls_leaf(tree):
-    """assert if a node is dataclass leaf"""
-    if dc.is_dataclass(tree):
-
-        return dc.is_dataclass(tree) and not any(
-            [dc.is_dataclass(getattr(tree, fi.name)) for fi in dc.fields(tree)]
-        )
-    return False
-
-
-def _is_dcls_non_leaf(tree):
-    return dc.is_dataclass(tree) and not _is_dcls_leaf(tree)
 
 
 def _mermaid_marker(field_item: dc.Field, node: Any, default: str = "--") -> str:
@@ -116,11 +102,7 @@ def _mermaid_marker(field_item: dc.Field, node: Any, default: str = "--") -> str
         str: marker character.
     """
     # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if (
-        isinstance(field_item, _FrozenWrapper)
-        or is_children_frozen(node)
-        or isinstance(node, _FrozenWrapper)
-    ):
+    if isinstance(field_item, _FrozenWrapper) or is_children_frozen(node):
         return "-..-"
 
     if isinstance(field_item, _NonDiffField) or _is_children_nondiff(node):

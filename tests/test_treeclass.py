@@ -30,15 +30,23 @@ def test_field_nondiff():
 
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = jnp.array([1, 2, 3])
-        b: jnp.ndarray = jnp.array([4, 5, 6])
+        a: jnp.ndarray
+        b: jnp.ndarray
+
+        def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
+            self.a = a
+            self.b = b
 
     test = Test()
 
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = pytc.field(nondiff=True, default=jnp.array([1, 2, 3]))
-        b: jnp.ndarray = pytc.field(nondiff=True, default=jnp.array([4, 5, 6]))
+        a: jnp.ndarray = pytc.field(nondiff=True)
+        b: jnp.ndarray = pytc.field(nondiff=True)
+
+        def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
+            self.a = a
+            self.b = b
 
     test = Test()
 
@@ -46,8 +54,12 @@ def test_field_nondiff():
 
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = pytc.field(nondiff=True, default=jnp.array([1, 2, 3]))
-        b: jnp.ndarray = jnp.array([4, 5, 6])
+        a: jnp.ndarray = pytc.field(nondiff=True)
+        b: jnp.ndarray
+
+        def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
+            self.a = a
+            self.b = b
 
     test = Test()
     npt.assert_allclose(jtu.tree_leaves(test)[0], jnp.array([4, 5, 6]))
@@ -181,7 +193,7 @@ def test_treeclass_decorator_arguments():
 
     assert "__repr__" not in Test.__dict__
 
-    @pytc.treeclass(eq=False)
+    @pytc.treeclass(order=False)
     class Test:
         a: int = 1
         b: int = 2
@@ -204,7 +216,10 @@ def test_is_tree_equal():
 
     @pytc.treeclass
     class Test2:
-        a: jnp.ndarray = jnp.array([1, 2, 3])
+        a: jnp.ndarray
+
+        def __init__(self) -> None:
+            self.a = jnp.array([1, 2, 3])
 
     assert pytc.is_tree_equal(Test1(), Test2()) is False
 
