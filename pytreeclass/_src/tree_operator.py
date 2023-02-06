@@ -99,10 +99,21 @@ def _transform_to_kwds_func(func: Callable) -> Callable:
 
 @ft.lru_cache(maxsize=None)
 def bmap(
-    func: Callable[..., Any], *, is_leaf: Callable[[Any], bool] | None = None
+    func: Callable[..., Any],
+    *,
+    is_leaf: Callable[[Any], bool] | None = None,
+    argnames: tuple[str, ...] = None,
+    argnums: tuple[int, ...] = None,
 ) -> Callable:
 
-    """Maps a function over pytrees leaves with automatic broadcasting for scalar arguments.
+    """(map)s a function over pytrees leaves with automatic (b)roadcasting for scalar arguments,
+    or broadcast for chosen argnames or argnums.
+
+    Args:
+        func: the function to be mapped over the pytree
+        is_leaf: a function that returns True if the argument is a leaf of the pytree
+        argnums: the indices of the arguments that should be broadcasted
+        argnames: the names of the arguments that should be broadcasted
 
     Example:
         >>> @pytc.treeclass
@@ -148,7 +159,7 @@ def bmap(
     # `bmap` <=> `ft.partial(ft.partial, jtu.tree_map)`
 
     signature = inspect.getfullargspec(func)
-    arg_names = signature[0]
+    sig_argnames = signature[0]
 
     # transform the function to a keyword accepting function to
     # make it possible to use `functools.partial`
@@ -156,50 +167,91 @@ def bmap(
 
     @ft.wraps(func)
     def wrapper(*args, **kwds):
+        # automatically to handle the broadcasting of scalar arguments to pytree leaves
+        partial_kwds, non_partial_kwds = dict(), dict()
 
-        if len(args) == 0:
-            # the user provided only keyword args, then we fetch the first arg
-            # by its name from the keywords
-            leaves, treedef = jtu.tree_flatten(kwds[arg_names[0]], is_leaf=is_leaf)
-            del kwds[arg_names[0]]
+        if argnums or argnames:
+            # here we handle the case where the user provides which
+            # argnum and argname to broadcast over
+
+            if argnums:
+                # the user provided positional args to broadcast
+                # leaves, treedef = jtu.tree_flatten(args[argnums[0]], is_leaf=is_leaf)
+                for name, argnum in zip(sig_argnames, range(len(args))):
+                    if argnum in argnums:
+                        partial_kwds[name] = args[argnum]
+
+            if argnames:
+                # the user provided keyword args to broadcast
+                for name in argnames:
+                    partial_kwds[name] = kwds[name]
+
+            # handle non-broadcasted arg
+            for (key, value) in zip(sig_argnames, args):
+                if key not in partial_kwds:
+                    non_partial_kwds[key] = value
+
+            for (key, value) in kwds.items():
+                if key not in partial_kwds:
+                    non_partial_kwds[key] = kwds[key]
+
+            # fetch the first arg/kwd to broadcast against
+            # this arg/kwd is the first non-broadcasted arg/kwd
+            name0 = next(iter(non_partial_kwds))
+            node0 = non_partial_kwds.pop(name0)
+            leaves, treedef = jtu.tree_flatten(node0, is_leaf=is_leaf)
 
         else:
-            # the user provided positional args
-            leaves, treedef = jtu.tree_flatten(args[0], is_leaf=is_leaf)
+            # here we handle the case where the user does not provide which argnum and argname
+            # to broadcast over, so we broadcast all the arguments that have dont have same
+            # same pytree structure as the first
+            # ex: [1,2,3], 1, [3,4] => 1 and [3,4] will be broadcasted (partialized) to [1,2,3]
+            # this will throw an error later because [3,4] is not broadcastable to [1,2,3]
 
-        partial_args = dict()
-        non_partial_args = dict()
+            if len(args) == 0:
+                # the user provided only keyword args
+                # we fetch the first arg by its name from the keywords
+                node0 = kwds.pop(sig_argnames[0])
+                leaves, treedef = jtu.tree_flatten(node0, is_leaf=is_leaf)
+                name0 = sig_argnames[0]
 
-        # handle positional args except the first one
-        # as we are comparing aginast the first arg
-        for (key, value) in zip(arg_names[1:], args[1:]):
-            if jtu.tree_structure(value) == treedef:
-                # similar pytree structure arguments are not broadcasted
-                non_partial_args[key] = value
             else:
-                # different pytree structure arguments are broadcasted
-                # might be a scalar or a pytree with a different structure
-                # in case of different structure, the function will fail
-                partial_args[key] = value
+                # the user provided positional args
+                leaves, treedef = jtu.tree_flatten(args[0], is_leaf=is_leaf)
+                name0 = sig_argnames[0]
 
-        # handle keyword-only args
-        for (key, value) in kwds.items():
-            if jtu.tree_structure(value) == treedef:
-                non_partial_args[key] = kwds[key]
-            else:
-                partial_args[key] = kwds[key]
+            # handle positional args except the first one
+            # as we are comparing aginast the first arg
+            for (key, value) in zip(sig_argnames[1:], args[1:]):
+                if jtu.tree_structure(value) == treedef:
+                    # similar pytree structure arguments are not broadcasted (i.e. not partialized)
+                    non_partial_kwds[key] = value
+                else:
+                    # different pytree structure arguments are broadcasted
+                    # might be a scalar or a pytree with a different structure
+                    # in case of different structure, the function will fail
+                    partial_kwds[key] = value
+
+            # handle keyword-only args
+            for (key, value) in kwds.items():
+                if jtu.tree_structure(value) == treedef:
+                    non_partial_kwds[key] = kwds[key]
+                else:
+                    partial_kwds[key] = kwds[key]
 
         all_leaves = [leaves]
-        all_leaves += [treedef.flatten_up_to(r) for r in non_partial_args.values()]
+        all_leaves += [treedef.flatten_up_to(r) for r in non_partial_kwds.values()]
 
         # pass the leaves values to the function by argnames
-        partial_func = ft.partial(kwd_func, **partial_args)
-        argnames = [arg_names[0]] + list(non_partial_args.keys())
-        flattened = (partial_func(**dict(zip(argnames, xs))) for xs in zip(*all_leaves))
+        # without kwd_func we would have to pass the leaves as positional arguments
+        # which would not work if a middle arg is needed to be broadcasted
+        # this is why we need to transform the function to a keyword accepting function
+        partial_func = ft.partial(kwd_func, **partial_kwds)
+        names = [name0] + list(non_partial_kwds.keys())
+        flattened = (partial_func(**dict(zip(names, xs))) for xs in zip(*all_leaves))
         return treedef.unflatten(flattened)
 
     wrapper.__doc__ = f"(broadcasted function) {func.__doc__}"
-
     return wrapper
 
 
@@ -209,7 +261,7 @@ class _TreeOperator:
     Example:
         >>> import jax.tree_util as jtu
         >>> import dataclasses as dc
-        >>> @jtu.register_pytree_node_class
+        >>> @jtu.register_pynode0_class
         ... @dc.dataclass
         ... class Tree(_TreeOperator):
         ...    a: int =1

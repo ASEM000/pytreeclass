@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools as ft
+
 import jax.numpy as jnp
 import pytest
 
@@ -24,6 +26,7 @@ def test_bmap():
     tree = Test()
     rhs = Test(a=(1, 0, 0), b=(0, 0, 0), c=jnp.array([1, 0, 0]), d=1)
 
+    # test auto broadcasting
     lhs = pytc.bmap(jnp.where)(tree > 1, 0, tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
@@ -47,6 +50,18 @@ def test_bmap():
         @pytc.bmap
         def func(**k):
             return 0
+
+    # test broadcasting with selected argnums/argnames
+    lhs = ft.partial(pytc.bmap, argnums=(1,))(jnp.where)(tree > 1, 0, tree)
+    assert pytc.is_tree_equal(lhs, rhs)
+
+    lhs = ft.partial(pytc.bmap, argnames=("x",))(jnp.where)(tree > 1, x=0, y=tree)
+    assert pytc.is_tree_equal(lhs, rhs)
+
+    lhs = ft.partial(pytc.bmap, argnums=(1,), argnames=("x",))(jnp.where)(
+        tree > 1, x=0, y=tree
+    )
+    assert pytc.is_tree_equal(lhs, rhs)
 
 
 def test_math_operations():

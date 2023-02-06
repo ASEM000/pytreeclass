@@ -8,7 +8,7 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass._src.tree_freeze import (
-    _FrozenWrapper,
+    FrozenWrapper,
     _NonDiffField,
     _set_dataclass_frozen,
     _unwrap,
@@ -145,10 +145,10 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
             # non differentiable fields as metadata
             continue
 
-        if isinstance(field, _FrozenWrapper):
+        if isinstance(field, FrozenWrapper):
             # expose static fields as static leaves (FrozenWrapper)
             static[_FIELDS][field.name] = _unwrap(field)
-            dynamic[field.name] = _FrozenWrapper(static.pop(field.name))
+            dynamic[field.name] = FrozenWrapper(static.pop(field.name))
             continue
 
         # expose normal fields as dynamic leaves
@@ -164,10 +164,10 @@ def _unflatten(cls, treedef, leaves):
     dynamic = dict(zip(treedef[0], leaves))
 
     for name in dynamic:
-        if isinstance(dynamic[name], _FrozenWrapper):
+        if isinstance(dynamic[name], FrozenWrapper):
             # convert frozen value (static leaf) -> frozen field (to metadata)
             dynamic[name] = _unwrap(dynamic[name])
-            static[_FIELDS][name] = _FrozenWrapper(static[_FIELDS][name])
+            static[_FIELDS][name] = FrozenWrapper(static[_FIELDS][name])
 
     tree.__dict__.update(static)
     tree.__dict__.update(dynamic)

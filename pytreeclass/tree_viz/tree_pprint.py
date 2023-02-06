@@ -7,6 +7,8 @@ from typing import Any
 
 import jax.tree_util as jtu
 
+import pytreeclass as pytc
+from pytreeclass._src.tree_freeze import _unwrap
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _node_pprint
 from pytreeclass.tree_viz.tree_viz_util import (
@@ -244,13 +246,13 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
     for info in tree_trace(tree, depth):
         # `tree_trace` returns a list of `NodeInfo` objects that contain the
         # leaves info at the specified depth
+
         row = [info.path]  # name
-        row += [f"{info.node.__class__.__name__}" + ("(Frozen)" if info.frozen else "")]
+        node = _unwrap(info.node) if pytc.is_frozen(info.node) else info.node
+        row += [f"{node.__class__.__name__}" + ("(frozen)" if info.frozen else "")]
         row += [_format_count(info.count.real + info.count.imag)]
         row += [_format_size(info.size.real + info.size.imag)]
-        row += [
-            f"{info.path.split('.')[-1]}={_node_pprint(info.node, kind='repr').expandtabs(1)}"
-        ]
+        row += [f"{info.path.split('.')[-1]}={_node_pprint(node).expandtabs(1)}"]
         # row += [str(info.frozen)]  # frozen
         ROWS += [row]
         COUNT[int(info.frozen)] += info.count

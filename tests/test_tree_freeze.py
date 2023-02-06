@@ -7,7 +7,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_freeze import _FrozenWrapper
+from pytreeclass._src.tree_freeze import FrozenWrapper, _HashableWrapper
 
 
 def test_freeze_unfreeze():
@@ -370,9 +370,9 @@ def test_freeze_nondiff_func():
 
 def test_wrapper():
     # only apply last wrapper
-    assert _FrozenWrapper(_FrozenWrapper(1)) == _FrozenWrapper(1)
+    assert hash((pytc.tree_freeze(1))) == hash(1)
 
-    lhs = _FrozenWrapper(1)
+    lhs = _HashableWrapper(1)
     # test getter
     assert lhs.__wrapped__ == 1
     assert lhs.__wrapped__
@@ -381,3 +381,9 @@ def test_wrapper():
     assert lhs != 1
     # hash of the wrapped object
     assert hash(lhs) == hash(1)
+
+    # test immutability
+    frozen_value = FrozenWrapper(1)
+
+    with pytest.raises(ValueError):
+        frozen_value.__wrapped__ = 2

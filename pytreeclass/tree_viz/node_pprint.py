@@ -87,7 +87,7 @@ def _func_pprint(func: Callable) -> str:
     return fmt
 
 
-def _node_pprint(node: Any, depth: int = 0, kind: str = "str") -> str:
+def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
     if isinstance(node, (FunctionType, custom_jvp)):
         return _func_pprint(node)
 
