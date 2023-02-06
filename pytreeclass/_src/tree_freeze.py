@@ -1,45 +1,44 @@
 from __future__ import annotations
 
+import copy
 import dataclasses as dc
+from contextlib import contextmanager
 from typing import Any, Iterable
 
 import jax.tree_util as jtu
 import numpy as np
 
+import pytreeclass as pytc
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
 from pytreeclass._src.tree_operator import _hash_node
 
 PyTree = Any
 
-_PARAMS = "__dataclass_params__"
 
-
-def _set_dataclass_frozen(tree: PyTree, frozen: bool):
-    def freeze_step(tree: PyTree, frozen: bool) -> PyTree:
-        if not dc.is_dataclass(tree):
+def _set_tree_immutability(tree: PyTree, set_value: bool):
+    def immutate_step(tree, set_value):
+        if not hasattr(tree, _FIELD_MAP):
             return tree
 
-        params = getattr(tree, _PARAMS)
-
-        if params.frozen is not frozen:
-            params.frozen = frozen  # params is an instance variable
-
+        object.__setattr__(tree, _FROZEN, set_value)
         # traverse the tree
-        for field in dc.fields(tree):
-            if not hasattr(tree, field.name):
+        for key in getattr(tree, _FIELD_MAP):
+            if not hasattr(tree, key):
                 continue
             # some field value might not be set yet
-            child = freeze_step(getattr(tree, field.name), frozen=frozen)
-            tree.__dict__[field.name] = child
-
+            child = immutate_step(getattr(tree, key), set_value=set_value)
+            tree.__dict__[key] = child
         return tree
 
-    return freeze_step((tree), frozen=frozen)
+    return immutate_step(tree, set_value=set_value)
 
 
-class _NonDiffField(dc.Field):
-    """A field that is not differentiable"""
-
-    pass
+@contextmanager
+def _MutableContext(tree: PyTree, inplace: bool = False):
+    tree = tree if inplace else copy.copy(tree)
+    _set_tree_immutability(tree, set_value=False)
+    yield tree
+    _set_tree_immutability(tree, set_value=True)
 
 
 class _HashableWrapper:
@@ -53,6 +52,10 @@ class _HashableWrapper:
 
     def __hash__(self):
         return _hash_node(self.__wrapped__)
+
+    @property
+    def value(self):
+        return self.__wrapped__
 
 
 @jtu.register_pytree_node_class
@@ -72,7 +75,7 @@ class FrozenWrapper:
 
     def __getattr__(self, k):
         if k == "__wrapped__":
-            return getattr(self, k)
+            raise AttributeError
         return getattr(self.__wrapped__, k)
 
     def tree_flatten(self):
@@ -83,7 +86,7 @@ class FrozenWrapper:
     @classmethod
     def tree_unflatten(cls, treedef, leaves):
         self = object.__new__(cls)
-        self.__dict__.update(__wrapped__=_unwrap(treedef))
+        self.__dict__.update(__wrapped__=treedef.value)
         self.__class__.__name__ = f"Frozen{self.__wrapped__.__class__.__name__}"
         return self
 
@@ -98,15 +101,14 @@ class FrozenWrapper:
     def __hash__(self):
         return hash(self.__wrapped__)
 
+    @property
+    def value(self):
+        return self.__wrapped__
 
-def _unwrap(node: FrozenWrapper) -> PyTree:
-    """Unwrap a tree"""
-    return node.__wrapped__
 
-
-def is_frozen(tree: PyTree) -> bool:
+def is_frozen(node: Any) -> bool:
     """Check if a tree is wrapped by a wrapper"""
-    return isinstance(tree, FrozenWrapper)
+    return isinstance(node, FrozenWrapper)
 
 
 def tree_freeze(x: PyTree) -> PyTree:
@@ -129,7 +131,7 @@ def tree_unfreeze(x: PyTree) -> PyTree:
     # `is_leaf` as it will traverse the whole tree and miss the wrapper mark
     def map_func(node: Any):
         if isinstance(node, FrozenWrapper):
-            return _unwrap(node)
+            return (node).value
         return node
 
     return jtu.tree_map(map_func, x, is_leaf=is_frozen)

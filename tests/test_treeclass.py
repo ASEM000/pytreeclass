@@ -1,5 +1,4 @@
 import copy
-import dataclasses as dc
 
 import jax.tree_util as jtu
 import numpy.testing as npt
@@ -7,8 +6,8 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_base import _DataclassParams
-from pytreeclass._src.tree_freeze import _set_dataclass_frozen
+from pytreeclass._src.tree_base import ImmutableTreeError
+from pytreeclass._src.tree_freeze import _set_tree_immutability
 
 
 def test_field():
@@ -152,7 +151,7 @@ def test_delattr():
 
     t = L0()
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(ImmutableTreeError):
         del t.a
 
     @pytc.treeclass
@@ -163,25 +162,25 @@ def test_delattr():
             del self.a
 
     t = L2()
-    t = _set_dataclass_frozen(t, False)
+    t = _set_tree_immutability(t, False)
     t.delete("a")
 
-    t = _set_dataclass_frozen(t, True)
-    with pytest.raises(dc.FrozenInstanceError):
+    t = _set_tree_immutability(t, True)
+    with pytest.raises(ImmutableTreeError):
         t.delete("a")
 
 
-def test_dataclass_params():
-    a = _DataclassParams(*((False,) * 6))
-    b = _DataclassParams(*((False,) * 6))
+# def test_dataclass_params():
+#     a = TreeClassParams(*((False,) * 6))
+#     b = TreeClassParams(*((False,) * 6))
 
-    assert a == b
+#     assert a == b
 
-    b = _DataclassParams(*((True,) * 6))
+#     b = _DataclassParams(*((True,) * 6))
 
-    assert a != b
+#     assert a != b
 
-    assert a != "a"
+#     assert a != "a"
 
 
 def test_treeclass_decorator_arguments():
@@ -232,3 +231,27 @@ def test_is_tree_equal():
         b: int = 2
 
     assert pytc.is_tree_equal(Test1(), Test3()) is False
+
+
+def test_params():
+    @pytc.treeclass
+    class l0:
+        a: int = 2
+
+    @pytc.treeclass
+    class l1:
+        a: int = 1
+        b: l0 = l0()
+
+    t1 = l1(1, l0(100))
+
+    # t2 = copy.copy(t1)
+    # t3 = l1(1, l0(100))
+
+    with pytest.raises(AttributeError):
+        t1.__FIELDS__["a"].default = 100
+
+    # test for identity
+    assert jtu.tree_structure(
+        _set_tree_immutability(_set_tree_immutability(l1(), False), True)
+    ) == jtu.tree_structure(l1())

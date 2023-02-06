@@ -1,136 +1,88 @@
 from __future__ import annotations
 
+import copy
 import dataclasses as dc
 import functools as ft
+import operator as op
+import sys
+from types import FunctionType
 from typing import Any
 
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_freeze import (
-    FrozenWrapper,
-    _NonDiffField,
-    _set_dataclass_frozen,
-    _unwrap,
+from pytreeclass._src.tree_decorator import (
+    _FIELD_MAP,
+    _FROZEN,
+    _MISSING,
+    Field,
+    ImmutableTreeError,
+    NonDiffField,
+    _patch_init_method,
 )
+from pytreeclass._src.tree_freeze import FrozenWrapper
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
-from pytreeclass.tree_viz.tree_pprint import tree_repr, tree_str
+from pytreeclass.tree_viz.tree_pprint import _TreePretty
 
 PyTree = Any
 
-# The name of an attribute on the class where we store the Field
-_FIELDS = "__dataclass_fields__"
-
-# The name of an attribute on the class that stores the parameters to
-# @dataclass.
-_PARAMS = "__dataclass_params__"
-_PARAMS_SLOTS = dc._DataclassParams.__slots__
-
-
-class _DataclassParams(dc._DataclassParams):
-    # dataclass params frozen is used to mark the tree as immutable
-    # in treeclass we set it as an instance variable to mark individual trees as immutable
-    # this means it is part of the instance treedef/metadata.
-    # in order to make same instance of _DataclassParams equal to each other, we need to override __eq__
-    def __eq__(self, rhs):
-        if not isinstance(rhs, _DataclassParams):
-            return False
-        return f"{self}!" == f"{rhs}!"
-
-
-def field(
-    *,
-    nondiff: bool = False,
-    default: Any = dc.MISSING,
-    default_factory: Any = dc.MISSING,
-    init: bool = True,
-    repr: bool = True,
-    hash: bool = None,
-    compare: bool = True,
-    metadata: Any = None,
-    kw_only: Any = dc.MISSING,
-) -> dc.Field:
-    """Create a field for a dataclass
-
-    Args:
-        nondiff: if True, the field will be non-differentiable (i.e. will not be updated by optimizers)
-        default: default value of the field
-        default_factory: default factory of the field
-        init: if True, the field will be initialized
-        repr: if True, the field will be included in the repr
-        hash: if True, the field will be included in the hash
-        compare: if True, the field will be included in the comparison
-        metadata: metadata of the field
-        kw_only: if True, the field will be keyword only
-    """
-    params = dict()
-
-    params.update(default=default)
-    params.update(default_factory=default_factory)
-    params.update(init=init)
-    params.update(repr=repr)
-    params.update(hash=hash)
-    params.update(compare=compare)
-    params.update(metadata=metadata)
-
-    if "kw_only" in dir(dc.Field):
-        params.update(kw_only=kw_only)
-
-    if default is not dc.MISSING and default_factory is not dc.MISSING:
-        raise ValueError("cannot specify both default and default_factory")
-
-    return _NonDiffField(**params) if nondiff else dc.Field(**params)
+_POST = "__post_init__"
 
 
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
     """Set the attribute of the tree if the tree is not frozen"""
-    if getattr(tree, _PARAMS).frozen is True:
+    if getattr(tree, _FROZEN):
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
-        raise dc.FrozenInstanceError(msg)
+        raise ImmutableTreeError(msg)
 
     object.__setattr__(tree, key, value)
 
-    if dc.is_dataclass(value) and (key not in [f.name for f in dc.fields(tree)]):
-        # register the field to the tree to mark it as a leaf
-        field = dc.field()
-        field.name = key
-        field.type = type(value)
-        field._field_type = dc._FIELD
-
+    if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
+        field = Field(name=key, type=tuple)
         # register it to dataclass fields
-        getattr(tree, _FIELDS)[key] = field
+        getattr(tree, _FIELD_MAP)[key] = field
 
 
 def _delattr(tree, key: str) -> None:
     """Delete the attribute of the  if tree is not frozen"""
-    # Delete if __dataclass_params__.frozen is False otherwise raise dc.FrozenInstanceError"""
-    if getattr(tree, _PARAMS).frozen is True:
-        raise dc.FrozenInstanceError(f"Cannot delete {key}.")
+    if getattr(tree, _FROZEN):
+        raise ImmutableTreeError(f"Cannot delete {key}.")
     object.__delattr__(tree, key)
 
 
-def _new_wrapper(new_func, params, fields):
+def _new_wrapper(new_func):
     @ft.wraps(new_func)
-    def new(cls, *a, **k) -> PyTree:
-        # set the params and fields as instance variables
-        tree = object.__new__(cls)
-        tree.__dict__[_PARAMS] = params
-        tree.__dict__[_FIELDS] = fields
-        return tree
+    def new_method(cls, *a, **k) -> PyTree:
+        self = object.__new__(cls)
+        field_map = getattr(cls, _FIELD_MAP)
+        # shadow the field map class attribute with an instance attribute
+        object.__setattr__(self, _FIELD_MAP, field_map)
 
-    return new
+        for key in field_map:
+            if field_map[key].default is not _MISSING:
+                object.__setattr__(self, key, field_map[key].default)
+            elif field_map[key].default_factory is not _MISSING:
+                object.__setattr__(self, key, field_map[key].default_factory())
+        return self
+
+    return new_method
 
 
 def _init_wrapper(init_func):
     @ft.wraps(init_func)
-    def init(self, *a, **k) -> None:
-        self = _set_dataclass_frozen(self, frozen=False)
+    def init_method(self, *a, **k) -> None:
+        object.__setattr__(self, _FROZEN, False)
         output = init_func(self, *a, **k)
-        self = _set_dataclass_frozen(self, frozen=True)
+        # in case __post_init__ is defined then call it
+        # after the tree is initialized
+        # here, we assume that __post_init__ is a method
+        if _POST in vars(self.__class__):
+            output = getattr(self, _POST)()
+        object.__setattr__(self, _FROZEN, True)
         return output
 
-    return init
+    return init_method
 
 
 def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
@@ -138,21 +90,23 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     # in essence anything not declared as a dataclass fields will be considered static
     static, dynamic = dict(tree.__dict__), dict()
     # avoid mutating the original dict by making a copy of dataclass fields
-    static[_FIELDS] = dict(static[_FIELDS])
+    static[_FIELD_MAP] = dict(static[_FIELD_MAP])
 
-    for field in static[_FIELDS].values():
-        if isinstance(field, _NonDiffField):
-            # non differentiable fields as metadata
+    for field in static[_FIELD_MAP].values():
+
+        if isinstance(field, NonDiffField):
+            # non differentiable fields as metadata always static
             continue
 
         if isinstance(field, FrozenWrapper):
             # expose static fields as static leaves (FrozenWrapper)
-            static[_FIELDS][field.name] = _unwrap(field)
+            static[_FIELD_MAP][field.name] = (field).value
             dynamic[field.name] = FrozenWrapper(static.pop(field.name))
             continue
 
-        # expose normal fields as dynamic leaves
+        # normal fields as dynamic leaves
         dynamic[field.name] = static.pop(field.name)
+        continue
 
     return dynamic.values(), (dynamic.keys(), static)
 
@@ -163,11 +117,11 @@ def _unflatten(cls, treedef, leaves):
     static = treedef[1]
     dynamic = dict(zip(treedef[0], leaves))
 
-    for name in dynamic:
-        if isinstance(dynamic[name], FrozenWrapper):
+    for key in dynamic:
+        if isinstance(dynamic[key], FrozenWrapper):
             # convert frozen value (static leaf) -> frozen field (to metadata)
-            dynamic[name] = _unwrap(dynamic[name])
-            static[_FIELDS][name] = FrozenWrapper(static[_FIELDS][name])
+            dynamic[key] = (dynamic[key]).value
+            static[_FIELD_MAP][key] = FrozenWrapper(static[_FIELD_MAP][key])
 
     tree.__dict__.update(static)
     tree.__dict__.update(dynamic)
@@ -193,7 +147,7 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         repr: if `True` the `treeclass` will have a `__repr__`/ `__str__` method (default: `True`)
         frozen: if `True` the `treeclass` will be immutable (default: `True`) - use with caution -
 
-    Returns:
+    Returns:`
         `treeclass` of the input class
 
     Raises:
@@ -201,20 +155,17 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
     """
 
     def decorator(cls, order, repr):
+        # generate and register field map to class.
+        # generate init method if not defined based of the fields map
+        cls = _patch_init_method(cls)
 
-        init = "__init__" not in vars(cls)
-        dcls = dc.dataclass(init=init, repr=False, eq=False)(cls)
-        params = getattr(dcls, _PARAMS)
-        params = _DataclassParams(**{k: getattr(params, k) for k in _PARAMS_SLOTS})
-        fields = dcls.__dict__.get(_FIELDS)
-
-        attrs = dict()
+        attrs = dict(cls.__dict__)
 
         # initialize class
-        attrs.update(__new__=_new_wrapper(dcls.__new__, params, fields))
-        attrs.update(__init__=_init_wrapper(dcls.__init__))
+        attrs.update(__new__=_new_wrapper(cls.__new__))
+        attrs.update(__init__=_init_wrapper(cls.__init__))
 
-        # immutable methods
+        # immutable setters/deleters
         attrs.update(__setattr__=_setattr)
         attrs.update(__delattr__=_delattr)
 
@@ -222,18 +173,15 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         attrs.update(tree_flatten=_flatten)
         attrs.update(tree_unflatten=classmethod(_unflatten))
 
-        if repr is True:
-            attrs.update(__repr__=tree_repr)
-            attrs.update(__str__=tree_str)
-
-        # decide class bases based on kwargs
-        bases = (dcls, _TreeAtIndexer)
+        bases = (cls,)
         bases += (_TreeOperator,) if order else ()
+        bases += (_TreePretty,) if repr else ()
+        bases += (_TreeAtIndexer,)
 
-        dcls = type(cls.__name__, bases, attrs)
+        cls = type(cls.__name__, bases, attrs)
 
         # register the class to jax pytree
-        return jtu.register_pytree_node_class(dcls)
+        return jtu.register_pytree_node_class(cls)
 
     if cls is None:
         return lambda cls: decorator(cls, order, repr)  # @treeclass

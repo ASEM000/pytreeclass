@@ -1,5 +1,6 @@
 from pytreeclass import tree_viz
-from pytreeclass._src.tree_base import field, is_tree_equal, treeclass
+from pytreeclass._src.tree_base import is_tree_equal, treeclass
+from pytreeclass._src.tree_decorator import field
 from pytreeclass._src.tree_freeze import (
     is_frozen,
     is_nondiff,

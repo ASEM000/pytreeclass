@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses as dc
 import functools as ft
 from collections.abc import Callable
-from copy import copy
 from typing import Any
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.core import Tracer
 
-from pytreeclass._src.tree_freeze import _set_dataclass_frozen
+from pytreeclass._src.tree_freeze import _MutableContext
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
@@ -118,10 +118,10 @@ class PyTreeIndexer:
         return _at_get_pytree(self.tree, self.where, is_leaf=is_leaf)
 
     def set(self, set_value, *, is_leaf: Callable[[Any], bool] = None):
-        return _at_set_pytree(copy(self.tree), self.where, set_value, is_leaf)
+        return _at_set_pytree(copy.copy(self.tree), self.where, set_value, is_leaf)
 
     def apply(self, func, *, is_leaf: Callable[[Any], bool] = None):
-        return _at_apply_pytree(copy(self.tree), self.where, func, is_leaf)
+        return _at_apply_pytree(copy.copy(self.tree), self.where, func, is_leaf)
 
     def reduce(self, func, *, is_leaf: Callable[[Any], bool] = None, initializer=0):
         return _at_reduce_pytree(self.tree, self.where, func, is_leaf, initializer)
@@ -177,7 +177,7 @@ def _at_set_str(
 
         if depth > 0:
             # non-leaf parent case setting the connection between the parent and the child
-            setattr(parent, child_name, value)
+            parent.__dict__[child_name] = value
             return tree if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
         # leaf parent case
@@ -190,7 +190,7 @@ def _at_set_str(
         # masking the parent = False, and child = True
         child_mask = getattr(parent_mask, child_name)
         child_mask = jtu.tree_map(lambda _: True, child_mask)
-        setattr(parent_mask, child_name, child_mask)
+        parent_mask.__dict__[child_name] = child_mask
         parent = _at_set_pytree(parent, parent_mask, set_value, is_leaf=is_leaf)
         return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
@@ -215,7 +215,7 @@ def _at_apply_str(
 
         if depth > 0:
             # non-leaf parent case setting the connection between the parent and the child
-            setattr(parent, child_name, value)
+            parent.__dict__[child_name] = value
             return tree if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
         # leaf parent case
@@ -228,7 +228,7 @@ def _at_apply_str(
         # masking the parent = False, and child = True
         child_mask = getattr(parent_mask, child_name)
         child_mask = jtu.tree_map(lambda _: True, child_mask)
-        setattr(parent_mask, child_name, child_mask)
+        parent_mask.__dict__[child_name] = child_mask
         parent = _at_apply_pytree(parent, parent_mask, func, is_leaf=is_leaf)
         return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
@@ -245,30 +245,17 @@ class StrIndexer:
         return _get_child(self.tree, self.where.split("."))
 
     def set(self, set_value, *, is_leaf: Callable[[Any], bool] = None):
-        # x.at["a"].set(value) returns a new tree with x.a = value
-        # unlike [...].set with mask, this **does not preserve** the tree structure
-        tree = _set_dataclass_frozen(copy(self.tree), frozen=False)
         where = self.where.split(".")
-        tree = _at_set_str(tree, where, set_value, is_leaf=is_leaf)
-        tree = _set_dataclass_frozen(tree, frozen=True)
-        return tree
+        return _at_set_str(copy.copy(self.tree), where, set_value, is_leaf=is_leaf)
 
     def apply(self, func, *, is_leaf: Callable[[Any], bool] = None):
-        # x.at["a"].apply(func) returns a new tree with x.a = func(x.a)
-        # unlike [...].apply with mask, this does not preserve the tree structure
-        tree = _set_dataclass_frozen(copy(self.tree), frozen=False)
         where = self.where.split(".")
-        tree = _at_apply_str(tree, where, func, is_leaf)
-        tree = _set_dataclass_frozen(tree, frozen=True)
-        return tree
+        return _at_apply_str(copy.copy(self.tree), where, func, is_leaf=is_leaf)
 
     def __call__(self, *a, **k):
-        # x.at[method_name]() -> returns value and new_tree
-        tree = _set_dataclass_frozen(copy(self.tree), frozen=False)
-        method = getattr(tree, self.where)
-        value = method(*a, **k)
-        tree = _set_dataclass_frozen(tree, frozen=True)
-        return value, tree
+        with _MutableContext(self.tree) as tree:
+            method = getattr(tree, self.where)
+            return method(*a, **k), tree
 
     def __repr__(self) -> str:
         return f"where={self.where!r}"

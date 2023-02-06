@@ -8,7 +8,6 @@ from typing import Any
 import jax.tree_util as jtu
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_freeze import _unwrap
 from pytreeclass.tree_viz.box_drawing import _table
 from pytreeclass.tree_viz.node_pprint import _node_pprint
 from pytreeclass.tree_viz.tree_viz_util import (
@@ -29,7 +28,7 @@ __all__ = ("tree_diagram", "tree_repr", "tree_str", "tree_summary")
 
 
 def _tree_pprint(tree, width: int = 80, kind="repr") -> str:
-    """Prertty print dataclass tree"""
+    """Prertty print treeclass"""
 
     def recurse(tree: PyTree, depth: int):
         if not dc.is_dataclass(tree):
@@ -88,6 +87,14 @@ def tree_repr(tree, width: int = 80) -> str:
 def tree_str(tree, width: int = 80) -> str:
     """Prertty print dataclass tree __str__"""
     return _tree_pprint(tree, width, kind="str")
+
+
+class _TreePretty:
+    def __repr__(self) -> str:
+        return tree_repr(self)
+
+    def __str__(self) -> str:
+        return tree_str(self)
 
 
 def tree_diagram(tree: PyTree) -> str:
@@ -248,7 +255,7 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
         # leaves info at the specified depth
 
         row = [info.path]  # name
-        node = _unwrap(info.node) if pytc.is_frozen(info.node) else info.node
+        node = (info.node).value if pytc.is_frozen(info.node) else info.node
         row += [f"{node.__class__.__name__}" + ("(frozen)" if info.frozen else "")]
         row += [_format_count(info.count.real + info.count.imag)]
         row += [_format_size(info.size.real + info.size.imag)]

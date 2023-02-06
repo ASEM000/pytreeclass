@@ -52,15 +52,17 @@ def test_bmap():
             return 0
 
     # test broadcasting with selected argnums/argnames
-    lhs = ft.partial(pytc.bmap, argnums=(1,))(jnp.where)(tree > 1, 0, tree)
+    lhs = ft.partial(pytc.bmap, broadcast_argnums=(1,))(jnp.where)(tree > 1, 0, tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = ft.partial(pytc.bmap, argnames=("x",))(jnp.where)(tree > 1, x=0, y=tree)
-    assert pytc.is_tree_equal(lhs, rhs)
-
-    lhs = ft.partial(pytc.bmap, argnums=(1,), argnames=("x",))(jnp.where)(
+    lhs = ft.partial(pytc.bmap, broadcast_argnames=("x",))(jnp.where)(
         tree > 1, x=0, y=tree
     )
+    assert pytc.is_tree_equal(lhs, rhs)
+
+    lhs = ft.partial(pytc.bmap, broadcast_argnums=(1,), broadcast_argnames=("x",))(
+        jnp.where
+    )(tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
 

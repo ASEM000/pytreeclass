@@ -7,7 +7,8 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from pytreeclass._src.tree_freeze import FrozenWrapper, _NonDiffField
+from pytreeclass._src.tree_decorator import NonDiffField
+from pytreeclass._src.tree_freeze import FrozenWrapper
 
 PyTree = Any
 
@@ -73,7 +74,7 @@ def _is_children_nondiff(tree):
     if dc.is_dataclass(tree):
         fields = dc.fields(tree)
         if len(fields) > 0:
-            return all(isinstance(f, _NonDiffField) for f in fields)
+            return all(isinstance(f, NonDiffField) for f in fields)
     return False
 
 
@@ -105,7 +106,7 @@ def _mermaid_marker(field_item: dc.Field, node: Any, default: str = "--") -> str
     if isinstance(field_item, FrozenWrapper) or is_children_frozen(node):
         return "-..-"
 
-    if isinstance(field_item, _NonDiffField) or _is_children_nondiff(node):
+    if isinstance(field_item, NonDiffField) or _is_children_nondiff(node):
         return "--x"
 
     return default
@@ -118,7 +119,7 @@ def _marker(field_item: dc.Field, node: Any, default: str = "") -> str:
     if isinstance(field_item, FrozenWrapper) or is_children_frozen(node):
         return "#"
 
-    if isinstance(field_item, _NonDiffField) or _is_children_nondiff(node):
+    if isinstance(field_item, NonDiffField) or _is_children_nondiff(node):
         return "*"
 
     return default
@@ -185,7 +186,7 @@ def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
 
     def dcls_flatten(info: NodeInfo, depth: int):
         for field in dc.fields(info.node):
-            if isinstance(field, _NonDiffField):
+            if isinstance(field, NonDiffField):
                 # skip non-diff fields
                 continue
 
