@@ -7,10 +7,9 @@ from __future__ import annotations
 
 import dataclasses as dc
 import functools as ft
-import inspect
 import sys
 from types import FunctionType
-from typing import Any, Callable, NamedTuple
+from typing import Any, NamedTuple
 
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__FROZEN__"
@@ -76,7 +75,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
 
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
-    annotations = inspect.get_annotations(cls)
+    annotations = cls.__annotations__
 
     for name in annotations:
         value = getattr(cls, name, _MISSING)
