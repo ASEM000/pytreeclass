@@ -8,7 +8,7 @@ from __future__ import annotations
 import dataclasses as dc
 import functools as ft
 import sys
-from types import FunctionType
+from types import FunctionType, GetSetDescriptorType
 from typing import Any, NamedTuple
 
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
@@ -62,6 +62,7 @@ def field(
     )
 
 
+
 @ft.lru_cache(maxsize=None)
 def _generate_field_map(cls) -> dict[str, Field]:
     # get all the fields of the class and its base classes
@@ -75,7 +76,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
 
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
-    annotations = cls.__annotations__
+    annotations = cls.__dict__.get("__annotations__", dict())
 
     for name in annotations:
         value = getattr(cls, name, _MISSING)
