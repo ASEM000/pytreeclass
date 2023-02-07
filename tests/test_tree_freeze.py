@@ -7,7 +7,7 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_base import ImmutableTreeError
-from pytreeclass._src.tree_freeze import FrozenWrapper, _HashableWrapper
+from pytreeclass._src.tree_freeze import _FrozenWrapper, _HashableWrapper
 
 
 def test_freeze_unfreeze():
@@ -23,6 +23,9 @@ def test_freeze_unfreeze():
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
     assert jtu.tree_leaves(c) == [1, 2]
+
+    d = pytc.tree_freeze(b)
+    assert pytc.tree_freeze(pytc.tree_freeze(1.0)).unwrap() == 1.0
 
     @pytc.treeclass
     class A:
@@ -383,7 +386,10 @@ def test_wrapper():
     assert hash(lhs) == hash(1)
 
     # test immutability
-    frozen_value = FrozenWrapper(1)
+    frozen_value = _FrozenWrapper(1)
 
     with pytest.raises(ValueError):
         frozen_value.__wrapped__ = 2
+
+    assert _FrozenWrapper(1) == _FrozenWrapper(1)
+    assert f"{_FrozenWrapper(1)!r}" == "#1"

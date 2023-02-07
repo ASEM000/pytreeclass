@@ -227,6 +227,8 @@ def test_is_tree_equal():
 
     assert pytc.is_tree_equal(Test1(), Test3()) is False
 
+    assert pytc.is_tree_equal(jnp.array([1, 2, 3]), 1) is False
+
 
 def test_params():
     @pytc.treeclass
@@ -245,3 +247,12 @@ def test_params():
 
     with pytest.raises(AttributeError):
         t1.__FIELDS__["a"].default = 100
+
+
+def test_mutable_field():
+
+    with pytest.raises(TypeError):
+
+        @pytc.treeclass
+        class Test:
+            a: list = [1, 2, 3]

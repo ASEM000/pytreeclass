@@ -127,10 +127,10 @@ class PyTreeIndexer:
         return _at_reduce_pytree(self.tree, self.where, func, is_leaf, initializer)
 
     def __repr__(self) -> str:
-        return f"where={self.where!r}"
+        return f"where=({self.where})"
 
     def __str__(self) -> str:
-        return f"where={self.where}"
+        return f"where=({self.where})"
 
 
 def _get_child(item: Any, path: list[str]) -> Any:
@@ -258,10 +258,10 @@ class StrIndexer:
             return method(*a, **k), tree
 
     def __repr__(self) -> str:
-        return f"where={self.where!r}"
+        return f"where=({self.where!r})"
 
     def __str__(self) -> str:
-        return f"where={self.where}"
+        return f"where=({self.where})"
 
 
 def _str_nested_indexer(tree, where):

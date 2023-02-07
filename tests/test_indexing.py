@@ -324,31 +324,31 @@ def test_reduce_and_its_derivatives():
         # def __call__(self, x):
         #     return x @ self.weight + self.bias
 
-    # @pytc.treeclass
-    # class StackedLinear:
-    #     l1: Linear = field(metadata={"description": "First layer"})
-    #     l2: Linear = field(metadata={"description": "Second layer"})
+    @pytc.treeclass
+    class StackedLinear:
+        l1: Linear
+        l2: Linear
 
-    #     def __init__(self, key, in_dim, out_dim, hidden_dim):
-    #         keys = jax.random.split(key, 3)
+        def __init__(self, key, in_dim, out_dim, hidden_dim):
+            keys = jax.random.split(key, 3)
 
-    #         self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
-    #         self.l2 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
+            self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
+            self.l2 = Linear(key=keys[2], in_dim=hidden_dim, out_dim=out_dim)
 
-    # model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=5, key=jax.random.PRNGKey(0))
+    model = StackedLinear(in_dim=1, out_dim=1, hidden_dim=5, key=jax.random.PRNGKey(0))
 
-    # assert (
-    #     model.at[model > 0].reduce(
-    #         lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=jnp.inf
-    #     )
-    # ) == 0.98507565
-    # assert (
-    #     model.at[model > 0].reduce(
-    #         lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
-    #     )
-    # ) == 1.3969219
-    # assert (model.at[model > 0].reduce(lambda x, y: x + jnp.sum(y))) == 10.6970625
-    # assert (model.at[model > 0].reduce(lambda x, y: x * jnp.product(y), initializer=1)) == 1.8088213  # fmt: skip
+    assert (
+        model.at[model > 0].reduce(
+            lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=jnp.inf
+        )
+    ) == 0.98507565
+    assert (
+        model.at[model > 0].reduce(
+            lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
+        )
+    ) == 1.3969219
+    assert (model.at[model > 0].reduce(lambda x, y: x + jnp.sum(y))) == 10.6970625
+    assert (model.at[model > 0].reduce(lambda x, y: x * jnp.product(y), initializer=1)) == 1.8088213  # fmt: skip
 
 
 def test_is_leaf():
@@ -534,3 +534,16 @@ def test_at_set_apply_is_leaf():
 
     with pytest.raises(AttributeError):
         t.at[""].set(10)
+
+
+def test_repr_str():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: int = 2
+
+    t = Test()
+
+    assert repr(t.at["a"]) == "where=('a')"
+    assert str(t.at["a"]) == "where=(a)"
+    assert repr(t.at[...]) == "where=(Test(a=True, b=True))"

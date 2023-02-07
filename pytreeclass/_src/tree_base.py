@@ -5,6 +5,7 @@ from typing import Any
 
 import jax.tree_util as jtu
 import numpy as np
+import numpy.testing as npt
 
 from pytreeclass._src.tree_decorator import (
     _FIELD_MAP,
@@ -14,7 +15,7 @@ from pytreeclass._src.tree_decorator import (
     ImmutableTreeError,
     _patch_init_method,
 )
-from pytreeclass._src.tree_freeze import FrozenWrapper
+from pytreeclass._src.tree_freeze import _FrozenWrapper
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
 from pytreeclass.tree_viz.tree_pprint import _TreePretty
@@ -88,10 +89,10 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     static[_FIELD_MAP] = dict(static[_FIELD_MAP])
 
     for field in static[_FIELD_MAP].values():
-        if isinstance(field, FrozenWrapper):
-            # expose static fields as static leaves (FrozenWrapper)
+        if isinstance(field, _FrozenWrapper):
+            # expose static fields as static leaves (_FrozenWrapper)
             static[_FIELD_MAP][field.name] = (field).unwrap()
-            dynamic[field.name] = FrozenWrapper(static.pop(field.name))
+            dynamic[field.name] = _FrozenWrapper(static.pop(field.name))
             continue
 
         # normal fields as dynamic leaves
@@ -108,10 +109,10 @@ def _unflatten(cls, treedef, leaves):
     dynamic = dict(zip(treedef[0], leaves))
 
     for key in dynamic:
-        if isinstance(dynamic[key], FrozenWrapper):
+        if isinstance(dynamic[key], _FrozenWrapper):
             # convert frozen value (static leaf) -> frozen field (to metadata)
             dynamic[key] = (dynamic[key]).unwrap()
-            static[_FIELD_MAP][key] = FrozenWrapper(static[_FIELD_MAP][key])
+            static[_FIELD_MAP][key] = _FrozenWrapper(static[_FIELD_MAP][key])
 
     tree.__dict__.update(static)
     tree.__dict__.update(dynamic)
@@ -184,17 +185,10 @@ def is_tree_equal(lhs: Any, rhs: Any) -> bool:
     lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
     rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
 
-    def is_equal(lhs_node, rhs_node):
-        if hasattr(lhs_node, "dtype") and hasattr(rhs_node, "shape"):
-            if hasattr(lhs_node, "dtype") and hasattr(rhs_node, "shape"):
-                return np.all(lhs_node == rhs_node)
-            return False
-        return lhs_node == rhs_node
-
     if not (lhs_treedef == rhs_treedef):
         return False
 
     for (lhs, rhs) in zip(lhs_leaves, rhs_leaves):
-        if not is_equal(lhs, rhs):
+        if not np.array_equal(lhs, rhs):
             return False
     return True

@@ -7,7 +7,7 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from pytreeclass._src.tree_freeze import FrozenWrapper
+from pytreeclass._src.tree_freeze import _FrozenWrapper
 
 PyTree = Any
 
@@ -73,9 +73,9 @@ def is_children_frozen(tree):
     if dc.is_dataclass(tree):
         fields = dc.fields(tree)
         if len(fields) > 0:
-            if all(isinstance(f, FrozenWrapper) for f in fields):
+            if all(isinstance(f, _FrozenWrapper) for f in fields):
                 return True
-            if all(isinstance(getattr(tree, f.name), FrozenWrapper) for f in fields):
+            if all(isinstance(getattr(tree, f.name), _FrozenWrapper) for f in fields):
                 return True
 
     return False
@@ -93,7 +93,7 @@ def _mermaid_marker(field_item: dc.Field, node: Any, default: str = "--") -> str
         str: marker character.
     """
     # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if isinstance(field_item, FrozenWrapper) or is_children_frozen(node):
+    if isinstance(field_item, _FrozenWrapper) or is_children_frozen(node):
         return "-..-"
     return default
 
@@ -102,7 +102,7 @@ def _marker(field_item: dc.Field, node: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item"""
     # '*' for non-diff
 
-    if isinstance(field_item, FrozenWrapper) or is_children_frozen(node):
+    if isinstance(field_item, _FrozenWrapper) or is_children_frozen(node):
         return "#"
 
     return default
@@ -157,13 +157,13 @@ def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
 
     def container_flatten(info: NodeInfo, depth: int):
         for i, item in enumerate(info.node):
-            frozen = info.frozen or isinstance(item, FrozenWrapper)
+            frozen = info.frozen or isinstance(item, _FrozenWrapper)
             sub_info = NodeInfo(item, f"{info.path}[{i}]", frozen, info.repr)
             yield from tree_flatten_recurse(sub_info, depth - 1)
 
     def dict_flatten(info: NodeInfo, depth: int):
         for key, item in info.node.items():
-            frozen = info.frozen or isinstance(item, FrozenWrapper)
+            frozen = info.frozen or isinstance(item, _FrozenWrapper)
             sub_info = NodeInfo(item, f"{info.path}[{key}]", frozen, info.repr)
             yield from tree_flatten_recurse(sub_info, depth - 1)
 
@@ -171,8 +171,8 @@ def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
         for field in dc.fields(info.node):
             node = getattr(info.node, field.name)
             path = f"{info.path}" + ("." if len(info.path) > 0 else "") + field.name
-            frozen = info.frozen or isinstance(field, FrozenWrapper)
-            frozen = frozen or isinstance(node, FrozenWrapper)
+            frozen = info.frozen or isinstance(field, _FrozenWrapper)
+            frozen = frozen or isinstance(node, _FrozenWrapper)
             sub_info = NodeInfo(node, path, frozen, info.repr)
             yield from tree_flatten_recurse(sub_info, depth - 1)
 
