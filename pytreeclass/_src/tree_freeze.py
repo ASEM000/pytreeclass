@@ -14,7 +14,8 @@ _FIELD_MAP = "__dataclass_fields__"
 _FROZEN = "__FROZEN__"
 
 
-def _set_tree_immutability(tree: PyTree, set_value: bool):
+@contextmanager
+def _MutableContext(tree: PyTree, inplace: bool = False):
     def immutate_step(tree, set_value):
         if not hasattr(tree, _FIELD_MAP):
             return tree
@@ -23,21 +24,19 @@ def _set_tree_immutability(tree: PyTree, set_value: bool):
         # traverse the tree
         for key in getattr(tree, _FIELD_MAP):
             if not hasattr(tree, key):
+                # some field value might not have been set
                 continue
-            # some field value might not be set yet
-            child = immutate_step(getattr(tree, key), set_value=set_value)
+
+            node = getattr(tree, key)
+            child = immutate_step(node, set_value)
             tree.__dict__[key] = child
+
         return tree
 
-    return immutate_step(tree, set_value=set_value)
-
-
-@contextmanager
-def _MutableContext(tree: PyTree, inplace: bool = False):
     tree = tree if inplace else copy.copy(tree)
-    _set_tree_immutability(tree, set_value=False)
+    immutate_step(tree, set_value=False)
     yield tree
-    _set_tree_immutability(tree, set_value=True)
+    immutate_step(tree, set_value=True)
 
 
 class _HashableWrapper:

@@ -7,7 +7,7 @@ from jax import numpy as jnp
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_base import ImmutableTreeError
-from pytreeclass._src.tree_freeze import _set_tree_immutability
+from pytreeclass._src.tree_freeze import _MutableContext
 
 
 def test_field():
@@ -167,25 +167,15 @@ def test_delattr():
             del self.a
 
     t = L2()
-    t = _set_tree_immutability(t, False)
-    t.delete("a")
 
-    t = _set_tree_immutability(t, True)
+    with _MutableContext(t, inplace=False) as tx:
+        tx.delete("a")
+
+    with _MutableContext(t, inplace=True) as tx:
+        tx.delete("a")
+
     with pytest.raises(ImmutableTreeError):
         t.delete("a")
-
-
-# def test_dataclass_params():
-#     a = TreeClassParams(*((False,) * 6))
-#     b = TreeClassParams(*((False,) * 6))
-
-#     assert a == b
-
-#     b = _DataclassParams(*((True,) * 6))
-
-#     assert a != b
-
-#     assert a != "a"
 
 
 def test_treeclass_decorator_arguments():
@@ -255,8 +245,3 @@ def test_params():
 
     with pytest.raises(AttributeError):
         t1.__FIELDS__["a"].default = 100
-
-    # test for identity
-    assert jtu.tree_structure(
-        _set_tree_immutability(_set_tree_immutability(l1(), False), True)
-    ) == jtu.tree_structure(l1())
