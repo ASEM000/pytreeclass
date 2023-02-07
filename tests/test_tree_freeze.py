@@ -24,7 +24,6 @@ def test_freeze_unfreeze():
     assert jtu.tree_leaves(b) == []
     assert jtu.tree_leaves(c) == [1, 2]
 
-    d = pytc.tree_freeze(b)
     assert pytc.tree_freeze(pytc.tree_freeze(1.0)).unwrap() == 1.0
 
     @pytc.treeclass

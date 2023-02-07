@@ -486,19 +486,14 @@ def test_composed_at():
 def test_repr_str():
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray
+        a: int = 1
+        b: int = 2
 
-        def __init__(self) -> None:
-            self.a = jnp.array([1, 2, 3, 4, 5])
+    t = Test()
 
-    pass
-    # t = Test()
-
-    # assert f"{t.at[...]!r}" == "where=Test(a=bool[5])"
-    # assert f"{t.at[...]!s}" == "where=Test(a=[ True  True  True  True  True])"
-
-    # assert f"{t.at['a']!r}" == "where='a'"
-    # assert f"{t.at['a']!s}" == "where=a"
+    assert repr(t.at["a"]) == "where=('a')"
+    assert str(t.at["a"]) == "where=(a)"
+    assert repr(t.at[...]) == "where=(Test(a=True, b=True))"
 
 
 def test_not_equal():
@@ -534,16 +529,3 @@ def test_at_set_apply_is_leaf():
 
     with pytest.raises(AttributeError):
         t.at[""].set(10)
-
-
-def test_repr_str():
-    @pytc.treeclass
-    class Test:
-        a: int = 1
-        b: int = 2
-
-    t = Test()
-
-    assert repr(t.at["a"]) == "where=('a')"
-    assert str(t.at["a"]) == "where=(a)"
-    assert repr(t.at[...]) == "where=(Test(a=True, b=True))"

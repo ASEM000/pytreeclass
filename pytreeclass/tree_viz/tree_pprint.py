@@ -255,7 +255,7 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
         # leaves info at the specified depth
 
         row = [info.path]  # name
-        node = (info.node).value if pytc.is_frozen(info.node) else info.node
+        node = (info.node).unwrap() if pytc.is_frozen(info.node) else info.node
         row += [f"{node.__class__.__name__}" + ("(frozen)" if info.frozen else "")]
         row += [_format_count(info.count.real + info.count.imag)]
         row += [_format_size(info.size.real + info.size.imag)]

@@ -5,7 +5,6 @@ from typing import Any
 
 import jax.tree_util as jtu
 import numpy as np
-import numpy.testing as npt
 
 from pytreeclass._src.tree_decorator import (
     _FIELD_MAP,
