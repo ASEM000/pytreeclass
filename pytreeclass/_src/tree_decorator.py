@@ -11,8 +11,6 @@ import sys
 from types import FunctionType
 from typing import Any, NamedTuple
 
-from pytreeclass.tree_viz.node_pprint import _node_pprint
-
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__FROZEN__"
 # required to mark the field map to get recognized `dataclasses.is_dataclass`
@@ -46,7 +44,7 @@ def field(
     kwonly: bool = False,
 ):
     if default is not _MISSING and default_factory is not _MISSING:
-        raise ValueError(" cannot specify both default and default_factory")
+        raise ValueError("Cannot specify both `default` and `default_factory`")
 
     return Field(
         default=default,
@@ -93,7 +91,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
             # the annotated attribute has a non-field default value
             # check for mutable types and raise an error if found
             if isinstance(value, (list, dict, set)):
-                msg = f"mutable type {(value)} is not allowed as a value"
+                msg = f"mutable value= {(value)} is not allowed as a value"
                 msg += f" for field `{name}` in class `{cls.__name__}`.\n"
                 msg += f" use `field(default_factory=lambda:{value})` instead"
                 raise TypeError(msg)

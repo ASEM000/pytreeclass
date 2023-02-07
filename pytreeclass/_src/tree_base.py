@@ -57,6 +57,7 @@ def _new_wrapper(new_func):
             if field_map[key].default is not _MISSING:
                 object.__setattr__(self, key, field_map[key].default)
             elif field_map[key].default_factory is not _MISSING:
+                # call the default factory to get the default value
                 object.__setattr__(self, key, field_map[key].default_factory())
         return self
 
@@ -89,7 +90,7 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     for field in static[_FIELD_MAP].values():
         if isinstance(field, FrozenWrapper):
             # expose static fields as static leaves (FrozenWrapper)
-            static[_FIELD_MAP][field.name] = (field).value
+            static[_FIELD_MAP][field.name] = (field).unwrap()
             dynamic[field.name] = FrozenWrapper(static.pop(field.name))
             continue
 
@@ -109,7 +110,7 @@ def _unflatten(cls, treedef, leaves):
     for key in dynamic:
         if isinstance(dynamic[key], FrozenWrapper):
             # convert frozen value (static leaf) -> frozen field (to metadata)
-            dynamic[key] = (dynamic[key]).value
+            dynamic[key] = (dynamic[key]).unwrap()
             static[_FIELD_MAP][key] = FrozenWrapper(static[_FIELD_MAP][key])
 
     tree.__dict__.update(static)
@@ -146,6 +147,7 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
     def decorator(cls, order, repr):
         # generate and register field map to class.
         # generate init method if not defined based of the fields map
+        # this is similar to dataclass decorator but without the bloated functionality
         cls = _patch_init_method(cls)
 
         attrs = dict(cls.__dict__)

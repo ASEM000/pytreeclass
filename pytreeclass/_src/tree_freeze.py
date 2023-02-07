@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import copy
-import dataclasses as dc
 from contextlib import contextmanager
 from typing import Any, Iterable
 
 import jax.tree_util as jtu
 import numpy as np
 
-import pytreeclass as pytc
 from pytreeclass._src.tree_operator import _hash_node
 
 PyTree = Any
@@ -54,8 +52,7 @@ class _HashableWrapper:
     def __hash__(self):
         return _hash_node(self.__wrapped__)
 
-    @property
-    def value(self):
+    def unwrap(self):
         return self.__wrapped__
 
 
@@ -87,7 +84,7 @@ class FrozenWrapper:
     @classmethod
     def tree_unflatten(cls, treedef, leaves):
         self = object.__new__(cls)
-        self.__dict__.update(__wrapped__=treedef.value)
+        self.__dict__.update(__wrapped__=treedef.unwrap())
         self.__class__.__name__ = f"Frozen{self.__wrapped__.__class__.__name__}"
         return self
 
@@ -102,8 +99,7 @@ class FrozenWrapper:
     def __hash__(self):
         return hash(self.__wrapped__)
 
-    @property
-    def value(self):
+    def unwrap(self):
         return self.__wrapped__
 
 
@@ -137,7 +133,7 @@ def tree_unfreeze(x: PyTree) -> PyTree:
     # `is_leaf` as it will traverse the whole tree and miss the wrapper mark
     def map_func(node: Any):
         if isinstance(node, FrozenWrapper):
-            return (node).value
+            return (node).unwrap()
         return node
 
     return jtu.tree_map(map_func, x, is_leaf=is_frozen)

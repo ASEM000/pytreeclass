@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import field
-
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
