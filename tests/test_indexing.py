@@ -16,7 +16,10 @@ class Test:
     b: float
     c: float
     d: jnp.ndarray
-    name: str = pytc.field(nondiff=True)
+    name: str
+
+    def __post_init__(self):
+        self.name = pytc.frozen(self.name)
 
 
 def test_getter_by_val():

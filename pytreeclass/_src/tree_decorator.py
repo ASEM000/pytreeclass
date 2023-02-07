@@ -8,12 +8,14 @@ from __future__ import annotations
 import dataclasses as dc
 import functools as ft
 import sys
-from types import FunctionType, GetSetDescriptorType
+from types import FunctionType
 from typing import Any, NamedTuple
+
+from pytreeclass.tree_viz.node_pprint import _node_pprint
 
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__FROZEN__"
-# required to get recognized by dataclasses when using `dataclasses.is_dataclass`
+# required to mark the field map to get recognized `dataclasses.is_dataclass`
 _FIELD_MAP = "__dataclass_fields__"
 
 
@@ -35,32 +37,27 @@ class Field(NamedTuple):
     _field_type = dc._FIELD
 
 
-class NonDiffField(Field):
-    pass
-
-
 def field(
     *,
     default: Any = _MISSING,
+    default_factory: Any = _MISSING,
     init: bool = True,
-    nondiff: bool = False,
     repr: bool = True,
     kwonly: bool = False,
-    default_factory: Any = _MISSING,
 ):
     if default is not _MISSING and default_factory is not _MISSING:
         raise ValueError(" cannot specify both default and default_factory")
 
-    return (NonDiffField if nondiff else Field)(
+    return Field(
         default=default,
-        name=None,
-        type=None,
+        default_factory=default_factory,
+        init=init,
         repr=repr,
         kwonly=kwonly,
-        init=init,
-        default_factory=default_factory,
+        # set by the constructor
+        name=None,
+        type=None,
     )
-
 
 
 @ft.lru_cache(maxsize=None)
@@ -143,6 +140,7 @@ def _patch_init_method(cls):
 
     body = " def __init__(self, " + head[:-2] + "):" + body
     body = f"def closure(FIELD_MAP):\n{body}\n return __init__"
+
     exec(body, global_namespace, local_namespace)
     method = local_namespace["closure"](field_map)
 

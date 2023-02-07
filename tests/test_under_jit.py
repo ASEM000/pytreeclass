@@ -12,13 +12,14 @@ def test_jit_freeze():
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
-        name: str = pytc.field(nondiff=True, default=("a"))
+        name: str
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
                 2 / in_dim
             )
             self.bias = jnp.ones((1, out_dim))
+            self.name = pytc.frozen("a")
 
         def __call__(self, x):
             return x @ self.weight + self.bias

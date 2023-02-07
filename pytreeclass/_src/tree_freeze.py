@@ -9,10 +9,11 @@ import jax.tree_util as jtu
 import numpy as np
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
 from pytreeclass._src.tree_operator import _hash_node
 
 PyTree = Any
+_FIELD_MAP = "__dataclass_fields__"
+_FROZEN = "__FROZEN__"
 
 
 def _set_tree_immutability(tree: PyTree, set_value: bool):
@@ -91,7 +92,7 @@ class FrozenWrapper:
         return self
 
     def __repr__(self):
-        return f"#({self.__wrapped__!r})"
+        return f"#{self.__wrapped__!r}"
 
     def __eq__(self, rhs: Any) -> bool:
         if not isinstance(rhs, FrozenWrapper):
@@ -109,6 +110,11 @@ class FrozenWrapper:
 def is_frozen(node: Any) -> bool:
     """Check if a tree is wrapped by a wrapper"""
     return isinstance(node, FrozenWrapper)
+
+
+def frozen(node: Any) -> FrozenWrapper:
+    """Wrap a node with a wrapper"""
+    return FrozenWrapper(node)
 
 
 def tree_freeze(x: PyTree) -> PyTree:

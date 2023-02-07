@@ -72,7 +72,10 @@ def test_math_operations():
         a: float
         b: float
         c: float
-        name: str = pytc.field(nondiff=True)
+        name: str
+
+        def __post_init__(self):
+            self.name = pytc.frozen(self.name)
 
     A = Test(10, 20, 30, ("A"))
     # binary operations
@@ -87,7 +90,10 @@ def test_math_operations():
     class Test:
         a: float
         b: float
-        name: str = pytc.field(nondiff=True)
+        name: str
+
+        def __post_init__(self):
+            self.name = pytc.frozen(self.name)
 
     A = Test(-10, 20, ("A"))
 
@@ -118,10 +124,11 @@ def test_math_operations_errors():
         a: float
         b: float
         c: float
-        name: str = pytc.field(nondiff=True)
+        name: str
         d: jnp.ndarray = None
 
         def __post_init__(self):
+            self.name = pytc.frozen(self.name)
             self.d = jnp.array([1, 2, 3])
 
     A = Test(10, 20, 30, ("A"))

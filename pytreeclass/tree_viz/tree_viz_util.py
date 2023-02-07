@@ -7,7 +7,6 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from pytreeclass._src.tree_decorator import NonDiffField
 from pytreeclass._src.tree_freeze import FrozenWrapper
 
 PyTree = Any
@@ -69,15 +68,6 @@ def _format_count(node_count, newline=False):
     raise TypeError(f"node_count must be int or float, got {type(node_count)}")
 
 
-def _is_children_nondiff(tree):
-    """assert if a dataclass is static"""
-    if dc.is_dataclass(tree):
-        fields = dc.fields(tree)
-        if len(fields) > 0:
-            return all(isinstance(f, NonDiffField) for f in fields)
-    return False
-
-
 def is_children_frozen(tree):
     """assert if a dataclass is static"""
     if dc.is_dataclass(tree):
@@ -105,10 +95,6 @@ def _mermaid_marker(field_item: dc.Field, node: Any, default: str = "--") -> str
     # for now, we only have two markers '*' for non-diff and '#' for frozen
     if isinstance(field_item, FrozenWrapper) or is_children_frozen(node):
         return "-..-"
-
-    if isinstance(field_item, NonDiffField) or _is_children_nondiff(node):
-        return "--x"
-
     return default
 
 
@@ -118,9 +104,6 @@ def _marker(field_item: dc.Field, node: Any, default: str = "") -> str:
 
     if isinstance(field_item, FrozenWrapper) or is_children_frozen(node):
         return "#"
-
-    if isinstance(field_item, NonDiffField) or _is_children_nondiff(node):
-        return "*"
 
     return default
 
@@ -186,10 +169,6 @@ def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
 
     def dcls_flatten(info: NodeInfo, depth: int):
         for field in dc.fields(info.node):
-            if isinstance(field, NonDiffField):
-                # skip non-diff fields
-                continue
-
             node = getattr(info.node, field.name)
             path = f"{info.path}" + ("." if len(info.path) > 0 else "") + field.name
             frozen = info.frozen or isinstance(field, FrozenWrapper)

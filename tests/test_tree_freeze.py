@@ -115,8 +115,8 @@ def test_freeze_with_ops():
     @pytc.treeclass
     class Test:
         a: int = 1
-        b: float = pytc.field(nondiff=True, default=(1.0))
-        c: str = pytc.field(nondiff=True, default=("test"))
+        b: float = pytc.frozen(1.0)
+        c: str = pytc.frozen("test")
 
     t = Test()
     assert jtu.tree_leaves(t) == [1]
@@ -197,7 +197,7 @@ def test_freeze_mask():
 def test_freeze_nondiff():
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(nondiff=True, default=1)
+        a: int = pytc.frozen(1)
         b: str = "a"
 
     t = Test()

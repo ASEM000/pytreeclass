@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-import copy
-import dataclasses as dc
 import functools as ft
-import operator as op
-import sys
-from types import FunctionType
 from typing import Any
 
 import jax.tree_util as jtu
@@ -17,7 +12,6 @@ from pytreeclass._src.tree_decorator import (
     _MISSING,
     Field,
     ImmutableTreeError,
-    NonDiffField,
     _patch_init_method,
 )
 from pytreeclass._src.tree_freeze import FrozenWrapper
@@ -93,11 +87,6 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     static[_FIELD_MAP] = dict(static[_FIELD_MAP])
 
     for field in static[_FIELD_MAP].values():
-
-        if isinstance(field, NonDiffField):
-            # non differentiable fields as metadata always static
-            continue
-
         if isinstance(field, FrozenWrapper):
             # expose static fields as static leaves (FrozenWrapper)
             static[_FIELD_MAP][field.name] = (field).value

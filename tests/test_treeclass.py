@@ -40,10 +40,15 @@ def test_field_nondiff():
 
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = pytc.field(nondiff=True)
-        b: jnp.ndarray = pytc.field(nondiff=True)
+        a: jnp.ndarray
+        b: jnp.ndarray
 
-        def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
+        def __init__(
+            self,
+            a=pytc.frozen(jnp.array([1, 2, 3])),
+            b=pytc.frozen(jnp.array([4, 5, 6])),
+        ):
+
             self.a = a
             self.b = b
 
@@ -53,11 +58,11 @@ def test_field_nondiff():
 
     @pytc.treeclass
     class Test:
-        a: jnp.ndarray = pytc.field(nondiff=True)
+        a: jnp.ndarray
         b: jnp.ndarray
 
         def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
-            self.a = a
+            self.a = pytc.frozen(a)
             self.b = b
 
     test = Test()

@@ -47,7 +47,7 @@ def _tree_pprint(tree, width: int = 80, kind="repr") -> str:
             FMT += "\n" + "\t" * depth
 
             if dc.is_dataclass(node):
-                FMT += f"{mark}{field_item.name}={node.__class__.__name__}("
+                FMT += f"{field_item.name}={mark}{node.__class__.__name__}("
                 cursor = len(FMT)  # capture children repr
                 recurse(tree=node, depth=depth + 1)
                 _FMT = FMT
@@ -57,7 +57,7 @@ def _tree_pprint(tree, width: int = 80, kind="repr") -> str:
                 continue
 
             # leaf node case
-            FMT += f"{mark}{field_item.name}="
+            FMT += f"{field_item.name}={mark}"
 
             if kind == "repr":
                 FMT += f"{(_node_pprint(node,depth, kind=kind))}"
