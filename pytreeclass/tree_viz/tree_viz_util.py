@@ -94,7 +94,7 @@ def _mermaid_marker(field_item: dc.Field, node: Any, default: str = "--") -> str
     """
     # for now, we only have two markers '*' for non-diff and '#' for frozen
     if isinstance(field_item, _FrozenWrapper) or is_children_frozen(node):
-        return "-..-"
+        return "--x"
     return default
 
 

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import copy
-import dataclasses as dc
 import functools as ft
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NamedTuple
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -109,8 +108,7 @@ def _at_reduce_pytree(
     return jtu.tree_reduce(func, tree.at[where].get(is_leaf=is_leaf), initializer)
 
 
-@dc.dataclass(eq=False, frozen=True)
-class PyTreeIndexer:
+class PyTreeIndexer(NamedTuple):
     tree: PyTree
     where: PyTree
 
@@ -235,8 +233,7 @@ def _at_apply_str(
     return recurse(path, func, depth=0)
 
 
-@dc.dataclass(eq=False, frozen=True)
-class StrIndexer:
+class StrIndexer(NamedTuple):
     tree: PyTree
     where: str
 

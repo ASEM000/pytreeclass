@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses as dc
 import functools as ft
 import inspect
 import math
@@ -10,7 +11,57 @@ import numpy as np
 from jax._src.custom_derivatives import custom_jvp
 from jaxlib.xla_extension import CompiledFunction
 
-from pytreeclass.tree_viz.tree_viz_util import _format_width
+from pytreeclass.tree_viz.tree_viz_util import _format_width, _marker
+
+
+def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
+    if isinstance(node, (FunctionType, custom_jvp)):
+        return _func_pprint(node)
+
+    if isinstance(node, CompiledFunction):
+        # special case for jitted functions
+        return f"jit({_func_pprint(node.__wrapped__)})"
+
+    if isinstance(node, ft.partial):
+        # applies for partial functions including `jtu.Partial`
+        return f"Partial({_func_pprint(node.func)})"
+
+    if hasattr(node, "shape") and hasattr(node, "dtype") and kind == "repr":
+        # works for numpy arrays, jax arrays
+        return _numpy_pprint(node, kind)
+
+    if hasattr(node, "_fields") and hasattr(node, "_asdict"):
+        return f"namedtuple({_dict_pprint(node._asdict(), depth, kind=kind)})"
+
+    if isinstance(node, list):
+        return _list_pprint(node, depth, kind=kind)
+
+    if isinstance(node, tuple):
+        return _tuple_pprint(node, depth, kind=kind)
+
+    if isinstance(node, set):
+        return _set_pprint(node, depth, kind=kind)
+
+    if isinstance(node, dict):
+        return _dict_pprint(node, depth, kind=kind)
+
+    if dc.is_dataclass(node):
+        return _marked_dataclass_pprint(node, depth, kind=kind)
+
+    if kind == "repr":
+        fmt = f"{node!r}"
+    elif kind in ["str"]:
+        fmt = f"{node!s}"
+    else:
+        raise ValueError(f"kind must be 'repr', 'str' or 'extended_repr', got {kind}")
+
+    return ("\n" + "\t" * (depth)).join(fmt.split("\n"))
+
+
+_printer_map = {
+    "repr": lambda node, depth: _node_pprint(node, depth, kind="repr"),
+    "str": lambda node, depth: _node_pprint(node, depth, kind="str"),
+}
 
 
 def _numpy_pprint(node: np.ndarray, kind: str = "repr") -> str:
@@ -65,6 +116,7 @@ def _numpy_pprint(node: np.ndarray, kind: str = "repr") -> str:
     raise ValueError(f"kind must be 'repr' got {kind}")
 
 
+@ft.lru_cache
 def _func_pprint(func: Callable) -> str:
     """Pretty print function
 
@@ -82,81 +134,35 @@ def _func_pprint(func: Callable) -> str:
     name = "Lambda" if (func.__name__ == "<lambda>") else func.__name__
 
     fmt = f"{name}("
-    fmt += ",".join(item for item in [args, varargs, kwonlyargs, varkw] if item != "")
+    fmt += ", ".join(item for item in [args, varargs, kwonlyargs, varkw] if item != "")
     fmt += ")"
     return fmt
-
-
-def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
-    if isinstance(node, (FunctionType, custom_jvp)):
-        return _func_pprint(node)
-
-    if isinstance(node, CompiledFunction):
-        # special case for jitted functions
-        return f"jit({_func_pprint(node.__wrapped__)})"
-
-    if isinstance(node, ft.partial):
-        # applies for partial functions including `jtu.Partial`
-        return f"Partial({_func_pprint(node.func)})"
-
-    if hasattr(node, "shape") and hasattr(node, "dtype") and kind == "repr":
-        # works for numpy arrays, jax arrays
-        return _numpy_pprint(node, kind)
-
-    if hasattr(node, "_fields") and hasattr(node, "_asdict"):
-        return f"namedtuple({_dict_pprint(node._asdict(), depth, kind=kind)})"
-
-    if isinstance(node, list):
-        return _list_pprint(node, depth, kind=kind)
-
-    if isinstance(node, tuple):
-        return _tuple_pprint(node, depth, kind=kind)
-
-    if isinstance(node, set):
-        return _set_pprint(node, depth, kind=kind)
-
-    if isinstance(node, dict):
-        return _dict_pprint(node, depth, kind=kind)
-
-    if kind == "repr":
-        fmt = f"{node!r}"
-    elif kind in ["str"]:
-        fmt = f"{node!s}"
-    else:
-        raise ValueError(f"kind must be 'repr', 'str' or 'extended_repr', got {kind}")
-
-    return ("\n" + "\t" * (depth)).join(fmt.split("\n"))
-
-
-_printer_map = {
-    "repr": lambda node, depth: _node_pprint(node, depth, kind="repr"),
-    "str": lambda node, depth: _node_pprint(node, depth, kind="str"),
-}
 
 
 def _list_pprint(node: list, depth: int, kind: str = "repr") -> str:
     """Pretty print a list"""
     printer = _printer_map[kind]
     fmt = (f"{_format_width(printer(v,depth=depth+1))}" for v in node)
-    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "[\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "]"
     return _format_width(fmt)
 
 
-def _tuple_pprint(node: list, depth: int, kind: str = "repr") -> str:
+@ft.lru_cache
+def _tuple_pprint(node: tuple, depth: int, kind: str = "repr") -> str:
     """Pretty print a list"""
     printer = _printer_map[kind]
     fmt = (f"{_format_width(printer(v,depth=depth+1))}" for v in node)
-    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
     return _format_width(fmt)
 
 
-def _set_pprint(node: list, depth: int, kind: str = "repr") -> str:
+def _set_pprint(node: set, depth: int, kind: str = "repr") -> str:
     """Pretty print a list"""
     printer = _printer_map[kind]
     fmt = (f"{_format_width(printer(v,depth=depth+1))}" for v in node)
-    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt)
 
@@ -165,7 +171,7 @@ def _dict_pprint(node: dict, depth: int, kind: str = "repr") -> str:
     printer = _printer_map[kind]
     fmt = (
         f"{k}:{printer(v,depth=depth+1)}"
-        if "\n" not in f"{v!s}"
+        if "\n" not in f"{printer(v,depth)}"
         else f"{k}:"
         + "\n"
         + "\t" * (depth + 1)
@@ -173,6 +179,30 @@ def _dict_pprint(node: dict, depth: int, kind: str = "repr") -> str:
         for k, v in node.items()
     )
 
-    fmt = (",\n" + "\t" * (depth + 1)).join(fmt)
+    fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
+    return _format_width(fmt)
+
+
+# @ft.lru_cache
+# def _dataclass_pprint(node: dict, depth: int, kind: str = "repr") -> str:
+#     printer = _printer_map[kind]
+#     name = node.__class__.__name__
+#     vs = (getattr(node, f.name) for f in dc.fields(node) if f.repr)
+#     fs = (f for f in dc.fields(node) if f.repr)
+#     fmt = (f"{f.name}={printer(v,depth+1)}" for f, v in zip(fs, vs))
+#     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
+#     fmt = f"{name}(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
+#     return _format_width(fmt)
+
+
+@ft.lru_cache
+def _marked_dataclass_pprint(node: dict, depth: int, kind: str = "repr") -> str:
+    printer = _printer_map[kind]
+    name = node.__class__.__name__
+    vs = (getattr(node, f.name) for f in dc.fields(node) if f.repr)
+    fs = (f for f in dc.fields(node) if f.repr)
+    fmt = (f"{f.name}={_marker(f,v)}{printer(v,depth+1)}" for f, v in zip(fs, vs))
+    fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
+    fmt = f"{name}(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
     return _format_width(fmt)

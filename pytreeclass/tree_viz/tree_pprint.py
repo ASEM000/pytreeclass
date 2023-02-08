@@ -14,7 +14,6 @@ from pytreeclass.tree_viz.tree_viz_util import (
     NodeInfo,
     _format_count,
     _format_size,
-    _format_width,
     _marker,
     _mermaid_marker,
     tree_trace,
@@ -27,66 +26,14 @@ PyTree = Any
 __all__ = ("tree_diagram", "tree_repr", "tree_str", "tree_summary")
 
 
-def _tree_pprint(tree, width: int = 80, kind="repr") -> str:
-    """Prertty print treeclass"""
-
-    def recurse(tree: PyTree, depth: int):
-        if not dc.is_dataclass(tree):
-            return
-
-        nonlocal FMT
-
-        leaves_count = len(dc.fields(tree))
-        fields = [f for f in dc.fields(tree) if f.repr]
-        leaves_count = len(fields)
-
-        for i, field_item in enumerate(fields):
-            node = getattr(tree, field_item.name)
-            mark = _marker(field_item, node)
-            endl = "" if i == (leaves_count - 1) else ", "
-            FMT += "\n" + "\t" * depth
-
-            if dc.is_dataclass(node):
-                FMT += f"{field_item.name}={mark}{node.__class__.__name__}("
-                cursor = len(FMT)  # capture children repr
-                recurse(tree=node, depth=depth + 1)
-                _FMT = FMT
-                FMT = _FMT[:cursor]
-                FMT += _format_width(_FMT[cursor:] + "\n" + "\t" * (depth) + ")")
-                FMT += endl
-                continue
-
-            # leaf node case
-            FMT += f"{field_item.name}={mark}"
-
-            if kind == "repr":
-                FMT += f"{(_node_pprint(node,depth, kind=kind))}"
-
-            elif kind == "str":
-                if "\n" in f"{node!s}":
-                    # in case of multiline string then indent all lines
-                    FMT += "\n" + "\t" * (depth + 1)
-                    FMT += f"{(_node_pprint(node,depth+1, kind=kind))}"
-                else:
-                    FMT += f"{(_node_pprint(node,depth, kind=kind))}"
-
-            FMT += endl
-            recurse(tree=node, depth=depth)
-
-    FMT = ""
-    recurse(tree=tree, depth=1)
-    FMT = f"{(tree.__class__.__name__)}(" + _format_width(FMT + "\n)", width)
-    return FMT.expandtabs(2)
-
-
 def tree_repr(tree, width: int = 80) -> str:
     """Prertty print dataclass tree __repr__"""
-    return _tree_pprint(tree, width, kind="repr")
+    return _node_pprint(tree, depth=0, kind="repr").expandtabs(2)
 
 
 def tree_str(tree, width: int = 80) -> str:
     """Prertty print dataclass tree __str__"""
-    return _tree_pprint(tree, width, kind="str")
+    return _node_pprint(tree, depth=0, kind="str").expandtabs(2)
 
 
 class _TreePretty:
@@ -256,11 +203,12 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
 
         row = [info.path]  # name
         node = (info.node).unwrap() if pytc.is_frozen(info.node) else info.node
-        row += [f"{node.__class__.__name__}" + ("(frozen)" if info.frozen else "")]
+        row += [f"{node.__class__.__name__}"]
         row += [_format_count(info.count.real + info.count.imag)]
         row += [_format_size(info.size.real + info.size.imag)]
-        row += [f"{info.path.split('.')[-1]}={_node_pprint(node).expandtabs(1)}"]
-        # row += [str(info.frozen)]  # frozen
+        row += [
+            f"{info.path.split('.')[-1]}={('#' if info.frozen else '')}{_node_pprint(node).expandtabs(1)}"
+        ]
         ROWS += [row]
         COUNT[int(info.frozen)] += info.count
         SIZE[int(info.frozen)] += info.size

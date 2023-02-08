@@ -59,7 +59,7 @@ class _FrozenWrapper:
     def __init__(self, wrapped: Any):
         # disable composition of Wrappers
         self.__wrapped__ = wrapped.__wrapped__ if is_frozen(wrapped) else wrapped
-        self.__class__.__name__ = f"Frozen{self.__wrapped__.__class__.__name__}"
+        # self.__class__.__name__ = f"Frozen{self.__wrapped__.__class__.__name__}"
 
     def __setattr__(self, key: str, value: Any) -> None:
         if "__wrapped__" in self.__dict__:
