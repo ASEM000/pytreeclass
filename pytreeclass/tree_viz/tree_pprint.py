@@ -78,7 +78,7 @@ def tree_diagram(tree: PyTree) -> str:
 
     def recurse(tree, path, index, expand):
 
-        nonlocal FMT
+        nonlocal fmt
 
         if not expand:
             return
@@ -109,10 +109,10 @@ def tree_diagram(tree: PyTree) -> str:
             index = count - i
             is_last_field = index == 1
 
-            FMT += "\n"
-            FMT += "".join([(("│" if lvl > 1 else "") + "\t") for lvl in path])
-            FMT += f"└{mark}─ " if is_last_field else f"├{mark}─ "
-            FMT += f"{name}"
+            fmt += "\n"
+            fmt += "".join([(("│" if lvl > 1 else "") + "\t") for lvl in path])
+            fmt += f"└{mark}─ " if is_last_field else f"├{mark}─ "
+            fmt += f"{name}"
 
             # decide whether to expand a container or not
             expand = False
@@ -129,93 +129,68 @@ def tree_diagram(tree: PyTree) -> str:
             if expand:
                 # expand dataclass or list/tuple with a single dataclass item
                 # otherwise do not expand
-                FMT += f":{value.__class__.__name__}"
+                fmt += f":{value.__class__.__name__}"
                 recurse(value, path + [index], index, expand=True)
                 continue
 
             # leaf node case
-            FMT += f":{value.__class__.__name__}={_node_pprint(value, kind='repr')}"
+            fmt += f":{value.__class__.__name__}={_node_pprint(value, kind='repr')}"
             recurse(value, path + [1], index, expand=False)
 
-        FMT += "\t"
+        fmt += "\t"
 
-    FMT = f"{(tree.__class__.__name__)}"
+    fmt = f"{(tree.__class__.__name__)}"
     recurse(tree, [1], 0, expand=True)
-    return FMT.expandtabs(4)
+    return fmt.expandtabs(4)
 
 
 def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
-    """Print a summary of the pytree structure
+    """Print a summary of a pytree structure
 
     Args:
         tree: pytree to summarize (ex. list, tuple, dict, dataclass, jax.numpy.ndarray)
-        depth: depth to traverse the tree (default: float("inf"))
+        depth: depth to traverse the tree. defaults to maximum depth.
 
     Note:
         array elements are considered as leaves, for example `jnp.array([1,2,3])` has 3 leaves
     Example:
         >>> # Traverse only the first level of the tree
         >>> print(tree_summary((1,(2,(3,4))),depth=1))
-        ┌────┬─────┬──────┬──────┬─────────────┐
-        │Name│Type │Leaf #│Size  │Config       │
-        ├────┼─────┼──────┼──────┼─────────────┤
-        │[0] │int  │1     │28.00B│[0]=1        │
-        ├────┼─────┼──────┼──────┼─────────────┤
-        │[1] │tuple│3     │84.00B│[1]=(2,(3,4))│
-        └────┴─────┴──────┴──────┴─────────────┘
-        Total leaf count:       4
-        Non-frozen leaf count:  4
-        Frozen leaf count:      0
-        ----------------------------------------
-        Total leaf size:        112.00B
-        Non-frozen leaf size:   112.00B
-        Frozen leaf size:       0.00B
-        ========================================
-
-        >>> # Traverse two levels of the tree
-        >>> print(tree_summary((1,(2,(3,4))),depth=2))
-        ┌──────┬─────┬──────┬──────┬────────────┐
-        │Name  │Type │Leaf #│Size  │Config      │
-        ├──────┼─────┼──────┼──────┼────────────┤
-        │[0]   │int  │1     │28.00B│[0]=1       │
-        ├──────┼─────┼──────┼──────┼────────────┤
-        │[1][0]│int  │1     │28.00B│[1][0]=2    │
-        ├──────┼─────┼──────┼──────┼────────────┤
-        │[1][1]│tuple│2     │56.00B│[1][1]=(3,4)│
-        └──────┴─────┴──────┴──────┴────────────┘
-        Total leaf count:       4
-        Non-frozen leaf count:  4
-        Frozen leaf count:      0
-        -----------------------------------------
-        Total leaf size:        112.00B
-        Non-frozen leaf size:   112.00B
-        Frozen leaf size:       0.00B
-        =========================================
-
     """
-    ROWS = [["Name", "Type ", "Leaf #", "Size ", "Config"]]
-    COUNT = [complex(0), complex(0)]  # non-frozen, frozen
-    SIZE = [complex(0), complex(0)]
+    ROWS = [["Name", "Type ", "Leaf #(size)", "Frozen #(size)", "Type stats"]]
 
     for info in tree_trace(tree, depth):
-        # `tree_trace` returns a list of `NodeInfo` objects that contain the
-        # leaves info at the specified depth
+        path = ".".join(info.path).replace("].", "]").replace(".[", "[")
 
-        row = [info.path]  # name
+        row = [path]
         node = (info.node).unwrap() if pytc.is_frozen(info.node) else info.node
         row += [f"{node.__class__.__name__}"]
-        row += [_format_count(info.count.real + info.count.imag)]
-        row += [_format_size(info.size.real + info.size.imag)]
-        row += [
-            f"{info.path.split('.')[-1]}={('#' if info.frozen else '')}{_node_pprint(node).expandtabs(1)}"
-        ]
+
+        # size and count
+        leaves_count = _format_count(info.count.real)
+        frozen_count = _format_count(info.count.imag)
+
+        leaves_size = _format_size(info.size.real)
+        frozen_size = _format_size(info.size.imag)
+
+        row += [f"{leaves_count}({leaves_size})"]
+        row += [f"{frozen_count}({frozen_size})"]
+
+        # type stats
+        row += [", ".join([f"{k}:{v:,}" for k, v in info.stats.items()])]
+
         ROWS += [row]
-        COUNT[int(info.frozen)] += info.count
-        SIZE[int(info.frozen)] += info.size
 
     COLS = [list(c) for c in zip(*ROWS)]
     layer_table = _table(COLS)
     table_width = len(layer_table.split("\n")[0])
+
+    COUNT = [complex(0), complex(0)]  # non-frozen, frozen
+    SIZE = [complex(0), complex(0)]
+
+    for info in tree_trace(tree):
+        COUNT[info.frozen] += info.count
+        SIZE[info.frozen] += info.size
 
     total_count = sum(COUNT).real + sum(COUNT).imag
     non_frozen_count = COUNT[0].real + COUNT[0].imag
@@ -264,7 +239,7 @@ def tree_mermaid(tree: PyTree):
         return ft.reduce(reduce_func, tree_trace(item), (0, 0))
 
     def recurse(tree, depth, prev_id, expand=True):
-        nonlocal FMT
+        nonlocal fmt
 
         if dc.is_dataclass(tree) and expand:
             fields = [f for f in dc.fields(tree) if f.repr]
@@ -304,27 +279,27 @@ def tree_mermaid(tree: PyTree):
                 isinstance(value, (list, tuple)) and any(map(dc.is_dataclass, value))
             ):
 
-                FMT += f"\n\tid{prev_id} {mark} "
-                FMT += f'|"{(count)}<br>{(size)}"| '  # add count and size of children
-                FMT += f'id{cur_id}("{bold_text(name) }:{type}")'
+                fmt += f"\n\tid{prev_id} {mark} "
+                fmt += f'|"{(count)}<br>{(size)}"| '  # add count and size of children
+                fmt += f'id{cur_id}("{bold_text(name) }:{type}")'
                 recurse(tree=value, depth=depth + 1, prev_id=cur_id, expand=True)
                 continue
 
-            FMT += f"\n\tid{prev_id} {mark} "
+            fmt += f"\n\tid{prev_id} {mark} "
 
             # add count and size of children
             if mark == "-..-":
-                FMT += f'|"(frozen) {(count)}<br>{(size)}"| '  # add count and size of children for frozen leaves
+                fmt += f'|"(frozen) {(count)}<br>{(size)}"| '  # add count and size of children for frozen leaves
             elif mark == "--x":
-                FMT += ""  # no count or size for frozen leaves
+                fmt += ""  # no count or size for frozen leaves
             elif mark == "--->" or mark == "---":
-                FMT += f'|"{(count)}<br>{(size)}"| '
+                fmt += f'|"{(count)}<br>{(size)}"| '
 
-            FMT += f'id{cur_id}["{bold_text(name)}:{type}={_node_pprint(value, kind="repr")}"]'
+            fmt += f'id{cur_id}["{bold_text(name)}:{type}={_node_pprint(value, kind="repr")}"]'
 
         prev_id = cur_id
 
     cur_id = node_id((0, 0, -1, 0))
-    FMT = f"flowchart LR\n\tid{cur_id}({bold_text(tree.__class__.__name__)})"
+    fmt = f"flowchart LR\n\tid{cur_id}({bold_text(tree.__class__.__name__)})"
     recurse(tree=tree, depth=1, prev_id=cur_id)
-    return FMT.expandtabs(4)
+    return fmt.expandtabs(4)

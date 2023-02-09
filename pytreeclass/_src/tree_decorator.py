@@ -8,13 +8,14 @@ from __future__ import annotations
 import dataclasses as dc
 import functools as ft
 import sys
-from types import FunctionType
+from types import FunctionType, MappingProxyType
 from typing import Any, NamedTuple
 
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
-_FROZEN = "__FROZEN__"
+_FROZEN = "__datalcass_frozen__"
 # required to mark the field map to get recognized `dataclasses.is_dataclass`
 _FIELD_MAP = "__dataclass_fields__"
+_POST_INIT = "__post_init__"
 
 
 class ImmutableTreeError(Exception):
@@ -31,7 +32,9 @@ class Field(NamedTuple):
     repr: bool = True
     kwonly: bool = False
     default_factory: Any = _MISSING
+    metadata: MappingProxyType | None = None
     # make it get recognized as a dataclass field
+    # to make it work with `dataclasses.fields`
     _field_type = dc._FIELD
 
 
@@ -42,9 +45,16 @@ def field(
     init: bool = True,
     repr: bool = True,
     kwonly: bool = False,
+    metadata: dict | None = None,
 ):
+    # consider adding validator function
     if default is not _MISSING and default_factory is not _MISSING:
         raise ValueError("Cannot specify both `default` and `default_factory`")
+
+    metadata = metadata or dict()
+
+    if not isinstance(metadata, dict):
+        raise TypeError("metadata must be a dict")
 
     return Field(
         default=default,
@@ -52,7 +62,8 @@ def field(
         init=init,
         repr=repr,
         kwonly=kwonly,
-        # set by the constructor
+        metadata=MappingProxyType(metadata),
+        # set later when assigned to class
         name=None,
         type=None,
     )
@@ -71,9 +82,11 @@ def _generate_field_map(cls) -> dict[str, Field]:
 
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
+    # TODO: use inspect to get annotations, once we are on minimum python version >3.9
     annotations = cls.__dict__.get("__annotations__", dict())
 
     for name in annotations:
+        # get the value associated with the type hint
         value = getattr(cls, name, _MISSING)
         type = annotations[name]
 
@@ -124,19 +137,27 @@ def _patch_init_method(cls):
         mark0 = f"FIELD_MAP['{key}'].default"
         mark1 = f"self.{key}"
 
+        # add keyword marker in we have a `kwonly` field
         head += "*, " if (field.kwonly and "*" not in head and field.init) else ""
 
         if field.default is not _MISSING:
+            # we add the default into the function head (def f(.. x= default_value))
+            # if the the field require initialization. if not, then omit it from head
             head += f"{key}={mark0}, " if field.init else ""
+            # we then add self.x = x for the body function if field is initialized
+            # otherwise, define the default value inside the body ( self.x = default_value)
             body += f"{mark1}=" + (f"{key}; " if field.init else f"{mark0};")
         elif field.default_factory is not _MISSING:
+            # same story for functions as above
             head += f"{key}={mark0}_factory(), " if field.init else ""
             body += f"{mark1}=" + (f"{key};" if field.init else f"{mark0}_factory();")
         else:
+            # no defaults are added
             head += f"{key}, "
             body += f"{mark1}={key}; "
 
     body = " def __init__(self, " + head[:-2] + "):" + body
+    # use closure to be able to reference default values of all types
     body = f"def closure(FIELD_MAP):\n{body}\n return __init__"
 
     exec(body, global_namespace, local_namespace)

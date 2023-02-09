@@ -3,13 +3,14 @@ from __future__ import annotations
 import functools as ft
 
 import jax.numpy as jnp
+import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_freeze import _hash_node
 
 
-def test_bmap():
+def test_bcmap():
     @pytc.treeclass
     class Test:
         a: tuple[int]
@@ -25,42 +26,42 @@ def test_bmap():
 
     tree = Test()
     rhs = Test(a=(1, 0, 0), b=(0, 0, 0), c=jnp.array([1, 0, 0]), d=1)
-
+    rhs = jtu.tree_map(lambda x: jnp.array(x), rhs)
     # test auto broadcasting
-    lhs = pytc.bmap(jnp.where)(tree > 1, 0, tree)
+    lhs = pytc.bcmap(jnp.where)(tree > 1, 0, tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = pytc.bmap(jnp.where)(tree > 1, 0, y=tree)
+    lhs = pytc.bcmap(jnp.where)(tree > 1, 0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = pytc.bmap(jnp.where)(tree > 1, x=0, y=tree)
+    lhs = pytc.bcmap(jnp.where)(tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = pytc.bmap(jnp.where)(tree > 1, x=0, y=tree)
+    lhs = pytc.bcmap(jnp.where)(tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = pytc.bmap(jnp.where)(condition=tree > 1, x=0, y=tree)
+    lhs = pytc.bcmap(jnp.where)(condition=tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
     with pytest.raises(ValueError):
-        pytc.bmap(lambda *x: x)(tree)
+        pytc.bcmap(lambda *x: x)(tree)
 
     with pytest.raises(ValueError):
 
-        @pytc.bmap
+        @pytc.bcmap
         def func(**k):
             return 0
 
     # test broadcasting with selected argnums/argnames
-    lhs = ft.partial(pytc.bmap, broadcast_argnums=(1,))(jnp.where)(tree > 1, 0, tree)
+    lhs = ft.partial(pytc.bcmap, broadcast_argnums=(1,))(jnp.where)(tree > 1, 0, tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = ft.partial(pytc.bmap, broadcast_argnames=("x",))(jnp.where)(
+    lhs = ft.partial(pytc.bcmap, broadcast_argnames=("x",))(jnp.where)(
         tree > 1, x=0, y=tree
     )
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = ft.partial(pytc.bmap, broadcast_argnums=(1,), broadcast_argnames=("x",))(
+    lhs = ft.partial(pytc.bcmap, broadcast_argnums=(1,), broadcast_argnames=("x",))(
         jnp.where
     )(tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
@@ -75,7 +76,7 @@ def test_math_operations():
         name: str
 
         def __post_init__(self):
-            self.name = pytc.frozen(self.name)
+            self.name = pytc.FrozenWrapper(self.name)
 
     A = Test(10, 20, 30, ("A"))
     # binary operations
@@ -93,7 +94,7 @@ def test_math_operations():
         name: str
 
         def __post_init__(self):
-            self.name = pytc.frozen(self.name)
+            self.name = pytc.FrozenWrapper(self.name)
 
     A = Test(-10, 20, ("A"))
 
@@ -128,7 +129,7 @@ def test_math_operations_errors():
         d: jnp.ndarray = None
 
         def __post_init__(self):
-            self.name = pytc.frozen(self.name)
+            self.name = pytc.FrozenWrapper(self.name)
             self.d = jnp.array([1, 2, 3])
 
     A = Test(10, 20, 30, ("A"))

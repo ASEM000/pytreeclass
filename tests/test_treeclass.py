@@ -45,8 +45,8 @@ def test_field_nondiff():
 
         def __init__(
             self,
-            a=pytc.frozen(jnp.array([1, 2, 3])),
-            b=pytc.frozen(jnp.array([4, 5, 6])),
+            a=pytc.FrozenWrapper(jnp.array([1, 2, 3])),
+            b=pytc.FrozenWrapper(jnp.array([4, 5, 6])),
         ):
 
             self.a = a
@@ -62,7 +62,7 @@ def test_field_nondiff():
         b: jnp.ndarray
 
         def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
-            self.a = pytc.frozen(a)
+            self.a = pytc.FrozenWrapper(a)
             self.b = b
 
     test = Test()
@@ -256,3 +256,11 @@ def test_mutable_field():
         @pytc.treeclass
         class Test:
             a: list = [1, 2, 3]
+
+
+def test_non_class_input():
+    with pytest.raises(TypeError):
+
+        @pytc.treeclass
+        def f(x):
+            return x

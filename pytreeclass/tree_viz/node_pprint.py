@@ -19,11 +19,11 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
         return _func_pprint(node)
 
     if isinstance(node, CompiledFunction):
-        # special case for jitted functions
+        # special case for jitted JAX functions
         return f"jit({_func_pprint(node.__wrapped__)})"
 
     if isinstance(node, ft.partial):
-        # applies for partial functions including `jtu.Partial`
+        # applies for partial functions including `jax.tree_util.Partial`
         return f"Partial({_func_pprint(node.func)})"
 
     if hasattr(node, "shape") and hasattr(node, "dtype") and kind == "repr":
@@ -31,7 +31,7 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
         return _numpy_pprint(node, kind)
 
     if hasattr(node, "_fields") and hasattr(node, "_asdict"):
-        return f"namedtuple({_dict_pprint(node._asdict(), depth, kind=kind)})"
+        return _namedtuple_pprint(node, depth, kind=kind)
 
     if isinstance(node, list):
         return _list_pprint(node, depth, kind=kind)
@@ -87,7 +87,7 @@ def _numpy_pprint(node: np.ndarray, kind: str = "repr") -> str:
         base = f"{node.dtype}" + shape
 
     # Extended repr for numpy array, with extended information
-    # this part of function is inspired by
+    # this part of the function is inspired by
     # lovely-jax https://github.com/xl0/lovely-jax
 
     if issubclass(node.dtype.type, np.number):
@@ -124,12 +124,12 @@ def _func_pprint(func: Callable) -> str:
         >>> def example(a: int, b=1, *c, d, e=2, **f) -> str:
             ...
         >>> _func_pprint(example)
-        "example(a,b,*c,d,e,**f)"
+        "example(a, b, *c, d, e, **f)"
     """
     args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(func)
-    args = (",".join(args)) if len(args) > 0 else ""
+    args = (", ".join(args)) if len(args) > 0 else ""
     varargs = ("*" + varargs) if varargs is not None else ""
-    kwonlyargs = (",".join(kwonlyargs)) if len(kwonlyargs) > 0 else ""
+    kwonlyargs = (", ".join(kwonlyargs)) if len(kwonlyargs) > 0 else ""
     varkw = ("**" + varkw) if varkw is not None else ""
     name = "Lambda" if (func.__name__ == "<lambda>") else func.__name__
 
@@ -148,7 +148,6 @@ def _list_pprint(node: list, depth: int, kind: str = "repr") -> str:
     return _format_width(fmt)
 
 
-@ft.lru_cache
 def _tuple_pprint(node: tuple, depth: int, kind: str = "repr") -> str:
     """Pretty print a list"""
     printer = _printer_map[kind]
@@ -181,6 +180,23 @@ def _dict_pprint(node: dict, depth: int, kind: str = "repr") -> str:
 
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
+    return _format_width(fmt)
+
+
+def _namedtuple_pprint(node, depth: int, kind: str = "repr") -> str:
+    printer = _printer_map[kind]
+    fmt = (
+        f"{k}={printer(v,depth=depth+1)}"
+        if "\n" not in f"{printer(v,depth)}"
+        else f"{k}:"
+        + "\n"
+        + "\t" * (depth + 1)
+        + f"{_format_width(printer(v,depth=depth+1))}"
+        for k, v in node._asdict().items()
+    )
+
+    fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
+    fmt = "namedtuple(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
     return _format_width(fmt)
 
 

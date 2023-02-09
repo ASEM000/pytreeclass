@@ -23,15 +23,18 @@ def test_func_pprint():
     def example(a: int, b=1, *c, d, e=2, **f) -> str:
         ...  # fmt: skip
 
-    assert _func_pprint(example) == "example(a,b,*c,d,e,**f)"
+    assert _func_pprint(example) == "example(a, b, *c, d, e, **f)"
     assert _func_pprint(lambda x: x) == "Lambda(x)"
-    assert _func_pprint(jax.nn.relu) == "relu(*args,**kwargs)"
-    assert (_node_pprint(jtu.Partial(jax.nn.relu)) == "Partial(relu(*args,**kwargs))")  # fmt: skip
+    assert _func_pprint(jax.nn.relu) == "relu(*args, **kwargs)"
+    assert (_node_pprint(jtu.Partial(jax.nn.relu)) == "Partial(relu(*args, **kwargs))")  # fmt: skip
     assert (
         _node_pprint(jtu.Partial(jax.nn.relu), kind="str")
-        == "Partial(relu(*args,**kwargs))"
+        == "Partial(relu(*args, **kwargs))"
     )
-    assert (_func_pprint(jax.nn.initializers.he_normal) == "he_normal(in_axis,out_axis,batch_axis,dtype)")  # fmt: skip
+    assert (
+        _func_pprint(jax.nn.initializers.he_normal)
+        == "he_normal(in_axis, out_axis, batch_axis, dtype)"
+    )
 
 
 def test_format_count():

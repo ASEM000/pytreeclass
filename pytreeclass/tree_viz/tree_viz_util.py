@@ -3,11 +3,13 @@ from __future__ import annotations
 import dataclasses as dc
 import math
 import sys
+from collections import defaultdict
 from typing import Any, NamedTuple
 
 import numpy as np
+from jax._src.tree_util import _registry
 
-from pytreeclass._src.tree_freeze import _FrozenWrapper
+from pytreeclass._src.tree_freeze import FrozenWrapper, is_frozen
 
 PyTree = Any
 
@@ -40,7 +42,7 @@ def _format_size(node_size, newline=False):
         fmt += f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
         return fmt
 
-    elif isinstance(node_size, (float, int)):
+    if isinstance(node_size, (float, int)):
         size_order = int(math.log(node_size, 1024)) if node_size > 0 else 0
         return f"{(node_size)/(1024**size_order):.2f}{order_kw[size_order]}"
 
@@ -62,7 +64,8 @@ def _format_count(node_count, newline=False):
 
     if isinstance(node_count, complex):
         return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
-    elif isinstance(node_count, (float, int)):
+
+    if isinstance(node_count, (float, int)):
         return f"{int(node_count):,}"
 
     raise TypeError(f"node_count must be int or float, got {type(node_count)}")
@@ -73,53 +76,37 @@ def is_children_frozen(tree):
     if dc.is_dataclass(tree):
         fields = dc.fields(tree)
         if len(fields) > 0:
-            if all(isinstance(f, _FrozenWrapper) for f in fields):
+            if all(isinstance(f, FrozenWrapper) for f in fields):
                 return True
-            if all(isinstance(getattr(tree, f.name), _FrozenWrapper) for f in fields):
+            if all(isinstance(getattr(tree, f.name), FrozenWrapper) for f in fields):
                 return True
 
     return False
 
 
-def _mermaid_marker(field_item: dc.Field, node: Any, default: str = "--") -> str:
+def _mermaid_marker(field: dc.Field, node: Any, default: str = "--") -> str:
     """return the suitable marker given the field and node item
 
     Args:
-        field_item (Field): field item of the pytree node
+        field (Field): field item of the pytree node
         node (Any): node item
         default (str, optional): default marker. Defaults to "".
 
     Returns:
         str: marker character.
     """
-    # for now, we only have two markers '*' for non-diff and '#' for frozen
-    if isinstance(field_item, _FrozenWrapper) or is_children_frozen(node):
+    if is_frozen(field) or is_children_frozen(node):
         return "--x"
     return default
 
 
-def _marker(field_item: dc.Field, node: Any, default: str = "") -> str:
+def _marker(field: dc.Field, node: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item"""
-    # '*' for non-diff
-
-    if isinstance(field_item, _FrozenWrapper) or is_children_frozen(node):
+    # if all your children are frozen, the you are frozen
+    if is_frozen(field) or is_children_frozen(node):
         return "#"
 
     return default
-
-
-# def _sequential_tree_shape_eval(tree, array):
-#     """Evaluate shape propagation of assumed sequential modules"""
-#     dyanmic, static = dcu._dataclass_structure(tree)
-
-#     # all dynamic/static leaves
-#     all_leaves = (*dyanmic.values(), *static.values())
-#     leaves = [leaf for leaf in all_leaves if dc.is_dataclass(leaf)]
-
-#     shape = [jax.eval_shape(lambda x: x, array)]
-#     for leave in leaves:
-#         shape += [jax.eval_shape(leave, shape[-1])]
-#     return shape
 
 
 class NodeInfo(NamedTuple):
@@ -127,17 +114,24 @@ class NodeInfo(NamedTuple):
     path: str
     frozen: bool = False
     repr: bool = True
-    count: int = 0
-    size: int = 0
+    count: complex = complex(0, 0)
+    size: complex = complex(0, 0)
+    stats: dict[str, int] | None = None
+
+
+def _get_type(node: Any) -> str:
+    if hasattr(node, "dtype"):
+        return (
+            str(node.dtype)
+            .replace("float", "f")
+            .replace("int", "i")
+            .replace("complex", "c")
+        )
+    return node.__class__.__name__
 
 
 def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
-    """trace and flatten a a PyTree to a list of `NodeInfo` objects
-
-    Args:
-        tree : the PyTree to be traced
-        depth : the depth to be traced. Defaults to float("inf") for trace till the leaf.
-
+    """trace the tree and return a list of NodeInfo objects
     Returns:
         list of NodeInfo objects containing
             node: the node itself
@@ -150,77 +144,77 @@ def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
     Example:
         >>> for leaf in pytc.tree_viz.utils.tree_trace((1,2,3)):
         ...    print(leaf)
-        NodeInfo(node=1, path='[0]', frozen=False, repr=True, count=1j, size=28j)
-        NodeInfo(node=2, path='[1]', frozen=False, repr=True, count=1j, size=28j)
-        NodeInfo(node=3, path='[2]', frozen=False, repr=True, count=1j, size=28j)
+        NodeInfo(node=1, path=['[0]'], frozen=False, repr=True, count=1j, size=28j)
+        NodeInfo(node=2, path=['[1]'], frozen=False, repr=True, count=1j, size=28j)
+        NodeInfo(node=3, path=['[2]'], frozen=False, repr=True, count=1j, size=28j)
     """
+    # unlike `jax.tree_util.tree_leaves`, this function can flatten tree at a certain depth
+    # for instance, a depth of 0 will return the tree itself, and a depth of 1 will return the
+    # the direct discedents of the tree. depth of `inf` is equivalent to `jax.tree_util.tree_leaves`
+    # the returned list is a list of NodeInfo objects, which contains the node itself, the path to
+    # the node, and some stats about the path size and number of leaves.
+    # this is done on two steps: the first is to reach to the desired depth using recurisve calls
+    # defined by `yield_one_level_leaves`, and the second is to calculate the stats of the nodes using
+    # `yield_stats`, which picks up the yield leaves from the first step and recurse to the max tree depth.
 
-    def container_flatten(info: NodeInfo, depth: int):
-        for i, item in enumerate(info.node):
-            frozen = info.frozen or isinstance(item, _FrozenWrapper)
-            sub_info = NodeInfo(item, f"{info.path}[{i}]", frozen, info.repr)
-            yield from tree_flatten_recurse(sub_info, depth - 1)
+    def yield_one_level_leaves(info: NodeInfo, depth: int) -> list[NodeInfo]:
+        if is_frozen(info.node):
+            info = info._replace(node=info.node.unwrap(), frozen=True)
+            yield from yield_one_level_leaves(info, depth)
 
-    def dict_flatten(info: NodeInfo, depth: int):
-        for key, item in info.node.items():
-            frozen = info.frozen or isinstance(item, _FrozenWrapper)
-            sub_info = NodeInfo(item, f"{info.path}[{key}]", frozen, info.repr)
-            yield from tree_flatten_recurse(sub_info, depth - 1)
+        elif _registry.get(type(info.node)):
+            # the tree is JAX pytree and has a flatten handler
+            handler = _registry.get(type(info.node))
+            leaves = list(handler.to_iter(info.node)[0])
 
-    def dcls_flatten(info: NodeInfo, depth: int):
-        for field in dc.fields(info.node):
-            node = getattr(info.node, field.name)
-            path = f"{info.path}" + ("." if len(info.path) > 0 else "") + field.name
-            frozen = info.frozen or isinstance(field, _FrozenWrapper)
-            frozen = frozen or isinstance(node, _FrozenWrapper)
-            sub_info = NodeInfo(node, path, frozen, info.repr)
-            yield from tree_flatten_recurse(sub_info, depth - 1)
-
-    def leaf_count_and_size_flatten(info: NodeInfo) -> NodeInfo:
-        """count and size of the leaf node in the form of (inexact, exact) complex number"""
-        count, size = complex(0, 0), complex(0, 0)
-
-        for sub_info in tree_flatten_recurse(info, float("inf")):
-            node = sub_info.node
-            if hasattr(node, "shape") and hasattr(node, "dtype"):
-                if np.issubdtype(node.dtype, np.inexact):
-                    # inexact(trainable) array
-                    count += complex(int(np.array(node.shape).prod()), 0)
-                    size += complex(int(node.nbytes), 0)
-                else:
-                    # non in-exact paramter
-                    count += complex(0, int(np.array(node.shape).prod()))
-                    size += complex(0, int(node.nbytes))
-
-            elif isinstance(node, (float, complex)):
-                # inexact non-array (array_like)
-                count += complex(1, 0)
-                size += complex(sys.getsizeof(node), 0)
-
+            # check for python datastructure that has named paths first
+            # otherwise assign `leaf_` for each leaf.
+            if isinstance(info.node, tuple) and hasattr(info.node, "_fields"):
+                names = (f"{f}" for f in info.node._fields)
+                reprs = (info.repr,) * len(info.node)  # inherit repr from parent
+            elif isinstance(info.node, dict):
+                names = (f"{key}" for key in info.node)
+                reprs = (info.repr,) * len(info.node)
+            elif isinstance(info.node, (list, tuple)):
+                names = (f"[{i}]" for i in range(len(info.node)))
+                reprs = (info.repr,) * len(info.node)  # inherit repr from parent
+            elif dc.is_dataclass(info.node):
+                names = (f"{f.name}" for f in dc.fields(info.node))
+                reprs = (info.repr and f.repr for f in dc.fields(info.node))
             else:
-                count += complex(0, 1)
-                size += complex(0, sys.getsizeof(node))
+                names = (f"leaf_{i}" for i in range(len(leaves)))
+                reprs = (info.repr,) * len(leaves)
 
-        return info._replace(count=count, size=size)
-
-    def tree_flatten_recurse(info: NodeInfo, depth):
-        if depth < 1:
-            yield info
-
-        elif isinstance(info.node, tuple) and hasattr(info.node, "_fields"):
-            yield from dict_flatten(info._asdict(), depth)
-
-        elif isinstance(info.node, (list, tuple)):
-            yield from container_flatten(info, depth)
-
-        elif isinstance(info.node, dict):
-            yield from dict_flatten(info, depth)
-
-        elif dc.is_dataclass(info.node):
-            yield from dcls_flatten(info, depth)
+            for name, repr, leaf in zip(names, reprs, leaves):
+                sub_info = NodeInfo(leaf, info.path + [name], info.frozen, repr)
+                yield from (recurse_step(sub_info, depth - 1))
 
         else:
+            # the node is not a JAX pytree
             yield info
 
-    info = NodeInfo(node=tree, path="", frozen=False, repr=True)
-    return list(map(leaf_count_and_size_flatten, tree_flatten_recurse(info, depth)))
+    def yield_subtree_stats(info: NodeInfo) -> NodeInfo:
+        # calcuate some states of a single subtree defined by the `NodeInfo` objects
+        # for each subtree, we will calculate the types distribution and their size
+        stats = defaultdict(lambda: 0)
+        count = size = 0
+
+        for sub_info in recurse_step(info, float("inf")):
+            type = _get_type(sub_info.node)
+            node = sub_info.node
+            _count = int(np.array(node.shape).prod()) if hasattr(node, "shape") else 1
+            _count = complex(0, _count) if sub_info.frozen else _count
+            stats[type] += int(_count.imag + _count.real)
+            count += _count
+
+            _size = node.nbytes if hasattr(node, "nbytes") else sys.getsizeof(node)
+            _size = complex(0, _size) if sub_info.frozen else _size
+            size += _size
+
+        return info._replace(count=count, size=size, stats=stats)
+
+    def recurse_step(info: NodeInfo, depth):
+        yield from yield_one_level_leaves(info, depth) if depth > 0 else [info]
+
+    info = NodeInfo(node=tree, path=[], frozen=False, repr=True)
+    return list(map(yield_subtree_stats, recurse_step(info, depth)))

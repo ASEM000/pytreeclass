@@ -7,15 +7,15 @@ from typing import Any, Iterable
 import jax.tree_util as jtu
 import numpy as np
 
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
 from pytreeclass._src.tree_operator import _hash_node
 
 PyTree = Any
-_FIELD_MAP = "__dataclass_fields__"
-_FROZEN = "__FROZEN__"
 
 
 @contextmanager
 def _MutableContext(tree: PyTree, inplace: bool = False):
+    # this is used with .at[__call__] method
     def immutate_step(tree, set_value):
         if not hasattr(tree, _FIELD_MAP):
             return tree
@@ -36,6 +36,9 @@ def _MutableContext(tree: PyTree, inplace: bool = False):
 
 
 class _HashableWrapper:
+    # used to wrap metadata to make it hashable
+    # this is intended to wrap frozen values to avoid error when comparing
+    # the metadata.
     def __init__(self, wrapped) -> None:
         self.__wrapped__ = wrapped
 
@@ -52,8 +55,8 @@ class _HashableWrapper:
 
 
 @jtu.register_pytree_node_class
-class _FrozenWrapper:
-    "Wrapper for frozen tree leaf"
+class FrozenWrapper:
+    "Wrapper to freeze a node" ""
     # in essence this is a wrapper for a tree leaf to make it appear as a leaf to jax.tree_util
     # but it is not editable (i.e. it is frozen)
     def __init__(self, wrapped: Any):
@@ -63,7 +66,7 @@ class _FrozenWrapper:
 
     def __setattr__(self, key: str, value: Any) -> None:
         if "__wrapped__" in self.__dict__:
-            raise ValueError("_FrozenWrapper only allows `__wrapped__` to be set once`")
+            raise ValueError("FrozenWrapper only allows `__wrapped__` to be set once`")
         return super().__setattr__(key, value)
 
     def __getattr__(self, k):
@@ -78,14 +81,14 @@ class _FrozenWrapper:
     def tree_unflatten(cls, treedef, leaves):
         self = object.__new__(cls)
         self.__dict__.update(__wrapped__=treedef.unwrap())
-        self.__class__.__name__ = f"Frozen{self.__wrapped__.__class__.__name__}"
+        # self.__class__.__name__ = f"Frozen{self.__wrapped__.__class__.__name__}"
         return self
 
     def __repr__(self):
         return f"#{self.__wrapped__!r}"
 
     def __eq__(self, rhs: Any) -> bool:
-        if not isinstance(rhs, _FrozenWrapper):
+        if not isinstance(rhs, FrozenWrapper):
             return False
         return self.__wrapped__ == rhs.__wrapped__
 
@@ -98,12 +101,7 @@ class _FrozenWrapper:
 
 def is_frozen(node: Any) -> bool:
     """Check if a tree is wrapped by a wrapper"""
-    return isinstance(node, _FrozenWrapper)
-
-
-def frozen(node: Any) -> _FrozenWrapper:
-    """Wrap a node with a wrapper"""
-    return _FrozenWrapper(node)
+    return isinstance(node, FrozenWrapper)
 
 
 def tree_freeze(x: PyTree) -> PyTree:
@@ -112,7 +110,7 @@ def tree_freeze(x: PyTree) -> PyTree:
     def map_func(node: Any):
         if is_frozen(node):
             return node
-        return _FrozenWrapper(node)
+        return FrozenWrapper(node)
 
     return jtu.tree_map(map_func, x)
 
@@ -120,12 +118,12 @@ def tree_freeze(x: PyTree) -> PyTree:
 def tree_unfreeze(x: PyTree) -> PyTree:
     """Unfreeze tree leaf"""
     # this is a bit tricky as we are using `is_leaf` to stop
-    # traversing the tree when we hit a `_FrozenWrapper`
+    # traversing the tree when we hit a `FrozenWrapper`
     # the problem here is that, unlike `tree_freeze` this function
     # can not be used inside a `jtu.tree_map` **without** specifying
     # `is_leaf` as it will traverse the whole tree and miss the wrapper mark
     def map_func(node: Any):
-        if isinstance(node, _FrozenWrapper):
+        if isinstance(node, FrozenWrapper):
             return (node).unwrap()
         return node
 

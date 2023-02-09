@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools as ft
 from typing import Any
 
+import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
@@ -10,18 +11,17 @@ from pytreeclass._src.tree_decorator import (
     _FIELD_MAP,
     _FROZEN,
     _MISSING,
+    _POST_INIT,
     Field,
     ImmutableTreeError,
     _patch_init_method,
 )
-from pytreeclass._src.tree_freeze import _FrozenWrapper
+from pytreeclass._src.tree_freeze import FrozenWrapper, is_frozen
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
 from pytreeclass.tree_viz.tree_pprint import _TreePretty
 
 PyTree = Any
-
-_POST = "__post_init__"
 
 
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
@@ -72,8 +72,8 @@ def _init_wrapper(init_func):
         # in case __post_init__ is defined then call it
         # after the tree is initialized
         # here, we assume that __post_init__ is a method
-        if _POST in vars(self.__class__):
-            output = getattr(self, _POST)()
+        if _POST_INIT in vars(self.__class__):
+            output = getattr(self, _POST_INIT)()
         object.__setattr__(self, _FROZEN, True)
         return output
 
@@ -88,10 +88,10 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     static[_FIELD_MAP] = dict(static[_FIELD_MAP])
 
     for field in static[_FIELD_MAP].values():
-        if isinstance(field, _FrozenWrapper):
-            # expose static fields as static leaves (_FrozenWrapper)
+        if is_frozen(field):
+            # expose static fields as static leaves (FrozenWrapper)
             static[_FIELD_MAP][field.name] = (field).unwrap()
-            dynamic[field.name] = _FrozenWrapper(static.pop(field.name))
+            dynamic[field.name] = FrozenWrapper(static.pop(field.name))
             continue
 
         # normal fields as dynamic leaves
@@ -108,10 +108,10 @@ def _unflatten(cls, treedef, leaves):
     dynamic = dict(zip(treedef[0], leaves))
 
     for key in dynamic:
-        if isinstance(dynamic[key], _FrozenWrapper):
+        if is_frozen(dynamic[key]):
             # convert frozen value (static leaf) -> frozen field (to metadata)
             dynamic[key] = (dynamic[key]).unwrap()
-            static[_FIELD_MAP][key] = _FrozenWrapper(static[_FIELD_MAP][key])
+            static[_FIELD_MAP][key] = FrozenWrapper(static[_FIELD_MAP][key])
 
     tree.__dict__.update(static)
     tree.__dict__.update(dynamic)
@@ -135,7 +135,6 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         cls: class to be converted to a `treeclass`
         order: if `True` the `treeclass` math operations will be applied leaf-wise (default: `True`)
         repr: if `True` the `treeclass` will have a `__repr__`/ `__str__` method (default: `True`)
-        frozen: if `True` the `treeclass` will be immutable (default: `True`) - use with caution -
 
     Returns:`
         `treeclass` of the input class
@@ -145,9 +144,14 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
     """
 
     def decorator(cls, order, repr):
+        if not isinstance(cls, type):
+            # non class input will raise an error
+            msg = f"@treeclass accepts class as input. Found type={type(cls)}"
+            raise TypeError(msg)
+
         # generate and register field map to class.
         # generate init method if not defined based of the fields map
-        # this is similar to dataclass decorator but without the bloated functionality
+        # this is similar to dataclass decorator but only implements the relevant parts
         cls = _patch_init_method(cls)
 
         attrs = dict(cls.__dict__)
@@ -171,7 +175,7 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
 
         cls = type(cls.__name__, bases, attrs)
 
-        # register the class to jax pytree
+        # register the class to JAX registry
         return jtu.register_pytree_node_class(cls)
 
     if cls is None:
@@ -188,6 +192,12 @@ def is_tree_equal(lhs: Any, rhs: Any) -> bool:
         return False
 
     for (lhs, rhs) in zip(lhs_leaves, rhs_leaves):
-        if not np.array_equal(lhs, rhs):
-            return False
+        if isinstance(lhs, (jnp.ndarray, np.ndarray)):
+            if isinstance(rhs, (jnp.ndarray, np.ndarray)):
+                if not np.array_equal(lhs, rhs):
+                    return False
+            else:
+                return False
+        else:
+            return lhs == rhs
     return True

@@ -98,7 +98,7 @@ def _transform_to_kwds_func(func: Callable) -> Callable:
 
 
 @ft.lru_cache(maxsize=None)
-def bmap(
+def bcmap(
     func: Callable[..., Any],
     *,
     is_leaf: Callable[[Any], bool] | None = None,
@@ -125,27 +125,27 @@ def bmap(
         >>> tree = Test()
         >>> # 0 is broadcasted to all leaves of the pytree
 
-        >>> print(pytc.bmap(jnp.where)(tree>1, tree, 0))
+        >>> print(pytc.bcmap(jnp.where)(tree>1, tree, 0))
         Test(a=(0,2,3), b=(4,5,6), c=[0 2 3])
 
-        >>> print(pytc.bmap(jnp.where)(tree>1, 0, tree))
+        >>> print(pytc.bcmap(jnp.where)(tree>1, 0, tree))
         Test(a=(1,0,0), b=(0,0,0), c=[1 0 0])
 
         >>> # 1 is broadcasted to all leaves of the list pytree
-        >>> bmap(lambda x,y:x+y)([1,2,3],1)
+        >>> bcmap(lambda x,y:x+y)([1,2,3],1)
         [2, 3, 4]
 
         >>> # trees are summed leaf-wise
-        >>> bmap(lambda x,y:x+y)([1,2,3],[1,2,3])
+        >>> bcmap(lambda x,y:x+y)([1,2,3],[1,2,3])
         [2, 4, 6]
 
         >>> # Non scalar second args case
-        >>> bmap(lambda x,y:x+y)([1,2,3],[[1,2,3],[1,2,3]])
+        >>> bcmap(lambda x,y:x+y)([1,2,3],[[1,2,3],[1,2,3]])
         TypeError: unsupported operand type(s) for +: 'int' and 'list'
 
         >>> # using **numpy** functions on pytrees
         >>> import jax.numpy as jnp
-        >>> bmap(jnp.add)([1,2,3],[1,2,3])
+        >>> bcmap(jnp.add)([1,2,3],[1,2,3])
         [DeviceArray(2, dtype=int32, weak_type=True),
         DeviceArray(4, dtype=int32, weak_type=True),
         DeviceArray(6, dtype=int32, weak_type=True)]
@@ -154,9 +154,9 @@ def bmap(
     # use of numpy functions on pytrees by decorating the numpy function.
     # for example, the following codes are equivalent:
     # >>> jtu.tree_map(np.add, jnp.array([1,2,3]), jnp.array([1,2,3]))
-    # >>> bmap(np.add)(jnp.array([1,2,3]), jnp.array([1,2,3])
+    # >>> bcmap(np.add)(jnp.array([1,2,3]), jnp.array([1,2,3])
     # In case of all arguments are of the same structure, the function is equivalent to
-    # `bmap` <=> `ft.partial(ft.partial, jtu.tree_map)`
+    # `bcmap` <=> `ft.partial(ft.partial, jtu.tree_map)`
 
     signature = inspect.getfullargspec(func)
     sig_argnames = signature[0]
@@ -279,32 +279,32 @@ class _TreeOperator:
 
     __copy__ = _copy
     __hash__ = _hash
-    __abs__ = bmap(op.abs)
-    __add__ = bmap(op.add)
-    __radd__ = bmap(op.add)
-    __and__ = bmap(op.and_)
-    __rand__ = bmap(op.and_)
-    __eq__ = bmap(op.eq)
-    __floordiv__ = bmap(op.floordiv)
-    __ge__ = bmap(op.ge)
-    __gt__ = bmap(op.gt)
-    __inv__ = bmap(op.inv)
-    __invert__ = bmap(op.invert)
-    __le__ = bmap(op.le)
-    __lshift__ = bmap(op.lshift)
-    __lt__ = bmap(op.lt)
-    __matmul__ = bmap(op.matmul)
-    __mod__ = bmap(op.mod)
-    __mul__ = bmap(op.mul)
-    __rmul__ = bmap(op.mul)
-    __ne__ = bmap(op.ne)
-    __neg__ = bmap(op.neg)
-    __not__ = bmap(op.not_)
-    __or__ = bmap(op.or_)
-    __pos__ = bmap(op.pos)
-    __pow__ = bmap(op.pow)
-    __rshift__ = bmap(op.rshift)
-    __sub__ = bmap(op.sub)
-    __rsub__ = bmap(op.sub)
-    __truediv__ = bmap(op.truediv)
-    __xor__ = bmap(op.xor)
+    __abs__ = bcmap(op.abs)
+    __add__ = bcmap(op.add)
+    __radd__ = bcmap(op.add)
+    __and__ = bcmap(op.and_)
+    __rand__ = bcmap(op.and_)
+    __eq__ = bcmap(op.eq)
+    __floordiv__ = bcmap(op.floordiv)
+    __ge__ = bcmap(op.ge)
+    __gt__ = bcmap(op.gt)
+    __inv__ = bcmap(op.inv)
+    __invert__ = bcmap(op.invert)
+    __le__ = bcmap(op.le)
+    __lshift__ = bcmap(op.lshift)
+    __lt__ = bcmap(op.lt)
+    __matmul__ = bcmap(op.matmul)
+    __mod__ = bcmap(op.mod)
+    __mul__ = bcmap(op.mul)
+    __rmul__ = bcmap(op.mul)
+    __ne__ = bcmap(op.ne)
+    __neg__ = bcmap(op.neg)
+    __not__ = bcmap(op.not_)
+    __or__ = bcmap(op.or_)
+    __pos__ = bcmap(op.pos)
+    __pow__ = bcmap(op.pow)
+    __rshift__ = bcmap(op.rshift)
+    __sub__ = bcmap(op.sub)
+    __rsub__ = bcmap(op.sub)
+    __truediv__ = bcmap(op.truediv)
+    __xor__ = bcmap(op.xor)
