@@ -18,12 +18,6 @@ _FIELD_MAP = "__dataclass_fields__"
 _POST_INIT = "__post_init__"
 
 
-class ImmutableTreeError(Exception):
-    """Raised when the tree is immutable"""
-
-    pass
-
-
 class Field(NamedTuple):
     init: bool = True
     default: Any = _MISSING

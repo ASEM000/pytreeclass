@@ -106,7 +106,7 @@ def bcmap(
     broadcast_argnums: tuple[int, ...] = None,
 ) -> Callable:
 
-    """(map)s a function over pytrees leaves with automatic (b)roadcasting for scalar arguments,
+    """(map)s a function over pytrees leaves with automatic (b)road(c)asting for scalar arguments,
     or broadcast for chosen argnames or argnums.
 
     Args:
@@ -176,7 +176,6 @@ def bcmap(
 
             if broadcast_argnums:
                 # the user provided positional args to broadcast
-                # leaves, treedef = jtu.tree_flatten(args[argnums[0]], is_leaf=is_leaf)
                 for name, argnum in zip(sig_argnames, range(len(args))):
                     if argnum in broadcast_argnums:
                         broadcast_kwds[name] = args[argnum]
@@ -191,7 +190,7 @@ def bcmap(
                 if key not in broadcast_kwds:
                     no_broadcast_kwds[key] = value
 
-            for (key, value) in kwds.items():
+            for key in kwds:
                 if key not in broadcast_kwds:
                     no_broadcast_kwds[key] = kwds[key]
 
@@ -262,7 +261,7 @@ class _TreeOperator:
     Example:
         >>> import jax.tree_util as jtu
         >>> import dataclasses as dc
-        >>> @jtu.register_pynode0_class
+        >>> @jtu.`
         ... @dc.dataclass
         ... class Tree(_TreeOperator):
         ...    a: int =1

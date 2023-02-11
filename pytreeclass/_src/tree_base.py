@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses as dc
 import functools as ft
 from typing import Any
 
@@ -13,7 +14,6 @@ from pytreeclass._src.tree_decorator import (
     _MISSING,
     _POST_INIT,
     Field,
-    ImmutableTreeError,
     _patch_init_method,
 )
 from pytreeclass._src.tree_freeze import FrozenWrapper, is_frozen
@@ -28,7 +28,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
     """Set the attribute of the tree if the tree is not frozen"""
     if getattr(tree, _FROZEN):
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
-        raise ImmutableTreeError(msg)
+        raise dc.FrozenInstanceError(msg)
 
     object.__setattr__(tree, key, value)
 
@@ -41,7 +41,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
 def _delattr(tree, key: str) -> None:
     """Delete the attribute of the  if tree is not frozen"""
     if getattr(tree, _FROZEN):
-        raise ImmutableTreeError(f"Cannot delete {key}.")
+        raise dc.F(f"Cannot delete {key}.")
     object.__delattr__(tree, key)
 
 
