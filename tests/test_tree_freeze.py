@@ -1,3 +1,4 @@
+import dataclasses as dc
 from typing import Any, Callable
 
 import jax
@@ -6,7 +7,6 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_base import ImmutableTreeError
 from pytreeclass._src.tree_freeze import FrozenWrapper, _HashableWrapper
 
 
@@ -122,10 +122,10 @@ def test_freeze_with_ops():
     t = Test()
     assert jtu.tree_leaves(t) == [1]
 
-    with pytest.raises(ImmutableTreeError):
+    with pytest.raises(dc.FrozenInstanceError):
         pytc.tree_freeze(t).a = 1
 
-    with pytest.raises(ImmutableTreeError):
+    with pytest.raises(dc.FrozenInstanceError):
         pytc.tree_unfreeze(t).a = 1
 
     hash(t)

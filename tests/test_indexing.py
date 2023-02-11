@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import dataclasses as dc
+
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
+from pytreeclass._src.tree_indexer import _CallContext
 
 
 @pytc.treeclass
@@ -529,3 +532,23 @@ def test_at_set_apply_is_leaf():
 
     with pytest.raises(AttributeError):
         t.at[""].set(10)
+
+
+def test_mutable_context():
+    @pytc.treeclass
+    class L2:
+        a: int = 1
+
+        def delete(self, name):
+            del self.a
+
+    t = L2()
+
+    with _CallContext(t, inplace=False) as tx:
+        tx.delete("a")
+
+    with _CallContext(t, inplace=True) as tx:
+        tx.delete("a")
+
+    with pytest.raises(dc.FrozenInstanceError):
+        t.delete("a")

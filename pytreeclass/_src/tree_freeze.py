@@ -1,38 +1,13 @@
 from __future__ import annotations
 
-import copy
-from contextlib import contextmanager
 from typing import Any, Iterable
 
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
 from pytreeclass._src.tree_operator import _hash_node
 
 PyTree = Any
-
-
-@contextmanager
-def _MutableContext(tree: PyTree, inplace: bool = False):
-    # this is used with .at["__call__"] method
-    def immutate_step(tree, set_value):
-        if not hasattr(tree, _FIELD_MAP):
-            return tree
-
-        object.__setattr__(tree, _FROZEN, set_value)
-        # traverse the tree
-        for key in getattr(tree, _FIELD_MAP):
-            node = getattr(tree, key)
-            child = immutate_step(node, set_value)
-            tree.__dict__[key] = child
-
-        return tree
-
-    tree = tree if inplace else copy.copy(tree)
-    immutate_step(tree, set_value=False)
-    yield tree
-    immutate_step(tree, set_value=True)
 
 
 class _Wrapper:
@@ -61,7 +36,8 @@ class _HashableWrapper(_Wrapper):
 class FrozenWrapper(_Wrapper):
     def __setattr__(self, key: str, value: Any) -> None:
         if "__wrapped__" in self.__dict__:
-            raise ValueError("FrozenWrapper only allows `__wrapped__` to be set once`")
+            msg = "FrozenWrapper only allows `__wrapped__` to be set once`"
+            raise ValueError(msg)
         return super().__setattr__(key, value)
 
     def __getattr__(self, k):

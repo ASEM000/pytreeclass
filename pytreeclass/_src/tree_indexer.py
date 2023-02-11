@@ -5,13 +5,14 @@ from __future__ import annotations
 import copy
 import functools as ft
 from collections.abc import Callable
+from contextlib import contextmanager
 from typing import Any, NamedTuple
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.core import Tracer
 
-from pytreeclass._src.tree_freeze import _MutableContext
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
@@ -233,6 +234,27 @@ def _at_apply_str(
     return recurse(path, func, depth=0)
 
 
+@contextmanager
+def _CallContext(tree: PyTree, inplace: bool = False):
+    def immutate_step(tree, set_value):
+        if not hasattr(tree, _FIELD_MAP):
+            return tree
+
+        object.__setattr__(tree, _FROZEN, set_value)
+        # traverse the tree
+        for key in getattr(tree, _FIELD_MAP):
+            node = getattr(tree, key)
+            child = immutate_step(node, set_value)
+            tree.__dict__[key] = child
+
+        return tree
+
+    tree = tree if inplace else copy.copy(tree)
+    immutate_step(tree, set_value=False)
+    yield tree
+    immutate_step(tree, set_value=True)
+
+
 class StrIndexer(NamedTuple):
     tree: PyTree
     where: str
@@ -250,7 +272,7 @@ class StrIndexer(NamedTuple):
         return _at_apply_str(copy.copy(self.tree), where, func, is_leaf=is_leaf)
 
     def __call__(self, *a, **k):
-        with _MutableContext(self.tree) as tree:
+        with _CallContext(self.tree) as tree:
             method = getattr(tree, self.where)
             return method(*a, **k), tree
 

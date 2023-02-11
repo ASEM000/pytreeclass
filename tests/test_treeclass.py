@@ -1,4 +1,5 @@
 import copy
+import dataclasses as dc
 
 import jax.tree_util as jtu
 import numpy.testing as npt
@@ -6,8 +7,6 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_base import ImmutableTreeError
-from pytreeclass._src.tree_freeze import _MutableContext
 
 
 def test_field():
@@ -156,7 +155,7 @@ def test_delattr():
 
     t = L0()
 
-    with pytest.raises(ImmutableTreeError):
+    with pytest.raises(dc.FrozenInstanceError):
         del t.a
 
     @pytc.treeclass
@@ -168,13 +167,7 @@ def test_delattr():
 
     t = L2()
 
-    with _MutableContext(t, inplace=False) as tx:
-        tx.delete("a")
-
-    with _MutableContext(t, inplace=True) as tx:
-        tx.delete("a")
-
-    with pytest.raises(ImmutableTreeError):
+    with pytest.raises(dc.FrozenInstanceError):
         t.delete("a")
 
 

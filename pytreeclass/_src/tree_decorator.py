@@ -11,10 +11,11 @@ import sys
 from types import FunctionType, MappingProxyType
 from typing import Any, NamedTuple
 
+from pytreeclass._src.tree_freeze import FrozenWrapper
+
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__datalcass_frozen__"
-# required to mark the field map to get recognized `dataclasses.is_dataclass`
-_FIELD_MAP = "__dataclass_fields__"
+_FIELD_MAP = "__dataclass_fields__"  # to make it work with `dataclasses.is_dataclass`
 _POST_INIT = "__post_init__"
 
 
@@ -24,9 +25,10 @@ class Field(NamedTuple):
     name: str = None
     type: type = Any
     repr: bool = True
-    kwonly: bool = False
+    kw_only: bool = False
     default_factory: Any = _MISSING
     metadata: MappingProxyType | None = None
+    frozen: bool = False
     # make it get recognized as a dataclass field
     # to make it work with `dataclasses.fields`
     _field_type = dc._FIELD
@@ -38,25 +40,26 @@ def field(
     default_factory: Any = _MISSING,
     init: bool = True,
     repr: bool = True,
-    kwonly: bool = False,
+    kw_only: bool = False,
+    frozen: bool = False,
     metadata: dict | None = None,
 ):
-    # consider adding validator function
     if default is not _MISSING and default_factory is not _MISSING:
         raise ValueError("Cannot specify both `default` and `default_factory`")
 
-    metadata = metadata or dict()
-
-    if not isinstance(metadata, dict):
-        raise TypeError("metadata must be a dict")
+    if isinstance(metadata, dict):
+        metadata = MappingProxyType(metadata)
+    elif metadata is not None:
+        raise TypeError("`metadata` must be a dict or None")
 
     return Field(
         default=default,
         default_factory=default_factory,
         init=init,
         repr=repr,
-        kwonly=kwonly,
-        metadata=MappingProxyType(metadata),
+        kw_only=kw_only,
+        metadata=metadata,
+        frozen=frozen,
         # set later when assigned to class
         name=None,
         type=None,
@@ -87,7 +90,8 @@ def _generate_field_map(cls) -> dict[str, Field]:
         if isinstance(value, Field):
             # the annotated attribute is a Field
             # assign the name and type to the Field from the annotation
-            field_map[name] = value._replace(name=name, type=type)
+            field = value._replace(name=name, type=type)
+            field_map[name] = FrozenWrapper(field) if field.frozen else field
 
         elif value is _MISSING:
             # nothing is assigned to the annotated attribute
@@ -131,8 +135,8 @@ def _patch_init_method(cls):
         mark0 = f"FIELD_MAP['{key}'].default"
         mark1 = f"self.{key}"
 
-        # add keyword marker in we have a `kwonly` field
-        head += "*, " if (field.kwonly and "*" not in head and field.init) else ""
+        # add keyword marker in we have a `kw_only` field
+        head += "*, " if (field.kw_only and "*" not in head and field.init) else ""
 
         if field.default is not _MISSING:
             # we add the default into the function head (def f(.. x= default_value))

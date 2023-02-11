@@ -41,7 +41,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
 def _delattr(tree, key: str) -> None:
     """Delete the attribute of the  if tree is not frozen"""
     if getattr(tree, _FROZEN):
-        raise dc.F(f"Cannot delete {key}.")
+        raise dc.FrozenInstanceError(f"Cannot delete {key}.")
     object.__delattr__(tree, key)
 
 
