@@ -9,7 +9,7 @@ from typing import Any, NamedTuple
 import numpy as np
 from jax._src.tree_util import _registry
 
-from pytreeclass._src.tree_freeze import FrozenWrapper, is_frozen
+from pytreeclass._src.tree_freeze import is_frozen
 
 PyTree = Any
 
@@ -76,9 +76,9 @@ def is_children_frozen(tree):
     if dc.is_dataclass(tree):
         fields = dc.fields(tree)
         if len(fields) > 0:
-            if all(isinstance(f, FrozenWrapper) for f in fields):
+            if all(is_frozen(f) for f in fields):
                 return True
-            if all(isinstance(getattr(tree, f.name), FrozenWrapper) for f in fields):
+            if all(is_frozen(getattr(tree, f.name)) for f in fields):
                 return True
 
     return False

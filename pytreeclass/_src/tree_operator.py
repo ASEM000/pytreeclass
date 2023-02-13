@@ -202,8 +202,8 @@ def bcmap(
 
         else:
             # here we handle the case where the user does not provide which argnum and argname
-            # to broadcast over, so we broadcast all the arguments that have dont have same
-            # same pytree structure as the first
+            # to broadcast over, so we broadcast all the arguments that dont have same
+            # same pytree structure as the first. this is the default behavior of `bcmap`
             # ex: [1,2,3], 1, [3,4] => 1 and [3,4] will be broadcasted (partialized) to [1,2,3]
             # this will throw an error later because [3,4] is not broadcastable to [1,2,3]
             # but we proceed with the assumption that the user knows what he is doing
@@ -261,7 +261,7 @@ class _TreeOperator:
     Example:
         >>> import jax.tree_util as jtu
         >>> import dataclasses as dc
-        >>> @jtu.`
+        >>> @jtu.register_pytree_node_class`
         ... @dc.dataclass
         ... class Tree(_TreeOperator):
         ...    a: int =1

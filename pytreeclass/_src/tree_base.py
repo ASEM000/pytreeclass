@@ -16,7 +16,7 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _patch_init_method,
 )
-from pytreeclass._src.tree_freeze import FrozenWrapper, is_frozen
+from pytreeclass._src.tree_freeze import frozen, is_frozen
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
 from pytreeclass.tree_viz.tree_pprint import _TreePretty
@@ -33,7 +33,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
     object.__setattr__(tree, key, value)
 
     if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
-        field = Field(name=key, type=tuple)
+        field = Field(name=key, type=type(value))
         # register it to dataclass fields
         getattr(tree, _FIELD_MAP)[key] = field
 
@@ -51,7 +51,7 @@ def _new_wrapper(new_func):
         self = object.__new__(cls)
         field_map = getattr(cls, _FIELD_MAP)
         # shadow the field map class attribute with an instance attribute
-        object.__setattr__(self, _FIELD_MAP, field_map)
+        object.__setattr__(self, _FIELD_MAP, dict(field_map))
 
         for key in field_map:
             if field_map[key].default is not _MISSING:
@@ -89,14 +89,15 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
 
     for field in static[_FIELD_MAP].values():
         if is_frozen(field):
-            # expose static fields as static leaves (FrozenWrapper)
+            # expose frozen fields as frozen wrapped leaves
+            # the idea is to be able to expose the static leaves so that, 
+            # unfreezing it will be possible. if we do not do this, then
+            # the static leaves will be lost when the tree is flattened.
             static[_FIELD_MAP][field.name] = (field).unwrap()
-            dynamic[field.name] = FrozenWrapper(static.pop(field.name))
-            continue
-
-        # normal fields as dynamic leaves
-        dynamic[field.name] = static.pop(field.name)
-        continue
+            dynamic[field.name] = frozen(static.pop(field.name))
+        else:
+            # normal fields as dynamic leaves
+            dynamic[field.name] = static.pop(field.name)
 
     return dynamic.values(), (dynamic.keys(), static)
 
@@ -110,8 +111,11 @@ def _unflatten(cls, treedef, leaves):
     for key in dynamic:
         if is_frozen(dynamic[key]):
             # convert frozen value (static leaf) -> frozen field (to metadata)
+            # in essence, we are moving the wrapper on the static leaf to the corresponding field
+            # without this step, then for any wrapped leaf, we need first to unwrap it before
+            # we can access the static leaf in the class body.
             dynamic[key] = (dynamic[key]).unwrap()
-            static[_FIELD_MAP][key] = FrozenWrapper(static[_FIELD_MAP][key])
+            static[_FIELD_MAP][key] = frozen(static[_FIELD_MAP][key])
 
     tree.__dict__.update(static)
     tree.__dict__.update(dynamic)
@@ -127,7 +131,9 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         ...     x: float
         ...     y: float
         ...     z: float
+
         >>> tree = Tree(1, 2, 3)
+
         >>> tree
         Tree(x=1, y=2, z=3)
 
@@ -152,6 +158,7 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         # generate and register field map to class.
         # generate init method if not defined based of the fields map
         # this is similar to dataclass decorator but only implements the relevant parts
+        # for the purpose of this decorator.
         cls = _patch_init_method(cls)
 
         attrs = dict(cls.__dict__)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from typing import Any
 
 import jax.tree_util as jtu
 import numpy as np
@@ -67,6 +67,11 @@ class FrozenWrapper(_Wrapper):
         return hash(self.unwrap())
 
 
+def frozen(x: Any) -> FrozenWrapper:
+    """Wrap a value in a FrozenWrapper"""
+    return FrozenWrapper(x)
+
+
 def is_frozen(node: Any) -> bool:
     """Check if a tree is wrapped by a wrapper"""
     return isinstance(node, FrozenWrapper)
@@ -88,19 +93,12 @@ def tree_unfreeze(x: PyTree) -> PyTree:
     return jtu.tree_map(map_func, x, is_leaf=is_frozen)
 
 
-def is_nondiff(item: Any) -> bool:
+def is_nondiff(node: Any) -> bool:
     """Check if a node is non-differentiable."""
+    # this is meant to be used with `jtu.tree_map`.
 
-    def _is_nondiff_item(node: Any):
-        if hasattr(node, "dtype") and np.issubdtype(node.dtype, np.inexact):
-            return False
-        if isinstance(node, (float, complex)):
-            return False
-        return True
-
-    if isinstance(item, Iterable):
-        # if an iterable has at least one non-differentiable item
-        # then the whole iterable is non-differentiable
-        return any([_is_nondiff_item(item) for item in jtu.tree_leaves(item)])
-
-    return _is_nondiff_item(item)
+    if hasattr(node, "dtype") and np.issubdtype(node.dtype, np.inexact):
+        return False
+    if isinstance(node, (float, complex)):
+        return False
+    return True

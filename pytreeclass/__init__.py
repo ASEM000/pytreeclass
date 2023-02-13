@@ -1,7 +1,7 @@
 from pytreeclass._src.tree_base import is_tree_equal, treeclass
 from pytreeclass._src.tree_decorator import field
 from pytreeclass._src.tree_freeze import (
-    FrozenWrapper,
+    frozen,
     is_frozen,
     is_nondiff,
     tree_freeze,
@@ -32,6 +32,7 @@ __all__ = (
     "tree_repr",
     "tree_str",
     "tree_summary",
+    "frozen",
 )
 
 __version__ = "0.2.0b"

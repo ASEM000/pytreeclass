@@ -76,7 +76,7 @@ def test_math_operations():
         name: str
 
         def __post_init__(self):
-            self.name = pytc.FrozenWrapper(self.name)
+            self.name = pytc.frozen(self.name)
 
     A = Test(10, 20, 30, ("A"))
     # binary operations
@@ -94,7 +94,7 @@ def test_math_operations():
         name: str
 
         def __post_init__(self):
-            self.name = pytc.FrozenWrapper(self.name)
+            self.name = pytc.frozen(self.name)
 
     A = Test(-10, 20, ("A"))
 
@@ -129,7 +129,7 @@ def test_math_operations_errors():
         d: jnp.ndarray = None
 
         def __post_init__(self):
-            self.name = pytc.FrozenWrapper(self.name)
+            self.name = pytc.frozen(self.name)
             self.d = jnp.array([1, 2, 3])
 
     A = Test(10, 20, 30, ("A"))

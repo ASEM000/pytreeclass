@@ -19,7 +19,7 @@ def test_jit_freeze():
                 2 / in_dim
             )
             self.bias = jnp.ones((1, out_dim))
-            self.name = pytc.FrozenWrapper("a")
+            self.name = pytc.frozen("a")
 
         def __call__(self, x):
             return x @ self.weight + self.bias

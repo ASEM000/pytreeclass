@@ -44,8 +44,8 @@ def test_field_nondiff():
 
         def __init__(
             self,
-            a=pytc.FrozenWrapper(jnp.array([1, 2, 3])),
-            b=pytc.FrozenWrapper(jnp.array([4, 5, 6])),
+            a=pytc.frozen(jnp.array([1, 2, 3])),
+            b=pytc.frozen(jnp.array([4, 5, 6])),
         ):
 
             self.a = a
@@ -61,7 +61,7 @@ def test_field_nondiff():
         b: jnp.ndarray
 
         def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
-            self.a = pytc.FrozenWrapper(a)
+            self.a = pytc.frozen(a)
             self.b = b
 
     test = Test()

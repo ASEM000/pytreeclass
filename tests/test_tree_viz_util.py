@@ -4,7 +4,7 @@ import jax
 import jax.tree_util as jtu
 
 from pytreeclass.tree_viz.box_drawing import _hbox, _vbox
-from pytreeclass.tree_viz.node_pprint import _func_pprint, _node_pprint
+from pytreeclass.tree_viz.tree_pprint import _func_pprint, _node_pprint
 from pytreeclass.tree_viz.tree_viz_util import _format_count, _format_size
 
 # import pytest
