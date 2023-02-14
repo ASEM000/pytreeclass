@@ -8,6 +8,8 @@ import math
 from types import FunctionType
 from typing import Any, Callable
 
+import jax
+import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 from jax._src.custom_derivatives import custom_jvp
@@ -39,9 +41,9 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
 
     if isinstance(node, CompiledFunction):
         # special case for jitted JAX functions
-        return f"jit({_func_pprint(node.__wrapped__)})"
+        return f"jit({_func_pprint(node)})"
 
-    if hasattr(node, "shape") and hasattr(node, "dtype") and kind == "repr":
+    if isinstance(node, (np.ndarray, jnp.ndarray)) and kind == "repr":
         # works for numpy arrays, jax arrays
         return _numpy_pprint(node, kind)
 
@@ -63,20 +65,42 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
     if dc.is_dataclass(node):
         return _marked_dataclass_pprint(node, depth, kind=kind)
 
-    if kind == "repr":
-        fmt = f"{node!r}"
-    elif kind in ["str"]:
-        fmt = f"{node!s}"
-    else:
-        raise ValueError(f"kind must be 'repr', 'str' or 'extended_repr', got {kind}")
+    if isinstance(node, jax.ShapeDtypeStruct):
+        return _shape_dtype_struct_pprint(node)
 
-    return ("\n" + "\t" * (depth)).join(fmt.split("\n"))
+    if kind not in ("repr", "str"):
+        raise ValueError(f"kind must be 'repr' or 'str', got {kind}")
+
+    fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
+
+    if "\n" not in fmt:
+        # if no newlines, just return the string with the correct indentation
+        return ("\n" + "\t" * (depth)).join(fmt.split("\n"))
+
+    # if there are newlines, indent the string and return it with a newline
+    return "\n" + "\t" * (depth + 1) + ("\n" + "\t" * (depth + 1)).join(fmt.split("\n"))
 
 
 _printer_map = {
     "repr": lambda node, depth: _node_pprint(node, depth, kind="repr"),
     "str": lambda node, depth: _node_pprint(node, depth, kind="str"),
 }
+
+
+def _shape_dtype_struct_pprint(node: jax.ShapeDtypeStruct) -> str:
+    """Pretty print jax.ShapeDtypeStruct"""
+    shape = (
+        f"{node.shape}".replace(",", "")
+        .replace("(", "[")
+        .replace(")", "]")
+        .replace(" ", ",")
+    )
+    dtype = (
+        f"{node.dtype}".replace("float", "f")
+        .replace("int", "i")
+        .replace("complex", "c")
+    )
+    return f"{dtype}{shape}"
 
 
 def _numpy_pprint(node: np.ndarray, kind: str = "repr") -> str:
@@ -183,16 +207,7 @@ def _set_pprint(node: set, depth: int, kind: str = "repr") -> str:
 
 def _dict_pprint(node: dict, depth: int, kind: str = "repr") -> str:
     printer = _printer_map[kind]
-    fmt = (
-        f"{k}:{printer(v,depth=depth+1)}"
-        if "\n" not in f"{printer(v,depth)}"
-        else f"{k}:"
-        + "\n"
-        + "\t" * (depth + 1)
-        + f"{_format_width(printer(v,depth=depth+1))}"
-        for k, v in node.items()
-    )
-
+    fmt = (f"{k}:{printer(v,depth=depth+1)}" for k, v in node.items())
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt)
@@ -200,16 +215,7 @@ def _dict_pprint(node: dict, depth: int, kind: str = "repr") -> str:
 
 def _namedtuple_pprint(node, depth: int, kind: str = "repr") -> str:
     printer = _printer_map[kind]
-    fmt = (
-        f"{k}={printer(v,depth=depth+1)}"
-        if "\n" not in f"{printer(v,depth)}"
-        else f"{k}:"
-        + "\n"
-        + "\t" * (depth + 1)
-        + f"{_format_width(printer(v,depth=depth+1))}"
-        for k, v in node._asdict().items()
-    )
-
+    fmt = (f"{k}={printer(v,depth=depth+1)}" for k, v in node._asdict().items())
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "namedtuple(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
     return _format_width(fmt)
@@ -345,7 +351,15 @@ def tree_diagram(tree: PyTree) -> str:
     return fmt.expandtabs(4)
 
 
-def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
+def _get_type_name(node):
+    if isinstance(node, (jnp.ndarray, np.ndarray)):
+        return _node_pprint(jax.ShapeDtypeStruct(node.shape, node.dtype))
+    return f"{node.__class__.__name__}"
+
+
+def tree_summary(
+    tree: PyTree, *, depth=float("inf"), array: jnp.ndarray | None = None
+) -> str:
     """Print a summary of a pytree structure
 
     Args:
@@ -358,34 +372,38 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
         >>> # Traverse only the first level of the tree
         >>> print(tree_summary((1,(2,(3,4))),depth=1))
     """
-    ROWS = [["Name", "Type ", "Leaf #(size)", "Frozen #(size)", "Type stats"]]
+    ROWS = [["Name", "Type", "Count(Frozen)", "Size(Frozen)"]]
 
-    for info in tree_trace(tree, depth):
+    # traverse the tree and collect info about each node
+    infos = tree_trace(tree, depth)
+    infos = infos if len(infos) > 1 else ()
+
+    for info in infos:
+        if not info.repr:
+            continue
+
         path = ".".join(info.path).replace("].", "]").replace(".[", "[")
 
         row = [path]
         node = (info.node).unwrap() if pytc.is_frozen(info.node) else info.node
-        row += [f"{node.__class__.__name__}"]
 
-        # size and count
-        leaves_count = _format_count(info.count.real)
-        frozen_count = _format_count(info.count.imag)
+        # type name row
+        row += [_get_type_name(node)]
 
-        leaves_size = _format_size(info.size.real)
-        frozen_size = _format_size(info.size.imag)
+        # count row
+        frozen_count = info.count.imag
+        total_count = info.count.real + frozen_count
+        row += [f"{_format_count(total_count)}({_format_count(frozen_count)})"]
 
-        row += [f"{leaves_count}({leaves_size})"]
-        row += [f"{frozen_count}({frozen_size})"]
-
-        # type stats
-        row += [", ".join([f"{k}:{v:,}" for k, v in info.stats.items()])]
+        # size row
+        frozen_size = info.size.imag
+        total_size = info.size.real + frozen_size
+        row += [f"{_format_size(total_size)}({_format_size(frozen_size)})"]
 
         ROWS += [row]
 
-    COLS = [list(c) for c in zip(*ROWS)]
-    layer_table = _table(COLS)
-    table_width = len(layer_table.split("\n")[0])
-
+    # add summary row at the end to
+    # show total number of leaves and total size
     COUNT = [complex(0), complex(0)]  # non-frozen, frozen
     SIZE = [complex(0), complex(0)]
 
@@ -393,26 +411,23 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
         COUNT[info.frozen] += info.count
         SIZE[info.frozen] += info.size
 
-    total_count = sum(COUNT).real + sum(COUNT).imag
-    non_frozen_count = COUNT[0].real + COUNT[0].imag
-    frozen_count = total_count - non_frozen_count
+    unfrozen_count = COUNT[0].real + COUNT[0].imag
+    frozen_count = COUNT[1].real + COUNT[1].imag
+    total_count = unfrozen_count + frozen_count
 
-    total_size = sum(SIZE).real + sum(SIZE).imag
-    non_frozen_size = SIZE[0].real + SIZE[0].imag
-    frozen_size = total_size - non_frozen_size
+    unfrozen_size = SIZE[0].real + SIZE[0].imag
+    frozen_size = SIZE[1].real + SIZE[1].imag
+    total_size = unfrozen_size + frozen_size
 
-    param_summary = (
-        f"Total leaf count:\t{_format_count(total_count)}\n"
-        f"Non-frozen leaf count:\t{_format_count(non_frozen_count)}\n"
-        f"Frozen leaf count:\t{_format_count(frozen_count)}\n"
-        f"{'-'*max([table_width,40])}\n"
-        f"Total leaf size:\t{_format_size(total_size)}\n"
-        f"Non-frozen leaf size:\t{_format_size(non_frozen_size)}\n"
-        f"Frozen leaf size:\t{_format_size(frozen_size)}\n"
-        f"{'='*max([table_width,40])}\n"
-    )
+    row = ["Σ"]
+    row += [_get_type_name(tree)]
+    row += [f"{_format_count(total_count)}({_format_count(frozen_count)})"]
+    row += [f"{_format_size(total_size)}({_format_size(frozen_size)})"]
+    ROWS += [row]
 
-    return (layer_table + "\n" + (param_summary)).expandtabs(8)
+    COLS = [list(c) for c in zip(*ROWS)]
+    layer_table = _table(COLS)
+    return layer_table.expandtabs(8)
 
 
 def tree_mermaid(tree: PyTree):

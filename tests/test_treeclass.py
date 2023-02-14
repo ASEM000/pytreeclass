@@ -257,3 +257,20 @@ def test_non_class_input():
         @pytc.treeclass
         def f(x):
             return x
+
+
+def test_setattr_delattr():
+
+    with pytest.raises(dc.FrozenInstanceError):
+
+        @pytc.treeclass
+        class Test:
+            def __setattr__(self, k, v):
+                pass
+
+    with pytest.raises(dc.FrozenInstanceError):
+
+        @pytc.treeclass
+        class Test:
+            def __delattr__(self, k):
+                pass

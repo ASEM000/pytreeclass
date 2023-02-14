@@ -3,8 +3,7 @@ from __future__ import annotations
 import dataclasses as dc
 import math
 import sys
-from collections import defaultdict
-from typing import Any, NamedTuple
+from typing import Any, Generator, NamedTuple
 
 import numpy as np
 from jax._src.tree_util import _registry
@@ -116,18 +115,6 @@ class NodeInfo(NamedTuple):
     repr: bool = True
     count: complex = complex(0, 0)
     size: complex = complex(0, 0)
-    stats: dict[str, int] | None = None
-
-
-def _get_type(node: Any) -> str:
-    if hasattr(node, "dtype"):
-        return (
-            str(node.dtype)
-            .replace("float", "f")
-            .replace("int", "i")
-            .replace("complex", "c")
-        )
-    return node.__class__.__name__
 
 
 def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
@@ -157,13 +144,15 @@ def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
     # defined by `yield_one_level_leaves`, and the second is to calculate the stats of the nodes using
     # `yield_stats`, which picks up the yield leaves from the first step and recurse to the max tree depth.
 
-    def yield_one_level_leaves(info: NodeInfo, depth: int) -> list[NodeInfo]:
+    def yield_one_level_leaves(
+        info: NodeInfo, depth: int
+    ) -> Generator[NodeInfo, None, None]:
         if is_frozen(info.node):
             info = info._replace(node=info.node.unwrap(), frozen=True)
             yield from yield_one_level_leaves(info, depth)
 
         elif _registry.get(type(info.node)):
-            # the tree is JAX pytree and has a flatten handler
+            # the tree is a registered JAX pytree and has a flatten handler
             handler = _registry.get(type(info.node))
             leaves = list(handler.to_iter(info.node)[0])
 
@@ -190,31 +179,32 @@ def tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
                 yield from (recurse_step(sub_info, depth - 1))
 
         else:
-            # the node is not a JAX pytree
+            # the node is not a registered JAX pytree
             yield info
 
-    def yield_subtree_stats(info: NodeInfo) -> NodeInfo:
-        # calcuate some states of a single subtree defined by the `NodeInfo` objects
+    def calculate_node_info_stats(info: NodeInfo) -> NodeInfo:
+        # calcuate some stats of a single subtree defined by the `NodeInfo` objects
         # for each subtree, we will calculate the types distribution and their size
-        stats = defaultdict(lambda: 0)
+        # stats = defaultdict(lambda: [0, 0])
         count = size = 0
 
         for sub_info in recurse_step(info, float("inf")):
-            type = _get_type(sub_info.node)
+            # get all the leaves of the subtree
             node = sub_info.node
-            _count = int(np.array(node.shape).prod()) if hasattr(node, "shape") else 1
-            _count = complex(0, _count) if sub_info.frozen else _count
-            stats[type] += int(_count.imag + _count.real)
-            count += _count
 
+            # array count is the product of the shape. if the node is not an array, then the count is 1
+            _count = int(np.array(node.shape).prod()) if hasattr(node, "shape") else 1
+            # if the node is frozen, then the count is imaginary otherwise it is real
+            _count = complex(0, _count) if sub_info.frozen else _count
+            count += _count
             _size = node.nbytes if hasattr(node, "nbytes") else sys.getsizeof(node)
             _size = complex(0, _size) if sub_info.frozen else _size
             size += _size
 
-        return info._replace(count=count, size=size, stats=stats)
+        return info._replace(count=count, size=size)
 
     def recurse_step(info: NodeInfo, depth):
         yield from yield_one_level_leaves(info, depth) if depth > 0 else [info]
 
     info = NodeInfo(node=tree, path=[], frozen=False, repr=True)
-    return list(map(yield_subtree_stats, recurse_step(info, depth)))
+    return list(map(calculate_node_info_stats, recurse_step(info, depth)))

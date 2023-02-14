@@ -90,7 +90,7 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     for field in static[_FIELD_MAP].values():
         if is_frozen(field):
             # expose frozen fields as frozen wrapped leaves
-            # the idea is to be able to expose the static leaves so that, 
+            # the idea is to be able to expose the static leaves so that,
             # unfreezing it will be possible. if we do not do this, then
             # the static leaves will be lost when the tree is flattened.
             static[_FIELD_MAP][field.name] = (field).unwrap()
@@ -154,6 +154,13 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
             # non class input will raise an error
             msg = f"@treeclass accepts class as input. Found type={type(cls)}"
             raise TypeError(msg)
+        if "__setattr__" in vars(cls):
+            # check if `__setattr__` or `__delattr__` are defined in the class
+            msg = f"Cannot define `__setattr__` in {cls.__name__}."
+            raise dc.FrozenInstanceError(msg)
+        if "__delattr__" in vars(cls):
+            msg = f"Cannot define `__delattr__` in {cls.__name__}."
+            raise dc.FrozenInstanceError(msg)
 
         # generate and register field map to class.
         # generate init method if not defined based of the fields map
