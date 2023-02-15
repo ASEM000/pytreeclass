@@ -9,7 +9,7 @@ import dataclasses as dc
 import functools as ft
 import sys
 from types import FunctionType, MappingProxyType
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Type
 
 from pytreeclass._src.tree_freeze import freeze
 
@@ -22,13 +22,14 @@ _POST_INIT = "__post_init__"
 class Field(NamedTuple):
     init: bool = True
     default: Any = _MISSING
-    name: str = None
-    type: type = Any
+    name: str | _MISSING = _MISSING
+    type: type | _MISSING = _MISSING
     repr: bool = True
     kw_only: bool = False
     default_factory: Any = _MISSING
     metadata: MappingProxyType | None = None
     frozen: bool = False
+    validator: FunctionType | tuple[FunctionType] | _MISSING = _MISSING
     # make it get recognized as a dataclass field
     # to make it work with `dataclasses.fields`
     _field_type = dc._FIELD
@@ -36,21 +37,46 @@ class Field(NamedTuple):
 
 def field(
     *,
-    default: Any = _MISSING,
-    default_factory: Any = _MISSING,
+    default: Any | _MISSING = _MISSING,
+    default_factory: Any | _MISSING = _MISSING,
     init: bool = True,
     repr: bool = True,
     kw_only: bool = False,
     frozen: bool = False,
-    metadata: dict | None = None,
+    metadata: dict | _MISSING = _MISSING,
+    validator: FunctionType | tuple[FunctionType, ...] | _MISSING = _MISSING,
 ):
+    """
+    default: The default value of the field.
+    default_factory: A 0-argument function called to initialize a field's value.
+    init: Whether the field is included in the object's __init__ function.
+    repr: Whether the field is included in the object's __repr__ function.
+    kw_only: Whether the field is keyword-only.
+    frozen: Whether the field is frozen (i.e. excluded from `jtu.tree_leaves`)
+    metadata: A mapping of user-defined data for the field.
+    validator: A function to call after initialization to validate the field value.
+    """
+
     if default is not _MISSING and default_factory is not _MISSING:
+        # this is the similar behavior to `dataclasses`
         raise ValueError("Cannot specify both `default` and `default_factory`")
 
     if isinstance(metadata, dict):
         metadata = MappingProxyType(metadata)
-    elif metadata is not None:
-        raise TypeError("`metadata` must be a dict or None")
+    elif metadata is not _MISSING:
+        raise TypeError("`metadata` must be a dict or _MISSING")
+
+    # check if validator is a tuple of functions or a single function
+    msg = "`validator` must be a function or a tuple of type `FunctionType`"
+
+    if isinstance(validator, tuple):
+        for _validator in validator:
+            if not isinstance(_validator, FunctionType):
+                raise TypeError(msg + f", got {_validator}")
+    elif isinstance(validator, FunctionType):
+        validator = (validator,)
+    elif validator is not _MISSING:
+        raise TypeError(msg + f", got {validator}")
 
     return Field(
         default=default,
@@ -60,9 +86,10 @@ def field(
         kw_only=kw_only,
         metadata=metadata,
         frozen=frozen,
-        # set later when assigned to class
-        name=None,
-        type=None,
+        validator=validator,
+        # set later after the class is initialized
+        name=_MISSING,
+        type=_MISSING,
     )
 
 
@@ -91,7 +118,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
             # the annotated attribute is a Field
             # assign the name and type to the Field from the annotation
             field = value._replace(name=name, type=type)
-            # wrap the field in a frozen field if the class is frozen
+            # decide to wrap the field in a frozen wrapper
             field_map[name] = freeze(field) if field.frozen else field
 
         elif value is _MISSING:
@@ -108,6 +135,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
                 msg += f" use `field(default_factory=lambda:{value})` instead"
                 raise TypeError(msg)
 
+            # otherwise, we create a Field and assign default value to the class
             field_map[name] = Field(name=name, type=type, default=value)
 
     return field_map

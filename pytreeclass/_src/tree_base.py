@@ -75,6 +75,20 @@ def _init_wrapper(init_func):
         if _POST_INIT in vars(self.__class__):
             output = getattr(self, _POST_INIT)()
         object.__setattr__(self, _FROZEN, True)
+
+        # this is the last stage of initialization i.e. post `__post_init__`
+        for field in dc.fields(self):
+            # validator is a callable that takes the value and should raise an error if the value is invalid
+            # according to the validator
+            # this is useful for checking the value of the field after initialization
+            # possible use cases are: checking type, checking value range, etc.
+            if field.validator is not _MISSING:
+                for validator in field.validator:
+                    # validator is either None or tuple of callables
+                    # this is checked at `pytc.field(...)` boundary
+                    validator(getattr(self, field.name))
+
+        # output must be None, anything else is an error
         return output
 
     return init_method

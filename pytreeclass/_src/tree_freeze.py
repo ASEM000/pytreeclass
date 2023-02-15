@@ -146,19 +146,20 @@ def freeze(x: Any) -> FrozenWrapper:
         ... def dfdx(x,y):
         ...    # we are taking derivative w.r.t x, however x is a frozen value
         ...    # so the gradient of x is **ignored** and x is returned as is
-        ...    # >>> dfdx(pytc.freeze(1),2.)
-        ...    # #1
         ...    # without using `pytc.freeze` we would have to define `static_argnums=0` in `jit`
         ...    return x+y**2
+
+        >>> dfdx(pytc.freeze(1),2.)
+        #1
 
         >>> @ft.partial(jax.grad,argnums=1)
         ... def dfdy(x,y):
         ...    # we are taking derivative w.r.t y,
         ...    # so the gradient of y is just 2*y
-        ...    # >>> dfdy(pytc.freeze(1),2.)
-        ...    # Array(4., dtype=float32, weak_type=True)
         ...    return x+y**2
 
+        >>> dfdy(pytc.freeze(1),2.)
+        Array(4., dtype=float32, weak_type=True)
     """
     return FrozenWrapper(x)
 

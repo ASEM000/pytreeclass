@@ -274,6 +274,53 @@ def test_setattr_delattr():
     with pytest.raises(dc.FrozenInstanceError):
 
         @pytc.treeclass
-        class Test:
+        class _:
             def __delattr__(self, k):
                 pass
+
+
+def test_validators():
+    def instance_validator(types):
+        def _instance_validator(x):
+            if isinstance(x, types) is False:
+                raise AssertionError
+
+        return _instance_validator
+
+    def range_validator(min, max):
+        def _range_validator(x):
+            if x < min or x > max:
+                raise AssertionError
+
+        return _range_validator
+
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(validator=instance_validator(int))
+
+    with pytest.raises(AssertionError):
+        Test(a="a")
+
+    assert Test(a=1).a == 1
+
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(validator=instance_validator((int, float)))
+
+    assert Test(a=1).a == 1
+    assert Test(a=1.0).a == 1.0
+
+    with pytest.raises(AssertionError):
+        Test(a="a")
+
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(validator=range_validator(0, 10))
+
+    with pytest.raises(AssertionError):
+        Test(a=-1)
+
+    assert Test(a=0).a == 0
+
+    with pytest.raises(AssertionError):
+        Test(a=11)
