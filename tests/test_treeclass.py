@@ -19,6 +19,12 @@ def test_field():
     with pytest.raises(TypeError):
         pytc.field(metadata=1)
 
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(default=1, metadata={"a": 1})
+
+    assert Test().__dataclass_fields__["a"].metadata["a"] == 1
+
 
 def test_field_nondiff():
     @pytc.treeclass
@@ -324,3 +330,19 @@ def test_validators():
 
     with pytest.raises(AssertionError):
         Test(a=11)
+
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(validator=(range_validator(0, 10), instance_validator(int)))
+
+    with pytest.raises(AssertionError):
+        Test(a=-1)
+
+    with pytest.raises(AssertionError):
+        Test(a=11)
+
+    with pytest.raises(TypeError):
+
+        @pytc.treeclass
+        class Test:
+            a: int = pytc.field(validator=1)

@@ -9,7 +9,7 @@ import dataclasses as dc
 import functools as ft
 import sys
 from types import FunctionType, MappingProxyType
-from typing import Any, NamedTuple, Type
+from typing import Any, NamedTuple
 
 from pytreeclass._src.tree_freeze import freeze
 
@@ -27,9 +27,9 @@ class Field(NamedTuple):
     repr: bool = True
     kw_only: bool = False
     default_factory: Any = _MISSING
-    metadata: MappingProxyType | None = None
+    metadata: MappingProxyType | _MISSING = _MISSING
     frozen: bool = False
-    validator: FunctionType | tuple[FunctionType] | _MISSING = _MISSING
+    validator: tuple[FunctionType, ...] | _MISSING = _MISSING
     # make it get recognized as a dataclass field
     # to make it work with `dataclasses.fields`
     _field_type = dc._FIELD
@@ -54,27 +54,27 @@ def field(
     kw_only: Whether the field is keyword-only.
     frozen: Whether the field is frozen (i.e. excluded from `jtu.tree_leaves`)
     metadata: A mapping of user-defined data for the field.
-    validator: A function to call after initialization to validate the field value.
+    validator: A function or tuple of functions to call after initialization to validate the field value.
     """
 
     if default is not _MISSING and default_factory is not _MISSING:
         # this is the similar behavior to `dataclasses`
         raise ValueError("Cannot specify both `default` and `default_factory`")
 
+    # check metadata
     if isinstance(metadata, dict):
         metadata = MappingProxyType(metadata)
     elif metadata is not _MISSING:
-        raise TypeError("`metadata` must be a dict or _MISSING")
+        raise TypeError("`metadata` must be a dict")
 
     # check if validator is a tuple of functions or a single function
     msg = "`validator` must be a function or a tuple of type `FunctionType`"
-
-    if isinstance(validator, tuple):
+    if isinstance(validator, FunctionType):
+        validator = (validator,)
+    elif isinstance(validator, tuple):
         for _validator in validator:
             if not isinstance(_validator, FunctionType):
                 raise TypeError(msg + f", got {_validator}")
-    elif isinstance(validator, FunctionType):
-        validator = (validator,)
     elif validator is not _MISSING:
         raise TypeError(msg + f", got {validator}")
 

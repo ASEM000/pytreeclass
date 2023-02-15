@@ -54,6 +54,7 @@ def _new_wrapper(new_func):
         object.__setattr__(self, _FIELD_MAP, dict(field_map))
 
         for key in field_map:
+            # set the default value if it is not missing
             if field_map[key].default is not _MISSING:
                 object.__setattr__(self, key, field_map[key].default)
             elif field_map[key].default_factory is not _MISSING:
@@ -64,11 +65,27 @@ def _new_wrapper(new_func):
     return new_method
 
 
+def _validator_wrapper(attribute_name: str):
+    def func_wrapper(validator_func):
+        def validate(value: Any):
+            try:
+                validator_func(value)
+            except Exception as e:
+                # raise the same exception with the attribute name in the error message
+                msg = f"for field=`{attribute_name}`, the following error occurred: {e}"
+                raise type(e)(msg)
+
+        return validate
+
+    return func_wrapper
+
+
 def _init_wrapper(init_func):
     @ft.wraps(init_func)
     def init_method(self, *a, **k) -> None:
         object.__setattr__(self, _FROZEN, False)
         output = init_func(self, *a, **k)
+
         # in case __post_init__ is defined then call it
         # after the tree is initialized
         # here, we assume that __post_init__ is a method
@@ -76,19 +93,15 @@ def _init_wrapper(init_func):
             output = getattr(self, _POST_INIT)()
         object.__setattr__(self, _FROZEN, True)
 
-        # this is the last stage of initialization i.e. post `__post_init__`
+        # last stage of initialization i.e. post `__post_init__`
+        # call the validator functions
         for field in dc.fields(self):
-            # validator is a callable that takes the value and should raise an error if the value is invalid
-            # according to the validator
-            # this is useful for checking the value of the field after initialization
-            # possible use cases are: checking type, checking value range, etc.
             if field.validator is not _MISSING:
                 for validator in field.validator:
-                    # validator is either None or tuple of callables
-                    # this is checked at `pytc.field(...)` boundary
-                    validator(getattr(self, field.name))
+                    # augment the error message -if exists- with the field name
+                    _validator_wrapper(field.name)(validator)(getattr(self, field.name))
 
-        # output must be None, anything else is an error
+        # output must be None,otherwise will raise error
         return output
 
     return init_method
