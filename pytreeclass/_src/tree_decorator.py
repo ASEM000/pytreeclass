@@ -11,7 +11,7 @@ import sys
 from types import FunctionType, MappingProxyType
 from typing import Any, NamedTuple
 
-from pytreeclass._src.tree_freeze import frozen
+from pytreeclass._src.tree_freeze import freeze
 
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__datalcass_frozen__"
@@ -92,7 +92,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
             # assign the name and type to the Field from the annotation
             field = value._replace(name=name, type=type)
             # wrap the field in a frozen field if the class is frozen
-            field_map[name] = frozen(field) if field.frozen else field
+            field_map[name] = freeze(field) if field.frozen else field
 
         elif value is _MISSING:
             # nothing is assigned to the annotated attribute

@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools as ft
 import hashlib
 import inspect
+import math
 import operator as op
 from typing import Any, Callable
 
@@ -276,14 +277,14 @@ class _TreeOperator:
         Tree(a=2)
     """
 
-    __copy__ = _copy
-    __hash__ = _hash
     __abs__ = bcmap(op.abs)
     __add__ = bcmap(op.add)
-    __radd__ = bcmap(op.add)
     __and__ = bcmap(op.and_)
-    __rand__ = bcmap(op.and_)
+    __ceil__ = bcmap(math.ceil)
+    __copy__ = _copy
+    __divmod__ = bcmap(divmod)
     __eq__ = bcmap(op.eq)
+    __floor__ = bcmap(math.floor)
     __floordiv__ = bcmap(op.floordiv)
     __ge__ = bcmap(op.ge)
     __gt__ = bcmap(op.gt)
@@ -295,15 +296,28 @@ class _TreeOperator:
     __matmul__ = bcmap(op.matmul)
     __mod__ = bcmap(op.mod)
     __mul__ = bcmap(op.mul)
-    __rmul__ = bcmap(op.mul)
     __ne__ = bcmap(op.ne)
     __neg__ = bcmap(op.neg)
-    __not__ = bcmap(op.not_)
     __or__ = bcmap(op.or_)
     __pos__ = bcmap(op.pos)
     __pow__ = bcmap(op.pow)
+    __radd__ = bcmap(op.add)
+    __rand__ = bcmap(op.and_)
+    __rdivmod__ = bcmap(divmod)
+    __rfloordiv__ = bcmap(op.floordiv)
+    __rlshift__ = bcmap(op.lshift)
+    __rmod__ = bcmap(op.mod)
+    __rmul__ = bcmap(op.mul)
+    __ror__ = bcmap(op.or_)
+    __round__ = bcmap(round)
+    __rpow__ = bcmap(op.pow)
+    __rrshift__ = bcmap(op.rshift)
     __rshift__ = bcmap(op.rshift)
-    __sub__ = bcmap(op.sub)
     __rsub__ = bcmap(op.sub)
+    __rtruediv__ = bcmap(op.truediv)
+    __rxor__ = bcmap(op.xor)
+    __sub__ = bcmap(op.sub)
     __truediv__ = bcmap(op.truediv)
+    __trunk__ = bcmap(math.trunc)
     __xor__ = bcmap(op.xor)
+    __hash__ = _hash

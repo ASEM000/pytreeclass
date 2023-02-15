@@ -212,7 +212,7 @@ def test_freeze_nondiff():
         return value, model - 1e-3 * grads
 
     mask = jtu.tree_map(pytc.is_nondiff, model)
-    freezeed_model = model.at[mask].apply(pytc.tree_freeze)
+    freezeed_model = model.at[mask].apply(pytc.freeze)
 
     for _ in range(1, 10_001):
         value, freezeed_model = update(freezeed_model, x, y)
@@ -220,6 +220,7 @@ def test_freeze_nondiff():
     np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
 
     X = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
-    assert jtu.tree_leaves(X) == jtu.tree_leaves(
-        pytc.tree_unfreeze(pytc.tree_freeze(X))
-    )
+
+    frozen_ = jtu.tree_map(pytc.freeze, X)
+    unfrozen_ = jtu.tree_map(pytc.unfreeze, frozen_, is_leaf=pytc.is_frozen)
+    assert jtu.tree_leaves(X) == jtu.tree_leaves(unfrozen_)

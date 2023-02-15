@@ -19,7 +19,7 @@ def test_jit_freeze():
                 2 / in_dim
             )
             self.bias = jnp.ones((1, out_dim))
-            self.name = pytc.frozen("a")
+            self.name = pytc.freeze("a")
 
         def __call__(self, x):
             return x @ self.weight + self.bias
@@ -62,7 +62,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.at["l1"].apply(pytc.tree_freeze)
+        model = model.at["l1"].apply(pytc.freeze)
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
@@ -77,7 +77,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.at["l2"].apply(pytc.tree_freeze)
+        model = model.at["l2"].apply(pytc.freeze)
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
@@ -92,7 +92,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = pytc.tree_freeze(model)
+        model = jtu.tree_map(pytc.freeze, model)
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools as ft
+import math
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -76,7 +77,7 @@ def test_math_operations():
         name: str
 
         def __post_init__(self):
-            self.name = pytc.frozen(self.name)
+            self.name = pytc.freeze(self.name)
 
     A = Test(10, 20, 30, ("A"))
     # binary operations
@@ -94,29 +95,44 @@ def test_math_operations():
         name: str
 
         def __post_init__(self):
-            self.name = pytc.frozen(self.name)
+            self.name = pytc.freeze(self.name)
 
     A = Test(-10, 20, ("A"))
+    B = Test(10, 20, ("B"))
+    C = Test(jnp.array([10]), jnp.array([20]), ("C"))
 
     # magic ops
     assert abs(A) == Test(10, 20, ("A"))
     assert A + A == Test(-20, 40, ("A"))
-    assert A == A
-    assert A // 2 == Test(-5, 10, ("A"))
-    assert A / 2 == Test(-5.0, 10.0, ("A"))
-    assert (A > A) == Test(False, False, ("A"))
-    assert (A >= A) == Test(True, True, ("A"))
-    assert (A <= A) == Test(True, True, ("A"))
-    assert -A == Test(10, -20, ("A"))
-    assert A * A == Test(100, 400, ("A"))
-    assert A**A == Test((-10) ** (-10), 20**20, ("A"))
-    assert A - A == Test(0, 0, ("A"))
+    assert A & A == Test(-10 & -10, 20 & 20, ("A"))
+    assert math.ceil(A) == Test(math.ceil(-10), math.ceil(20), ("A"))
+    assert divmod(A, A) == Test(divmod(-10, -10), divmod(20, 20), ("A"))
+    assert (A == A) == Test(-10 == -10, 20 == 20, ("A"))
+    assert math.floor(A) == Test(math.floor(-10), math.floor(20), ("A"))
+    assert A // A == Test(-10 // (-10), 20 // (20), ("A"))
+    assert A >= A == Test(-10 > -10, 20 > 20, ("A"))
+    assert A > A == Test(-10 >= -10, 20 >= 20, ("A"))
+    assert ~A == Test(~-10, ~20, ("A"))
+    assert A <= A == Test(-10 <= -10, 20 <= 20, ("A"))
+    assert A < A == Test(-10 < -10, 20 < 20, ("A"))
 
-    # unary operations
-    assert abs(A) == Test(10, 20, ("A"))
-    assert -A == Test(-10, -20, ("A"))
-    assert +A == Test(10, 20, ("A"))
-    assert ~A == Test(~10, ~20, ("A"))
+    assert B << B == Test(10 << 10, 20 << 20, ("B"))
+    assert C @ C == Test(
+        jnp.array([10]) @ jnp.array([10]), jnp.array([20]) @ jnp.array([20]), ("C")
+    )
+
+    with pytest.raises(TypeError):
+        assert A @ A == Test(-10 @ -10, 20 @ 20, ("A"))
+
+    assert A % A == Test(-10 % -10, 20 % 20, ("A"))
+    assert A * A == Test(-10 * -10, 20 * 20, ("A"))
+    assert -A == Test(-(-10), -20, ("A"))
+    assert A | A == Test(-10 | -10, 20 | 20, ("A"))
+    assert +A == Test(+(-10), +20, ("A"))
+    assert A**A == Test(-(10**-10), 20**20, ("A"))
+    assert round(A) == Test(round(-10), round(20), ("A"))
+    assert A - A == Test(-10 + 10, 20 - 20, ("A"))
+    assert A ^ A == Test(-10 ^ -10, 20 ^ 20, ("A"))
 
 
 def test_math_operations_errors():
@@ -129,7 +145,7 @@ def test_math_operations_errors():
         d: jnp.ndarray = None
 
         def __post_init__(self):
-            self.name = pytc.frozen(self.name)
+            self.name = pytc.freeze(self.name)
             self.d = jnp.array([1, 2, 3])
 
     A = Test(10, 20, 30, ("A"))

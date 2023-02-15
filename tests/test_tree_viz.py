@@ -37,7 +37,7 @@ class Repr1:
 
 r1 = Repr1()
 mask = jtu.tree_map(pytc.is_nondiff, r1)
-r1f = r1.at[mask].apply(pytc.tree_freeze)
+r1f = r1.at[mask].apply(pytc.freeze)
 
 
 def test_repr():

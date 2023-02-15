@@ -20,7 +20,7 @@ class Test:
     name: str
 
     def __post_init__(self):
-        self.name = pytc.frozen(self.name)
+        self.name = pytc.freeze(self.name)
 
 
 def test_getter_by_val():

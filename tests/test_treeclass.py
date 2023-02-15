@@ -16,6 +16,9 @@ def test_field():
 
     assert pytc.field(default=1).default == 1
 
+    with pytest.raises(TypeError):
+        pytc.field(metadata=1)
+
 
 def test_field_nondiff():
     @pytc.treeclass
@@ -44,8 +47,8 @@ def test_field_nondiff():
 
         def __init__(
             self,
-            a=pytc.frozen(jnp.array([1, 2, 3])),
-            b=pytc.frozen(jnp.array([4, 5, 6])),
+            a=pytc.freeze(jnp.array([1, 2, 3])),
+            b=pytc.freeze(jnp.array([4, 5, 6])),
         ):
 
             self.a = a
@@ -61,7 +64,7 @@ def test_field_nondiff():
         b: jnp.ndarray
 
         def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
-            self.a = pytc.frozen(a)
+            self.a = pytc.freeze(a)
             self.b = b
 
     test = Test()

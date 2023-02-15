@@ -7,7 +7,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_freeze import _HashableWrapper, frozen
+from pytreeclass._src.tree_freeze import _HashableWrapper
 
 
 def test_freeze_unfreeze():
@@ -17,14 +17,19 @@ def test_freeze_unfreeze():
         b: int
 
     a = A(1, 2)
-    b = a.at[...].apply(pytc.tree_freeze)
-    c = a.at["a"].apply(pytc.tree_unfreeze).at["b"].apply(pytc.tree_unfreeze)
+    b = a.at[...].apply(pytc.freeze)
+    c = (
+        a.at["a"]
+        .apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+        .at["b"]
+        .apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+    )
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
     assert jtu.tree_leaves(c) == [1, 2]
 
-    assert pytc.tree_freeze(pytc.tree_freeze(1.0)).unwrap() == 1.0
+    assert pytc.unfreeze(pytc.freeze(1.0)) == 1.0
 
     @pytc.treeclass
     class A:
@@ -42,8 +47,13 @@ def test_freeze_unfreeze():
         b: int
 
     a = A(1, 2)
-    b = pytc.tree_freeze(a)
-    c = a.at["a"].apply(pytc.tree_unfreeze).at["b"].apply(pytc.tree_unfreeze)
+    b = jtu.tree_map(pytc.freeze, a)
+    c = (
+        a.at["a"]
+        .apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+        .at["b"]
+        .apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+    )
 
     assert jtu.tree_leaves(a) == [1, 2]
     assert jtu.tree_leaves(b) == []
@@ -61,7 +71,7 @@ def test_freeze_unfreeze():
     class l2:
         c: l1 = l1()
 
-    t = pytc.tree_freeze(l2())
+    t = jtu.tree_map(pytc.freeze, l2())
 
     assert jtu.tree_leaves(t) == []
     assert jtu.tree_leaves(t.c) == []
@@ -77,7 +87,7 @@ def test_freeze_unfreeze():
         def __init__(self):
             self.c = l1()
 
-    t = pytc.tree_freeze(l2())
+    t = jtu.tree_map(pytc.freeze, l2())
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
 
@@ -116,29 +126,29 @@ def test_freeze_with_ops():
     @pytc.treeclass
     class Test:
         a: int = 1
-        b: float = pytc.frozen(1.0)
-        c: str = pytc.frozen("test")
+        b: float = pytc.freeze(1.0)
+        c: str = pytc.freeze("test")
 
     t = Test()
     assert jtu.tree_leaves(t) == [1]
 
     with pytest.raises(dc.FrozenInstanceError):
-        pytc.tree_freeze(t).a = 1
+        jtu.tree_map(pytc.freeze, t).a = 1
 
     with pytest.raises(dc.FrozenInstanceError):
-        pytc.tree_unfreeze(t).a = 1
+        jtu.tree_map(pytc.unfreeze, t).a = 1
 
     hash(t)
 
     t = Test()
-    pytc.tree_unfreeze(t)
-    pytc.tree_freeze(t)
+    jtu.tree_map(pytc.unfreeze, t, is_leaf=pytc.is_frozen)
+    jtu.tree_map(pytc.freeze, t)
 
     @pytc.treeclass
     class Test:
         a: int
 
-    t = pytc.tree_freeze(Test(100))
+    t = jtu.tree_map(pytc.freeze, (Test(100)))
 
     assert pytc.is_tree_equal(t.at[...].set(0), t)
     assert pytc.is_tree_equal(t.at[...].apply(lambda x: x + 1), t)
@@ -177,10 +187,10 @@ def test_freeze_diagram():
         d: A = A(1, 2)
 
     a = B()
-    a = a.at["d"].set(pytc.tree_freeze(a.d))
+    a = a.at["d"].set(pytc.freeze(a.d))
     a = B()
 
-    a = a.at["d"].set(pytc.tree_freeze(a.d))  # = a.d.freeze()
+    a = a.at["d"].set(pytc.freeze(a.d))  # = a.d.freeze()
 
 
 def test_freeze_mask():
@@ -192,21 +202,23 @@ def test_freeze_mask():
 
     t = Test()
 
-    assert jtu.tree_leaves(pytc.tree_freeze(t)) == []
+    assert jtu.tree_leaves(jtu.tree_map(pytc.freeze, t)) == []
 
 
 def test_freeze_nondiff():
     @pytc.treeclass
     class Test:
-        a: int = pytc.frozen(1)
+        a: int = pytc.freeze(1)
         b: str = "a"
 
     t = Test()
 
     assert jtu.tree_leaves(t) == ["a"]
-    assert jtu.tree_leaves(pytc.tree_freeze(t)) == []
+    assert jtu.tree_leaves(jtu.tree_map(pytc.freeze, t)) == []
     assert jtu.tree_leaves(
-        (pytc.tree_freeze(t)).at["b"].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)
+        (jtu.tree_map(pytc.freeze, t))
+        .at["b"]
+        .apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
     ) == ["a"]
 
     @pytc.treeclass
@@ -216,10 +228,10 @@ def test_freeze_nondiff():
     t = T0()
 
     assert jtu.tree_leaves(t) == ["a"]
-    assert jtu.tree_leaves(pytc.tree_freeze(t)) == []
+    assert jtu.tree_leaves(jtu.tree_map(pytc.freeze, t)) == []
 
     assert jtu.tree_leaves(t) == ["a"]
-    assert jtu.tree_leaves(pytc.tree_freeze(t)) == []
+    assert jtu.tree_leaves(jtu.tree_map(pytc.freeze, t)) == []
 
 
 def test_freeze_nondiff_with_mask():
@@ -244,14 +256,14 @@ def test_freeze_nondiff_with_mask():
         d: L1 = L1()
 
     t = L2()
-    t = t.at["d"].at["d"].at["a"].apply(pytc.tree_freeze)
-    t = t.at["d"].at["d"].at["b"].apply(pytc.tree_freeze)
+    t = t.at["d"].at["d"].at["a"].apply(pytc.freeze)
+    t = t.at["d"].at["d"].at["b"].apply(pytc.freeze)
 
     assert jtu.tree_leaves(t) == [10, 20, 30, 1, 2, 3, 3]
 
 
 def test_non_dataclass_input_to_freeze():
-    assert jtu.tree_leaves(pytc.tree_freeze(1)) == []
+    assert jtu.tree_leaves(pytc.freeze(1)) == []
 
 
 def test_tree_freeze():
@@ -268,17 +280,17 @@ def test_tree_freeze():
     tree = l1()
 
     assert jtu.tree_leaves(tree) == [1, 2, 3]
-    assert jtu.tree_leaves(pytc.tree_freeze(tree)) == []
-    assert jtu.tree_leaves(jtu.tree_map(pytc.tree_freeze, tree)) == []
-    assert jtu.tree_leaves(tree.at[...].apply(pytc.tree_freeze)) == []
-    assert jtu.tree_leaves(tree.at[tree > 1].apply(pytc.tree_freeze)) == [1]
-    assert jtu.tree_leaves(tree.at[tree == 1].apply(pytc.tree_freeze)) == [2, 3]
-    assert jtu.tree_leaves(tree.at[tree < 1].apply(pytc.tree_freeze)) == [1, 2, 3]
+    assert jtu.tree_leaves(jtu.tree_map(pytc.freeze, tree)) == []
+    assert jtu.tree_leaves(jtu.tree_map(pytc.freeze, tree)) == []
+    assert jtu.tree_leaves(tree.at[...].apply(pytc.freeze)) == []
+    assert jtu.tree_leaves(tree.at[tree > 1].apply(pytc.freeze)) == [1]
+    assert jtu.tree_leaves(tree.at[tree == 1].apply(pytc.freeze)) == [2, 3]
+    assert jtu.tree_leaves(tree.at[tree < 1].apply(pytc.freeze)) == [1, 2, 3]
 
-    assert jtu.tree_leaves(tree.at["a"].apply(pytc.tree_freeze)) == [2, 3]
-    assert jtu.tree_leaves(tree.at["b"].apply(pytc.tree_freeze)) == [1]
-    assert jtu.tree_leaves(tree.at["b"].at["x"].apply(pytc.tree_freeze)) == [1, 3]
-    assert jtu.tree_leaves(tree.at["b"].at["y"].apply(pytc.tree_freeze)) == [1, 2]
+    assert jtu.tree_leaves(tree.at["a"].apply(pytc.freeze)) == [2, 3]
+    assert jtu.tree_leaves(tree.at["b"].apply(pytc.freeze)) == [1]
+    assert jtu.tree_leaves(tree.at["b"].at["x"].apply(pytc.freeze)) == [1, 3]
+    assert jtu.tree_leaves(tree.at["b"].at["y"].apply(pytc.freeze)) == [1, 2]
 
 
 def test_tree_unfreeze():
@@ -294,21 +306,21 @@ def test_tree_unfreeze():
 
     tree = l1()
 
-    frozen_tree = tree.at[...].apply(pytc.tree_freeze)
+    frozen_tree = tree.at[...].apply(pytc.freeze)
     assert jtu.tree_leaves(frozen_tree) == []
 
     mask = tree == tree
-    unfrozen_tree = frozen_tree.at[mask].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
+    unfrozen_tree = frozen_tree.at[mask].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [1, 2, 3]
 
     mask = tree > 1
-    unfrozen_tree = frozen_tree.at[mask].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
+    unfrozen_tree = frozen_tree.at[mask].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [2, 3]
 
-    unfrozen_tree = frozen_tree.at["a"].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
+    unfrozen_tree = frozen_tree.at["a"].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [1]
 
-    unfrozen_tree = frozen_tree.at["b"].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
+    unfrozen_tree = frozen_tree.at["b"].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [2, 3]
 
 
@@ -326,12 +338,12 @@ def test_tree_freeze_unfreeze():
     tree = l1()
 
     mask = tree == tree
-    frozen_tree = tree.at[...].apply(pytc.tree_freeze)
-    unfrozen_tree = frozen_tree.at[mask].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
+    frozen_tree = tree.at[...].apply(pytc.freeze)
+    unfrozen_tree = frozen_tree.at[mask].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [1, 2, 3]
 
-    frozen_tree = tree.at["a"].apply(pytc.tree_freeze)
-    unfrozen_tree = frozen_tree.at["a"].apply(pytc.tree_unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
+    frozen_tree = tree.at["a"].apply(pytc.freeze)
+    unfrozen_tree = frozen_tree.at["a"].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)  # fmt: skip
     assert jtu.tree_leaves(unfrozen_tree) == [1, 2, 3]
 
 
@@ -359,7 +371,7 @@ def test_freeze_nondiff_func():
     # Test(a=1.0,b=2,c=3,act=tanh(x))
 
     mask = jtu.tree_map(pytc.is_nondiff, model)
-    model = model.at[mask].apply(pytc.tree_freeze)
+    model = model.at[mask].apply(pytc.freeze)
     # Test(a=1.0,*b=2,*c=3,*act=tanh(x))
 
     for _ in range(1, 20001):
@@ -372,7 +384,7 @@ def test_freeze_nondiff_func():
 
 def test_wrapper():
     # only apply last wrapper
-    assert hash((pytc.tree_freeze(1))) == hash(1)
+    assert hash((pytc.freeze(1))) == hash(1)
 
     lhs = _HashableWrapper(1)
     # test getter
@@ -385,10 +397,10 @@ def test_wrapper():
     assert hash(lhs) == hash(1)
 
     # test immutability
-    frozen_value = frozen(1)
+    frozen_value = pytc.freeze(1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(dc.FrozenInstanceError):
         frozen_value.__wrapped__ = 2
 
-    assert frozen(1) == frozen(1)
-    assert f"{frozen(1)!r}" == "#1"
+    assert pytc.freeze(1) == pytc.freeze(1)
+    assert f"{pytc.freeze(1)!r}" == "#1"

@@ -16,7 +16,7 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _patch_init_method,
 )
-from pytreeclass._src.tree_freeze import frozen, is_frozen
+from pytreeclass._src.tree_freeze import freeze, is_frozen
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
 from pytreeclass.tree_viz.tree_pprint import _TreePretty
@@ -94,7 +94,7 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
             # unfreezing it will be possible. if we do not do this, then
             # the static leaves will be lost when the tree is flattened.
             static[_FIELD_MAP][field.name] = (field).unwrap()
-            dynamic[field.name] = frozen(static.pop(field.name))
+            dynamic[field.name] = freeze(static.pop(field.name))
         else:
             # normal fields as dynamic leaves
             dynamic[field.name] = static.pop(field.name)
@@ -115,7 +115,7 @@ def _unflatten(cls, treedef, leaves):
             # without this step, then for any wrapped leaf, we need first to unwrap it before
             # we can access the static leaf in the class body.
             dynamic[key] = (dynamic[key]).unwrap()
-            static[_FIELD_MAP][key] = frozen(static[_FIELD_MAP][key])
+            static[_FIELD_MAP][key] = freeze(static[_FIELD_MAP][key])
 
     tree.__dict__.update(static)
     tree.__dict__.update(dynamic)
