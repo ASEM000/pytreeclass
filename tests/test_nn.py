@@ -224,3 +224,13 @@ def test_freeze_nondiff():
     frozen_ = jtu.tree_map(pytc.freeze, X)
     unfrozen_ = jtu.tree_map(pytc.unfreeze, frozen_, is_leaf=pytc.is_frozen)
     assert jtu.tree_leaves(X) == jtu.tree_leaves(unfrozen_)
+
+
+@pytest.mark.benchmark
+def test_nn_benchmark(benchmark):
+    benchmark(test_nn)
+
+
+@pytest.mark.benchmark
+def test_freeze_nondiff_benchmark(benchmark):
+    benchmark(test_freeze_nondiff)

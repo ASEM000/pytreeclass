@@ -33,7 +33,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
     object.__setattr__(tree, key, value)
 
     if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
-        field = Field(name=key, type=type(value))
+        field = Field(name=key, type=type(value))  # type: ignore
         # register it to dataclass fields
         getattr(tree, _FIELD_MAP)[key] = field
 
@@ -47,7 +47,7 @@ def _delattr(tree, key: str) -> None:
 
 def _new_wrapper(new_func):
     @ft.wraps(new_func)
-    def new_method(cls, *a, **k) -> PyTree:
+    def new_method(cls, *_, **__) -> PyTree:
         self = object.__new__(cls)
         field_map = getattr(cls, _FIELD_MAP)
         # shadow the field map class attribute with an instance attribute
@@ -72,7 +72,7 @@ def _validator_wrapper(attribute_name: str):
                 validator_func(value)
             except Exception as e:
                 # raise the same exception with the attribute name in the error message
-                msg = f"for field=`{attribute_name}`, the following error occurred: {e}"
+                msg = f"for field=`{attribute_name}`: {e}"
                 raise type(e)(msg)
 
         return validate
