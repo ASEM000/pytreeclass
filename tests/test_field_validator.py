@@ -3,7 +3,6 @@ import pytest
 
 from pytreeclass._src.tree_decorator import (
     enum_validator,
-    invert_validator,
     range_validator,
     shape_validator,
     type_validator,
@@ -90,30 +89,3 @@ def test_enum_validator():
 
     with pytest.raises(ValueError):
         enum_validator((1, 2, 3))(0)
-
-
-def test_invert_validator():
-    invert_validator(range_validator(0, 1))(2)
-    invert_validator(range_validator(0, 1))(-1)
-
-    with pytest.raises(Exception):
-        invert_validator(range_validator(0, 1))(0.5)
-
-    with pytest.raises(Exception):
-        invert_validator(range_validator(0, 1))(0)
-
-    invert_validator(type_validator(int))("hello")
-    invert_validator(type_validator(int))(1.0)
-
-    with pytest.raises(Exception):
-        invert_validator(type_validator(int))(1)
-
-    invert_validator(enum_validator((1, 2, 3)))(0)
-
-    with pytest.raises(Exception):
-        invert_validator(enum_validator((1, 2, 3)))(1)
-
-    invert_validator(shape_validator((1, 2, 3)))(jnp.ones([1, 2, 4]))
-
-    with pytest.raises(Exception):
-        invert_validator(shape_validator((1, 2, 3)))(jnp.ones([1, 2, 3]))

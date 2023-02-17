@@ -9,13 +9,13 @@ import dataclasses as dc
 import functools as ft
 import sys
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, NamedTuple
+from typing import Any, Callable, NamedTuple, Sequence
 
 import numpy as np
 
 from pytreeclass._src.tree_freeze import freeze
 
-_MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()  # type: ignore
+_MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__datalcass_frozen__"
 _FIELD_MAP = "__dataclass_fields__"  # to make it work with `dataclasses.is_dataclass`
 _POST_INIT = "__post_init__"
@@ -31,7 +31,7 @@ class Field(NamedTuple):
     kw_only: bool = False
     metadata: MappingProxyType | _MISSING = _MISSING
     frozen: bool = False
-    validator: tuple[FunctionType, ...] | _MISSING = _MISSING
+    validators: Sequence[Callable] | _MISSING = _MISSING
     # make it get recognized as a dataclass field
     # to make it work with `dataclasses.fields`
     _field_type = dc._FIELD
@@ -46,7 +46,7 @@ def field(
     kw_only: bool = False,
     metadata: dict | _MISSING = _MISSING,
     frozen: bool = False,
-    validator: FunctionType | tuple[FunctionType, ...] | _MISSING = _MISSING,
+    validators: Sequence[Callable] | _MISSING = _MISSING,
 ):
     """
     default: The default value of the field.
@@ -56,7 +56,7 @@ def field(
     kw_only: Whether the field is keyword-only.
     frozen: Whether the field is frozen, if frozen its excluded from `jax` transformations.
     metadata: A mapping of user-defined data for the field.
-    validator: A function or tuple of functions to call after initialization to validate the field value.
+    validators: A sequence of functions to call after initialization to validate the field value.
     """
 
     if default is not _MISSING and default_factory is not _MISSING:
@@ -69,19 +69,18 @@ def field(
     elif metadata is not _MISSING:
         raise TypeError("`metadata` must be a dict")
 
-    # check if validator is a tuple of functions or a single function
-    msg = "`validator` must be a function or a tuple of type `FunctionType`"
-    if isinstance(validator, FunctionType):
-        validator = (validator,)
-    elif isinstance(validator, tuple):
-        for _validator in validator:
-            if not isinstance(_validator, FunctionType):
-                raise TypeError(msg + f", got {_validator}")
-    elif validator is not _MISSING:
-        raise TypeError(msg + f", got {validator}")
+    # check if validators is a Sequence of functions
+    if isinstance(validators, Sequence):
+        for index, validator in enumerate(validators):
+            if not isinstance(validator, (Callable, type(_MISSING))):
+                msg = f"`validators` must be a Sequence of functions, got {type(validator)}"
+                msg += f" at index {index}"
+                raise TypeError(msg)
+    elif validators is not _MISSING:
+        msg = f"`validators` must be a Sequence of functions, got {type(validators)}"
+        raise TypeError(msg)
 
     # set name and type post initialization
-
     return Field(
         name=_MISSING,
         type=_MISSING,
@@ -92,7 +91,7 @@ def field(
         kw_only=kw_only,
         metadata=metadata,
         frozen=frozen,
-        validator=validator,
+        validators=validators,
     )
 
 
@@ -216,7 +215,9 @@ def shape_validator(shape: tuple[int | None | Ellipsis]) -> Callable:
     """A shape validator for numpy arrays
 
     Args:
-        shape : A tuple of ints and Nones, where None represents a dimension that can be of any size
+        shape : A tuple of ints, Nones, or Ellipsis,
+                where None represents a dimension that can be of any size abd
+                Ellipsis represents any number of dimensions
 
     Returns:
         validator : A function that takes a numpy array and checks if the shape is valid
@@ -240,6 +241,7 @@ def shape_validator(shape: tuple[int | None | Ellipsis]) -> Callable:
 
         if isinstance(dim, type(Ellipsis)):
             if ellipsis_index is not None:
+                # allow only one ellipsis
                 raise ValueError(f"Only one Ellipsis is allowed, got {shape}")
             ellipsis_index = index
 
@@ -247,11 +249,10 @@ def shape_validator(shape: tuple[int | None | Ellipsis]) -> Callable:
         if not hasattr(x, "shape"):
             raise TypeError(f"Expected an object with a shape attribute, got {type(x)}")
 
-        new_shape = shape
+        new_shape = list(shape)
 
         if ellipsis_index is not None:
             # replace ellipsis with Nones
-            new_shape = list(shape)
             nones = [None] * (len(x.shape) - len(shape) + 1)
             new_shape[ellipsis_index : ellipsis_index + 1] = nones
 
@@ -269,8 +270,15 @@ def shape_validator(shape: tuple[int | None | Ellipsis]) -> Callable:
 
 
 def type_validator(types: type | tuple[type, ...]) -> Callable:
-    """Returns a validator that checks if the value is an instance of the given types."""
-    # convert to tuple if not already
+    """Returns a validator that checks if the value is an instance of the given types.
+
+    Example:
+        >>> x = 1
+        >>> type_validator(int)(x)  # no error, 1 is an instance of int
+        >>> type_validator((int, float))(x)  # no error, 1 is an instance of int
+        >>> type_validator(float)(x)  # TypeError raised because x is not an instance of float
+    """
+
     def validator(x):
         if not isinstance(x, types):
             msg = f"Expected type in ({types}), for value=({x}), but got {type(x)}"
@@ -280,10 +288,16 @@ def type_validator(types: type | tuple[type, ...]) -> Callable:
 
 
 def range_validator(min=-float("inf"), max=float("inf")) -> Callable:
-    """Returns a validator that checks if the value is in the given range."""
+    """Returns a validator that checks if the value is in the given range.
+
+    Example:
+        >>> x = 1
+        >>> range_validator(min=0)(x)  # no error
+        >>> range_validator(max=0)(x)  # ValueError raised because x is not in the range (-inf, 0]
+        >>> range_validator(min=0, max=2)(x)  # no error
+    """
 
     def validator(x):
-        # using numpy to handle jax arrays
         x = np.asarray(x)
         if not np.all(x >= min):
             msg = f"Value is not in range: min is not greater than or equal to {min}, got {x}"
@@ -296,57 +310,17 @@ def range_validator(min=-float("inf"), max=float("inf")) -> Callable:
 
 
 def enum_validator(args: Any | tuple[Any, ...]) -> Callable:
-    """Returns a validator that checks if the value is in the given set."""
+    """Returns a validator that checks if the value is in the given set.
+
+    Example:
+        >>> x = 1
+        >>> enum_validator((1, 2, 3))(x)  # no error, 1 is in the set (1, 2, 3)
+        >>> enum_validator(2)(x)  # ValueError raised because x is not in the set (2,)
+    """
     args = (args,) if not isinstance(args, tuple) else args
 
     def validator(x):
         if x not in args:
             raise ValueError(f"Expected value in ({args}), for value=({x})")
-
-    return validator
-
-
-def normalization_validator(atol: float = 1e-2) -> Callable:
-    """Returns a validator that checks if the data mean and standard deviation are close to zero and one respectively.
-
-    Args:
-        atol: The absolute tolerance for the mean and standard deviation checks.
-
-    Returns:
-        validator: A function that takes a numpy array and checks if the data is normalized.
-
-    Example:
-        >>> x = jnp.ones([1,2,3])
-        >>> normalization_validator()(x)  # no error
-
-        >>> x = jnp.ones([1,2,3]) * 2
-        >>> normalization_validator()(x)  # ValueError raised because the mean is not close to zero
-    """
-
-    def validator(x) -> None:
-        x_mean, x_std = np.mean(x, axis=0), np.std(x, axis=0)
-        if not np.allclose(x_mean, 0.0, atol=atol):
-            raise ValueError("Data is not normalized: mean is not close to zero")
-        if not np.allclose(x_std, 1.0, atol=atol):
-            msg = f"Data is not normalized: standard deviation is not close to one, got {x_std}"
-            raise ValueError(msg)
-
-    return validator
-
-
-def invert_validator(func: Callable) -> Callable:
-    """Returns a validator that checks if the value is not valid."""
-
-    def validator(x):
-        try:
-            func(x)
-        except Exception:
-            # if the validator raises an exception,invert the result
-            # meaning the value is valid
-            pass
-        else:
-            # no error was raised, so the value is not valid
-            # no we want to raise the original error
-            raise Exception(f"Expected value to not be valid, for value=({x})")
 
     return validator

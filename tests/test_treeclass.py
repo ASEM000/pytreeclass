@@ -302,7 +302,7 @@ def test_validators():
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(validator=instance_validator(int))
+        a: int = pytc.field(validators=[instance_validator(int)])
 
     with pytest.raises(AssertionError):
         Test(a="a")
@@ -311,7 +311,7 @@ def test_validators():
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(validator=instance_validator((int, float)))
+        a: int = pytc.field(validators=[instance_validator((int, float))])
 
     assert Test(a=1).a == 1
     assert Test(a=1.0).a == 1.0
@@ -321,7 +321,7 @@ def test_validators():
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(validator=range_validator(0, 10))
+        a: int = pytc.field(validators=[range_validator(0, 10)])
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -333,7 +333,9 @@ def test_validators():
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(validator=(range_validator(0, 10), instance_validator(int)))
+        a: int = pytc.field(
+            validators=[range_validator(0, 10), instance_validator(int)]
+        )
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -345,4 +347,4 @@ def test_validators():
 
         @pytc.treeclass
         class Test:
-            a: int = pytc.field(validator=1)
+            a: int = pytc.field(validators=1)

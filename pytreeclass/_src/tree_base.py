@@ -96,8 +96,8 @@ def _init_wrapper(init_func):
         # last stage of initialization i.e. post `__post_init__`
         # call the validator functions
         for field in dc.fields(self):
-            if field.validator is not _MISSING:
-                for validator in field.validator:
+            if field.validators is not _MISSING:
+                for validator in field.validators:
                     # augment the error message -if exists- with the field name
                     _validator_wrapper(field.name)(validator)(getattr(self, field.name))
 
