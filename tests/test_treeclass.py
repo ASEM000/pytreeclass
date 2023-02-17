@@ -348,3 +348,9 @@ def test_validators():
         @pytc.treeclass
         class Test:
             a: int = pytc.field(validators=1)
+
+    with pytest.raises(TypeError):
+
+        @pytc.treeclass
+        class Test:
+            a: int = pytc.field(validators=[1])

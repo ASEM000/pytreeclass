@@ -74,7 +74,7 @@ def field(
         for index, validator in enumerate(validators):
             if not isinstance(validator, (Callable, type(_MISSING))):
                 msg = f"`validators` must be a Sequence of functions, got {type(validator)}"
-                msg += f" at index {index}"
+                msg += f" at index={index}"
                 raise TypeError(msg)
     elif validators is not _MISSING:
         msg = f"`validators` must be a Sequence of functions, got {type(validators)}"
@@ -215,20 +215,17 @@ def shape_validator(shape: tuple[int | None | Ellipsis]) -> Callable:
     """A shape validator for numpy arrays
 
     Args:
-        shape : A tuple of ints, Nones, or Ellipsis,
-                where None represents a dimension that can be of any size abd
-                Ellipsis represents any number of dimensions
+        shape : A tuple of ints, Nones, or Ellipsis.
 
     Returns:
         validator : A function that takes a numpy array and checks if the shape is valid
 
     Example:
         >>> x = jnp.ones([1,2,3])
-        >>> shape_validator((1,2,3))(x)  # no error
-        >>> shape_validator((1,2,None))(x)  # no error
-        >>> shape_validator((1,2,4))(x)  # ValueError raised because the last dimension is not 4
-        >>> shape_validator((1,2,3,4))(x)  # ValueError raised because the shape length is not 3
-        >>> shape_validator((1,2,3.))(x)  # TypeError raised because the shape is not a tuple of ints, Nones, or ...
+        >>> shape_validator((1,2,3))(x)     # valid
+        >>> shape_validator((1,2,4))(x)     # invalid
+        >>> shape_validator((1,2,None))(x)  # valid
+        >>> shape_validator((1,...))(x)     # valid
     """
 
     ellipsis_index = None

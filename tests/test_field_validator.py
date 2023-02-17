@@ -20,6 +20,9 @@ def test_shape_validator():
     with pytest.raises(ValueError):
         shape_validator((1, 2, None, None))(x)
 
+    with pytest.raises(ValueError):
+        shape_validator((1, 2, 4))(x)
+
     shape_validator((None, None, None))(x)
     shape_validator((1, None, None))(x)
     shape_validator((1, 2, None))(x)
@@ -31,6 +34,9 @@ def test_shape_validator():
 
     with pytest.raises(ValueError):
         shape_validator((..., ...))(x)
+
+    with pytest.raises(TypeError):
+        shape_validator((2, 2, 3))(1)
 
 
 def test_range_validator():
