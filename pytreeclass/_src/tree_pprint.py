@@ -309,30 +309,6 @@ def tree_diagram(tree, depth=float("inf")):
                 ├── [0]:int=20
                 ├── [1]:int=30
                 └── [2]:A=A(x=10, y=(20, 30), z=40)
-
-        >>> print(pytc.tree_diagram(B(), depth=3))
-        B
-            ├── a:int=10
-            └── b:tuple
-                ├── [0]:int=20
-                ├── [1]:int=30
-                └── [2]:A
-                    ├── x:int=10
-                    ├── y:tuple=(20, 30)
-                    └── z:int=40
-
-        >>> print(pytc.tree_diagram(B(), depth=4))
-        B
-            ├── a:int=10
-            └── b:tuple
-                ├── [0]:int=20
-                ├── [1]:int=30
-                └── [2]:A
-                    ├── x:int=10
-                    ├── y:tuple
-                    │   ├── [0]:int=20
-                    │   └── [1]:int=30
-                    └── z:int=40
     """
 
     infos = _tree_trace(tree, depth)

@@ -85,6 +85,7 @@ class FrozenWrapper(_Wrapper):
     __rlshift__ = lambda self, rhs: op.lshift(rhs, self.unwrap())
     __rmod__ = lambda self, rhs: op.mod(rhs, self.unwrap())
     __rmul__ = lambda self, rhs: op.mul(rhs, self.unwrap())
+    __rmatmul__ = lambda self, rhs: op.matmul(rhs, self.unwrap())
     __ror__ = lambda self, rhs: op.or_(rhs, self.unwrap())
     __round__ = lambda self, rhs: round(self.unwrap(), rhs)
     __rpow__ = lambda self, rhs: op.pow(rhs, self.unwrap())
@@ -101,6 +102,7 @@ class FrozenWrapper(_Wrapper):
 
     # repr and str
     __repr__ = lambda self: f"#{self.unwrap()!r}"
+    __str__ = lambda self: f"#{self.unwrap()!s}"
 
     # JAX methods
     def tree_flatten(self):
@@ -133,6 +135,16 @@ def freeze(x: Any) -> FrozenWrapper:
         # When interacting with the wrapped value, the returned value is **not frozen**
         >>> frozen_value + 1
         2
+
+        >>> # wrapped value is considred for mean calculation,
+        >>> # but gradient is ignored
+        @jax.grad
+        >>> def f(x):
+        ...    return jnp.mean(jnp.asarray(x)**2)
+
+        >>> f([2.,2.,pytc.freeze(2.)])
+        [Array(1.3333334, dtype=float32, weak_type=True), Array(1.3333334, dtype=float32, weak_type=True), #2.0]
+
 
         # Inplace operations take no effect
         >>> frozen_value = freeze([1, 2, 3])
@@ -184,7 +196,7 @@ def unfreeze(x: Any) -> Any:
 
 
 def is_frozen(node: Any) -> bool:
-    """Check if a tree is frozen"""
+    """Check if a node is frozen"""
     return isinstance(node, FrozenWrapper)
 
 

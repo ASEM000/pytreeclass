@@ -16,7 +16,6 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _patch_init_method,
 )
-from pytreeclass._src.tree_freeze import freeze, is_frozen
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
 from pytreeclass._src.tree_pprint import _TreePretty
@@ -49,13 +48,11 @@ def _new_wrapper(new_func):
     @ft.wraps(new_func)
     def new_method(cls, *_, **__) -> PyTree:
         self = object.__new__(cls)
-        field_map = getattr(cls, _FIELD_MAP)
-        # shadow the field map class attribute with an instance attribute
-        object.__setattr__(self, _FIELD_MAP, dict(field_map))
-
+        field_map = getattr(self, _FIELD_MAP)
         for key in field_map:
-            # set the default value if it is not missing
+
             if field_map[key].default is not _MISSING:
+                # set the default value if it is not missing
                 object.__setattr__(self, key, field_map[key].default)
             elif field_map[key].default_factory is not _MISSING:
                 # call the default factory to get the default value
@@ -112,19 +109,8 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     # in essence anything not declared as a dataclass fields will be considered static
     static, dynamic = dict(tree.__dict__), dict()
     # avoid mutating the original dict by making a copy of dataclass fields
-    static[_FIELD_MAP] = dict(static[_FIELD_MAP])
-
-    for field in static[_FIELD_MAP].values():
-        if is_frozen(field):
-            # expose frozen fields as frozen wrapped leaves
-            # the idea is to be able to expose the static leaves so that,
-            # unfreezing it will be possible. if we do not do this, then
-            # the static leaves will be lost when the tree is flattened.
-            static[_FIELD_MAP][field.name] = (field).unwrap()
-            dynamic[field.name] = freeze(static.pop(field.name))
-        else:
-            # normal fields as dynamic leaves
-            dynamic[field.name] = static.pop(field.name)
+    for key in getattr(tree, _FIELD_MAP):
+        dynamic[key] = static.pop(key)
 
     return dynamic.values(), (dynamic.keys(), static)
 
@@ -132,20 +118,8 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
 def _unflatten(cls, treedef, leaves):
     """Unflatten rule for `jax.tree_unflatten`"""
     tree = object.__new__(cls)  # do not call cls constructor
-    static = treedef[1]
-    dynamic = dict(zip(treedef[0], leaves))
-
-    for key in dynamic:
-        if is_frozen(dynamic[key]):
-            # convert frozen value (static leaf) -> frozen field (to metadata)
-            # in essence, we are moving the wrapper on the static leaf to the corresponding field
-            # without this step, then for any wrapped leaf, we need first to unwrap it before
-            # we can access the static leaf in the class body.
-            dynamic[key] = (dynamic[key]).unwrap()
-            static[_FIELD_MAP][key] = freeze(static[_FIELD_MAP][key])
-
-    tree.__dict__.update(static)
-    tree.__dict__.update(dynamic)
+    tree.__dict__.update(treedef[1])
+    tree.__dict__.update(zip(treedef[0], leaves))
     return tree
 
 
