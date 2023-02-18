@@ -341,6 +341,8 @@ def tree_diagram(tree, depth=float("inf")):
 
     for i, info in enumerate(infos):
         # iterate over the leaves `NodeInfo` object
+        if not info.repr:
+            continue
 
         max_depth = len(info.names)
         index = info.index
@@ -475,6 +477,9 @@ def tree_mermaid(tree: PyTree, depth=float("inf")) -> str:
     cur_id = None
 
     for info in infos:
+        if not info.repr:
+            continue
+
         count, size = _calculate_node_info_stats(info)
         count = _format_count(count) + " leaf"
         size = _format_size(size)

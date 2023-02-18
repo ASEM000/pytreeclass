@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import jax
 import jax.tree_util as jtu
+import pytest
 
 from pytreeclass._src.tree_pprint import _func_pprint, _node_pprint, _slice_pprint
 from pytreeclass._src.tree_viz_util import (
+    _calculate_node_info_stats,
     _format_count,
     _format_size,
     _hbox,
@@ -66,6 +68,9 @@ def test_format_count():
     assert _format_size(1000) == "1000.00B"
     assert _format_size(complex(1000, 2)) == "1000.00B(2.00B)"
 
+    with pytest.raises(TypeError):
+        _format_count("a")
+
 
 def test_slice_pprint():
     assert _slice_pprint(slice(0, 1, 1)) == "[0]"
@@ -73,3 +78,8 @@ def test_slice_pprint():
     assert _slice_pprint(slice(0, 2, 2)) == "[0:2:2]"
     assert _slice_pprint(slice(None, 1, 2)) == "[:1:2]"
     assert _slice_pprint(slice(1, None, 2)) == "[1::2]"
+
+
+def test_calculate_node_info_stats():
+    with pytest.raises(TypeError):
+        _calculate_node_info_stats(1)
