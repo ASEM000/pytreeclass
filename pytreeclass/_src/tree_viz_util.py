@@ -84,22 +84,6 @@ def is_children_frozen(tree):
     return False
 
 
-def _mermaid_marker(field: dc.Field, node: Any, default: str = "--") -> str:
-    """return the suitable marker given the field and node item
-
-    Args:
-        field (Field): field item of the pytree node
-        node (Any): node item
-        default (str, optional): default marker. Defaults to "".
-
-    Returns:
-        str: marker character.
-    """
-    if is_frozen(field) or is_children_frozen(node):
-        return "--x"
-    return default
-
-
 def _marker(field: dc.Field, node: Any, default: str = "") -> str:
     """return the suitable marker given the field and node item"""
     # if all your children are frozen, the you are frozen

@@ -17,13 +17,11 @@ from jaxlib.xla_extension import CompiledFunction
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_viz_util import (
-    NodeInfo,
     _calculate_node_info_stats,
     _format_count,
     _format_size,
     _format_width,
     _marker,
-    _mermaid_marker,
     _table,
     _tree_trace,
 )
@@ -450,7 +448,7 @@ def tree_summary(tree: PyTree, *, depth=float("inf")) -> str:
     return layer_table.expandtabs(8)
 
 
-def tree_mermaid(tree: PyTree):
+def tree_mermaid(tree: PyTree, depth=float("inf")) -> str:
     # def _generate_mermaid_link(mermaid_string: str) -> str:
     #     """generate a one-time link mermaid diagram"""
     #     url_val = "https://pytreeclass.herokuapp.com/generateTemp"
@@ -458,6 +456,8 @@ def tree_mermaid(tree: PyTree):
     #     generated_id = request.json()["id"]
     #     generated_html = f"https://pytreeclass.herokuapp.com/temp/?id={generated_id}"
     #     return f"Open URL in browser: {generated_html}"
+
+    """generate a mermaid diagram syntax of a pytree"""
 
     def bold_text(text: str) -> str:
         # bold a text in ansci code
@@ -467,75 +467,27 @@ def tree_mermaid(tree: PyTree):
         """hash a value by its location in a tree. used to connect values in mermaid"""
         return ctypes.c_size_t(hash(input)).value
 
-    def reduce_count_and_size(item: Any) -> tuple[complex, complex]:
-        def reduce_func(acc, cur: NodeInfo) -> tuple[complex, complex]:
-            count, size = acc
-            return (count + cur.count, size + cur.size)
+    printer = _printer_map["repr"]
+    infos = _tree_trace(tree, depth)
 
-        return ft.reduce(reduce_func, _tree_trace(item), (0, 0))
+    root_id = node_id((0, 0, -1, 0))
+    fmt = f"flowchart LR\n\tid{root_id}({bold_text(tree.__class__.__name__)})"
+    cur_id = None
 
-    def recurse(tree, depth, prev_id, expand=True):
-        nonlocal fmt
+    for info in infos:
+        count, size = _calculate_node_info_stats(info)
+        count = _format_count(count) + " leaf"
+        size = _format_size(size)
 
-        if dc.is_dataclass(tree) and expand:
-            fields = [f for f in dc.fields(tree) if f.repr]
-            names = (f.name for f in fields)
-            values = (getattr(tree, f.name) for f in fields)
-            marks = (_mermaid_marker(f, getattr(tree, f.name), default="--->") for f in fields)  # fmt: skip
+        for depth, (name, type) in enumerate(zip(info.names, info.types)):
+            name = printer(name, 0)
+            prev_id = root_id if depth == 0 else cur_id
+            cur_id = node_id((depth, tuple(info.index), prev_id))
+            mark = "-..-" if info.frozen else "--->"
+            fmt += f"\n\tid{prev_id}"
+            stats = f'|"{count}<br>{size}"|' if depth == len(info.names) - 1 else ""
+            fmt += f"{mark}" + stats
+            value = f"={printer(info.node,0)}" if depth == len(info.names) - 1 else ""
+            fmt += f'id{cur_id}("{bold_text(name)}:{type.__name__}{value}")'
 
-        elif isinstance(tree, (list, tuple)) and expand:
-            # expand lists and tuples
-            names = (f"[{i}]" for i in range(len(tree)))
-            values = tree
-            marks = ("--->" for _ in tree)
-
-        elif isinstance(tree, dict) and expand:
-            names = tree.keys()
-            values = tree.values()
-            marks = ("--->" for _ in tree)
-        else:
-            return
-
-        for i, (value, name, mark) in enumerate(zip(values, names, marks)):
-            cur_id = node_id((depth, -1, prev_id))
-            count, size = reduce_count_and_size(value)
-            count = count.real + count.imag
-            size = size.real + size.imag
-
-            if count == 0:
-                count = size = ""
-            else:
-                count = _format_count(count) + (" leaves" if count > 1 else " leaf")
-                size = _format_size(size.real)
-
-            cur_id = node_id((depth, i, prev_id))
-            type = value.__class__.__name__
-
-            if dc.is_dataclass(value) or (
-                isinstance(value, (list, tuple)) and any(map(dc.is_dataclass, value))
-            ):
-
-                fmt += f"\n\tid{prev_id} {mark} "
-                fmt += f'|"{(count)}<br>{(size)}"| '  # add count and size of children
-                fmt += f'id{cur_id}("{bold_text(name) }:{type}")'
-                recurse(tree=value, depth=depth + 1, prev_id=cur_id, expand=True)
-                continue
-
-            fmt += f"\n\tid{prev_id} {mark} "
-
-            # add count and size of children
-            if mark == "-..-":
-                fmt += f'|"(frozen) {(count)}<br>{(size)}"| '  # add count and size of children for frozen leaves
-            elif mark == "--x":
-                fmt += ""  # no count or size for frozen leaves
-            elif mark == "--->" or mark == "---":
-                fmt += f'|"{(count)}<br>{(size)}"| '
-
-            fmt += f'id{cur_id}["{bold_text(name)}:{type}={_node_pprint(value, kind="repr")}"]'
-
-        prev_id = cur_id
-
-    cur_id = node_id((0, 0, -1, 0))
-    fmt = f"flowchart LR\n\tid{cur_id}({bold_text(tree.__class__.__name__)})"
-    recurse(tree=tree, depth=1, prev_id=cur_id)
     return fmt.expandtabs(4)
