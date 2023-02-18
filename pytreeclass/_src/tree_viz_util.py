@@ -71,28 +71,6 @@ def _format_count(node_count, newline=False):
     raise TypeError(f"node_count must be int or float, got {type(node_count)}")
 
 
-def is_children_frozen(tree):
-    """assert if a dataclass is static"""
-    if dc.is_dataclass(tree):
-        fields = dc.fields(tree)
-        if len(fields) > 0:
-            if all(is_frozen(f) for f in fields):
-                return True
-            if all(is_frozen(getattr(tree, f.name)) for f in fields):
-                return True
-
-    return False
-
-
-def _marker(field: dc.Field, node: Any, default: str = "") -> str:
-    """return the suitable marker given the field and node item"""
-    # if all your children are frozen, the you are frozen
-    if is_frozen(field) or is_children_frozen(node):
-        return "#"
-
-    return default
-
-
 class NodeInfo(NamedTuple):
     node: Any  # node item
     names: list[str]  # name of nodes in each level
@@ -145,9 +123,8 @@ def _tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
             reprs = (info.repr,) * len(leaves)
             frozen = (is_frozen(leaf) or info.frozen for leaf in leaves)
 
-        for i, (leaf, name, repr, frozen) in enumerate(
-            zip(leaves, names, reprs, frozen)
-        ):
+        zipped = zip(leaves, names, reprs, frozen)
+        for i, (leaf, name, repr, frozen) in enumerate(zipped):
             names = info.names + [name]
             types = info.types + [type(leaf)]
             # reversed index of the leaf, index=0 is the last leaf

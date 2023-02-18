@@ -22,6 +22,12 @@ class _Wrapper:
     def unwrap(self):
         return self.__wrapped__
 
+    def __setattr__(self, key, value):
+        # allow setting the wrapped value only once.
+        if "__wrapped__" in self.__dict__:
+            raise dc.FrozenInstanceError("Cannot assign to frozen instance.")
+        super().__setattr__(key, value)
+
 
 class _HashableWrapper(_Wrapper):
     # used to wrap metadata to make it hashable
@@ -38,9 +44,12 @@ class _HashableWrapper(_Wrapper):
 
 @jtu.register_pytree_node_class
 class FrozenWrapper(_Wrapper):
-    # a transparent wrapper that freezes the wrapped object setter and inplace operations
-    # plus returning `None` for `jtu.tree_leaves`.
-    # however, when interacting with it, the returned values is not frozen.
+    # a transparent wrapper that freezes the wrapped and delegates methods to it
+    # prevents:
+    # (1) inplace operations
+    # (2) mutating the wrapped object by `jax` transformations
+    # (3) mutating the wrapped object's attributes
+
     __call__ = lambda self, *a, **k: self.unwrap()(*a, **k)
 
     # delegate most methods to the wrapped object
@@ -116,55 +125,22 @@ class FrozenWrapper(_Wrapper):
         self.__dict__.update(__wrapped__=treedef.unwrap())
         return self
 
-    def __setattr__(self, key, value):
-        # allow setting the wrapped value only once.
-        if "__wrapped__" in self.__dict__:
-            raise dc.FrozenInstanceError("Cannot assign to frozen instance.")
-        else:
-            super().__setattr__(key, value)
-
 
 def freeze(x: Any) -> FrozenWrapper:
-    """Wrap a value in a FrozenWrapper
+    """A transparent wrapper that freezes the wrapped and delegates methods to it. prevents:
+        (1) inplace operations
+        (2) mutating the wrapped object by `jax` transformations
+        (3) mutating the wrapped object's attributes
 
     Example:
-        >>> frozen_value = freeze(1)
-        >>> frozen_value
+        >>> freeze(1)
         #1
 
-        # When interacting with the wrapped value, the returned value is **not frozen**
+        >>> # When interacting with the wrapped value, the returned value is **not frozen**
         >>> frozen_value + 1
         2
 
-        >>> # wrapped value is considred for mean calculation,
-        >>> # but gradient is ignored
-        @jax.grad
-        >>> def f(x):
-        ...    return jnp.mean(jnp.asarray(x)**2)
-
-        >>> f([2.,2.,pytc.freeze(2.)])
-        [Array(1.3333334, dtype=float32, weak_type=True), Array(1.3333334, dtype=float32, weak_type=True), #2.0]
-
-
-        # Inplace operations take no effect
-        >>> frozen_value = freeze([1, 2, 3])
-        >>> frozen_value.append(4)
-        >>> frozen_value
-        #[1, 2, 3]
-
-
-        # using `frozen` with `jax.jit` and `jax.grad`
-        >>> @ft.partial(jax.grad,argnums=0)
-        ... def dfdx(x,y):
-        ...    # we are taking derivative w.r.t x, however x is a frozen value
-        ...    # so the gradient of x is **ignored** and x is returned as is
-        ...    # without using `pytc.freeze` we would have to define `static_argnums=0` in `jit`
-        ...    return x+y**2
-
-        >>> dfdx(pytc.freeze(1),2.)
-        #1
-
-        >>> @ft.partial(jax.grad,argnums=1)
+        >>> @jax.grad
         ... def dfdy(x,y):
         ...    # we are taking derivative w.r.t y,
         ...    # so the gradient of y is just 2*y

@@ -21,7 +21,6 @@ from pytreeclass._src.tree_viz_util import (
     _format_count,
     _format_size,
     _format_width,
-    _marker,
     _table,
     _tree_trace,
 )
@@ -64,7 +63,7 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
         return _dict_pprint(node, depth, kind=kind)
 
     if dc.is_dataclass(node):
-        return _marked_dataclass_pprint(node, depth, kind=kind)
+        return _dataclass_pprint(node, depth, kind=kind)
 
     if isinstance(node, slice):
         return _slice_pprint(node)
@@ -238,13 +237,12 @@ def _namedtuple_pprint(node, depth: int, kind: str = "repr") -> str:
     return _format_width(fmt)
 
 
-@ft.lru_cache
-def _marked_dataclass_pprint(node: dict, depth: int, kind: str = "repr") -> str:
+def _dataclass_pprint(node: dict, depth: int, kind: str = "repr") -> str:
     printer = _printer_map[kind]
     name = node.__class__.__name__
-    vs = (getattr(node, f.name) for f in dc.fields(node) if f.repr)
+    vs = (node.__dict__[f.name] for f in dc.fields(node) if f.repr)
     fs = (f for f in dc.fields(node) if f.repr)
-    fmt = (f"{f.name}={_marker(f,v)}{printer(v,depth+1)}" for f, v in zip(fs, vs))
+    fmt = (f"{f.name}={printer(v,depth+1)}" for f, v in zip(fs, vs))
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = f"{name}(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"
     return _format_width(fmt)

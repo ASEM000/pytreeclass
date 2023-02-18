@@ -13,8 +13,6 @@ from typing import Any, Callable, NamedTuple, Sequence
 
 import numpy as np
 
-from pytreeclass._src.tree_freeze import freeze
-
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__datalcass_frozen__"
 _FIELD_MAP = "__dataclass_fields__"  # to make it work with `dataclasses.is_dataclass`
@@ -119,9 +117,8 @@ def _generate_field_map(cls) -> dict[str, Field]:
         if isinstance(value, Field):
             # the annotated attribute is a Field
             # assign the name and type to the Field from the annotation
-            field = value._replace(name=name, type=type)
             # decide to wrap the field in a frozen wrapper
-            field_map[name] = freeze(field) if field.frozen else field
+            field_map[name] = value._replace(name=name, type=type)
 
         elif value is _MISSING:
             # nothing is assigned to the annotated attribute

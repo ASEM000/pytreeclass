@@ -240,13 +240,10 @@ def _CallContext(tree: PyTree, inplace: bool = False):
         if not hasattr(tree, _FIELD_MAP):
             return tree
 
-        object.__setattr__(tree, _FROZEN, set_value)
+        tree.__dict__[_FROZEN] = set_value
         # traverse the tree
         for key in getattr(tree, _FIELD_MAP):
-            node = getattr(tree, key)
-            child = immutate_step(node, set_value)
-            tree.__dict__[key] = child
-
+            immutate_step(getattr(tree, key), set_value)
         return tree
 
     tree = tree if inplace else copy.copy(tree)

@@ -16,6 +16,7 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _patch_init_method,
 )
+from pytreeclass._src.tree_freeze import freeze, unfreeze
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
 from pytreeclass._src.tree_pprint import _TreePretty
@@ -29,7 +30,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise dc.FrozenInstanceError(msg)
 
-    object.__setattr__(tree, key, value)
+    tree.__dict__[key] = value
 
     if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
         field = Field(name=key, type=type(value))  # type: ignore
@@ -41,22 +42,19 @@ def _delattr(tree, key: str) -> None:
     """Delete the attribute of the  if tree is not frozen"""
     if getattr(tree, _FROZEN):
         raise dc.FrozenInstanceError(f"Cannot delete {key}.")
-    object.__delattr__(tree, key)
+    del tree.__dict__[key]
 
 
 def _new_wrapper(new_func):
     @ft.wraps(new_func)
     def new_method(cls, *_, **__) -> PyTree:
         self = object.__new__(cls)
-        field_map = getattr(self, _FIELD_MAP)
-        for key in field_map:
-
-            if field_map[key].default is not _MISSING:
-                # set the default value if it is not missing
-                object.__setattr__(self, key, field_map[key].default)
-            elif field_map[key].default_factory is not _MISSING:
-                # call the default factory to get the default value
-                object.__setattr__(self, key, field_map[key].default_factory())
+        self.__dict__[_FROZEN] = False
+        for field in dc.fields(self):
+            if field.default is not _MISSING:
+                setattr(self, field.name, field.default)
+            elif field.default_factory is not _MISSING:
+                setattr(self, field.name, field.default_factory())
         return self
 
     return new_method
@@ -68,9 +66,7 @@ def _validator_wrapper(attribute_name: str):
             try:
                 validator_func(value)
             except Exception as e:
-                # raise the same exception with the attribute name in the error message
-                msg = f"for field=`{attribute_name}`: {e}"
-                raise type(e)(msg)
+                raise type(e)(f"for field=`{attribute_name}`: {e}")
 
         return validate
 
@@ -80,7 +76,6 @@ def _validator_wrapper(attribute_name: str):
 def _init_wrapper(init_func):
     @ft.wraps(init_func)
     def init_method(self, *a, **k) -> None:
-        object.__setattr__(self, _FROZEN, False)
         output = init_func(self, *a, **k)
 
         # in case __post_init__ is defined then call it
@@ -88,7 +83,6 @@ def _init_wrapper(init_func):
         # here, we assume that __post_init__ is a method
         if _POST_INIT in vars(self.__class__):
             output = getattr(self, _POST_INIT)()
-        object.__setattr__(self, _FROZEN, True)
 
         # last stage of initialization i.e. post `__post_init__`
         # call the validator functions
@@ -98,10 +92,23 @@ def _init_wrapper(init_func):
                     # augment the error message -if exists- with the field name
                     _validator_wrapper(field.name)(validator)(getattr(self, field.name))
 
+            if field.frozen:
+                setattr(self, field.name, freeze(getattr(self, field.name)))
+
         # output must be None,otherwise will raise error
+        setattr(self, _FROZEN, True)
         return output
 
     return init_method
+
+
+def _get_wrapper(get_func):
+    @ft.wraps(get_func)
+    def get_method(self, key: str) -> Any:
+        # avoid non-scalar error, raised by `jax` transformation if a frozen value is returned.
+        return unfreeze(get_func(self, key))
+
+    return get_method
 
 
 def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
@@ -174,6 +181,7 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         # initialize class
         attrs.update(__new__=_new_wrapper(cls.__new__))
         attrs.update(__init__=_init_wrapper(cls.__init__))
+        attrs.update(__getattribute__=_get_wrapper(cls.__getattribute__))
 
         # immutable setters/deleters
         attrs.update(__setattr__=_setattr)
