@@ -4,12 +4,7 @@ import jax.tree_util as jtu
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass.tree_viz import (  # tree_mermaid,
-    tree_diagram,
-    tree_repr,
-    tree_str,
-    tree_summary,
-)
+from pytreeclass import tree_diagram, tree_repr, tree_str, tree_summary  # tree_mermaid,
 
 
 @pytc.treeclass
@@ -112,28 +107,16 @@ def test_tree_summary():
 
 
 def test_tree_diagram():
+    assert tree_diagram(r1, depth=0) == tree_diagram(r1f, depth=0) == "Repr1"
+
     assert (
-        tree_diagram(r1)
+        tree_diagram(r1, depth=1)
         # trunk-ignore(flake8/E501)
-        == "Repr1\n    ├── a:int=1\n    ├── b:str='string'\n    ├── c:float=1.0\n    ├── d:str='aaaaa'\n    ├── e:list=[10, 10, 10, 10, 10]\n    ├── f:set={1, 2, 3}\n    ├── g:dict\n    │   ├-─ a:str='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n    │   ├-─ b:str='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'\n    │   └-─ c:Array=f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   \n    ├── h:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    ├── i:Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    └── j:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   "
+        == "Repr1\n    ├── 'a':int=1\n    ├── 'b':str='string'\n    ├── 'c':float=1.0\n    ├── 'd':str='aaaaa'\n    ├── 'e':list=[10, 10, 10, 10, 10]\n    ├── 'f':set={1, 2, 3}\n    ├── 'g':dict={\n            a:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', \n            b:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', \n            c:f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n        }\n    ├── 'h':Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    ├── 'i':Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    └── 'j':Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)"
     )
 
     assert (
-        tree_diagram(r1f)
+        tree_diagram(r1f, depth=1)
         # trunk-ignore(flake8/E501)
-        == "Repr1\n    ├#─ a:int=1\n    ├#─ b:str='string'\n    ├── c:float=1.0\n    ├#─ d:str='aaaaa'\n    ├── e:list=[#10, #10, #10, #10, #10]\n    ├#─ f:set={1, 2, 3}\n    ├── g:dict\n    │   ├-─ a:FrozenWrapper=#'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n    │   ├-─ b:FrozenWrapper=#'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'\n    │   └-─ c:Array=f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   \n    ├── h:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    ├── i:Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    └── j:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)   "
+        == "Repr1\n    ├#─ 'a':FrozenWrapper=1\n    ├#─ 'b':FrozenWrapper='string'\n    ├── 'c':float=1.0\n    ├#─ 'd':FrozenWrapper='aaaaa'\n    ├── 'e':list=[#10, #10, #10, #10, #10]\n    ├#─ 'f':FrozenWrapper={1, 2, 3}\n    ├── 'g':dict={\n            a:#'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', \n            b:#'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', \n            c:f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n        }\n    ├── 'h':Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    ├── 'i':Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n    └── 'j':Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)"
     )
-
-
-# def test_tree_mermaid():
-#     assert (
-#         tree_mermaid(r1)
-#         # trunk-ignore(flake8/E501)
-#         == 'flowchart LR\n    id15696277213149321320(<b>Repr1</b>)\n    id15696277213149321320 ---> |"1 leaf<br>28.00B"| id159132120600507116["<b>a</b>:int=1"]\n    id15696277213149321320 ---> |"1 leaf<br>55.00B"| id10009280772564895168["<b>b</b>:str=\'string\'"]\n    id15696277213149321320 ---> |"1 leaf<br>24.00B"| id7572222925824649475["<b>c</b>:float=1.0"]\n    id15696277213149321320 ---> |"1 leaf<br>54.00B"| id10865740276892226484["<b>d</b>:str=\'aaaaa\'"]\n    id15696277213149321320 ---> |"5 leaves<br>140.00B"| id2269144855147062920["<b>e</b>:list=[10, 10, 10, 10, 10]"]\n    id15696277213149321320 ---> |"1 leaf<br>216.00B"| id18278831082116368843["<b>f</b>:set={1, 2, 3}"]\n    id15696277213149321320 ---> |"27 leaves<br>298.00B"| id9682235660371205279["<b>g</b>:dict={\n    a:\'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\', \n    b:\'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\', \n    c:f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n}"]\n    id15696277213149321320 ---> |"5 leaves<br>20.00B"| id12975753011438782288["<b>h</b>:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id15696277213149321320 ---> |"6 leaves<br>24.00B"| id10538695164698536595["<b>i</b>:Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id15696277213149321320 ---> |"20 leaves<br>80.00B"| id1942099742953373031["<b>j</b>:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]'
-#     )
-
-#     assert (
-#         tree_mermaid(r1f)
-#         # trunk-ignore(flake8/E501)
-#         == 'flowchart LR\n    id15696277213149321320(<b>Repr1</b>)\n    id15696277213149321320 --x id159132120600507116["<b>a</b>:int=1"]\n    id15696277213149321320 --x id10009280772564895168["<b>b</b>:str=\'string\'"]\n    id15696277213149321320 ---> |"1 leaf<br>24.00B"| id7572222925824649475["<b>c</b>:float=1.0"]\n    id15696277213149321320 --x id10865740276892226484["<b>d</b>:str=\'aaaaa\'"]\n    id15696277213149321320 ---> |"5 leaves<br>240.00B"| id2269144855147062920["<b>e</b>:list=[#10, #10, #10, #10, #10]"]\n    id15696277213149321320 --x id18278831082116368843["<b>f</b>:set={1, 2, 3}"]\n    id15696277213149321320 ---> |"27 leaves<br>196.00B"| id9682235660371205279["<b>g</b>:dict={\n    a:#\'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\', \n    b:#\'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\', \n    c:f32[5,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)\n}"]\n    id15696277213149321320 ---> |"5 leaves<br>20.00B"| id12975753011438782288["<b>h</b>:Array=f32[5,1] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id15696277213149321320 ---> |"6 leaves<br>24.00B"| id10538695164698536595["<b>i</b>:Array=f32[1,6] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]\n    id15696277213149321320 ---> |"20 leaves<br>80.00B"| id1942099742953373031["<b>j</b>:Array=f32[1,1,4,5] ∈[1.0,1.0] μ(σ)=1.0(0.0)"]'
-#     )

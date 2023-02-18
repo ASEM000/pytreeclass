@@ -19,7 +19,7 @@ from pytreeclass._src.tree_decorator import (
 from pytreeclass._src.tree_freeze import freeze, is_frozen
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
-from pytreeclass.tree_viz.tree_pprint import _TreePretty
+from pytreeclass._src.tree_pprint import _TreePretty
 
 PyTree = Any
 
