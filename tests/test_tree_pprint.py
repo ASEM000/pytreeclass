@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import namedtuple
 
+import jax
 import jax.tree_util as jtu
 from jax import numpy as jnp
 
@@ -210,3 +211,23 @@ def test_field_no_repr():
         # trunk-ignore(flake8/E501)
         == 'flowchart LR\n    id15696277213149321320(<b>Test</b>)\n    id15696277213149321320--->id12446973225081843704("<b>\'c\'</b>:tuple")\n    id12446973225081843704--->|"1 leaf<br>28.00B"|id9772267725759667989("<b>[0]</b>:int=1")\n    id15696277213149321320--->id12408280303145007954("<b>\'c\'</b>:tuple")\n    id12408280303145007954--->|"1 leaf<br>28.00B"|id7897116322308127883("<b>[1]</b>:int=2")\n    id15696277213149321320--->id8168961130706115346("<b>\'c\'</b>:tuple")\n    id8168961130706115346--->|"1 leaf<br>28.00B"|id2766159651176208202("<b>[2]</b>:int=3")\n    id15696277213149321320--->|"1 leaf<br>64.00B"|id4205845433746830897("<b>\'d\'</b>:Test=namedtuple(a=1, b=2, c=3)")'
     )
+
+
+def test_compiled_func_repr():
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(frozen=True)
+
+    func = Test(jax.jit(lambda x: x))
+    assert f"{func!r}" == "Test(a=#jit(Lambda(x)))"
+    assert f"{func!s}" == "Test(a=#jit(Lambda(x)))"
+
+
+def test_array_repr():
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(frozen=True)
+
+    assert f"{Test(jnp.array([1]))!r}" == "Test(a=#i32[1] ∈[1,1] μ(σ)=1.0(0.0))"
+    assert f"{Test(jnp.array([1.],dtype=jnp.complex64))!r}" == "Test(a=#c64[1])"
+    assert f"{Test(jnp.array([True]))!r}" == "Test(a=#bool[1])"

@@ -16,6 +16,7 @@ from jax._src.custom_derivatives import custom_jvp
 from jaxlib.xla_extension import CompiledFunction
 
 import pytreeclass as pytc
+from pytreeclass._src.tree_freeze import is_frozen
 from pytreeclass._src.tree_viz_util import (
     _calculate_node_info_stats,
     _format_count,
@@ -67,6 +68,9 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
 
     if isinstance(node, slice):
         return _slice_pprint(node)
+
+    if is_frozen(node):
+        return f"#{_node_pprint(node.unwrap(), depth, kind=kind)}"
 
     return _general_pprint(node, depth, kind=kind)
 
@@ -132,7 +136,8 @@ def _numpy_pprint(node: np.ndarray, depth: int, kind: str = "repr") -> str:
     # this part of the function is inspired by
     # lovely-jax https://github.com/xl0/lovely-jax
 
-    if issubclass(node.dtype.type, np.number):
+    if issubclass(node.dtype.type, (np.integer, np.floating)):
+
         # get min, max, mean, std of node
         low, high = np.min(node), np.max(node)
         # add brackets to indicate closed/open interval

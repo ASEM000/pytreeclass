@@ -354,3 +354,14 @@ def test_validators():
         @pytc.treeclass
         class Test:
             a: int = pytc.field(validators=[1])
+
+
+def test_treeclass_frozen_field():
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(frozen=True)
+
+    t = Test(1)
+
+    assert t.a == 1
+    assert jtu.tree_leaves(t) == []
