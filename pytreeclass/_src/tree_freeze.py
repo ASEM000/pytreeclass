@@ -15,7 +15,7 @@ PyTree = Any
 class _Wrapper:
     def __init__(self, x: Any):
         # disable composition of Wrappers
-        self.__wrapped__ = x.unwrap() if isinstance(x, _Wrapper) else x
+        self.__wrapped__ = unfreeze(x)
 
     def unwrap(self):
         return self.__wrapped__
@@ -55,7 +55,7 @@ class FrozenWrapper(_Wrapper):
         return f"#{self.unwrap()!s}"
 
     def tree_flatten(self):
-        return ((None,), _HashableWrapper(self.unwrap()))
+        return (None,), _HashableWrapper(self.unwrap())
 
     @classmethod
     def tree_unflatten(cls, treedef, _):
