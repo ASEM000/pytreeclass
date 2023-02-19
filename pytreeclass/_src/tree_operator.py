@@ -14,6 +14,7 @@ import numpy as np
 """A wrapper around a tree that allows to use the tree leaves as if they were scalars."""
 
 PyTree = Any
+_empty = inspect.Parameter.empty
 
 
 def _hash_node(node):
@@ -39,8 +40,8 @@ def _copy(tree: PyTree) -> PyTree:
 
 
 @ft.lru_cache(maxsize=None)
-def _transform_to_kwds_func(func: Callable) -> Callable:
-    """Convert a function to a all keyword accepting function to use `functools.partial` on any arg
+def _transform_to_pos_or_kwd_func(func: Callable) -> Callable:
+    """Convert a function positional only and keyword only args to positional or keyword args.
 
     Args:
         func : the function to be transformed to a all keyword args function
@@ -53,50 +54,34 @@ def _transform_to_kwds_func(func: Callable) -> Callable:
         Callable: transformed function with all args as keyword args
 
     Example:
-        >>> @_transform_to_kwds_func
-        ... def func(x,y=1,*,z=2):
-        ...     return x+y+z
+        >>> @_transform_to_pos_or_kwd_func
+        ... def func(a,b,/,*,c=1):
+        ...     return a+b
         >>> func
-        <function <lambda>(x=None, y=1, z=2)>
+        <function __main__.f(a, b, c=1)>
     """
-    # get the function signature
-    args, avar, kvar, args_default, kwds, kwds_default, _ = inspect.getfullargspec(func)
 
-    # Its not possible to use *args or **kwds, because its not possible to
-    # get their argnames and default values
-    if avar is not None:
-        raise ValueError("Variable length args are not supported")
+    sig = inspect.signature(func)
+    params = list(sig.parameters.values())
 
-    if kvar is not None:
-        raise ValueError("Variable length keyword args are not supported")
+    lhs, rhs = "lambda ", ""
 
-    del avar, kvar
+    for i, param in enumerate(params):
+        if param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD:
+            raise ValueError("Variable length argument is not supported")
 
-    # convert the args_default to a dict with the arg name as key
-    # if defaults are not provided, use `None`
-    args_default = args_default or ()
-    args_default = (None,) * (len(args) - len(args_default)) + args_default
-    args_default = dict(zip(args, args_default))
+        if param.kind != param.POSITIONAL_OR_KEYWORD:
+            params[i] = param.replace(kind=param.POSITIONAL_OR_KEYWORD)
 
-    kwds_default = kwds_default or {}
-    kwds_default = {k: kwds_default.get(k, None) for k in kwds}
+        lhs += f"{param.name}"
+        lhs += f"={param.default}," if param.default is not _empty else ","
+        rhs += f"{param.name}"
+        rhs += f"={param.name}," if param.kind == param.KEYWORD_ONLY else ","
 
-    del args
-
-    # positional args encoded as keyword args
-    lhs = ", ".join(f"{key}={args_default[key]}" for key in args_default)
-
-    # keyword-only args are encoded as keyword args
-    lhs += (("," + ", ".join(f"{k}={kwds_default[k]}" for k in kwds_default))) if kwds_default else ""  # fmt: skip
-
-    # reference the keyword only args by their name inside function
-    rhs = ", ".join(f"{key}" for key in args_default)
-    rhs += ("," + ",".join(f"{k}={k}" for k in kwds_default)) if kwds_default else ""
-    kwd_func = eval(f"lambda {lhs} : func({rhs})", {"func": func})
-
-    # copy original function docstring and add a note about the keyword only args
-    kwd_func.__doc__ = f"(keyworded transformed function) {func.__doc__}"
-    return kwd_func
+    new_func = eval(f"{lhs[:-1]}:func({rhs[:-1]})", {"func": func})
+    new_func = ft.wraps(func)(new_func)
+    new_func.__signature__ = sig.replace(parameters=params)
+    return new_func
 
 
 @ft.lru_cache(maxsize=None)
@@ -163,9 +148,8 @@ def bcmap(
     signature = inspect.getfullargspec(func)
     sig_argnames = signature[0]
 
-    # transform the function to a keyword accepting function to
-    # make it possible to use `functools.partial`
-    kwd_func = _transform_to_kwds_func(func)
+    # remove * and / from the signature to make it possible to use `functools.partial`
+    kwd_or_pos_func = _transform_to_pos_or_kwd_func(func)
 
     @ft.wraps(func)
     def wrapper(*args, **kwds):
@@ -248,7 +232,7 @@ def bcmap(
         # without kwd_func we would have to pass the leaves as positional arguments
         # which would not work if a middle arg is needed to be broadcasted
         # this is why we need to transform the function to a keyword accepting function
-        partial_func = ft.partial(kwd_func, **broadcast_kwds)
+        partial_func = ft.partial(kwd_or_pos_func, **broadcast_kwds)
         names = [name0] + list(no_broadcast_kwds.keys())
         flattened = (partial_func(**dict(zip(names, xs))) for xs in zip(*all_leaves))
         return treedef.unflatten(flattened)
