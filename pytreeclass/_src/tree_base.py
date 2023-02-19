@@ -115,7 +115,7 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     """Flatten rule for `jax.tree_flatten`"""
     # in essence anything not declared as a dataclass fields will be considered static
     static, dynamic = dict(tree.__dict__), dict()
-    for key in getattr(tree, _FIELD_MAP):
+    for key in tree.__class__.__dict__[_FIELD_MAP]:
         dynamic[key] = static.pop(key)
 
     return dynamic.values(), (dynamic.keys(), static)
@@ -157,6 +157,7 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
     """
 
     def decorator(cls, order, repr):
+        # check if the input is a valid class
         if not isinstance(cls, type):
             # non class input will raise an error
             msg = f"@treeclass accepts class as input. Found type={type(cls)}"
@@ -168,6 +169,10 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         if "__delattr__" in vars(cls):
             msg = f"Cannot define `__delattr__` in {cls.__name__}."
             raise dc.FrozenInstanceError(msg)
+        if "__getattr__" in vars(cls) or "__getattribute__" in vars(cls):
+            msg = "Cannot define `__getattribute__`"
+            msg += f"or `__setattr__` in {cls.__name__}."
+            raise AttributeError(msg)
 
         # generate and register field map to class.
         # generate init method if not defined based of the fields map

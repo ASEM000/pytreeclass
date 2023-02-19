@@ -180,6 +180,26 @@ def test_delattr():
         t.delete("a")
 
 
+def test_getattr():
+    with pytest.raises(AttributeError):
+
+        @pytc.treeclass
+        class L2:
+            a: int = 1
+
+            def __getattribute__(self, __name: str):
+                pass
+
+    with pytest.raises(AttributeError):
+
+        @pytc.treeclass
+        class L3:
+            a: int = 1
+
+            def __getattr__(self, __name: str):
+                pass
+
+
 def test_treeclass_decorator_arguments():
     @pytc.treeclass(repr=False)
     class Test:
