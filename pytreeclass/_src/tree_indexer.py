@@ -235,7 +235,7 @@ def _at_apply_str(
 
 
 @contextmanager
-def _CallContext(tree: PyTree, inplace: bool = False):
+def _CallContext(tree: PyTree):
     def immutate_step(tree, set_value):
         if not hasattr(tree, _FIELD_MAP):
             return tree
@@ -246,7 +246,7 @@ def _CallContext(tree: PyTree, inplace: bool = False):
             immutate_step(getattr(tree, key), set_value)
         return tree
 
-    tree = tree if inplace else copy.copy(tree)
+    tree = copy.copy(tree)
     immutate_step(tree, set_value=False)
     yield tree
     immutate_step(tree, set_value=True)

@@ -115,7 +115,6 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     """Flatten rule for `jax.tree_flatten`"""
     # in essence anything not declared as a dataclass fields will be considered static
     static, dynamic = dict(tree.__dict__), dict()
-    # avoid mutating the original dict by making a copy of dataclass fields
     for key in getattr(tree, _FIELD_MAP):
         dynamic[key] = static.pop(key)
 

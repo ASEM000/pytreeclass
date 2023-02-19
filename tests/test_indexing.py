@@ -544,10 +544,7 @@ def test_mutable_context():
 
     t = L2()
 
-    with _CallContext(t, inplace=False) as tx:
-        tx.delete("a")
-
-    with _CallContext(t, inplace=True) as tx:
+    with _CallContext(t) as tx:
         tx.delete("a")
 
     with pytest.raises(dc.FrozenInstanceError):
