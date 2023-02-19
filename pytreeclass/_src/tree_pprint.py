@@ -107,9 +107,10 @@ def _shape_dtype_struct_pprint(node: jax.ShapeDtypeStruct) -> str:
     """Pretty print jax.ShapeDtypeStruct"""
     shape = (
         f"{node.shape}".replace(",", "")
-        .replace("(", "[")
-        .replace(")", "]")
-        .replace(" ", ",")
+        .replace("(", "{")
+        .replace(")", "}")
+        .replace(" ", "x")
+        .replace("{}", "{0}")
     )
     if issubclass(node.dtype.type, np.integer):
         return f"{node.dtype}".replace("int", "i") + shape
@@ -121,12 +122,7 @@ def _shape_dtype_struct_pprint(node: jax.ShapeDtypeStruct) -> str:
 
 
 def _numpy_pprint(node: np.ndarray, depth: int, kind: str = "repr") -> str:
-    """Replace np.ndarray repr with short hand notation for type and shape
-
-    Example:
-        >>> _numpy_pprint(np.ones((2,3)))
-        'f64[2,3]∈[1.0,1.0]'
-    """
+    """Replace np.ndarray repr with short hand notation for type and shape"""
     if kind == "str":
         return _general_pprint(node, depth, kind="str")
 
@@ -150,13 +146,12 @@ def _numpy_pprint(node: np.ndarray, depth: int, kind: str = "repr") -> str:
             else f"{low:.1f},{high:.1f}"
         )
 
-        mean, std = np.mean(node), np.std(node)
         # add brackets to indicate closed/open interval
         interval += ")" if math.isinf(high) else "]"
         # replace inf with infinity symbol
         interval = interval.replace("inf", "∞")
         # return extended repr
-        return f"{base} ∈{interval} μ(σ)={mean:.1f}({std:.1f})"
+        return f"{base}∈{interval}"
 
     # kind is repr
     return base
@@ -331,12 +326,14 @@ def tree_diagram(tree, depth=float("inf")):
             if i > 0 and infos[i - 1].names[: depth + 1] == info.names[: depth + 1]:
                 continue
 
+            is_last = depth == max_depth - 1
+
             fmt += "\n\t"
             fmt += "".join(("" if index[i] == 0 else "│") + "\t" for i in range(depth))
             fmt += "├" if not index[depth] == 0 else "└"
-            mark = "#" if (info.frozen and depth == max_depth - 1) else "─"
-            fmt += f"{mark}─ {printer(name,depth)}:{type.__name__}"
-            fmt += f"={printer(info.node,depth+2)}" if depth == max_depth - 1 else ""
+            mark = "#" if (info.frozen and is_last) else "─"
+            fmt += f"{mark}─ {_node_pprint(name, kind='str')}"
+            fmt += f"={printer(info.node,depth+2)}" if is_last else f":{type.__name__}"
 
     return fmt.expandtabs(4)
 
@@ -464,7 +461,7 @@ def tree_mermaid(tree: PyTree, depth=float("inf")) -> str:
         size = _format_size(size)
 
         for depth, (name, type) in enumerate(zip(info.names, info.types)):
-            name = printer(name, 0)
+            name = _node_pprint(name, kind="str")
             prev_id = root_id if depth == 0 else cur_id
             cur_id = node_id((depth, tuple(info.index), prev_id))
             mark = "-..-" if info.frozen else "--->"
