@@ -102,11 +102,16 @@ def _init_wrapper(init_func):
     return init_method
 
 
-def _get_wrapper(get_func):
+def _get_wrapper(get_func, fail_get_func=None):
     @ft.wraps(get_func)
     def get_method(self, key: str) -> Any:
         # avoid non-scalar error, raised by `jax` transformation if a frozen value is returned.
-        return unfreeze(get_func(self, key))
+        try:
+            return unfreeze(get_func(self, key))
+        except AttributeError as error:
+            if fail_get_func is not None:
+                return unfreeze(fail_get_func(self, key))
+            raise type(error)(f"for attribute=`{key}`: {error}")
 
     return get_method
 
@@ -162,17 +167,11 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
             # non class input will raise an error
             msg = f"@treeclass accepts class as input. Found type={type(cls)}"
             raise TypeError(msg)
-        if "__setattr__" in vars(cls):
-            # check if `__setattr__` or `__delattr__` are defined in the class
-            msg = f"Cannot define `__setattr__` in {cls.__name__}."
-            raise dc.FrozenInstanceError(msg)
-        if "__delattr__" in vars(cls):
-            msg = f"Cannot define `__delattr__` in {cls.__name__}."
-            raise dc.FrozenInstanceError(msg)
-        if "__getattr__" in vars(cls) or "__getattribute__" in vars(cls):
-            msg = "Cannot define `__getattribute__`"
-            msg += f"or `__setattr__` in {cls.__name__}."
-            raise AttributeError(msg)
+
+        for method_name in ("__setattr__", "__delattr__", "__getattribute__"):
+            if method_name in vars(cls):
+                msg = f"Cannot define `{method_name}` in {cls.__name__}."
+                raise AttributeError(msg)
 
         # generate and register field map to class.
         # generate init method if not defined based of the fields map
@@ -185,7 +184,9 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         # initialize class
         attrs.update(__new__=_new_wrapper(cls.__new__))
         attrs.update(__init__=_init_wrapper(cls.__init__))
-        attrs.update(__getattribute__=_get_wrapper(cls.__getattribute__))
+
+        _getattr = getattr(cls, "__getattr__", None)
+        attrs.update(__getattribute__=_get_wrapper(cls.__getattribute__, _getattr))
 
         # immutable setters/deleters
         attrs.update(__setattr__=_setattr)

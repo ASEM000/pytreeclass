@@ -196,7 +196,7 @@ def test_getattr():
         class L3:
             a: int = 1
 
-            def __getattr__(self, __name: str):
+            def __getattribute__(self, __name: str):
                 pass
 
 
@@ -290,14 +290,14 @@ def test_non_class_input():
 
 def test_setattr_delattr():
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(AttributeError):
 
         @pytc.treeclass
         class Test:
             def __setattr__(self, k, v):
                 pass
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(AttributeError):
 
         @pytc.treeclass
         class _:

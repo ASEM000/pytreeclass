@@ -7,7 +7,7 @@ from pytreeclass._src.tree_decorator import (
     type_validator,
 )
 from pytreeclass._src.tree_freeze import freeze, is_frozen, is_nondiff, unfreeze
-from pytreeclass._src.tree_operator import batch_vmap, bcmap
+from pytreeclass._src.tree_operator import bcmap
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_mermaid,
@@ -22,7 +22,6 @@ __all__ = (
     "field",
     "is_tree_equal",
     "bcmap",
-    "batch_vmap",
     # pprint utils
     "tree_diagram",
     "tree_mermaid",

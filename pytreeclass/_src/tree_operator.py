@@ -7,7 +7,6 @@ import math
 import operator as op
 from typing import Any, Callable
 
-import jax
 import jax.tree_util as jtu
 import numpy as np
 
@@ -41,7 +40,7 @@ def _copy(tree: PyTree) -> PyTree:
 
 @ft.lru_cache(maxsize=None)
 def _transform_to_pos_or_kwd_func(func: Callable) -> Callable:
-    """Convert a function positional only and keyword only args to positional or keyword args.
+    """Function transformation to convert a function pos only and kwd only args to pos or kwd args.
 
     Args:
         func : the function to be transformed to a all keyword args function
@@ -58,7 +57,7 @@ def _transform_to_pos_or_kwd_func(func: Callable) -> Callable:
         ... def func(a,b,/,*,c=1):
         ...     return a+b
         >>> func
-        <function __main__.f(a, b, c=1)>
+        <function __main__.f(a, b, c=1)>  # removed / and * from the signature
     """
 
     sig = inspect.signature(func)
@@ -89,8 +88,8 @@ def bcmap(
     func: Callable[..., Any],
     *,
     is_leaf: Callable[[Any], bool] | None = None,
-    broadcast_argnames: tuple[str, ...] = None,
-    broadcast_argnums: tuple[int, ...] = None,
+    broadcasted_argnames: tuple[str, ...] = None,
+    broadcasted_argnums: tuple[int, ...] = None,
 ) -> Callable:
 
     """(map)s a function over pytrees leaves with automatic (b)road(c)asting for scalar arguments,
@@ -99,8 +98,8 @@ def bcmap(
     Args:
         func: the function to be mapped over the pytree
         is_leaf: a function that returns True if the argument is a leaf of the pytree
-        broadcast_argnames: the indices of the arguments that should be broadcasted.
-        broadcast_argnums: the names of the arguments that should be broadcasted
+        broadcasted_argnames: the indices of the arguments that should be broadcasted.
+        broadcasted_argnums: the names of the arguments that should be broadcasted
 
     Example:
         >>> @pytc.treeclass
@@ -151,24 +150,24 @@ def bcmap(
     # remove * and / from the signature to make it possible to use `functools.partial`
     kwd_or_pos_func = _transform_to_pos_or_kwd_func(func)
 
-    @ft.wraps(func)
+    @ft.wraps(kwd_or_pos_func)
     def wrapper(*args, **kwds):
         # automatically to handle the broadcasting of scalar arguments to pytree leaves
         broadcast_kwds, no_broadcast_kwds = dict(), dict()
 
-        if broadcast_argnums or broadcast_argnames:
+        if broadcasted_argnums or broadcasted_argnames:
             # here we handle the case where the user provides which
             # argnum and argname to broadcast over
 
-            if broadcast_argnums:
+            if broadcasted_argnums:
                 # the user provided positional args to broadcast
                 for name, argnum in zip(sig_argnames, range(len(args))):
-                    if argnum in broadcast_argnums:
+                    if argnum in broadcasted_argnums:
                         broadcast_kwds[name] = args[argnum]
 
-            if broadcast_argnames:
+            if broadcasted_argnames:
                 # the user provided keyword args to broadcast
-                for name in broadcast_argnames:
+                for name in broadcasted_argnames:
                     broadcast_kwds[name] = kwds[name]
 
             # handle non-broadcasted arg
@@ -219,8 +218,8 @@ def bcmap(
                     broadcast_kwds[key] = value
 
             # handle keyword-only args
-            for (key, value) in kwds.items():
-                if jtu.tree_structure(value) == treedef:
+            for key in kwds:
+                if jtu.tree_structure(kwds[key]) == treedef:
                     no_broadcast_kwds[key] = kwds[key]
                 else:
                     broadcast_kwds[key] = kwds[key]
@@ -239,69 +238,6 @@ def bcmap(
 
     wrapper.__doc__ = f"(broadcasted function) {func.__doc__}"
     return wrapper
-
-
-def batch_vmap(batch_size: int = 1, batch_argnum: int = 0, drop_remainder: bool = True):
-    """Batch the first array argument of a function, then apply vmap.
-    Args:
-        batch_size: batch size
-        batch_argnum: the index of the array argument to be batched. default is 0.
-        drop_remainder: whether to drop the last batch if it is smaller than batch_size.
-
-    Example:
-        >>> import jax.numpy as jnp
-        >>> x = jnp.ones([11,2])
-        >>> @batch_vmap(batch_size=3)
-        ... def f(x):
-        ...     # the function will modify the input array of shape
-        ...     # (11,2) -> (3,3,2), then will apply vmap to the function
-        ...     # on the batch dimension (i.e. axis=0)
-        ...     return jnp.sum(x)
-    """
-
-    if batch_size < 1 or not isinstance(batch_size, int):
-        raise ValueError("batch_size should be a positive integer.")
-
-    def func_wrapper(func):
-        def wrapper(*args, **kwargs):
-            # combine all positional arguments and kwargs into a single dict
-            all_args = {**dict(enumerate(args)), **kwargs}
-            # array is the first positional argument or the first value of the kwargs
-            key0 = next(iter(all_args))
-            array = all_args[key0]
-            shape = array.shape
-
-            if batch_argnum >= len(shape):
-                msg = "batch_argnum should map to a dimension in the array."
-                msg += f"found batch_argnum={batch_argnum} and ndim={array.ndim}."
-                raise ValueError(msg)
-
-            if shape[batch_argnum] % batch_size != 0:
-                if not drop_remainder:
-                    msg = f"dimension size={shape[batch_argnum]} at batch_argnum={batch_argnum} "
-                    msg += f"is not divisible by batch_size={batch_size}."
-                    raise ValueError(msg)
-
-                # drop remainder elements from array
-                limit_index = shape[batch_argnum] // batch_size * batch_size
-                array = jax.lax.slice_in_dim(array, 0, limit_index, 1, batch_argnum)
-                shape = array.shape
-
-            # reshape the array argument to
-            new_shape = list(shape)
-            new_shape[batch_argnum] = shape[batch_argnum] // batch_size
-            new_shape.insert(batch_argnum, batch_size)
-            array = array.reshape(new_shape)
-
-            # return array back to args or kwargs
-            all_args[key0] = array
-            # convert args back to positional arguments and kwargs
-            args = [all_args.pop(i) for i, _ in enumerate(args)]
-            return jax.vmap(func)(*args, **all_args)
-
-        return wrapper
-
-    return func_wrapper
 
 
 class _TreeOperator:

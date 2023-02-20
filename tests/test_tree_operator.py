@@ -9,7 +9,7 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_freeze import _hash_node
-from pytreeclass._src.tree_operator import batch_vmap, bcmap
+from pytreeclass._src.tree_operator import bcmap
 
 
 def test_bcmap():
@@ -55,13 +55,15 @@ def test_bcmap():
             return 0
 
     # test broadcasting with selected argnums/argnames
-    lhs = ft.partial(bcmap, broadcast_argnums=(1,))(jnp.where)(tree > 1, 0, tree)
+    lhs = ft.partial(bcmap, broadcasted_argnums=(1,))(jnp.where)(tree > 1, 0, tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = ft.partial(bcmap, broadcast_argnames=("x",))(jnp.where)(tree > 1, x=0, y=tree)
+    lhs = ft.partial(bcmap, broadcasted_argnames=("x",))(jnp.where)(
+        tree > 1, x=0, y=tree
+    )
     assert pytc.is_tree_equal(lhs, rhs)
 
-    lhs = ft.partial(bcmap, broadcast_argnums=(1,), broadcast_argnames=("x",))(
+    lhs = ft.partial(bcmap, broadcasted_argnums=(1,), broadcasted_argnames=("x",))(
         jnp.where
     )(tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
@@ -161,28 +163,3 @@ def test_hash_node():
     assert _hash_node(jnp.array([1, 2, 3]))
     assert _hash_node({1, 2, 3})
     assert _hash_node({"a": 1})
-
-
-def test_batch_vmap():
-    x = jnp.ones([11, 7, 5, 6])
-
-    f = lambda x: x
-
-    assert batch_vmap(batch_size=3)(f)(x).shape == (3, 3, 7, 5, 6)
-    assert batch_vmap(batch_size=2)(f)(x).shape == (2, 5, 7, 5, 6)
-    assert batch_vmap(batch_size=2, batch_argnum=1)(f)(x).shape == (11, 2, 3, 5, 6)
-    assert batch_vmap(batch_size=2, batch_argnum=-1)(f)(x).shape == (11, 7, 5, 2, 3)
-
-    with pytest.raises(ValueError):
-        batch_vmap(batch_size=0)(f)(x)
-
-    with pytest.raises(ValueError):
-        batch_vmap(batch_size=2, batch_argnum=4)(f)(x)
-
-    with pytest.raises(ValueError):
-        # 11 is not divisible by 2
-        batch_vmap(batch_size=2, batch_argnum=0, drop_remainder=False)(f)(x)
-
-    with pytest.raises(ValueError):
-        # 7 is not divisible by 2
-        batch_vmap(batch_size=2, batch_argnum=1, drop_remainder=False)(f)(x)
