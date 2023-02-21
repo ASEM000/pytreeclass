@@ -60,39 +60,46 @@ def _new_wrapper(new_func):
     return new_method
 
 
-def _validator_wrapper(attribute_name: str):
-    def func_wrapper(validator_func):
-        def validate(value: Any):
+def _validate_fields(tree, init: bool = True):
+    for field in dc.fields(tree):
+        # init means that we are validating fields that are initialized
+        if field.init is not init or field.validators is _MISSING:
+            continue
+
+        for validator in field.validators:
             try:
-                validator_func(value)
+                validator(getattr(tree, field.name))
             except Exception as e:
-                raise type(e)(f"for field=`{attribute_name}`: {e}")
-
-        return validate
-
-    return func_wrapper
+                stage = "__init__" if init else "__post_init__"
+                msg = f"Error at `{stage}` for field=`{field.name}`:\n{e}"
+                raise type(e)(msg)
 
 
 def _init_wrapper(init_func):
     @ft.wraps(init_func)
     def init_method(self, *a, **k) -> None:
         output = init_func(self, *a, **k)
+        # call validation on fields that are initialized
+        _validate_fields(self, init=True)
 
         # in case __post_init__ is defined then call it
         # after the tree is initialized
         # here, we assume that __post_init__ is a method
         if _POST_INIT in vars(self.__class__):
             output = getattr(self, _POST_INIT)()
+            # call validation on fields that are not initialized
+            _validate_fields(self, init=False)
 
-        # last stage of initialization i.e. post `__post_init__`
-        # call the validator functions
+        # handle freezing values and uninitialized fields
+
         for field in dc.fields(self):
-            if field.validators is not _MISSING:
-                for validator in field.validators:
-                    # augment the error message -if exists- with the field name
-                    _validator_wrapper(field.name)(validator)(getattr(self, field.name))
+            if field.name not in vars(self):
+                # at this point, all fields should be initialized
+                # in principle, this error will be caught when invoking `repr`/`str`
+                # but we raise it here for better error message.
+                raise AttributeError(f"field=`{field.name}` is not initialized.")
 
-            if field.frozen:
+            if field.frozen is True:
                 setattr(self, field.name, freeze(getattr(self, field.name)))
 
         # output must be None,otherwise will raise error
@@ -119,8 +126,8 @@ def _get_wrapper(get_func, fail_get_func=None):
 def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     """Flatten rule for `jax.tree_flatten`"""
     # in essence anything not declared as a dataclass fields will be considered static
-    static, dynamic = dict(tree.__dict__), dict()
-    for key in tree.__class__.__dict__[_FIELD_MAP]:
+    static, dynamic = dict(vars(tree)), dict()
+    for key in vars(tree.__class__)[_FIELD_MAP]:
         dynamic[key] = static.pop(key)
 
     return dynamic.values(), (dynamic.keys(), static)
@@ -134,7 +141,7 @@ def _unflatten(cls, treedef, leaves):
     return tree
 
 
-def treeclass(cls=None, *, order: bool = True, repr: bool = True):
+def treeclass(cls=None, *, order: bool = True):
     """Decorator to convert a class to a `treeclass`
 
     Example:
@@ -152,7 +159,6 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
     Args:
         cls: class to be converted to a `treeclass`
         order: if `True` the `treeclass` math operations will be applied leaf-wise (default: `True`)
-        repr: if `True` the `treeclass` will have a `__repr__`/ `__str__` method (default: `True`)
 
     Returns:`
         `treeclass` of the input class
@@ -161,7 +167,7 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         TypeError: if the input class is not a `class`
     """
 
-    def decorator(cls, order, repr):
+    def decorator(cls, order):
         # check if the input is a valid class
         if not isinstance(cls, type):
             # non class input will raise an error
@@ -179,7 +185,7 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         # for the purpose of this decorator.
         cls = _patch_init_method(cls)
 
-        attrs = dict(cls.__dict__)
+        attrs = dict(vars(cls))
 
         # initialize class
         attrs.update(__new__=_new_wrapper(cls.__new__))
@@ -207,8 +213,8 @@ def treeclass(cls=None, *, order: bool = True, repr: bool = True):
         return jtu.register_pytree_node_class(cls)
 
     if cls is None:
-        return lambda cls: decorator(cls, order, repr)  # @treeclass
-    return decorator(cls, order, repr)  # @treeclass(...)
+        return lambda cls: decorator(cls, order)  # @treeclass
+    return decorator(cls, order)  # @treeclass(...)
 
 
 def is_tree_equal(lhs: Any, rhs: Any) -> bool:

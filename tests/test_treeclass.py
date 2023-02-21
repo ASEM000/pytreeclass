@@ -201,14 +201,6 @@ def test_getattr():
 
 
 def test_treeclass_decorator_arguments():
-    @pytc.treeclass(repr=False)
-    class Test:
-        a: int = 1
-        b: int = 2
-        c: int = 3
-
-    assert "__repr__" not in Test.__dict__
-
     @pytc.treeclass(order=False)
     class Test:
         a: int = 1
@@ -385,3 +377,15 @@ def test_treeclass_frozen_field():
 
     assert t.a == 1
     assert jtu.tree_leaves(t) == []
+
+
+def test_key_error():
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(frozen=True)
+
+        def __init__(self) -> None:
+            return
+
+    with pytest.raises(AttributeError):
+        Test()

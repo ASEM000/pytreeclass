@@ -11,8 +11,6 @@ import sys
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence
 
-import numpy as np
-
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__datalcass_frozen__"
 _FIELD_MAP = "__dataclass_fields__"  # to make it work with `dataclasses.is_dataclass`
@@ -20,6 +18,8 @@ _POST_INIT = "__post_init__"
 
 
 class Field(NamedTuple):
+    # Immutable version of dataclasses.Field
+    # with the addition of `frozen` and `validators` attributes
     name: str | _MISSING = _MISSING
     type: type | _MISSING = _MISSING
     default: Any = _MISSING
@@ -112,14 +112,15 @@ def _generate_field_map(cls) -> dict[str, Field]:
         # get the value associated with the type hint
         # in essence will skip any non type-hinted attributes
         value = getattr(cls, name, _MISSING)
+        # at this point we stick to the type hint provided by the user
+        # inconsistency between the type hint and the value will be handled later
         type = annotations[name]
 
         if isinstance(value, Field):
-            # the annotated attribute is a Field
+            # the annotated attribute is a `Field``
             # assign the name and type to the Field from the annotation
-            # decide to wrap the field in a frozen wrapper
             field_map[name] = value._replace(name=name, type=type)
-
+        
         elif value is _MISSING:
             # nothing is assigned to the annotated attribute
             # then we create a Field and assign it to the class
@@ -206,115 +207,3 @@ def _patch_init_method(cls):
 
     setattr(cls, method.__name__, method)
     return cls
-
-
-def shape_validator(shape: tuple[int | None | Ellipsis]) -> Callable:
-    """A shape validator for numpy arrays
-
-    Args:
-        shape : A tuple of ints, Nones, or Ellipsis.
-
-    Returns:
-        validator : A function that takes a numpy array and checks if the shape is valid
-
-    Example:
-        >>> x = jnp.ones([1,2,3])
-        >>> shape_validator((1,2,3))(x)     # valid
-        >>> shape_validator((1,2,4))(x)     # invalid
-        >>> shape_validator((1,2,None))(x)  # valid
-        >>> shape_validator((1,...))(x)     # valid
-    """
-
-    ellipsis_index = None
-
-    # first lets check the input shape is valid
-    for index, dim in enumerate(shape):
-        if not isinstance(dim, (int, type(None), type(Ellipsis))):
-            msg = f"Expected a tuple of int, None or Ellipsis, got {type(dim)} at index={index}"
-            raise TypeError(msg)
-
-        if isinstance(dim, type(Ellipsis)):
-            if ellipsis_index is not None:
-                # allow only one ellipsis
-                raise ValueError(f"Only one Ellipsis is allowed, got {shape}")
-            ellipsis_index = index
-
-    def validator(x: Any) -> None:
-        if not hasattr(x, "shape"):
-            raise TypeError(f"Expected an object with a shape attribute, got {type(x)}")
-
-        new_shape = list(shape)
-
-        if ellipsis_index is not None:
-            # replace ellipsis with Nones
-            nones = [None] * (len(x.shape) - len(shape) + 1)
-            new_shape[ellipsis_index : ellipsis_index + 1] = nones
-
-        if len(new_shape) != len(x.shape):
-            msg = f"Shape length mismatch, expected a shape definition of length={len(shape)}, got {len(x.shape)}"
-            raise ValueError(msg)
-
-        for index, dim in enumerate(new_shape):
-            if dim is not None and dim != x.shape[index]:
-                msg = f"Shape mismatch, expected value at dimension={index} to have shape={dim}, "
-                msg += f"got shape={x.shape[index]}"
-                raise ValueError(msg)
-
-    return validator
-
-
-def type_validator(types: type | tuple[type, ...]) -> Callable:
-    """Returns a validator that checks if the value is an instance of the given types.
-
-    Example:
-        >>> x = 1
-        >>> type_validator(int)(x)  # no error, 1 is an instance of int
-        >>> type_validator((int, float))(x)  # no error, 1 is an instance of int
-        >>> type_validator(float)(x)  # TypeError raised because x is not an instance of float
-    """
-
-    def validator(x):
-        if not isinstance(x, types):
-            msg = f"Expected type in ({types}), for value=({x}), but got {type(x)}"
-            raise TypeError(msg)
-
-    return validator
-
-
-def range_validator(min=-float("inf"), max=float("inf")) -> Callable:
-    """Returns a validator that checks if the value is in the given range.
-
-    Example:
-        >>> x = 1
-        >>> range_validator(min=0)(x)  # no error
-        >>> range_validator(max=0)(x)  # ValueError raised because x is not in the range (-inf, 0]
-        >>> range_validator(min=0, max=2)(x)  # no error
-    """
-
-    def validator(x):
-        x = np.asarray(x)
-        if not np.all(x >= min):
-            msg = f"Value is not in range: min is not greater than or equal to {min}, got {x}"
-            raise ValueError(msg)
-        if not np.all(x <= max):
-            msg = f"Value is not in range: max is not less than or equal to {max}, got {x}"
-            raise ValueError(msg)
-
-    return validator
-
-
-def enum_validator(args: Any | tuple[Any, ...]) -> Callable:
-    """Returns a validator that checks if the value is in the given set.
-
-    Example:
-        >>> x = 1
-        >>> enum_validator((1, 2, 3))(x)  # no error, 1 is in the set (1, 2, 3)
-        >>> enum_validator(2)(x)  # ValueError raised because x is not in the set (2,)
-    """
-    args = (args,) if not isinstance(args, tuple) else args
-
-    def validator(x):
-        if x not in args:
-            raise ValueError(f"Expected value in ({args}), for value=({x})")
-
-    return validator
