@@ -7,6 +7,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
+from pytreeclass._src.tree_decorator import _FIELD_MAP
 
 
 def test_field():
@@ -23,7 +24,7 @@ def test_field():
     class Test:
         a: int = pytc.field(default=1, metadata={"a": 1})
 
-    assert Test().__dataclass_fields__["a"].metadata["a"] == 1
+    assert getattr(Test(), _FIELD_MAP)["a"].metadata["a"] == 1
 
 
 def test_field_nondiff():
@@ -297,11 +298,12 @@ def test_setattr_delattr():
                 pass
 
 
-def test_validators():
+def test_callbacks():
     def instance_validator(types):
         def _instance_validator(x):
             if isinstance(x, types) is False:
                 raise AssertionError
+            return x
 
         return _instance_validator
 
@@ -309,12 +311,13 @@ def test_validators():
         def _range_validator(x):
             if x < min or x > max:
                 raise AssertionError
+            return x
 
         return _range_validator
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(validators=[instance_validator(int)])
+        a: int = pytc.field(callbacks=[instance_validator(int)])
 
     with pytest.raises(AssertionError):
         Test(a="a")
@@ -323,7 +326,7 @@ def test_validators():
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(validators=[instance_validator((int, float))])
+        a: int = pytc.field(callbacks=[instance_validator((int, float))])
 
     assert Test(a=1).a == 1
     assert Test(a=1.0).a == 1.0
@@ -333,7 +336,7 @@ def test_validators():
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(validators=[range_validator(0, 10)])
+        a: int = pytc.field(callbacks=[range_validator(0, 10)])
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -345,9 +348,7 @@ def test_validators():
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(
-            validators=[range_validator(0, 10), instance_validator(int)]
-        )
+        a: int = pytc.field(callbacks=[range_validator(0, 10), instance_validator(int)])
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -359,19 +360,19 @@ def test_validators():
 
         @pytc.treeclass
         class Test:
-            a: int = pytc.field(validators=1)
+            a: int = pytc.field(callbacks=1)
 
     with pytest.raises(TypeError):
 
         @pytc.treeclass
         class Test:
-            a: int = pytc.field(validators=[1])
+            a: int = pytc.field(callbacks=[1])
 
 
 def test_treeclass_frozen_field():
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(frozen=True)
+        a: int = pytc.field(callbacks=[pytc.freeze])
 
     t = Test(1)
 
@@ -382,7 +383,7 @@ def test_treeclass_frozen_field():
 def test_key_error():
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(frozen=True)
+        a: int = pytc.field()
 
         def __init__(self) -> None:
             return

@@ -16,7 +16,7 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _patch_init_method,
 )
-from pytreeclass._src.tree_freeze import freeze, unfreeze
+from pytreeclass._src.tree_freeze import unfreeze
 from pytreeclass._src.tree_indexer import _TreeAtIndexer
 from pytreeclass._src.tree_operator import _TreeOperator
 from pytreeclass._src.tree_pprint import _TreePretty
@@ -50,7 +50,7 @@ def _new_wrapper(new_func):
     def new_method(cls, *_, **__) -> PyTree:
         self = object.__new__(cls)
         self.__dict__[_FROZEN] = False
-        for field in dc.fields(self):
+        for field in cls.__dict__[_FIELD_MAP].values():
             if field.default is not _MISSING:
                 setattr(self, field.name, field.default)
             elif field.default_factory is not _MISSING:
@@ -60,15 +60,18 @@ def _new_wrapper(new_func):
     return new_method
 
 
-def _validate_fields(tree, init: bool = True):
-    for field in dc.fields(tree):
+def _apply_callbacks(tree, init: bool = True):
+    for field in tree.__class__.__dict__[_FIELD_MAP].values():
         # init means that we are validating fields that are initialized
-        if field.init is not init or field.validators is _MISSING:
+        if field.init is not init or field.callbacks is _MISSING:
             continue
 
-        for validator in field.validators:
+        for callback in field.callbacks:
             try:
-                validator(getattr(tree, field.name))
+                # callback is a function that takes the value of the field
+                # and returns a modified value
+                value = callback(getattr(tree, field.name))
+                setattr(tree, field.name, value)
             except Exception as e:
                 stage = "__init__" if init else "__post_init__"
                 msg = f"Error at `{stage}` for field=`{field.name}`:\n{e}"
@@ -79,8 +82,8 @@ def _init_wrapper(init_func):
     @ft.wraps(init_func)
     def init_method(self, *a, **k) -> None:
         output = init_func(self, *a, **k)
-        # call validation on fields that are initialized
-        _validate_fields(self, init=True)
+        # call callbacks on fields that are initialized
+        _apply_callbacks(self, init=True)
 
         # in case __post_init__ is defined then call it
         # after the tree is initialized
@@ -88,19 +91,16 @@ def _init_wrapper(init_func):
         if _POST_INIT in vars(self.__class__):
             output = getattr(self, _POST_INIT)()
             # call validation on fields that are not initialized
-            _validate_fields(self, init=False)
+            _apply_callbacks(self, init=False)
 
         # handle freezing values and uninitialized fields
 
-        for field in dc.fields(self):
+        for field in self.__class__.__dict__[_FIELD_MAP].values():
             if field.name not in vars(self):
                 # at this point, all fields should be initialized
                 # in principle, this error will be caught when invoking `repr`/`str`
-                # but we raise it here for better error message.
+                # like in `dataclasses` but we raise it here for better error message.
                 raise AttributeError(f"field=`{field.name}` is not initialized.")
-
-            if field.frozen is True:
-                setattr(self, field.name, freeze(getattr(self, field.name)))
 
         # output must be None,otherwise will raise error
         setattr(self, _FROZEN, True)
@@ -112,7 +112,8 @@ def _init_wrapper(init_func):
 def _get_wrapper(get_func, fail_get_func=None):
     @ft.wraps(get_func)
     def get_method(self, key: str) -> Any:
-        # avoid non-scalar error, raised by `jax` transformation if a frozen value is returned.
+        # avoid non-scalar error, raised by `jax` transformation
+        # if a frozen value is returned.
         try:
             return unfreeze(get_func(self, key))
         except AttributeError as error:
@@ -125,7 +126,7 @@ def _get_wrapper(get_func, fail_get_func=None):
 
 def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     """Flatten rule for `jax.tree_flatten`"""
-    # in essence anything not declared as a dataclass fields will be considered static
+    # in essence anything not declared in dataclass fields will be considered static
     static, dynamic = dict(vars(tree)), dict()
     for key in vars(tree.__class__)[_FIELD_MAP]:
         dynamic[key] = static.pop(key)

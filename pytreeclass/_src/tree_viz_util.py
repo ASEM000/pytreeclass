@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses as dc
 import math
 import sys
 from itertools import chain
@@ -9,6 +8,7 @@ from typing import Any, NamedTuple, Sequence
 import numpy as np
 from jax._src.tree_util import _registry
 
+from pytreeclass._src.tree_decorator import _dataclass_like_fields, _is_dataclass_like
 from pytreeclass._src.tree_freeze import is_frozen, unfreeze
 
 PyTree = Any
@@ -113,11 +113,12 @@ def _tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
             names = (slice(i, i + 1) for i in range(len(info.node)))
             reprs = (info.repr,) * len(info.node)
             frozen = (is_frozen(leaf) or info.frozen for leaf in leaves)
-        elif dc.is_dataclass(info.node):
-            names = (f"{f.name}" for f in dc.fields(info.node))
-            reprs = (info.repr and f.repr for f in dc.fields(info.node))
-            lfs = zip(leaves, dc.fields(info.node))
-            frozen = (is_frozen(leaf) or info.frozen or is_frozen(field) for leaf, field in lfs)  # fmt: skip
+        elif _is_dataclass_like(info.node):
+            fields = _dataclass_like_fields(info.node)
+            names = (f"{f.name}" for f in fields)
+            reprs = (info.repr and f.repr for f in fields)
+            frozen = (is_frozen(leaf) or info.frozen for leaf in leaves)
+
         else:
             names = (f"leaf_{i}" for i in range(len(leaves)))
             reprs = (info.repr,) * len(leaves)

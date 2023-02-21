@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ctypes
-import dataclasses as dc
 import functools as ft
 import inspect
 import math
@@ -19,9 +18,11 @@ import pytreeclass as pytc
 from pytreeclass._src.tree_freeze import is_frozen
 from pytreeclass._src.tree_viz_util import (
     _calculate_node_info_stats,
+    _dataclass_like_fields,
     _format_count,
     _format_size,
     _format_width,
+    _is_dataclass_like,
     _table,
     _tree_trace,
 )
@@ -63,8 +64,8 @@ def _node_pprint(node: Any, depth: int = 0, kind: str = "repr") -> str:
     if isinstance(node, dict):
         return _dict_pprint(node, depth, kind=kind)
 
-    if dc.is_dataclass(node):
-        return _dataclass_pprint(node, depth, kind=kind)
+    if _is_dataclass_like(node):
+        return _dataclass_like_pprint(node, depth, kind=kind)
 
     if isinstance(node, slice):
         return _slice_pprint(node)
@@ -237,11 +238,13 @@ def _namedtuple_pprint(node, depth: int, kind: str = "repr") -> str:
     return _format_width(fmt)
 
 
-def _dataclass_pprint(node: dict, depth: int, kind: str = "repr") -> str:
+def _dataclass_like_pprint(node, depth: int, kind: str = "repr") -> str:
     printer = _printer_map[kind]
     name = node.__class__.__name__
-    vs = (node.__dict__[f.name] for f in dc.fields(node) if f.repr)
-    fs = (f for f in dc.fields(node) if f.repr)
+    fields = _dataclass_like_fields(node)
+
+    vs = (node.__dict__[f.name] for f in fields if f.repr)
+    fs = (f for f in fields if f.repr)
     fmt = (f"{f.name}={printer(v,depth+1)}" for f, v in zip(fs, vs))
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = f"{name}(\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + ")"

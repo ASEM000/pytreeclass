@@ -12,14 +12,15 @@ from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence
 
 _MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
-_FROZEN = "__datalcass_frozen__"
-_FIELD_MAP = "__dataclass_fields__"  # to make it work with `dataclasses.is_dataclass`
+_FROZEN = "__FROZEN__"
+_FIELD_MAP = "__FIELD_MAP__"  # to make it work with `dataclasses.is_dataclass`
 _POST_INIT = "__post_init__"
+_MUTABLE_TYPES = (list, dict, set)
 
 
 class Field(NamedTuple):
     # Immutable version of dataclasses.Field
-    # with the addition of `frozen` and `validators` attributes
+    # with the addition `callbacks` attributes
     name: str | _MISSING = _MISSING
     type: type | _MISSING = _MISSING
     default: Any = _MISSING
@@ -28,11 +29,7 @@ class Field(NamedTuple):
     repr: bool = True
     kw_only: bool = False
     metadata: MappingProxyType | _MISSING = _MISSING
-    frozen: bool = False
-    validators: Sequence[Callable] | _MISSING = _MISSING
-    # make it get recognized as a dataclass field
-    # to make it work with `dataclasses.fields`
-    _field_type = dc._FIELD
+    callbacks: Sequence[Callable] | _MISSING = _MISSING
 
 
 def field(
@@ -43,8 +40,7 @@ def field(
     repr: bool = True,
     kw_only: bool = False,
     metadata: dict | _MISSING = _MISSING,
-    frozen: bool = False,
-    validators: Sequence[Callable] | _MISSING = _MISSING,
+    callbacks: Sequence[Callable] | _MISSING = _MISSING,
 ):
     """
     default: The default value of the field.
@@ -52,9 +48,8 @@ def field(
     init: Whether the field is included in the object's __init__ function.
     repr: Whether the field is included in the object's __repr__ function.
     kw_only: Whether the field is keyword-only.
-    frozen: Whether the field is frozen, if frozen its excluded from `jax` transformations.
     metadata: A mapping of user-defined data for the field.
-    validators: A sequence of functions to call after initialization to validate the field value.
+    callbacks: A sequence of functions to call after initialization to modify the field value.
     """
 
     if default is not _MISSING and default_factory is not _MISSING:
@@ -67,15 +62,15 @@ def field(
     elif metadata is not _MISSING:
         raise TypeError("`metadata` must be a dict")
 
-    # check if validators is a Sequence of functions
-    if isinstance(validators, Sequence):
-        for index, validator in enumerate(validators):
-            if not isinstance(validator, (Callable, type(_MISSING))):
-                msg = f"`validators` must be a Sequence of functions, got {type(validator)}"
+    # check if `callbacks` is a Sequence of functions
+    if isinstance(callbacks, Sequence):
+        for index, callback in enumerate(callbacks):
+            if not isinstance(callback, Callable):
+                msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
                 msg += f" at index={index}"
                 raise TypeError(msg)
-    elif validators is not _MISSING:
-        msg = f"`validators` must be a Sequence of functions, got {type(validators)}"
+    elif callbacks is not _MISSING:
+        msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
         raise TypeError(msg)
 
     # set name and type post initialization
@@ -88,8 +83,7 @@ def field(
         repr=repr,
         kw_only=kw_only,
         metadata=metadata,
-        frozen=frozen,
-        validators=validators,
+        callbacks=callbacks,
     )
 
 
@@ -120,7 +114,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
             # the annotated attribute is a `Field``
             # assign the name and type to the Field from the annotation
             field_map[name] = value._replace(name=name, type=type)
-        
+
         elif value is _MISSING:
             # nothing is assigned to the annotated attribute
             # then we create a Field and assign it to the class
@@ -129,7 +123,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
         else:
             # the annotated attribute has a non-field default value
             # check for mutable types and raise an error if found
-            if isinstance(value, (list, dict, set)):
+            if isinstance(value, _MUTABLE_TYPES):
                 msg = f"mutable value= {(value)} is not allowed as a value"
                 msg += f" for field `{name}` in class `{cls.__name__}`.\n"
                 msg += f" use `field(default_factory=lambda:{value})` instead"
@@ -158,8 +152,6 @@ def _patch_init_method(cls):
 
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
-    # here, for `validator` will be handled in the `__post_init__` method in `treeclass`
-    # and for `frozen` is handled in `_generate_field_map`
     head = body = ""
 
     for key in field_map:
@@ -207,3 +199,18 @@ def _patch_init_method(cls):
 
     setattr(cls, method.__name__, method)
     return cls
+
+
+def _is_dataclass_like(node):
+    # maybe include other dataclass-like objects here?
+    return dc.is_dataclass(node) or hasattr(node, _FIELD_MAP)
+
+
+def _dataclass_like_fields(node):
+    """Get the fields of a dataclass-like object."""
+    # maybe include other dataclass-like objects here?
+    if not _is_dataclass_like(node):
+        raise TypeError(f"Cannot get fields from {node!r}.")
+    if dc.is_dataclass(node):
+        return dc.fields(node)
+    return getattr(node, _FIELD_MAP).values()
