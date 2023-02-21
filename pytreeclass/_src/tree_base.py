@@ -11,7 +11,7 @@ import numpy as np
 from pytreeclass._src.tree_decorator import (
     _FIELD_MAP,
     _FROZEN,
-    _MISSING,
+    _NOT_SET,
     _POST_INIT,
     Field,
     _patch_init_method,
@@ -51,9 +51,9 @@ def _new_wrapper(new_func):
         self = object.__new__(cls)
         self.__dict__[_FROZEN] = False
         for field in cls.__dict__[_FIELD_MAP].values():
-            if field.default is not _MISSING:
+            if field.default is not _NOT_SET:
                 setattr(self, field.name, field.default)
-            elif field.default_factory is not _MISSING:
+            elif field.default_factory is not None:
                 setattr(self, field.name, field.default_factory())
         return self
 
@@ -63,7 +63,7 @@ def _new_wrapper(new_func):
 def _apply_callbacks(tree, init: bool = True):
     for field in tree.__class__.__dict__[_FIELD_MAP].values():
         # init means that we are validating fields that are initialized
-        if field.init is not init or field.callbacks is _MISSING:
+        if field.init is not init or field.callbacks is None:
             continue
 
         for callback in field.callbacks:

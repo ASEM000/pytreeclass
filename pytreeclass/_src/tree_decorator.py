@@ -11,7 +11,7 @@ import sys
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence
 
-_MISSING = type("MISSING", (), {"__repr__": lambda _: "?"})()
+_NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__FROZEN__"
 _FIELD_MAP = "__FIELD_MAP__"  # to make it work with `dataclasses.is_dataclass`
 _POST_INIT = "__post_init__"
@@ -21,26 +21,26 @@ _MUTABLE_TYPES = (list, dict, set)
 class Field(NamedTuple):
     # Immutable version of dataclasses.Field
     # with the addition `callbacks` attributes
-    name: str | _MISSING = _MISSING
-    type: type | _MISSING = _MISSING
-    default: Any = _MISSING
-    default_factory: Any = _MISSING
+    name: str | None = None
+    type: type | None = None
+    default: Any = _NOT_SET
+    default_factory: Any = None
     init: bool = True
     repr: bool = True
     kw_only: bool = False
-    metadata: MappingProxyType | _MISSING = _MISSING
-    callbacks: Sequence[Callable] | _MISSING = _MISSING
+    metadata: MappingProxyType | None = None
+    callbacks: Sequence[Callable] | None = None
 
 
 def field(
     *,
-    default: Any | _MISSING = _MISSING,
-    default_factory: Any | _MISSING = _MISSING,
+    default: Any | _NOT_SET = _NOT_SET,
+    default_factory: Any | None = None,
     init: bool = True,
     repr: bool = True,
     kw_only: bool = False,
-    metadata: dict | _MISSING = _MISSING,
-    callbacks: Sequence[Callable] | _MISSING = _MISSING,
+    metadata: dict | None = None,
+    callbacks: Sequence[Callable] | None = None,
 ):
     """
     default: The default value of the field.
@@ -52,14 +52,14 @@ def field(
     callbacks: A sequence of functions to call after initialization to modify the field value.
     """
 
-    if default is not _MISSING and default_factory is not _MISSING:
+    if default is not _NOT_SET and default_factory is not None:
         # this is the similar behavior to `dataclasses`
         raise ValueError("Cannot specify both `default` and `default_factory`")
 
     # check metadata
     if isinstance(metadata, dict):
         metadata = MappingProxyType(metadata)
-    elif metadata is not _MISSING:
+    elif metadata is not None:
         raise TypeError("`metadata` must be a dict")
 
     # check if `callbacks` is a Sequence of functions
@@ -69,14 +69,14 @@ def field(
                 msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
                 msg += f" at index={index}"
                 raise TypeError(msg)
-    elif callbacks is not _MISSING:
+    elif callbacks is not None:
         msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
         raise TypeError(msg)
 
     # set name and type post initialization
     return Field(
-        name=_MISSING,
-        type=_MISSING,
+        name=None,
+        type=None,
         default=default,
         default_factory=default_factory,
         init=init,
@@ -105,7 +105,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
     for name in annotations:
         # get the value associated with the type hint
         # in essence will skip any non type-hinted attributes
-        value = getattr(cls, name, _MISSING)
+        value = getattr(cls, name, _NOT_SET)
         # at this point we stick to the type hint provided by the user
         # inconsistency between the type hint and the value will be handled later
         type = annotations[name]
@@ -115,7 +115,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
             # assign the name and type to the Field from the annotation
             field_map[name] = value._replace(name=name, type=type)
 
-        elif value is _MISSING:
+        elif value is _NOT_SET:
             # nothing is assigned to the annotated attribute
             # then we create a Field and assign it to the class
             field_map[name] = Field(name=name, type=type)
@@ -162,14 +162,14 @@ def _patch_init_method(cls):
         # add keyword marker in we have a `kw_only` field
         head += "*, " if (field.kw_only and "*" not in head and field.init) else ""
 
-        if field.default is not _MISSING:
+        if field.default is not _NOT_SET:
             # we add the default into the function head (def f(.. x= default_value))
             # if the the field require initialization. if not, then omit it from head
             head += f"{key}={mark0}, " if field.init else ""
             # we then add self.x = x for the body function if field is initialized
             # otherwise, define the default value inside the body ( self.x = default_value)
             body += f"{mark1}=" + (f"{key}; " if field.init else f"{mark0};")
-        elif field.default_factory is not _MISSING:
+        elif field.default_factory is not None:
             # same story for functions as above
             head += f"{key}={mark0}_factory(), " if field.init else ""
             body += f"{mark1}=" + (f"{key};" if field.init else f"{mark0}_factory();")
