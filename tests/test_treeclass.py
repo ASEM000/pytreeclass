@@ -7,7 +7,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_decorator import _FIELD_MAP
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _dataclass_like_fields
 
 
 def test_field():
@@ -390,3 +390,14 @@ def test_key_error():
 
     with pytest.raises(AttributeError):
         Test()
+
+
+def test_dataclass_fields_like():
+    @dc.dataclass
+    class Test:
+        a: int = 1
+
+    assert _dataclass_like_fields(Test) == dc.fields(Test)
+
+    with pytest.raises(TypeError):
+        _dataclass_like_fields(1)

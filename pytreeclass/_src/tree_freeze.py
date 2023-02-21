@@ -51,9 +51,6 @@ class FrozenWrapper(_Wrapper):
     def __repr__(self) -> str:
         return f"#{self.unwrap()!r}"
 
-    def __str__(self) -> str:
-        return f"#{self.unwrap()!s}"
-
     def tree_flatten(self):
         return (None,), _HashableWrapper(self.unwrap())
 
