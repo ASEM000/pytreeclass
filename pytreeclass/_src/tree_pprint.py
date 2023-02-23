@@ -129,33 +129,34 @@ def _numpy_pprint(node: np.ndarray, depth: int, kind: str = "repr") -> str:
 
     base = _shape_dtype_struct_pprint(node)
 
+    if not issubclass(node.dtype.type, (np.integer, np.floating)):
+        return base
+
+    if node.size == 0:
+        return base
+
     # Extended repr for numpy array, with extended information
     # this part of the function is inspired by
     # lovely-jax https://github.com/xl0/lovely-jax
 
-    if issubclass(node.dtype.type, (np.integer, np.floating)):
+    # get min, max, mean, std of node
+    low, high = np.min(node), np.max(node)
+    # add brackets to indicate closed/open interval
+    interval = "(" if math.isinf(low) else "["
+    # if issubclass(node.dtype.type, np.integer):
+    # if integer, round to nearest integer
+    interval += (
+        f"{low},{high}"
+        if issubclass(node.dtype.type, np.integer)
+        else f"{low:.1f},{high:.1f}"
+    )
 
-        # get min, max, mean, std of node
-        low, high = np.min(node), np.max(node)
-        # add brackets to indicate closed/open interval
-        interval = "(" if math.isinf(low) else "["
-        # if issubclass(node.dtype.type, np.integer):
-        # if integer, round to nearest integer
-        interval += (
-            f"{low},{high}"
-            if issubclass(node.dtype.type, np.integer)
-            else f"{low:.1f},{high:.1f}"
-        )
-
-        # add brackets to indicate closed/open interval
-        interval += ")" if math.isinf(high) else "]"
-        # replace inf with infinity symbol
-        interval = interval.replace("inf", "∞")
-        # return extended repr
-        return f"{base}∈{interval}"
-
-    # kind is repr
-    return base
+    # add brackets to indicate closed/open interval
+    interval += ")" if math.isinf(high) else "]"
+    # replace inf with infinity symbol
+    interval = interval.replace("inf", "∞")
+    # return extended repr
+    return f"{base}∈{interval}"
 
 
 @ft.lru_cache

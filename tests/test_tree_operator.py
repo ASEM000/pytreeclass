@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools as ft
 import math
 
 import jax.numpy as jnp
@@ -43,29 +42,6 @@ def test_bcmap():
     assert pytc.is_tree_equal(lhs, rhs)
 
     lhs = bcmap(jnp.where)(condition=tree > 1, x=0, y=tree)
-    assert pytc.is_tree_equal(lhs, rhs)
-
-    with pytest.raises(ValueError):
-        bcmap(lambda *x: x)(tree)
-
-    with pytest.raises(ValueError):
-
-        @bcmap
-        def func(**k):
-            return 0
-
-    # test broadcasting with selected argnums/argnames
-    lhs = ft.partial(bcmap, broadcasted_argnums=(1,))(jnp.where)(tree > 1, 0, tree)
-    assert pytc.is_tree_equal(lhs, rhs)
-
-    lhs = ft.partial(bcmap, broadcasted_argnames=("x",))(jnp.where)(
-        tree > 1, x=0, y=tree
-    )
-    assert pytc.is_tree_equal(lhs, rhs)
-
-    lhs = ft.partial(bcmap, broadcasted_argnums=(1,), broadcasted_argnames=("x",))(
-        jnp.where
-    )(tree > 1, x=0, y=tree)
     assert pytc.is_tree_equal(lhs, rhs)
 
 

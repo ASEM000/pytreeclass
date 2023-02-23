@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from collections import namedtuple
 
-import jax
+# import jax
 import jax.tree_util as jtu
 import pytest
 from jax import numpy as jnp
