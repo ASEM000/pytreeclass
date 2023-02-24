@@ -103,7 +103,7 @@ def _at_reduce_pytree(
     tree: PyTree,
     where: PyTree,
     func: Callable[[Any], Any],
-    is_leaf: Callable[[Any], bool],
+    is_leaf: Callable[[Any], bool] | None,
     initializer: Any,
 ):
     return jtu.tree_reduce(func, tree.at[where].get(is_leaf=is_leaf), initializer)
@@ -113,16 +113,18 @@ class PyTreeIndexer(NamedTuple):
     tree: PyTree
     where: PyTree
 
-    def get(self, *, is_leaf: Callable[[Any], bool] = None):
+    def get(self, *, is_leaf: Callable[[Any], bool] | None = None):
         return _at_get_pytree(self.tree, self.where, is_leaf=is_leaf)
 
-    def set(self, set_value, *, is_leaf: Callable[[Any], bool] = None):
+    def set(self, set_value, *, is_leaf: Callable[[Any], bool] | None = None):
         return _at_set_pytree(copy.copy(self.tree), self.where, set_value, is_leaf)
 
-    def apply(self, func, *, is_leaf: Callable[[Any], bool] = None):
+    def apply(self, func, *, is_leaf: Callable[[Any], bool] | None = None):
         return _at_apply_pytree(copy.copy(self.tree), self.where, func, is_leaf)
 
-    def reduce(self, func, *, is_leaf: Callable[[Any], bool] = None, initializer=0):
+    def reduce(
+        self, func, *, is_leaf: Callable[[Any], bool] | None = None, initializer=0
+    ):
         return _at_reduce_pytree(self.tree, self.where, func, is_leaf, initializer)
 
     def __repr__(self) -> str:
@@ -162,7 +164,7 @@ def _at_set_str(
     tree: PyTree,
     path: list[str],
     set_value: Any,
-    is_leaf: Callable[[Any], bool] = None,
+    is_leaf: Callable[[Any], bool] | None = None,
 ):
     """Applies a function to a certain attribute of a tree based on a path using jax.tree_map and a mask."""
     # In essence this function retrieves the direct parent of the attribute
@@ -200,7 +202,7 @@ def _at_apply_str(
     tree: PyTree,
     path: list[str],
     func: Callable,
-    is_leaf: Callable[[Any], bool] = None,
+    is_leaf: Callable[[Any], bool] | None = None,
 ):
     """Applies a function to a certain attribute of a tree based on a path using jax.tree_map and a mask."""
     # In essence this function retrieves the direct parent of the attribute
@@ -235,7 +237,7 @@ def _at_apply_str(
 
 
 @contextmanager
-def _CallContext(tree: PyTree):
+def _call_context(tree: PyTree):
     def immutate_step(tree, set_value):
         if not hasattr(tree, _FIELD_MAP):
             return tree
@@ -260,16 +262,16 @@ class StrIndexer(NamedTuple):
         # x.at["a"].get() returns x.a
         return _get_child(self.tree, self.where.split("."))
 
-    def set(self, set_value, *, is_leaf: Callable[[Any], bool] = None):
+    def set(self, set_value, *, is_leaf: Callable[[Any], bool] | None = None):
         where = self.where.split(".")
         return _at_set_str(copy.copy(self.tree), where, set_value, is_leaf=is_leaf)
 
-    def apply(self, func, *, is_leaf: Callable[[Any], bool] = None):
+    def apply(self, func, *, is_leaf: Callable[[Any], bool] | None = None):
         where = self.where.split(".")
         return _at_apply_str(copy.copy(self.tree), where, func, is_leaf=is_leaf)
 
     def __call__(self, *a, **k):
-        with _CallContext(self.tree) as tree:
+        with _call_context(self.tree) as tree:
             method = getattr(tree, self.where)
             return method(*a, **k), tree
 

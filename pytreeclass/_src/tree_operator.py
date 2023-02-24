@@ -96,6 +96,7 @@ def bcmap(
         DeviceArray(6, dtype=int32, weak_type=True)]
     """
 
+    @ft.wraps(func)
     def wrapper(*args, **kwargs):
         if len(args) > 0:
             # positional arguments are passed the argument to be compare
@@ -146,6 +147,8 @@ def bcmap(
             all_leaves += [func_(*xs_args, **dict(zip(leaves_keys, xs_kwargs)))]
         return jtu.tree_unflatten(treedef0, all_leaves)
 
+    docs = f"Broadcasted version of {func.__name__}\n{func.__doc__}"
+    wrapper.__doc__ = docs
     return wrapper
 
 

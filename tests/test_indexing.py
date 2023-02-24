@@ -8,7 +8,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_indexer import _CallContext
+from pytreeclass._src.tree_indexer import _call_context
 
 
 @pytc.treeclass
@@ -544,7 +544,7 @@ def test_mutable_context():
 
     t = L2()
 
-    with _CallContext(t) as tx:
+    with _call_context(t) as tx:
         tx.delete("a")
 
     with pytest.raises(dc.FrozenInstanceError):

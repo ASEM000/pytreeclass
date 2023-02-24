@@ -381,7 +381,7 @@ def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
     if not (isinstance(depth, int) or depth is MAX_DEPTH):
         raise TypeError(f"depth must be an integer, got {type(depth)}")
 
-    ROWS = [["Name", "Type", "Count(Frozen)", "Size(Frozen)"]]
+    ROWS = [["Name", "Type", "Count", "Size"]]
 
     # traverse the tree and collect info about each node
     infos = _tree_trace(tree, depth)
@@ -402,13 +402,16 @@ def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
 
         # count and size row
         count, size = _calculate_node_info_stats(info)
-        row += [f"{_format_count(count.real+count.imag)}({_format_count(count.imag)})"]
-        row += [f"{_format_size(size.real+size.imag)}({_format_size(size.imag)})"]
+        leaves_count = _format_count(count.real + count.imag)
+        leaves_size = _format_size(size.real + size.imag)
+
+        # add frozen stats only if there are frozen leaves
+        leaves_count += f"({_format_count(count.imag)})" if count.imag > 0 else ""
+        leaves_size += f"({_format_size(size.imag)})" if size.imag > 0 else ""
+        row += [leaves_count, leaves_size]
 
         ROWS += [row]
 
-    # add summary row at the end to
-    # show total number of leaves and total size
     COUNT = [complex(0), complex(0)]  # non-frozen, frozen
     SIZE = [complex(0), complex(0)]
 
@@ -427,8 +430,19 @@ def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
 
     row = ["Σ"]
     row += [_node_type_pprint(tree, 0, "repr", width)]
-    row += [f"{_format_count(total_count)}({_format_count(frozen_count)})"]
-    row += [f"{_format_size(total_size)}({_format_size(frozen_size)})"]
+    total_count = _format_count(total_count)
+
+    total_size = _format_size(total_size)
+
+    if frozen_count > 0:
+        total_count += f"({_format_count(frozen_count)})"
+        total_size += f"({_format_size(frozen_size)})"
+        # add frozen to the header row if there are frozen leaves
+        # otherwise donot bloat the header row
+        ROWS[0][2] = ROWS[0][2] + "(Frozen)"
+        ROWS[0][3] = ROWS[0][3] + "(Frozen)"
+
+    row += [total_count, total_size]
     ROWS += [row]
 
     COLS = [list(c) for c in zip(*ROWS)]

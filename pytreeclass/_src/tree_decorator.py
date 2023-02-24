@@ -145,6 +145,7 @@ def _patch_init_method(cls):
     # designating the field map as class variable is important in case
     field_map = _generate_field_map(cls)
     setattr(cls, _FIELD_MAP, field_map)
+    setattr(cls, _FROZEN, True)
 
     if "__init__" in cls.__dict__:
         # do not generate the init method if the class already has one
