@@ -103,7 +103,7 @@ def _init_wrapper(init_func):
                 raise AttributeError(f"field=`{field.name}` is not initialized.")
 
         # output must be None,otherwise will raise error
-        setattr(self, _FROZEN, True)
+        self.__dict__[_FROZEN] = True
         return output
 
     return init_method
