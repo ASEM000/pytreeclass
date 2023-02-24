@@ -359,26 +359,3 @@ def _at_indexer(tree):
             )
 
     return AtIndexer()
-
-
-class _TreeAtIndexer:
-    """Base class for indexing by string or boolean pytree.
-
-    Example:
-        >>> class Test(treeAtIndexer):
-        ...     def __init__(self,a):
-        ...         self.a =
-        >>> test = Test(a=1)
-
-        >>> # indexing by string
-        >>> test.at["a"].get()
-        1
-
-        >>> # indexing by boolean pytree
-        >>> test.at[jtu.tree_map(lambda _: True)].get()
-        Test(a=1)
-    """
-
-    @property
-    def at(self):
-        return _at_indexer(self)

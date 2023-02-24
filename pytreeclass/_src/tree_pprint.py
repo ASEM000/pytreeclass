@@ -266,14 +266,6 @@ def tree_str(tree: PyTree, *, width: int = 60, indent: int = 2) -> str:
     return _node_pprint(tree, depth=0, kind="str", width=width).expandtabs(indent)
 
 
-class _TreePretty:
-    def __repr__(self) -> str:
-        return tree_repr(self)
-
-    def __str__(self) -> str:
-        return tree_str(self)
-
-
 def tree_diagram(tree, depth: int = MAX_DEPTH, width: int = 60):
     """Pretty print treeclass tree with tree structure diagram
 

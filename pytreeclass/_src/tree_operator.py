@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import functools as ft
 import hashlib
-import inspect
-import math
-import operator as op
 from typing import Any, Callable
 
 import jax.tree_util as jtu
@@ -13,10 +10,9 @@ import numpy as np
 """A wrapper around a tree that allows to use the tree leaves as if they were scalars."""
 
 PyTree = Any
-_empty = inspect.Parameter.empty
 
 
-def _hash_node(node):
+def _hash_node(node: PyTree) -> int:
     if hasattr(node, "dtype") and hasattr(node, "shape"):
         return hashlib.sha256(np.array(node).tobytes()).hexdigest()
     if isinstance(node, set):
@@ -28,7 +24,7 @@ def _hash_node(node):
     return hash(node)
 
 
-def _hash(tree):
+def _hash(tree: PyTree) -> int:
     hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
     return hash((*hashed, jtu.tree_structure(tree)))
 
@@ -42,7 +38,7 @@ _non_partial = object()
 
 
 class _Partial(ft.partial):
-    def __call__(self, *args, **keywords):
+    def __call__(self, *args, **keywords) -> Callable:
         # https://stackoverflow.com/a/7811270
         keywords = {**self.keywords, **keywords}
         iargs = iter(args)
@@ -50,7 +46,6 @@ class _Partial(ft.partial):
         return self.func(*args, *iargs, **keywords)
 
 
-@ft.lru_cache(maxsize=None)
 def bcmap(
     func: Callable[..., Any], *, is_leaf: Callable[[Any], bool] | None = None
 ) -> Callable:
@@ -150,70 +145,3 @@ def bcmap(
     docs = f"Broadcasted version of {func.__name__}\n{func.__doc__}"
     wrapper.__doc__ = docs
     return wrapper
-
-
-class _TreeOperator:
-    """Base class for tree operators used
-
-    Example:
-        >>> import jax.tree_util as jtu
-        >>> import dataclasses as dc
-        >>> @jtu.register_pytree_node_class`
-        ... @dc.dataclass
-        ... class Tree(_TreeOperator):
-        ...    a: int =1
-        ...    def tree_flatten(self):
-        ...        return (self.a,), None
-        ...    @classmethod
-        ...    def tree_unflatten(cls, _, children):
-        ...        return cls(*children)
-
-        >>> tree = Tree()
-        >>> tree + 1
-        Tree(a=2)
-    """
-
-    __abs__ = bcmap(op.abs)
-    __add__ = bcmap(op.add)
-    __and__ = bcmap(op.and_)
-    __ceil__ = bcmap(math.ceil)
-    __copy__ = _copy
-    __divmod__ = bcmap(divmod)
-    __eq__ = bcmap(op.eq)
-    __floor__ = bcmap(math.floor)
-    __floordiv__ = bcmap(op.floordiv)
-    __ge__ = bcmap(op.ge)
-    __gt__ = bcmap(op.gt)
-    __inv__ = bcmap(op.inv)
-    __invert__ = bcmap(op.invert)
-    __le__ = bcmap(op.le)
-    __lshift__ = bcmap(op.lshift)
-    __lt__ = bcmap(op.lt)
-    __matmul__ = bcmap(op.matmul)
-    __mod__ = bcmap(op.mod)
-    __mul__ = bcmap(op.mul)
-    __ne__ = bcmap(op.ne)
-    __neg__ = bcmap(op.neg)
-    __or__ = bcmap(op.or_)
-    __pos__ = bcmap(op.pos)
-    __pow__ = bcmap(op.pow)
-    __radd__ = bcmap(op.add)
-    __rand__ = bcmap(op.and_)
-    __rdivmod__ = bcmap(divmod)
-    __rfloordiv__ = bcmap(op.floordiv)
-    __rlshift__ = bcmap(op.lshift)
-    __rmod__ = bcmap(op.mod)
-    __rmul__ = bcmap(op.mul)
-    __ror__ = bcmap(op.or_)
-    __round__ = bcmap(round)
-    __rpow__ = bcmap(op.pow)
-    __rrshift__ = bcmap(op.rshift)
-    __rshift__ = bcmap(op.rshift)
-    __rsub__ = bcmap(op.sub)
-    __rtruediv__ = bcmap(op.truediv)
-    __rxor__ = bcmap(op.xor)
-    __sub__ = bcmap(op.sub)
-    __truediv__ = bcmap(op.truediv)
-    __trunk__ = bcmap(math.trunc)
-    __xor__ = bcmap(op.xor)
-    __hash__ = _hash

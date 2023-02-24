@@ -135,28 +135,14 @@ def _generate_field_map(cls) -> dict[str, Field]:
     return field_map
 
 
-def _patch_init_method(cls):
-    # this methods generates and injects the __init__ method into the class namespace
-
-    local_namespace = dict()
-    global_namespace = sys.modules[cls.__module__].__dict__
-
-    # patch class with field map
-    # designating the field map as class variable is important in case
-    field_map = _generate_field_map(cls)
-    setattr(cls, _FIELD_MAP, field_map)
-    setattr(cls, _FROZEN, True)
-
-    if "__init__" in cls.__dict__:
-        # do not generate the init method if the class already has one
-        return cls
-
+@ft.lru_cache(maxsize=None)
+def _generate_init_code(fields: Sequence[NamedTuple]):
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
     head = body = ""
 
-    for key in field_map:
-        field = field_map[key]
+    for field in fields:
+        key = field.name
         mark0 = f"FIELD_MAP['{key}'].default"
         mark1 = f"self.{key}"
 
@@ -186,20 +172,33 @@ def _patch_init_method(cls):
     body = " def __init__(self, " + head[:-2] + "):" + body
     # use closure to be able to reference default values of all types
     body = f"def closure(FIELD_MAP):\n{body}\n return __init__"
-    exec(body, global_namespace, local_namespace)
+    return body
+
+
+def _get_init_method(cls, field_map):
+    # generate the init method
+    # if the class already has an init method, we will use it
+    # otherwise, we will generate one
+    if "__init__" in cls.__dict__:
+        return cls.__init__
+
+    # generate init method
+    local_namespace = dict()
+    global_namespace = sys.modules[cls.__module__].__dict__
+
+    # generate the init method code string
+    # in here, we generate the function head and body and add `default`/`default_factory`
+    exec(_generate_init_code(field_map.values()), global_namespace, local_namespace)
     method = local_namespace["closure"](field_map)
 
     # inject the method into the class namespace
-    method = FunctionType(
+    return FunctionType(
         code=method.__code__,
         globals=global_namespace,
         name=method.__name__,
         argdefs=method.__defaults__,
         closure=method.__closure__,
     )
-
-    setattr(cls, method.__name__, method)
-    return cls
 
 
 def _is_dataclass_like(node):
