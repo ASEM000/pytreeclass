@@ -113,10 +113,16 @@ def test_subclassing():
         def sub(self, x):
             return x - 10
 
+        def __post_init__(self):
+            self.c = 5
+
     @pytc.treeclass
     class L1(L0):
         a: int = 2
         b: int = 4
+
+        def __post_init__(self):
+            self.d = 5
 
         def inc(self, x):
             return x + 10
@@ -126,6 +132,7 @@ def test_subclassing():
     assert jtu.tree_leaves(l1) == [2, 4, 5]
     assert l1.inc(10) == 20
     assert l1.sub(10) == 0
+    assert l1.d == 5
 
 
 def test_registering_state():
