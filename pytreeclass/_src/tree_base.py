@@ -109,7 +109,7 @@ def _init_wrapper(init_func):
     return init_method
 
 
-def _get_wrapper(get_func, fail_get_func=None):
+def _get_wrapper(get_func):
     @ft.wraps(get_func)
     def get_method(self, key: str) -> Any:
         # avoid non-scalar error, raised by `jax` transformation
@@ -117,9 +117,7 @@ def _get_wrapper(get_func, fail_get_func=None):
         try:
             return unfreeze(get_func(self, key))
         except AttributeError as error:
-            if fail_get_func is not None:
-                return unfreeze(fail_get_func(self, key))
-            raise type(error)(f"for attribute=`{key}`: {error}")
+            raise type(error)(error)
 
     return get_method
 
@@ -175,7 +173,12 @@ def treeclass(cls=None, *, order: bool = True):
             msg = f"@treeclass accepts class as input. Found type={type(cls)}"
             raise TypeError(msg)
 
-        for method_name in ("__setattr__", "__delattr__", "__getattribute__"):
+        for method_name in (
+            "__setattr__",  # immutable setters
+            "__delattr__",  # immutable deleters
+            "__getattribute__",  # control freezable attributes access
+            "__getattr__",  # can not override getattr
+        ):
             if method_name in vars(cls):
                 msg = f"Cannot define `{method_name}` in {cls.__name__}."
                 raise AttributeError(msg)
@@ -191,9 +194,7 @@ def treeclass(cls=None, *, order: bool = True):
         # initialize class
         attrs.update(__new__=_new_wrapper(cls.__new__))
         attrs.update(__init__=_init_wrapper(cls.__init__))
-
-        _getattr = getattr(cls, "__getattr__", None)
-        attrs.update(__getattribute__=_get_wrapper(cls.__getattribute__, _getattr))
+        attrs.update(__getattribute__=_get_wrapper(cls.__getattribute__))
 
         # immutable setters/deleters
         attrs.update(__setattr__=_setattr)
