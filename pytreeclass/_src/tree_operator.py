@@ -97,32 +97,28 @@ def bcmap(
     """
 
     def wrapper(*args, **kwargs):
-        masked_args = []
-        masked_kwargs = {}
-        leaves = []
-        leaves_keys = []
-
         if len(args) > 0:
-            # positional arguments are passed
-            # the argument to be compare the tree structure with is the first argument
+            # positional arguments are passed the argument to be compare
+            # the tree structure with is the first argument
             leaves0, treedef0 = jtu.tree_flatten(args[0], is_leaf=is_leaf)
-            masked_args += [_non_partial]
+            args = args[1:]
+            masked_args = [_non_partial]
             masked_kwargs = {}
             leaves = [leaves0]
-            args = args[1:]
+            leaves_keys = []
 
         else:
-            # only kwargs are passed
-            # the argument to be compare the tree structure with is the first kwarg
+            # only kwargs are passed the argument to be compare
+            # the tree structure with is the first kwarg
             key0 = next(iter(kwargs))
             leaves0, treedef0 = jtu.tree_flatten(kwargs.pop(key0), is_leaf=is_leaf)
-            masked_kwargs[key0] = _non_partial
-            leaves += [leaves0]
-            leaves_keys += [key0]
+            masked_args = []
+            masked_kwargs = {key0: _non_partial}
+            leaves = [leaves0]
+            leaves_keys = [key0]
 
         for arg in args:
             if jtu.tree_structure(arg) == treedef0:
-                # the argument value can be used leaf-wise and not to be broadcasted
                 masked_args += [_non_partial]
                 leaves += [treedef0.flatten_up_to(arg)]
             else:
@@ -130,7 +126,6 @@ def bcmap(
 
         for key in kwargs:
             if jtu.tree_structure(kwargs[key]) == treedef0:
-                # the keyword argument value can be used leaf-wise and not broadcasted
                 masked_kwargs[key] = _non_partial
                 leaves += [treedef0.flatten_up_to(kwargs[key])]
                 leaves_keys += [key]
@@ -144,10 +139,10 @@ def bcmap(
             return jtu.tree_unflatten(treedef0, [func_(*xs) for xs in zip(*leaves)])
 
         # kwargs leaves are present, so we need to zip them
+        kwargnum = len(leaves) - len(leaves_keys)
         all_leaves = []
-        limit_index = len(leaves) - len(leaves_keys)
         for xs in zip(*leaves):
-            xs_args, xs_kwargs = xs[:limit_index], xs[limit_index:]
+            xs_args, xs_kwargs = xs[:kwargnum], xs[kwargnum:]
             all_leaves += [func_(*xs_args, **dict(zip(leaves_keys, xs_kwargs)))]
         return jtu.tree_unflatten(treedef0, all_leaves)
 

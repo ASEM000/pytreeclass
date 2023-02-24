@@ -118,7 +118,6 @@ def _tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
             names = (f"{f.name}" for f in fields)
             reprs = (info.repr and f.repr for f in fields)
             frozen = (is_frozen(leaf) or info.frozen for leaf in leaves)
-
         else:
             names = (f"leaf_{i}" for i in range(len(leaves)))
             reprs = (info.repr,) * len(leaves)

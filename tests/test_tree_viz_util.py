@@ -46,16 +46,19 @@ def test_func_pprint():
     def example(a: int, b=1, *c, d, e=2, **f) -> str:
         ...  # fmt: skip
 
-    assert _func_pprint(example) == "example(a, b, *c, d, e, **f)"
-    assert _func_pprint(lambda x: x) == "Lambda(x)"
-    assert _func_pprint(jax.nn.relu) == "relu(*args, **kwargs)"
-    assert (_node_pprint(jtu.Partial(jax.nn.relu)) == "Partial(relu(*args, **kwargs))")  # fmt: skip
+    assert _func_pprint(example, 0, "str", 60) == "example(a, b, *c, d, e, **f)"
+    assert _func_pprint(lambda x: x, 0, "str", 60) == "Lambda(x)"
+    assert _func_pprint(jax.nn.relu, 0, "str", 60) == "relu(*args, **kwargs)"
     assert (
-        _node_pprint(jtu.Partial(jax.nn.relu), kind="str")
+        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60)
         == "Partial(relu(*args, **kwargs))"
     )
     assert (
-        _func_pprint(jax.nn.initializers.he_normal)
+        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60)
+        == "Partial(relu(*args, **kwargs))"
+    )
+    assert (
+        _func_pprint(jax.nn.initializers.he_normal, 0, "str", 60)
         == "he_normal(in_axis, out_axis, batch_axis, dtype)"
     )
 
@@ -73,11 +76,11 @@ def test_format_count():
 
 
 def test_slice_pprint():
-    assert _slice_pprint(slice(0, 1, 1)) == "[0]"
-    assert _slice_pprint(slice(0, 2, 1)) == "[0:2]"
-    assert _slice_pprint(slice(0, 2, 2)) == "[0:2:2]"
-    assert _slice_pprint(slice(None, 1, 2)) == "[:1:2]"
-    assert _slice_pprint(slice(1, None, 2)) == "[1::2]"
+    assert _slice_pprint(slice(0, 1, 1), 0, "str", 60) == "[0]"
+    assert _slice_pprint(slice(0, 2, 1), 0, "str", 60) == "[0:2]"
+    assert _slice_pprint(slice(0, 2, 2), 0, "str", 60) == "[0:2:2]"
+    assert _slice_pprint(slice(None, 1, 2), 0, "str", 60) == "[:1:2]"
+    assert _slice_pprint(slice(1, None, 2), 0, "str", 60) == "[1::2]"
 
 
 def test_calculate_node_info_stats():
