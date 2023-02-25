@@ -208,15 +208,15 @@ def test_getattr():
                 pass
 
 
-def test_treeclass_decorator_arguments():
-    @pytc.treeclass(order=False)
-    class Test:
-        a: int = 1
-        b: int = 2
-        c: int = 3
+# def test_treeclass_decorator_arguments():
+#     @pytc.treeclass(order=False)
+#     class Test:
+#         a: int = 1
+#         b: int = 2
+#         c: int = 3
 
-    with pytest.raises(TypeError):
-        Test() + 1
+#     with pytest.raises(TypeError):
+#         Test() + 1
 
 
 def test_is_tree_equal():

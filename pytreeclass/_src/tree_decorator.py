@@ -179,7 +179,7 @@ def _get_init_method(cls, field_map):
     # generate the init method
     # if the class already has an init method, we will use it
     # otherwise, we will generate one
-    if "__init__" in cls.__dict__:
+    if "__init__" in vars(cls):
         return cls.__init__
 
     # generate init method

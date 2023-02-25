@@ -5,14 +5,13 @@ from __future__ import annotations
 import copy
 import functools as ft
 from collections.abc import Callable
-from contextlib import contextmanager
 from typing import Any, NamedTuple
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.core import Tracer
 
-from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
+from pytreeclass._src.tree_freeze import _call_context
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
@@ -234,24 +233,6 @@ def _at_apply_str(
         return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
     return recurse(path, func, depth=0)
-
-
-@contextmanager
-def _call_context(tree: PyTree):
-    def immutate_step(tree, set_value):
-        if not hasattr(tree, _FIELD_MAP):
-            return tree
-
-        tree.__dict__[_FROZEN] = set_value
-        # traverse the tree
-        for key in getattr(tree, _FIELD_MAP):
-            immutate_step(getattr(tree, key), set_value)
-        return tree
-
-    tree = copy.copy(tree)
-    immutate_step(tree, set_value=False)
-    yield tree
-    immutate_step(tree, set_value=True)
 
 
 class StrIndexer(NamedTuple):

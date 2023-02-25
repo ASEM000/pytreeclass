@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import copy
 import dataclasses as dc
 import operator as op
+from contextlib import contextmanager
 from typing import Any
 
 import jax.tree_util as jtu
 import numpy as np
 
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
 from pytreeclass._src.tree_operator import _hash_node
 
 PyTree = Any
@@ -59,6 +62,24 @@ class FrozenWrapper(_Wrapper):
         self = object.__new__(cls)
         self.__dict__.update(__wrapped__=treedef.unwrap())
         return self
+
+
+@contextmanager
+def _call_context(tree: PyTree):
+    def immutate_step(tree, set_value):
+        if not hasattr(tree, _FIELD_MAP):
+            return tree
+
+        tree.__dict__[_FROZEN] = set_value
+        # traverse the tree
+        for key in getattr(tree, _FIELD_MAP):
+            immutate_step(getattr(tree, key), set_value)
+        return tree
+
+    tree = copy.copy(tree)
+    immutate_step(tree, set_value=False)
+    yield tree
+    immutate_step(tree, set_value=True)
 
 
 def freeze(x: Any) -> FrozenWrapper:

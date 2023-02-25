@@ -85,24 +85,24 @@ def _init_wrapper(init_func):
     def init_method(self, *a, **k) -> None:
         self.__dict__[_FROZEN] = False
         output = init_func(self, *a, **k)
+
         # call callbacks on fields that are initialized
+        self.__dict__[_FROZEN] = False
         _apply_callbacks(self, init=True)
 
         # in case __post_init__ is defined then call it
         # after the tree is initialized
         # here, we assume that __post_init__ is a method
-        for base in self.__class__.__mro__:
-            if _POST_INIT in vars(base):
-                # in case we found post_init in super class
-                # then defreeze it first and call it
-                # this behavior is differet to `dataclasses` with `frozen=True`
-                # but similar if `frozen=False`
-                self.__dict__[_FROZEN] = False
-                output = getattr(self, _POST_INIT)()
-                # call validation on fields that are not initialized
-                _apply_callbacks(self, init=False)
-                self.__dict__[_FROZEN] = True
-                break
+        if hasattr(self, _POST_INIT):
+            # in case we found post_init in super class
+            # then defreeze it first and call it
+            # this behavior is differet to `dataclasses` with `frozen=True`
+            # but similar if `frozen=False`
+            # self.__dict__[_FROZEN] = False
+            output = getattr(self, _POST_INIT)()
+            # call validation on fields that are not initialized
+            self.__dict__[_FROZEN] = False
+            _apply_callbacks(self, init=False)
 
         # handle freezing values and uninitialized fields
         for field in self.__class__.__dict__[_FIELD_MAP].values():
@@ -112,7 +112,6 @@ def _init_wrapper(init_func):
                 # like in `dataclasses` but we raise it here for better error message.
                 raise AttributeError(f"field=`{field.name}` is not initialized.")
 
-        # output must be None,otherwise will raise error
         self.__dict__[_FROZEN] = True
         return output
 
@@ -150,27 +149,46 @@ def _unflatten(cls, treedef, leaves):
     return tree
 
 
-def _treeclass(cls, order):
-    # check if the input is a valid class
+def treeclass(cls):
+    """Decorator to convert a class to a `treeclass`
+
+    Example:
+        >>> @treeclass
+        ... class Tree:
+        ...     x: float
+        ...     y: float
+        ...     z: float
+
+        >>> tree = Tree(1, 2, 3)
+
+        >>> tree
+        Tree(x=1, y=2, z=3)
+
+    Args:
+        cls: class to be converted to a `treeclass`
+        order: if `True` the `treeclass` math operations will be applied leaf-wise (default: `True`)
+
+    Returns:`
+        `treeclass` of the input class
+
+    Raises:
+        TypeError: if the input class is not a `class`
+    """
+
     if not isinstance(cls, type):
-        # non class input will raise an error
-        msg = f"@treeclass accepts class as input. Found type={type(cls)}"
-        raise TypeError(msg)
+        raise TypeError(f"Expected `class` but got `{type(cls)}`.")
 
-    no_methods = ("__setattr__", "__delattr__", "__getattribute__", "__getattr__")
     # check if the class has any of the above methods
-    for method_name in no_methods:
-        if method_name in vars(cls):
-            msg = f"Cannot define `{method_name}` in {cls.__name__}."
-            raise AttributeError(msg)
-
-    # get the mapping between field names and field `NamedTuple` objects
-    field_map = _generate_field_map(cls)
+    for key in ("__setattr__", "__delattr__", "__getattribute__", "__getattr__"):
+        if key in vars(cls):
+            raise AttributeError(f"Cannot define `{key}` in {cls.__name__}.")
 
     # treeclass constants
+    field_map = _generate_field_map(cls)
     setattr(cls, _FIELD_MAP, field_map)
     setattr(cls, _FROZEN, False)
-    # initialize the class
+
+    # class initialization
     setattr(cls, "__new__", _new_wrapper(cls.__new__))
     setattr(cls, "__init__", _init_wrapper(_get_init_method(cls, field_map)))
     # immutable methods
@@ -180,19 +198,14 @@ def _treeclass(cls, order):
     # pretty printing
     setattr(cls, "__repr__", tree_repr)
     setattr(cls, "__str__", tree_str)
-    # JAX tree utilities
+    # indexing
+    setattr(cls, "at", property(_at_indexer))
+
+    # define flatten/unflatten rules for `jax`
     setattr(cls, "tree_flatten", _flatten)
     setattr(cls, "tree_unflatten", classmethod(_unflatten))
-    # register the class with JAX
-    jtu.register_pytree_node_class(cls)
-    # at indexing
-    setattr(cls, "at", property(_at_indexer))
-    # copy and hash
     setattr(cls, "__copy__", _copy)
     setattr(cls, "__hash__", _hash)
-
-    if order is False:
-        return cls
 
     # math operations
     setattr(cls, "__abs__", bcmap(op.abs))
@@ -238,37 +251,7 @@ def _treeclass(cls, order):
     setattr(cls, "__sub__", bcmap(op.sub))
     setattr(cls, "__truediv__", bcmap(op.truediv))
     setattr(cls, "__xor__", bcmap(op.xor))
-    return cls
-
-
-def treeclass(cls=None, *, order: bool = True):
-    """Decorator to convert a class to a `treeclass`
-
-    Example:
-        >>> @treeclass
-        ... class Tree:
-        ...     x: float
-        ...     y: float
-        ...     z: float
-
-        >>> tree = Tree(1, 2, 3)
-
-        >>> tree
-        Tree(x=1, y=2, z=3)
-
-    Args:
-        cls: class to be converted to a `treeclass`
-        order: if `True` the `treeclass` math operations will be applied leaf-wise (default: `True`)
-
-    Returns:`
-        `treeclass` of the input class
-
-    Raises:
-        TypeError: if the input class is not a `class`
-    """
-    if cls is None:
-        return ft.wraps(cls)(ft.partial(_treeclass, order=order))
-    return _treeclass(cls, order)  # @treeclass(...)
+    return jtu.register_pytree_node_class(cls)
 
 
 def is_tree_equal(lhs: Any, rhs: Any) -> bool:

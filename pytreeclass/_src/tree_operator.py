@@ -103,6 +103,12 @@ def bcmap(
             leaves = [leaves0]
             leaves_keys = []
 
+            for arg in args:
+                if jtu.tree_structure(arg) == treedef0:
+                    masked_args += [_non_partial]
+                    leaves += [treedef0.flatten_up_to(arg)]
+                else:
+                    masked_args += [arg]
         else:
             # only kwargs are passed the argument to be compare
             # the tree structure with is the first kwarg
@@ -112,13 +118,6 @@ def bcmap(
             masked_kwargs = {key0: _non_partial}
             leaves = [leaves0]
             leaves_keys = [key0]
-
-        for arg in args:
-            if jtu.tree_structure(arg) == treedef0:
-                masked_args += [_non_partial]
-                leaves += [treedef0.flatten_up_to(arg)]
-            else:
-                masked_args += [arg]
 
         for key in kwargs:
             if jtu.tree_structure(kwargs[key]) == treedef0:
