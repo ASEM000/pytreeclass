@@ -112,7 +112,7 @@ def _init_wrapper(init_func):
                 # like in `dataclasses` but we raise it here for better error message.
                 raise AttributeError(f"field=`{field.name}` is not initialized.")
 
-        self.__dict__[_FROZEN] = True
+        del self.__dict__[_FROZEN]
         return output
 
     return init_method
@@ -186,7 +186,7 @@ def treeclass(cls):
     # treeclass constants
     field_map = _generate_field_map(cls)
     setattr(cls, _FIELD_MAP, field_map)
-    setattr(cls, _FROZEN, False)
+    setattr(cls, _FROZEN, True)
 
     # class initialization
     setattr(cls, "__new__", _new_wrapper(cls.__new__))

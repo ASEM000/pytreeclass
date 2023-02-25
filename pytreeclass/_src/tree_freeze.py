@@ -66,20 +66,33 @@ class FrozenWrapper(_Wrapper):
 
 @contextmanager
 def _call_context(tree: PyTree):
-    def immutate_step(tree, set_value):
+    def mutate_step(tree):
         if not hasattr(tree, _FIELD_MAP):
             return tree
-
-        tree.__dict__[_FROZEN] = set_value
-        # traverse the tree
+        # shadow the class _FROZEN attribute with an
+        # instance variable to temporarily disable the frozen behavior
+        # after the context manager exits, the instance variable will be deleted
+        # and the class attribute will be used again.
+        tree.__dict__[_FROZEN] = False
         for key in getattr(tree, _FIELD_MAP):
-            immutate_step(getattr(tree, key), set_value)
+            mutate_step(getattr(tree, key))
+        return tree
+
+    def immutate_step(tree):
+        if not hasattr(tree, _FIELD_MAP):
+            return tree
+        if _FROZEN not in vars(tree):
+            return tree
+
+        del tree.__dict__[_FROZEN]
+        for key in getattr(tree, _FIELD_MAP):
+            immutate_step(getattr(tree, key))
         return tree
 
     tree = copy.copy(tree)
-    immutate_step(tree, set_value=False)
+    mutate_step(tree)
     yield tree
-    immutate_step(tree, set_value=True)
+    immutate_step(tree)
 
 
 def freeze(x: Any) -> FrozenWrapper:

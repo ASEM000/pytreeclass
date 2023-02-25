@@ -42,7 +42,7 @@ def _at_get_pytree(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
 def _at_set_pytree(
     tree: PyTree,
     where: PyTree,
-    set_value: bool | int | float | complex | jnp.ndarray,
+    set_value: Any,
     is_leaf: Callable[[Any], bool],
 ):
     def lhs_set(lhs: Any, where: Any, set_value: Any):
@@ -142,16 +142,6 @@ def _get_parent_node_and_child_name(tree: Any, path: list[str]) -> tuple[Any, st
     return _get_parent_node_and_child_name(getattr(tree, path[0]), path[1:])
 
 
-def _check_structure_mismatch(tree, attr_name: str):
-    if hasattr(tree, attr_name):
-        return
-
-    msg = f"Error in retrieving `{attr_name}` from parent subtree {tree}.\n"
-    msg += "This is likely due to reducing the parent subtree to a single leaf node.\n"
-    msg += "This can happen if `is_leaf` is defined to reduce the parent subtree to a single leaf node.\n"
-    raise AttributeError(msg)
-
-
 def _at_set_str(
     tree: PyTree,
     path: list[str],
@@ -178,7 +168,11 @@ def _at_set_str(
         parent_mask = jtu.tree_map(lambda _: False, parent, is_leaf=is_leaf)
 
         # check if parent subtree has not been reduced to a single leaf node
-        _check_structure_mismatch(parent_mask, child_name)
+        if not hasattr(parent_mask, child_name):
+            msg = f"Error in retrieving `{child_name}` from parent subtree {tree}.\n"
+            msg += "This is likely due to reducing the parent subtree to a single leaf node.\n"
+            msg += "This can happen if `is_leaf` is defined to reduce the parent subtree to a single leaf node.\n"
+            raise AttributeError(msg)
 
         # masking the parent = False, and child = True
         child_mask = getattr(parent_mask, child_name)
@@ -216,7 +210,11 @@ def _at_apply_str(
         parent_mask = jtu.tree_map(lambda _: False, parent, is_leaf=is_leaf)
 
         # check if parent subtree has not been reduced to a single leaf node
-        _check_structure_mismatch(parent_mask, child_name)
+        if not hasattr(parent_mask, child_name):
+            msg = f"Error in retrieving `{child_name}` from parent subtree {tree}.\n"
+            msg += "This is likely due to reducing the parent subtree to a single leaf node.\n"
+            msg += "This can happen if `is_leaf` is defined to reduce the parent subtree to a single leaf node.\n"
+            raise AttributeError(msg)
 
         # masking the parent = False, and child = True
         child_mask = getattr(parent_mask, child_name)
@@ -247,7 +245,8 @@ class StrIndexer(NamedTuple):
     def __call__(self, *a, **k):
         with _call_context(self.tree) as tree:
             method = getattr(tree, self.where)
-            return method(*a, **k), tree
+            value = method(*a, **k)
+        return value, tree
 
     def __repr__(self) -> str:
         return f"where=({self.where!r})"
