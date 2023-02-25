@@ -17,18 +17,21 @@ PyTree = Any
 EllipsisType = type(Ellipsis)
 
 
-def _is_leaf_bool(node):
-    """assert if a dataclass leaf is boolean (for boolen indexing)"""
-    if hasattr(node, "dtype"):
-        return node.dtype == "bool"
-    return isinstance(node, bool)
+def _check_valid_mask_leaf(where: Any):
+    def is_leaf_bool(node):
+        if hasattr(node, "dtype"):
+            return node.dtype == "bool"
+        return isinstance(node, bool)
+
+    if not is_leaf_bool(where) and where is not None:
+        raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
+    return where
 
 
 def _at_get_pytree(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
     def _lhs_get(lhs: Any, where: Any):
         """Get pytree node value"""
-        if not (_is_leaf_bool(where) or where is None):
-            raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
+        where = _check_valid_mask_leaf(where)
 
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             return lhs[jnp.where(where)]
@@ -46,9 +49,7 @@ def _at_set_pytree(
     def _lhs_set(set_value: Any, lhs: Any, where: Any):
         """Set pytree node value."""
         # fuse the boolean check here
-        if not (_is_leaf_bool(where) or where is None):
-            raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
-
+        where = _check_valid_mask_leaf(where)
         if isinstance(lhs, (Tracer, jnp.ndarray)):
             if jnp.isscalar(set_value):
                 return jnp.where(where, set_value, lhs)
@@ -75,8 +76,7 @@ def _at_apply_pytree(
 ):
     def _lhs_apply(lhs: Any, where: bool):
         """Set pytree node"""
-        if not (_is_leaf_bool(where) or where is None):
-            raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
+        where = _check_valid_mask_leaf(where)
 
         if not isinstance(lhs, (Tracer, jnp.ndarray)):
             return func(lhs) if (where is True or where is None) else lhs
