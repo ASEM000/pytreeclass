@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import copy
-import functools as ft
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from jax.core import Tracer
+import numpy as np
 
 from pytreeclass._src.tree_freeze import _call_context
 
@@ -17,27 +16,27 @@ PyTree = Any
 EllipsisType = type(Ellipsis)
 
 
-def _check_valid_mask_leaf(where: Any):
-    def is_leaf_bool(node):
-        if hasattr(node, "dtype"):
-            return node.dtype == "bool"
-        return isinstance(node, bool)
+def _is_leaf_bool(node: Any) -> bool:
+    if hasattr(node, "dtype"):
+        return node.dtype == "bool"
+    return isinstance(node, bool)
 
-    if not is_leaf_bool(where) and where is not None:
+
+def _check_valid_mask_leaf(where: Any):
+    if not _is_leaf_bool(where) and where is not None:
         raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
     return where
 
 
 def _at_get_pytree(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
-    def _lhs_get(lhs: Any, where: Any):
+    def lhs_get(lhs: Any, where: Any):
         """Get pytree node value"""
         where = _check_valid_mask_leaf(where)
-
-        if isinstance(lhs, (Tracer, jnp.ndarray)):
+        if isinstance(lhs, (jnp.ndarray, np.ndarray)):
             return lhs[jnp.where(where)]
         return lhs if where else None
 
-    return jtu.tree_map(_lhs_get, tree, where, is_leaf=is_leaf)
+    return jtu.tree_map(lhs_get, tree, where, is_leaf=is_leaf)
 
 
 def _at_set_pytree(
@@ -46,26 +45,28 @@ def _at_set_pytree(
     set_value: bool | int | float | complex | jnp.ndarray,
     is_leaf: Callable[[Any], bool],
 ):
-    def _lhs_set(set_value: Any, lhs: Any, where: Any):
+    def lhs_set(lhs: Any, where: Any, set_value: Any):
         """Set pytree node value."""
         # fuse the boolean check here
         where = _check_valid_mask_leaf(where)
-        if isinstance(lhs, (Tracer, jnp.ndarray)):
+        if isinstance(lhs, (jnp.ndarray, np.ndarray)):
             if jnp.isscalar(set_value):
                 return jnp.where(where, set_value, lhs)
             return set_value if jnp.all(where) else lhs
+        return set_value if (where is True) else lhs
 
-        return set_value if (where is True or where is None) else lhs
-
-    if isinstance(set_value, type(tree)):
+    if isinstance(set_value, type(tree)) and (
+        jtu.tree_structure(tree, is_leaf=is_leaf)
+        == jtu.tree_structure(set_value, is_leaf=is_leaf)
+    ):
         # set_value leaf is set to tree leaf according to where leaf
         # for example lhs_tree.at[where].set(rhs_tree) will set rhs_tree leaves to lhs_tree leaves
-        return jtu.tree_map(_lhs_set, set_value, tree, where, is_leaf=is_leaf)
+        return jtu.tree_map(lhs_set, tree, where, set_value, is_leaf=is_leaf)
 
     # set_value is broadcasted to tree leaves
     # for example tree.at[where].set(1) will set all tree leaves to 1
-    _lhs_set = ft.partial(_lhs_set, set_value)
-    return jtu.tree_map(_lhs_set, tree, where, is_leaf=is_leaf)
+    partial_lhs_set = lambda lhs, where: lhs_set(lhs, where, set_value)
+    return jtu.tree_map(partial_lhs_set, tree, where, is_leaf=is_leaf)
 
 
 def _at_apply_pytree(
@@ -74,25 +75,17 @@ def _at_apply_pytree(
     func: Callable[[Any], Any],
     is_leaf: Callable[[Any], bool],
 ):
-    def _lhs_apply(lhs: Any, where: bool):
+    def lhs_apply(lhs: Any, where: bool):
         """Set pytree node"""
         where = _check_valid_mask_leaf(where)
+        value = func(lhs)
+        if isinstance(lhs, (jnp.ndarray, np.ndarray)):
+            if jnp.isscalar(value):
+                return jnp.where(where, value, lhs)
+            return value if jnp.all(where) else lhs
+        return value if (where is True) else lhs
 
-        if not isinstance(lhs, (Tracer, jnp.ndarray)):
-            return func(lhs) if (where is True or where is None) else lhs
-
-        # check if the `set_value` is a valid type for `jnp.where` (i.e. can replace single array content)
-        # otherwise , do not broadcast the `set_value` to the lhs
-        # but instead, set the `set_value` to the whole lhs if all array elements are True
-        try:
-            # the function should have a scalar output or array output with the same shape as the input
-            # unlike `set`, I think instead of evaluating the function and check for the output shape
-            # its better to try using `jnp.where` and catch the error
-            return jnp.where(where, func(lhs), lhs)
-        except TypeError:
-            return func(lhs) if jnp.all(where) else lhs
-
-    return jtu.tree_map(_lhs_apply, tree, where, is_leaf=is_leaf)
+    return jtu.tree_map(lhs_apply, tree, where, is_leaf=is_leaf)
 
 
 """ .at[...].reduce() """

@@ -361,12 +361,14 @@ def test_is_leaf():
 
     t = Test([1, 2, 3, None])
 
+    mask = jtu.tree_map(lambda x: True, t, is_leaf=lambda x: x is None)
+
     assert pytc.is_tree_equal(
-        t.at[...].set(10, is_leaf=lambda x: x is None), Test([10, 10, 10, 10])
+        t.at[mask].set(10, is_leaf=lambda x: x is None), Test([10, 10, 10, 10])
     )
 
     assert pytc.is_tree_equal(
-        t.at[...].apply(lambda x: 10, is_leaf=lambda x: x is None),
+        t.at[mask].apply(lambda x: 10, is_leaf=lambda x: x is None),
         Test([10, 10, 10, 10]),
     )
 
