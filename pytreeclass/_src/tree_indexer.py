@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import copy
 import functools as ft
+import math
+import operator as op
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
@@ -12,7 +14,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_freeze import _call_context
+from pytreeclass._src.tree_freeze import _call_context, _tree_hash
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
@@ -30,7 +32,12 @@ def _check_valid_mask_leaf(where: Any):
     return where
 
 
-def _at_get_pytree(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
+def _tree_copy(tree: PyTree) -> PyTree:
+    """Return a copy of the tree"""
+    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
+
+
+def _tree_get_at_pytree(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
     def lhs_get(lhs: Any, where: Any):
         """Get pytree node value"""
         where = _check_valid_mask_leaf(where)
@@ -44,7 +51,7 @@ def _at_get_pytree(tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool]):
     return jtu.tree_map(lhs_get, tree, where, is_leaf=is_leaf)
 
 
-def _at_set_pytree(
+def _tree_set_at_pytree(
     tree: PyTree,
     where: PyTree,
     set_value: Any,
@@ -55,9 +62,9 @@ def _at_set_pytree(
         # fuse the boolean check here
         where = _check_valid_mask_leaf(where)
         if isinstance(lhs, (jnp.ndarray, np.ndarray)):
-            # lhs is an array and set_value is scalar
-            # so we can apply `jnp.where` to set the value
             if jnp.isscalar(set_value):
+                # lhs is an array and set_value is scalar
+                # so we can apply `jnp.where` to set the value
                 return jnp.where(where, set_value, lhs)
             # lhs is an array and set_value is not scalar (ex. string)
             # so we apply the set_value to the lhs if the condition is met for the entire array
@@ -80,7 +87,7 @@ def _at_set_pytree(
     return jtu.tree_map(partial_lhs_set, tree, where, is_leaf=is_leaf)
 
 
-def _at_apply_pytree(
+def _tree_apply_at_pytree(
     tree: PyTree,
     where: PyTree,
     func: Callable[[Any], Any],
@@ -104,10 +111,7 @@ def _at_apply_pytree(
     return jtu.tree_map(lhs_apply, tree, where, is_leaf=is_leaf)
 
 
-""" .at[...].reduce() """
-
-
-def _at_reduce_pytree(
+def _tree_reduce_at_pytree(
     tree: PyTree,
     where: PyTree,
     func: Callable[[Any], Any],
@@ -117,23 +121,21 @@ def _at_reduce_pytree(
     return jtu.tree_reduce(func, tree.at[where].get(is_leaf=is_leaf), initializer)
 
 
-class PyTreeIndexer(NamedTuple):
+class _TreeAtPyTree(NamedTuple):
     tree: PyTree
     where: PyTree
 
     def get(self, *, is_leaf: Callable[[Any], bool] | None = None):
-        return _at_get_pytree(self.tree, self.where, is_leaf=is_leaf)
+        return _tree_get_at_pytree(self.tree, self.where, is_leaf=is_leaf)
 
     def set(self, set_value, *, is_leaf: Callable[[Any], bool] | None = None):
-        return _at_set_pytree(copy.copy(self.tree), self.where, set_value, is_leaf)
+        return _tree_set_at_pytree(copy.copy(self.tree), self.where, set_value, is_leaf)
 
     def apply(self, func, *, is_leaf: Callable[[Any], bool] | None = None):
-        return _at_apply_pytree(copy.copy(self.tree), self.where, func, is_leaf)
+        return _tree_apply_at_pytree(copy.copy(self.tree), self.where, func, is_leaf)
 
-    def reduce(
-        self, func, *, is_leaf: Callable[[Any], bool] | None = None, initializer=0
-    ):
-        return _at_reduce_pytree(self.tree, self.where, func, is_leaf, initializer)
+    def reduce(self, func, *, is_leaf: Callable | None = None, initializer=0):
+        return _tree_reduce_at_pytree(self.tree, self.where, func, is_leaf, initializer)
 
     def __repr__(self) -> str:
         return f"where=({self.where})"
@@ -142,14 +144,14 @@ class PyTreeIndexer(NamedTuple):
         return f"where=({self.where})"
 
 
-def _get_child(item: Any, path: list[str]) -> Any:
+def _tree_get_at_str(item: Any, path: list[str]) -> Any:
     """recursive getter"""
     # this function gets a certain attribute value based on a
     # sequence of strings.
     # for example _getter(item , ["a", "b", "c"]) is equivalent to item.a.b.c
     if len(path) == 1:
         return getattr(item, path[0])
-    return _get_child(getattr(item, path[0]), path[1:])
+    return _tree_get_at_str(getattr(item, path[0]), path[1:])
 
 
 def _get_parent_node_and_child_name(tree: Any, path: list[str]) -> tuple[Any, str]:
@@ -158,7 +160,7 @@ def _get_parent_node_and_child_name(tree: Any, path: list[str]) -> tuple[Any, st
     return _get_parent_node_and_child_name(getattr(tree, path[0]), path[1:])
 
 
-def _at_set_str(
+def _tree_set_at_str(
     tree: PyTree,
     path: list[str],
     set_value: Any,
@@ -194,13 +196,13 @@ def _at_set_str(
         child_mask = getattr(parent_mask, child_name)
         child_mask = jtu.tree_map(lambda _: True, child_mask)
         parent_mask.__dict__[child_name] = child_mask
-        parent = _at_set_pytree(parent, parent_mask, set_value, is_leaf=is_leaf)
+        parent = _tree_set_at_pytree(parent, parent_mask, set_value, is_leaf=is_leaf)
         return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
     return recurse(path, set_value, depth=0)
 
 
-def _at_apply_str(
+def _tree_apply_at_str(
     tree: PyTree,
     path: list[str],
     func: Callable,
@@ -236,27 +238,39 @@ def _at_apply_str(
         child_mask = getattr(parent_mask, child_name)
         child_mask = jtu.tree_map(lambda _: True, child_mask)
         parent_mask.__dict__[child_name] = child_mask
-        parent = _at_apply_pytree(parent, parent_mask, func, is_leaf=is_leaf)
+        parent = _tree_apply_at_pytree(parent, parent_mask, func, is_leaf=is_leaf)
         return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
     return recurse(path, func, depth=0)
 
 
-class StrIndexer(NamedTuple):
+def _tree_reduce_at_str(
+    tree: PyTree,
+    where: PyTree,
+    func: Callable[[Any], Any],
+    initializer: Any,
+):
+    return jtu.tree_reduce(func, tree.at[where].get(), initializer)
+
+
+class _TreeAtStr(NamedTuple):
     tree: PyTree
     where: str
 
     def get(self):
         # x.at["a"].get() returns x.a
-        return _get_child(self.tree, self.where.split("."))
+        return _tree_get_at_str(self.tree, self.where.split("."))
 
     def set(self, set_value, *, is_leaf: Callable[[Any], bool] | None = None):
         where = self.where.split(".")
-        return _at_set_str(copy.copy(self.tree), where, set_value, is_leaf=is_leaf)
+        return _tree_set_at_str(copy.copy(self.tree), where, set_value, is_leaf=is_leaf)
 
     def apply(self, func, *, is_leaf: Callable[[Any], bool] | None = None):
         where = self.where.split(".")
-        return _at_apply_str(copy.copy(self.tree), where, func, is_leaf=is_leaf)
+        return _tree_apply_at_str(copy.copy(self.tree), where, func, is_leaf=is_leaf)
+
+    def reduce(self, func, *, initializer=0):
+        return _tree_reduce_at_str(self.tree, self.where, func, initializer)
 
     def __call__(self, *a, **k):
         # return the output of the method called on the attribute
@@ -276,63 +290,63 @@ class StrIndexer(NamedTuple):
         return f"where=({self.where})"
 
 
-def _str_nested_indexer(tree, where):
-    class StrNestedIndexer(StrIndexer):
-        def __getitem__(nested_self, nested_where: list[str]):
-            # check if nested_where is a valid attribute of the current node before
+def _tree_at_str(tree, where):
+    class TreeAtStr(_TreeAtStr):
+        def __getitem__(next_self, next_where: list[str]):
+            # check if next_where is a valid attribute of the current node before
             # proceeding to the next level and to give a more informative error message
-            if hasattr(_get_child(tree, nested_self.where.split(".")), nested_where):
-                nested_where = nested_self.where + "." + nested_where
-                return StrNestedIndexer(tree=tree, where=nested_where)
+            if hasattr(_tree_get_at_str(tree, next_self.where.split(".")), next_where):
+                next_where = next_self.where + "." + next_where
+                return TreeAtStr(tree=tree, where=next_where)
 
-            msg = f"{nested_where} is not a valid attribute of {_get_child(tree, nested_self.where)}"
+            msg = f"{next_where} is not a valid attribute of {_tree_get_at_str(tree, next_self.where)}"
             raise AttributeError(msg)
 
-        def __getattr__(nested_self, name):
+        def __getattr__(next_self, name):
             # support nested `.at``
             # for example `.at[A].at[B]` represents model.A.B
             if name == "at":
                 # pass the current tree and the current path to the next `.at`
-                return StrNestedIndexer(tree=tree, where=nested_self.where)
+                return TreeAtStr(tree=tree, where=next_self.where)
 
-            msg = f"{name} is not a valid attribute of {nested_self}\n"
+            msg = f"{name} is not a valid attribute of {next_self}\n"
             msg += f"Did you mean to use .at[{name!r}]?"
             raise AttributeError(msg)
 
-    return StrNestedIndexer(tree=tree, where=where)
+    return TreeAtStr(tree=tree, where=where)
 
 
-def _pytree_nested_indexer(tree, where):
-    class PyTreeNestedIndexer(PyTreeIndexer):
-        def __getitem__(nested_self, nested_where):
+def _tree_at_pytree(tree, where):
+    class TreeAtPyTree(_TreeAtPyTree):
+        def __getitem__(next_self, next_where):
             # here the case is .at[cond1].at[cond2] <-> .at[ cond1 and cond2 ]
-            nested_where = nested_self.where & nested_where
-            return PyTreeNestedIndexer(tree=tree, where=nested_where)
+            next_where = next_self.where & next_where
+            return TreeAtPyTree(tree=tree, where=next_where)
 
-        def __getattr__(nested_self, name):
+        def __getattr__(next_self, name):
             # support for nested `.at`
             # e.g. `tree.at[tree>0].at[tree == str ]
             # corrsponds to (tree>0 and tree == str`)
             if name == "at":
                 # pass the current where condition to the next level
-                return PyTreeNestedIndexer(tree=tree, where=nested_self.where)
+                return TreeAtPyTree(tree=tree, where=next_self.where)
 
-            msg = f"{name} is not a valid attribute of {nested_self}\n"
+            msg = f"{name} is not a valid attribute of {next_self}\n"
             msg += f"Did you mean to use .at[{name!r}]?"
             raise AttributeError(msg)
 
-    return PyTreeNestedIndexer(tree=tree, where=where)
+    return TreeAtPyTree(tree=tree, where=where)
 
 
-def _at_indexer(tree):
+def _tree_indexer(tree):
     class AtIndexer:
         def __getitem__(_, where):
             if isinstance(where, str):
-                return _str_nested_indexer(tree=tree, where=where)
+                return _tree_at_str(tree=tree, where=where)
 
             if isinstance(where, type(tree)):
                 # indexing by boolean pytree
-                return _pytree_nested_indexer(tree=tree, where=where)
+                return _tree_at_pytree(tree=tree, where=where)
 
             if isinstance(where, EllipsisType):
                 # Ellipsis as an alias for all elements
@@ -464,3 +478,54 @@ def bcmap(
     docs = f"Broadcasted version of {func.__name__}\n{func.__doc__}"
     wrapper.__doc__ = docs
     return wrapper
+
+
+class _TreeOperator:
+    __abs__ = bcmap(op.abs)
+    __add__ = bcmap(op.add)
+    __and__ = bcmap(op.and_)
+    __ceil__ = bcmap(math.ceil)
+    __copy__ = _tree_copy
+    __divmod__ = bcmap(divmod)
+    __eq__ = bcmap(op.eq)
+    __floor__ = bcmap(math.floor)
+    __floordiv__ = bcmap(op.floordiv)
+    __ge__ = bcmap(op.ge)
+    __gt__ = bcmap(op.gt)
+    __hash__ = _tree_hash
+    __inv__ = bcmap(op.inv)
+    __invert__ = bcmap(op.invert)
+    __le__ = bcmap(op.le)
+    __lshift__ = bcmap(op.lshift)
+    __lt__ = bcmap(op.lt)
+    __matmul__ = bcmap(op.matmul)
+    __mod__ = bcmap(op.mod)
+    __mul__ = bcmap(op.mul)
+    __ne__ = bcmap(op.ne)
+    __neg__ = bcmap(op.neg)
+    __or__ = bcmap(op.or_)
+    __pos__ = bcmap(op.pos)
+    __pow__ = bcmap(op.pow)
+    __radd__ = bcmap(op.add)
+    __rand__ = bcmap(op.and_)
+    __rdivmod__ = bcmap(divmod)
+    __rfloordiv__ = bcmap(op.floordiv)
+    __rlshift__ = bcmap(op.lshift)
+    __rmatmul__ = bcmap(op.matmul)
+    __rmod__ = bcmap(op.mod)
+    __rmul__ = bcmap(op.mul)
+    __ror__ = bcmap(op.or_)
+    __round__ = bcmap(round)
+    __rpow__ = bcmap(op.pow)
+    __rrshift__ = bcmap(op.rshift)
+    __rshift__ = bcmap(op.rshift)
+    __rsub__ = bcmap(op.sub)
+    __rtruediv__ = bcmap(op.truediv)
+    __rxor__ = bcmap(op.xor)
+    __sub__ = bcmap(op.sub)
+    __truediv__ = bcmap(op.truediv)
+    __xor__ = bcmap(op.xor)
+
+
+class _TreeIndexer:
+    at = property(_tree_indexer)

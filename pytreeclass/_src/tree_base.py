@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import dataclasses as dc
 import functools as ft
-import math
-import operator as op
 from typing import Any
 
 import jax.numpy as jnp
@@ -16,24 +14,15 @@ from pytreeclass._src.tree_decorator import (
     _NOT_SET,
     _POST_INIT,
     Field,
+    _apply_callbacks,
     _generate_field_map,
-    _get_init_method,
+    _retrieve_init_method,
 )
-from pytreeclass._src.tree_freeze import _hash_node, unfreeze
-from pytreeclass._src.tree_indexer import _at_indexer, bcmap
-from pytreeclass._src.tree_pprint import tree_repr, tree_str
+from pytreeclass._src.tree_freeze import unfreeze
+from pytreeclass._src.tree_indexer import _TreeIndexer, _TreeOperator
+from pytreeclass._src.tree_pprint import _TreePretty
 
 PyTree = Any
-
-
-def _hash(tree: PyTree) -> int:
-    hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
-    return hash((*hashed, jtu.tree_structure(tree)))
-
-
-def _copy(tree: PyTree) -> PyTree:
-    """Return a copy of the tree"""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
 
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
@@ -61,7 +50,7 @@ def _new_wrapper(new_func):
     @ft.wraps(new_func)
     def new_method(cls, *_, **__) -> PyTree:
         self = object.__new__(cls)
-        for field in cls.__dict__[_FIELD_MAP].values():
+        for field in getattr(cls, _FIELD_MAP).values():
             if field.default is not _NOT_SET:
                 self.__dict__[field.name] = field.default
             elif field.default_factory is not None:
@@ -69,24 +58,6 @@ def _new_wrapper(new_func):
         return self
 
     return new_method
-
-
-def _apply_callbacks(tree, init: bool = True):
-    for field in tree.__class__.__dict__[_FIELD_MAP].values():
-        # init means that we are validating fields that are initialized
-        if field.init is not init or field.callbacks is None:
-            continue
-
-        for callback in field.callbacks:
-            try:
-                # callback is a function that takes the value of the field
-                # and returns a modified value
-                value = callback(getattr(tree, field.name))
-                setattr(tree, field.name, value)
-            except Exception as e:
-                stage = "__init__" if init else "__post_init__"
-                msg = f"Error at `{stage}` for field=`{field.name}`:\n{e}"
-                raise type(e)(msg)
 
 
 def _init_wrapper(init_func):
@@ -114,7 +85,7 @@ def _init_wrapper(init_func):
             _apply_callbacks(self, init=False)
 
         # handle freezing values and uninitialized fields
-        for field in self.__class__.__dict__[_FIELD_MAP].values():
+        for field in getattr(self, _FIELD_MAP).values():
             if field.name not in vars(self):
                 # at this point, all fields should be initialized
                 # in principle, this error will be caught when invoking `repr`/`str`
@@ -141,7 +112,7 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     """Flatten rule for `jax.tree_flatten`"""
     # in essence anything not declared in dataclass fields will be considered static
     static, dynamic = dict(vars(tree)), dict()
-    for key in vars(tree.__class__)[_FIELD_MAP]:
+    for key in getattr(tree, _FIELD_MAP):
         dynamic[key] = static.pop(key)
 
     return dynamic.values(), (dynamic.keys(), static)
@@ -153,6 +124,22 @@ def _unflatten(cls, treedef, leaves):
     tree.__dict__.update(treedef[1])
     tree.__dict__.update(zip(treedef[0], leaves))
     return tree
+
+
+def _init_subclass(cls):
+    # Non-decorated subclasses uses the base `treeclass` leaves only
+    # this behavior is aligned with `dataclasses` not registering non-decorated
+    # subclasses dataclass fields. for example:
+    # >>> @treeclass
+    # ... class A:
+    # ...   a:int=1
+    # >>> class B(A):
+    # ...    b:int=2
+    # >>> tree = B()
+    # >>> jax.tree_leaves(tree)
+    # [1]
+    jtu.register_pytree_node(cls, _flatten, ft.partial(_unflatten, cls))
+    return cls
 
 
 def treeclass(cls):
@@ -178,7 +165,6 @@ def treeclass(cls):
     Raises:
         TypeError: if the input class is not a `class`
     """
-
     if not isinstance(cls, type):
         # class decorator must be applied to a class
         raise TypeError(f"Expected `class` but got `{type(cls)}`.")
@@ -194,87 +180,61 @@ def treeclass(cls):
             # even though it is being overriden by the decorator
             raise AttributeError(f"Cannot define `{method_name}` in {cls.__name__}.")
 
-    # treeclass constants
     FIELD_MAP = _generate_field_map(cls)
 
     attrs = dict()
 
-    # data class attributes
+    # dataclass containers
     attrs[_FIELD_MAP] = FIELD_MAP
     attrs[_FROZEN] = True
 
-    # class initialization
+    # class constructor
+    attrs["__init__"] = _init_wrapper(_retrieve_init_method(cls, FIELD_MAP))
     attrs["__new__"] = _new_wrapper(getattr(cls, "__new__"))
-    attrs["__init__"] = _init_wrapper(_get_init_method(cls, FIELD_MAP))
+    attrs["__init_subclass__"] = _init_subclass
 
-    # immutable attributes
+    # immutable methods
     attrs["__getattribute__"] = _get_wrapper(getattr(cls, "__getattribute__"))
-    attrs["__setattr__"] = _setattr
     attrs["__delattr__"] = _delattr
+    attrs["__setattr__"] = _setattr
 
-    # pretty printing
-    attrs["__repr__"] = tree_repr
-    attrs["__str__"] = tree_str
+    bases = (cls, _TreePretty, _TreeOperator, _TreeIndexer)
+    cls = type(cls.__name__, bases, attrs)
 
-    # indexing and masking
-    attrs["at"] = property(_at_indexer)
+    try:
+        # in case of the base class is being initialized
+        # then register all subclasses
+        # however, do not consider the non-decorated subclasses leaves
+        # for example:
+        # >>> @treeclass
+        # ... class A:
+        # ...   a:int=1
+        # >>> class B(A):
+        # ...    b:int=2
+        # >>> tree = B()
+        # >>> jax.tree_leaves(tree)
+        # [1]
+        jtu.register_pytree_node(cls, _flatten, ft.partial(_unflatten, cls))
+    except ValueError:
+        # ignore if the class is already registered
+        # this happens in cases of decorating by `treeclass`
+        # and inheriting from `treeclass` decorated class
+        # so the registeration is done twice, initially by the base class
+        # and then by then by the decorator
+        # for example:
+        # >>> @treeclass
+        # ... class A:
+        # ...   a:int=1
 
-    # define flatten/unflatten rules for `JAX`
-    attrs["tree_flatten"] = _flatten
-    attrs["tree_unflatten"] = classmethod(_unflatten)
+        # >>> @treeclass
+        # ... class B(A):
+        # ...    b:int=2
+        # >>> tree = B()
+        # >>> jax.tree_leaves(tree)
+        # [1, 2]
+        pass
 
-    # hasing and copying
-    attrs["__copy__"] = _copy
-    attrs["__hash__"] = _hash
-
-    # math operations
-    attrs["__abs__"] = bcmap(op.abs)
-    attrs["__add__"] = bcmap(op.add)
-    attrs["__and__"] = bcmap(op.and_)
-    attrs["__ceil__"] = bcmap(math.ceil)
-    attrs["__divmod__"] = bcmap(divmod)
-    attrs["__eq__"] = bcmap(op.eq)
-    attrs["__floor__"] = bcmap(math.floor)
-    attrs["__floordiv__"] = bcmap(op.floordiv)
-    attrs["__ge__"] = bcmap(op.ge)
-    attrs["__gt__"] = bcmap(op.gt)
-    attrs["__inv__"] = bcmap(op.inv)
-    attrs["__invert__"] = bcmap(op.invert)
-    attrs["__le__"] = bcmap(op.le)
-    attrs["__lshift__"] = bcmap(op.lshift)
-    attrs["__lt__"] = bcmap(op.lt)
-    attrs["__matmul__"] = bcmap(op.matmul)
-    attrs["__mod__"] = bcmap(op.mod)
-    attrs["__mul__"] = bcmap(op.mul)
-    attrs["__ne__"] = bcmap(op.ne)
-    attrs["__neg__"] = bcmap(op.neg)
-    attrs["__or__"] = bcmap(op.or_)
-    attrs["__pos__"] = bcmap(op.pos)
-    attrs["__pow__"] = bcmap(op.pow)
-    attrs["__radd__"] = bcmap(op.add)
-    attrs["__rand__"] = bcmap(op.and_)
-    attrs["__rdivmod__"] = bcmap(divmod)
-    attrs["__rfloordiv__"] = bcmap(op.floordiv)
-    attrs["__rlshift__"] = bcmap(op.lshift)
-    attrs["__rmatmul__"] = bcmap(op.matmul)
-    attrs["__rmod__"] = bcmap(op.mod)
-    attrs["__rmul__"] = bcmap(op.mul)
-    attrs["__ror__"] = bcmap(op.or_)
-    attrs["__round__"] = bcmap(round)
-    attrs["__rpow__"] = bcmap(op.pow)
-    attrs["__rrshift__"] = bcmap(op.rshift)
-    attrs["__rshift__"] = bcmap(op.rshift)
-    attrs["__rsub__"] = bcmap(op.sub)
-    attrs["__rtruediv__"] = bcmap(op.truediv)
-    attrs["__rxor__"] = bcmap(op.xor)
-    attrs["__sub__"] = bcmap(op.sub)
-    attrs["__truediv__"] = bcmap(op.truediv)
-    attrs["__xor__"] = bcmap(op.xor)
-
-    for key in attrs:
-        setattr(cls, key, attrs[key])
-
-    return jtu.register_pytree_node_class(cls)
+    return cls
 
 
 def is_tree_equal(lhs: Any, rhs: Any) -> bool:

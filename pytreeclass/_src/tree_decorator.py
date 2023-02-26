@@ -13,7 +13,7 @@ from typing import Any, Callable, NamedTuple, Sequence
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__FROZEN__"
-_FIELD_MAP = "__FIELD_MAP__"  # to make it work with `dataclasses.is_dataclass`
+_FIELD_MAP = "__FIELD_MAP__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
 
@@ -56,7 +56,7 @@ def field(
         # this is the similar behavior to `dataclasses`
         raise ValueError("Cannot specify both `default` and `default_factory`")
 
-    # check metadata
+    # check metadata is a dict
     if isinstance(metadata, dict):
         metadata = MappingProxyType(metadata)
     elif metadata is not None:
@@ -87,6 +87,24 @@ def field(
     )
 
 
+def _apply_callbacks(tree, init: bool = True):
+    for field in getattr(tree, _FIELD_MAP).values():
+        # init means that we are validating fields that are initialized
+        if field.init is not init or field.callbacks is None:
+            continue
+
+        for callback in field.callbacks:
+            try:
+                # callback is a function that takes the value of the field
+                # and returns a modified value
+                value = callback(getattr(tree, field.name))
+                setattr(tree, field.name, value)
+            except Exception as e:
+                stage = "__init__" if init else "__post_init__"
+                msg = f"Error at `{stage}` for field=`{field.name}`:\n{e}"
+                raise type(e)(msg)
+
+
 @ft.lru_cache(maxsize=None)
 def _generate_field_map(cls) -> dict[str, Field]:
     # get all the fields of the class and its base classes
@@ -94,6 +112,11 @@ def _generate_field_map(cls) -> dict[str, Field]:
     FIELD_MAP = dict()
 
     for base in reversed(cls.__mro__):
+        # get the fields of the base class in the MRO
+        # in reverse order to ensure the correct order of the fields
+        # are preserved, i.e. the fields of the base class are added first
+        # and the fields of the derived class are added last so that
+        # in case of name collision, the derived class fields are preserved
         if hasattr(base, _FIELD_MAP):
             FIELD_MAP.update(getattr(base, _FIELD_MAP))
 
@@ -112,11 +135,13 @@ def _generate_field_map(cls) -> dict[str, Field]:
 
         if isinstance(value, Field):
             # the annotated attribute is a `Field``
+            # example case: `x: Any = field(default=1)`
             # assign the name and type to the Field from the annotation
             FIELD_MAP[name] = value._replace(name=name, type=type)
 
         elif value is _NOT_SET:
             # nothing is assigned to the annotated attribute
+            # example case: `x: Any`
             # then we create a Field and assign it to the class
             FIELD_MAP[name] = Field(name=name, type=type)
 
@@ -124,11 +149,19 @@ def _generate_field_map(cls) -> dict[str, Field]:
             # the annotated attribute has a non-field default value
             # check for mutable types and raise an error if found
             if isinstance(value, _MUTABLE_TYPES):
+                # example case: `x: Any = [1, 2, 3]`
+                # this is the prime motivation for writing this decorator
+                # as from python 3.11, jax arrays `dataclasses` will raise an error if
+                # `JAX` arrays are used as default values.
+                # the `dataclasses` logic is flawed by using `__hash__` existence
+                # as a proxy for immutability, which is not the case for `JAX` arrays
+                # which are immutable but do not have a `__hash__` method
                 msg = f"mutable value= {(value)} is not allowed as a value"
                 msg += f" for field `{name}` in class `{cls.__name__}`.\n"
                 msg += f" use `field(default_factory=lambda:{value})` instead"
                 raise TypeError(msg)
 
+            # example case: `x: int = 1`
             # otherwise, we create a Field and assign default value to the class
             FIELD_MAP[name] = Field(name=name, type=type, default=value)
 
@@ -139,6 +172,8 @@ def _generate_field_map(cls) -> dict[str, Field]:
 def _generate_init_code(fields: Sequence[NamedTuple]):
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
+    # for example, if we have a class with fields `x` and `y`
+    # then generated code will something like  `def __init__(self, x, y): self.x = x; self.y = y`
     head = body = ""
 
     for field in fields:
@@ -175,9 +210,8 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
     return body
 
 
-def _get_init_method(cls, FIELD_MAP):
-    # generate the init method
-    # if the class already has an init method, we will use it
+def _retrieve_init_method(cls, FIELD_MAP):
+    # get the init method if the class already has an init method, we will use it
     # otherwise, we will generate one
     if "__init__" in vars(cls):
         return cls.__init__
@@ -202,13 +236,13 @@ def _get_init_method(cls, FIELD_MAP):
 
 
 def _is_dataclass_like(node):
-    # maybe include other dataclass-like objects here?
+    # maybe include other dataclass-like objects here? (e.g. attrs)
     return dc.is_dataclass(node) or hasattr(node, _FIELD_MAP)
 
 
 def _dataclass_like_fields(node):
     """Get the fields of a dataclass-like object."""
-    # maybe include other dataclass-like objects here?
+    # maybe include other dataclass-like objects here? (e.g. attrs)
     if not _is_dataclass_like(node):
         raise TypeError(f"Cannot get fields from {node!r}.")
     if dc.is_dataclass(node):

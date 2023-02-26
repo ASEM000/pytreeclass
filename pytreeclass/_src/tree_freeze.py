@@ -27,6 +27,11 @@ def _hash_node(node: PyTree) -> int:
     return hash(node)
 
 
+def _tree_hash(tree: PyTree) -> int:
+    hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
+    return hash((*hashed, jtu.tree_structure(tree)))
+
+
 class _Wrapper:
     def __init__(self, x: Any):
         # disable composition of Wrappers

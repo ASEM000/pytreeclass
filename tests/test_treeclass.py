@@ -134,6 +134,16 @@ def test_subclassing():
     assert l1.sub(10) == 0
     assert l1.d == 5
 
+    class L1(L0):
+        a: int = 2
+        b: int = 4
+
+    l1 = L1()
+
+    # leaves of L0 are only considered
+    # as L1 is not decorated with @treeclass
+    assert jtu.tree_leaves(l1) == [1, 3, 5]
+
 
 def test_registering_state():
     @pytc.treeclass

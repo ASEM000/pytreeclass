@@ -311,6 +311,13 @@ def test_reduce():
     with pytest.raises(TypeError):
         init.at[init].reduce(lambda x, y: x + jnp.sum(y))
 
+    @pytc.treeclass
+    class Test:
+        a: tuple[int]
+
+    lhs = Test((1, 2, 3)).at["a"].reduce(lambda x, y: x + y)
+    assert lhs == 6
+
 
 def test_reduce_and_its_derivatives():
     @pytc.treeclass
