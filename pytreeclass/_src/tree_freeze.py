@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses as dc
+import hashlib
 import operator as op
 from contextlib import contextmanager
 from typing import Any
@@ -10,9 +11,20 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
-from pytreeclass._src.tree_operator import _hash_node
 
 PyTree = Any
+
+
+def _hash_node(node: PyTree) -> int:
+    if hasattr(node, "dtype") and hasattr(node, "shape"):
+        return hashlib.sha256(np.array(node).tobytes()).hexdigest()
+    if isinstance(node, set):
+        return hash(frozenset(node))
+    if isinstance(node, dict):
+        return hash(frozenset(node.items()))
+    if isinstance(node, list):
+        return hash(tuple(node))
+    return hash(node)
 
 
 class _Wrapper:

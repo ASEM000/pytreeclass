@@ -1,7 +1,7 @@
 from pytreeclass._src.tree_base import is_tree_equal, treeclass
 from pytreeclass._src.tree_decorator import field
 from pytreeclass._src.tree_freeze import freeze, is_frozen, is_nondiff, unfreeze
-from pytreeclass._src.tree_operator import bcmap
+from pytreeclass._src.tree_indexer import bcmap
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_mermaid,

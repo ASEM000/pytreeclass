@@ -19,12 +19,21 @@ from pytreeclass._src.tree_decorator import (
     _generate_field_map,
     _get_init_method,
 )
-from pytreeclass._src.tree_freeze import unfreeze
-from pytreeclass._src.tree_indexer import _at_indexer
-from pytreeclass._src.tree_operator import _copy, _hash, bcmap
+from pytreeclass._src.tree_freeze import _hash_node, unfreeze
+from pytreeclass._src.tree_indexer import _at_indexer, bcmap
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 
 PyTree = Any
+
+
+def _hash(tree: PyTree) -> int:
+    hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
+    return hash((*hashed, jtu.tree_structure(tree)))
+
+
+def _copy(tree: PyTree) -> PyTree:
+    """Return a copy of the tree"""
+    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
 
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
@@ -123,10 +132,7 @@ def _get_wrapper(get_func):
     def get_method(self, key: str) -> Any:
         # avoid non-scalar error, raised by `jax` transformation
         # if a frozen value is returned.
-        try:
-            return unfreeze(get_func(self, key))
-        except AttributeError as error:
-            raise type(error)(error)
+        return unfreeze(get_func(self, key))
 
     return get_method
 
@@ -153,104 +159,121 @@ def treeclass(cls):
     """Decorator to convert a class to a `treeclass`
 
     Example:
-        >>> @treeclass
-        ... class Tree:
-        ...     x: float
-        ...     y: float
-        ...     z: float
+        >>> import jax
+        >>> import jax.numpy as jnp
+        >>> import pytreeclass as pytc
 
-        >>> tree = Tree(1, 2, 3)
+        >>> @pytc.treeclass
+        ... class Linear :
+        ...     weight : jnp.ndarray
+        ...     bias   : jnp.ndarray
 
-        >>> tree
-        Tree(x=1, y=2, z=3)
+        >>> def __init__(self,key,in_dim,out_dim):
+        ...    self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
+        ...    self.bias = jnp.ones((1,out_dim))
 
-    Args:
-        cls: class to be converted to a `treeclass`
-        order: if `True` the `treeclass` math operations will be applied leaf-wise (default: `True`)
-
-    Returns:`
-        `treeclass` of the input class
+        >>> def __call__(self,x):
+        ...    return x @ self.weight + self.bias
 
     Raises:
         TypeError: if the input class is not a `class`
     """
 
     if not isinstance(cls, type):
+        # class decorator must be applied to a class
         raise TypeError(f"Expected `class` but got `{type(cls)}`.")
 
-    # check if the class has any of the above methods
-    for key in ("__setattr__", "__delattr__", "__getattribute__", "__getattr__"):
-        if key in vars(cls):
-            raise AttributeError(f"Cannot define `{key}` in {cls.__name__}.")
+    for method_name in (
+        "__setattr__",
+        "__delattr__",
+        "__getattribute__",
+        "__getattr__",
+    ):
+        if method_name in vars(cls):
+            # explicitly ensure that the class does not define these methods
+            # even though it is being overriden by the decorator
+            raise AttributeError(f"Cannot define `{method_name}` in {cls.__name__}.")
 
     # treeclass constants
-    field_map = _generate_field_map(cls)
-    setattr(cls, _FIELD_MAP, field_map)
-    setattr(cls, _FROZEN, True)
+    FIELD_MAP = _generate_field_map(cls)
+
+    attrs = dict()
+
+    # data class attributes
+    attrs[_FIELD_MAP] = FIELD_MAP
+    attrs[_FROZEN] = True
 
     # class initialization
-    setattr(cls, "__new__", _new_wrapper(cls.__new__))
-    setattr(cls, "__init__", _init_wrapper(_get_init_method(cls, field_map)))
-    # immutable methods
-    setattr(cls, "__getattribute__", _get_wrapper(cls.__getattribute__))
-    setattr(cls, "__setattr__", _setattr)
-    setattr(cls, "__delattr__", _delattr)
-    # pretty printing
-    setattr(cls, "__repr__", tree_repr)
-    setattr(cls, "__str__", tree_str)
-    # indexing
-    setattr(cls, "at", property(_at_indexer))
+    attrs["__new__"] = _new_wrapper(getattr(cls, "__new__"))
+    attrs["__init__"] = _init_wrapper(_get_init_method(cls, FIELD_MAP))
 
-    # define flatten/unflatten rules for `jax`
-    setattr(cls, "tree_flatten", _flatten)
-    setattr(cls, "tree_unflatten", classmethod(_unflatten))
-    setattr(cls, "__copy__", _copy)
-    setattr(cls, "__hash__", _hash)
+    # immutable attributes
+    attrs["__getattribute__"] = _get_wrapper(getattr(cls, "__getattribute__"))
+    attrs["__setattr__"] = _setattr
+    attrs["__delattr__"] = _delattr
+
+    # pretty printing
+    attrs["__repr__"] = tree_repr
+    attrs["__str__"] = tree_str
+
+    # indexing and masking
+    attrs["at"] = property(_at_indexer)
+
+    # define flatten/unflatten rules for `JAX`
+    attrs["tree_flatten"] = _flatten
+    attrs["tree_unflatten"] = classmethod(_unflatten)
+
+    # hasing and copying
+    attrs["__copy__"] = _copy
+    attrs["__hash__"] = _hash
 
     # math operations
-    setattr(cls, "__abs__", bcmap(op.abs))
-    setattr(cls, "__add__", bcmap(op.add))
-    setattr(cls, "__and__", bcmap(op.and_))
-    setattr(cls, "__ceil__", bcmap(math.ceil))
-    setattr(cls, "__copy__", _copy)
-    setattr(cls, "__divmod__", bcmap(divmod))
-    setattr(cls, "__eq__", bcmap(op.eq))
-    setattr(cls, "__floor__", bcmap(math.floor))
-    setattr(cls, "__floordiv__", bcmap(op.floordiv))
-    setattr(cls, "__ge__", bcmap(op.ge))
-    setattr(cls, "__gt__", bcmap(op.gt))
-    setattr(cls, "__inv__", bcmap(op.inv))
-    setattr(cls, "__invert__", bcmap(op.invert))
-    setattr(cls, "__le__", bcmap(op.le))
-    setattr(cls, "__lshift__", bcmap(op.lshift))
-    setattr(cls, "__lt__", bcmap(op.lt))
-    setattr(cls, "__matmul__", bcmap(op.matmul))
-    setattr(cls, "__mod__", bcmap(op.mod))
-    setattr(cls, "__mul__", bcmap(op.mul))
-    setattr(cls, "__ne__", bcmap(op.ne))
-    setattr(cls, "__neg__", bcmap(op.neg))
-    setattr(cls, "__or__", bcmap(op.or_))
-    setattr(cls, "__pos__", bcmap(op.pos))
-    setattr(cls, "__pow__", bcmap(op.pow))
-    setattr(cls, "__radd__", bcmap(op.add))
-    setattr(cls, "__rand__", bcmap(op.and_))
-    setattr(cls, "__rdivmod__", bcmap(divmod))
-    setattr(cls, "__rfloordiv__", bcmap(op.floordiv))
-    setattr(cls, "__rlshift__", bcmap(op.lshift))
-    setattr(cls, "__rmatmul__", bcmap(op.matmul))
-    setattr(cls, "__rmod__", bcmap(op.mod))
-    setattr(cls, "__rmul__", bcmap(op.mul))
-    setattr(cls, "__ror__", bcmap(op.or_))
-    setattr(cls, "__round__", bcmap(round))
-    setattr(cls, "__rpow__", bcmap(op.pow))
-    setattr(cls, "__rrshift__", bcmap(op.rshift))
-    setattr(cls, "__rshift__", bcmap(op.rshift))
-    setattr(cls, "__rsub__", bcmap(op.sub))
-    setattr(cls, "__rtruediv__", bcmap(op.truediv))
-    setattr(cls, "__rxor__", bcmap(op.xor))
-    setattr(cls, "__sub__", bcmap(op.sub))
-    setattr(cls, "__truediv__", bcmap(op.truediv))
-    setattr(cls, "__xor__", bcmap(op.xor))
+    attrs["__abs__"] = bcmap(op.abs)
+    attrs["__add__"] = bcmap(op.add)
+    attrs["__and__"] = bcmap(op.and_)
+    attrs["__ceil__"] = bcmap(math.ceil)
+    attrs["__divmod__"] = bcmap(divmod)
+    attrs["__eq__"] = bcmap(op.eq)
+    attrs["__floor__"] = bcmap(math.floor)
+    attrs["__floordiv__"] = bcmap(op.floordiv)
+    attrs["__ge__"] = bcmap(op.ge)
+    attrs["__gt__"] = bcmap(op.gt)
+    attrs["__inv__"] = bcmap(op.inv)
+    attrs["__invert__"] = bcmap(op.invert)
+    attrs["__le__"] = bcmap(op.le)
+    attrs["__lshift__"] = bcmap(op.lshift)
+    attrs["__lt__"] = bcmap(op.lt)
+    attrs["__matmul__"] = bcmap(op.matmul)
+    attrs["__mod__"] = bcmap(op.mod)
+    attrs["__mul__"] = bcmap(op.mul)
+    attrs["__ne__"] = bcmap(op.ne)
+    attrs["__neg__"] = bcmap(op.neg)
+    attrs["__or__"] = bcmap(op.or_)
+    attrs["__pos__"] = bcmap(op.pos)
+    attrs["__pow__"] = bcmap(op.pow)
+    attrs["__radd__"] = bcmap(op.add)
+    attrs["__rand__"] = bcmap(op.and_)
+    attrs["__rdivmod__"] = bcmap(divmod)
+    attrs["__rfloordiv__"] = bcmap(op.floordiv)
+    attrs["__rlshift__"] = bcmap(op.lshift)
+    attrs["__rmatmul__"] = bcmap(op.matmul)
+    attrs["__rmod__"] = bcmap(op.mod)
+    attrs["__rmul__"] = bcmap(op.mul)
+    attrs["__ror__"] = bcmap(op.or_)
+    attrs["__round__"] = bcmap(round)
+    attrs["__rpow__"] = bcmap(op.pow)
+    attrs["__rrshift__"] = bcmap(op.rshift)
+    attrs["__rshift__"] = bcmap(op.rshift)
+    attrs["__rsub__"] = bcmap(op.sub)
+    attrs["__rtruediv__"] = bcmap(op.truediv)
+    attrs["__rxor__"] = bcmap(op.xor)
+    attrs["__sub__"] = bcmap(op.sub)
+    attrs["__truediv__"] = bcmap(op.truediv)
+    attrs["__xor__"] = bcmap(op.xor)
+
+    for key in attrs:
+        setattr(cls, key, attrs[key])
+
     return jtu.register_pytree_node_class(cls)
 
 

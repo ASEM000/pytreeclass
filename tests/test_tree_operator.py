@@ -8,7 +8,7 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_freeze import _hash_node
-from pytreeclass._src.tree_operator import bcmap
+from pytreeclass._src.tree_indexer import bcmap
 
 
 def test_bcmap():

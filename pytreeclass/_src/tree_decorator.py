@@ -91,11 +91,11 @@ def field(
 def _generate_field_map(cls) -> dict[str, Field]:
     # get all the fields of the class and its base classes
     # get the fields of the class and its base classes
-    field_map = dict()
+    FIELD_MAP = dict()
 
     for base in reversed(cls.__mro__):
         if hasattr(base, _FIELD_MAP):
-            field_map.update(getattr(base, _FIELD_MAP))
+            FIELD_MAP.update(getattr(base, _FIELD_MAP))
 
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
@@ -113,12 +113,12 @@ def _generate_field_map(cls) -> dict[str, Field]:
         if isinstance(value, Field):
             # the annotated attribute is a `Field``
             # assign the name and type to the Field from the annotation
-            field_map[name] = value._replace(name=name, type=type)
+            FIELD_MAP[name] = value._replace(name=name, type=type)
 
         elif value is _NOT_SET:
             # nothing is assigned to the annotated attribute
             # then we create a Field and assign it to the class
-            field_map[name] = Field(name=name, type=type)
+            FIELD_MAP[name] = Field(name=name, type=type)
 
         else:
             # the annotated attribute has a non-field default value
@@ -130,9 +130,9 @@ def _generate_field_map(cls) -> dict[str, Field]:
                 raise TypeError(msg)
 
             # otherwise, we create a Field and assign default value to the class
-            field_map[name] = Field(name=name, type=type, default=value)
+            FIELD_MAP[name] = Field(name=name, type=type, default=value)
 
-    return field_map
+    return FIELD_MAP
 
 
 @ft.lru_cache(maxsize=None)
@@ -175,7 +175,7 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
     return body
 
 
-def _get_init_method(cls, field_map):
+def _get_init_method(cls, FIELD_MAP):
     # generate the init method
     # if the class already has an init method, we will use it
     # otherwise, we will generate one
@@ -188,8 +188,8 @@ def _get_init_method(cls, field_map):
 
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
-    exec(_generate_init_code(field_map.values()), global_namespace, local_namespace)
-    method = local_namespace["closure"](field_map)
+    exec(_generate_init_code(FIELD_MAP.values()), global_namespace, local_namespace)
+    method = local_namespace["closure"](FIELD_MAP)
 
     # inject the method into the class namespace
     return FunctionType(
