@@ -210,12 +210,7 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
     return body
 
 
-def _retrieve_init_method(cls, FIELD_MAP):
-    # get the init method if the class already has an init method, we will use it
-    # otherwise, we will generate one
-    if "__init__" in vars(cls):
-        return cls.__init__
-
+def _generate_init_method(cls, FIELD_MAP):
     # generate init method
     local_namespace = dict()
     global_namespace = sys.modules[cls.__module__].__dict__

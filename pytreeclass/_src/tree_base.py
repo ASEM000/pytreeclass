@@ -9,6 +9,7 @@ from typing import Any
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
+from jax._src.tree_util import _registry
 
 from pytreeclass._src.tree_decorator import (
     _FIELD_MAP,
@@ -18,7 +19,7 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _apply_callbacks,
     _generate_field_map,
-    _retrieve_init_method,
+    _generate_init_method,
 )
 from pytreeclass._src.tree_freeze import _hash_node, unfreeze
 from pytreeclass._src.tree_indexer import _tree_indexer, bcmap
@@ -27,12 +28,12 @@ from pytreeclass._src.tree_pprint import tree_repr, tree_str
 PyTree = Any
 
 
-def _hash(tree: PyTree) -> int:
+def _tree_hash(tree: PyTree) -> int:
     hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
     return hash((*hashed, jtu.tree_structure(tree)))
 
 
-def _copy(tree: PyTree) -> PyTree:
+def _tree_copy(tree: PyTree) -> PyTree:
     """Return a copy of the tree"""
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
@@ -96,7 +97,7 @@ def _init_subclass_wrapper(init_subclass_func):
         # this behavior is different from `flax.struct.dataclass`
         # as it does not register non-decorated subclasses field that inherited from decorated subclasses.
         init_subclass_func()
-        jtu.register_pytree_node(cls, _flatten, ft.partial(_unflatten, cls))
+        return _register_treeclass(cls)
 
     return _init_subclass
 
@@ -163,6 +164,13 @@ def _unflatten(cls, treedef, leaves):
     return tree
 
 
+def _register_treeclass(cls):
+    if cls in _registry:
+        return cls
+    jtu.register_pytree_node(cls, _flatten, ft.partial(_unflatten, cls))
+    return cls
+
+
 def treeclass(cls):
     """Decorator to convert a class to a `treeclass`
 
@@ -213,8 +221,8 @@ def treeclass(cls):
 
     # class initialization
     _new = getattr(cls, "__new__")
-    _init = _retrieve_init_method(cls, FIELD_MAP)
-    _init_subclass = getattr(cls, "__init_subclass__", None)
+    _init = vars(cls).get("__init__", _generate_init_method(cls, FIELD_MAP))
+    _init_subclass = getattr(cls, "__init_subclass__")
 
     attrs["__new__"] = _new_wrapper(_new)
     attrs["__init__"] = _init_wrapper(_init)
@@ -233,8 +241,8 @@ def treeclass(cls):
     attrs["at"] = property(_tree_indexer)
 
     # hasing and copying
-    attrs["__copy__"] = _copy
-    attrs["__hash__"] = _hash
+    attrs["__copy__"] = _tree_copy
+    attrs["__hash__"] = _tree_hash
 
     # math operations
     attrs["__abs__"] = bcmap(op.abs)
@@ -282,27 +290,7 @@ def treeclass(cls):
 
     for key in attrs:
         setattr(cls, key, attrs[key])
-
-    try:
-        jtu.register_pytree_node(cls, _flatten, ft.partial(_unflatten, cls))
-    except ValueError:
-        # if the class is already registered then `JAX` will raise a `ValueError`
-        # as `jax._src.tree_util._registry` cannot have duplicate keys
-        # this would happen if a class is being `decorated` with a `treeclass`
-        # and inherits from another `treeclass`, example:
-        # >>> @treeclass
-        # ... class A:
-        # ...     a: int = 1
-
-        # >>> @treeclass
-        # ... class B(A):
-        # ...     b: int = 2
-        # >>> jtu.tree_leaves(B(1, 2))
-        # [1]
-        # the logic is to treat the child class as a registered `PyTree` with base leaves
-        pass
-
-    return cls
+    return _register_treeclass(cls)
 
 
 def is_tree_equal(lhs: Any, rhs: Any) -> bool:

@@ -418,3 +418,13 @@ def test_dataclass_fields_like():
 
     with pytest.raises(TypeError):
         _dataclass_like_fields(1)
+
+
+def test_super():
+    @pytc.treeclass
+    class Test:
+        # a:int
+        def __init__(self) -> None:
+            super().__init__()
+
+    Test()
