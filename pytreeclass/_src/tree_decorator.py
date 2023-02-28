@@ -106,12 +106,12 @@ def _apply_callbacks(tree, init: bool = True):
 
 
 @ft.lru_cache(maxsize=None)
-def _generate_field_map(cls) -> dict[str, Field]:
+def _generate_field_map(klass) -> dict[str, Field]:
     # get all the fields of the class and its base classes
     # get the fields of the class and its base classes
     FIELD_MAP = dict()
 
-    for base in reversed(cls.__mro__):
+    for base in reversed(klass.__mro__):
         # get the fields of the base class in the MRO
         # in reverse order to ensure the correct order of the fields
         # are preserved, i.e. the fields of the base class are added first
@@ -123,12 +123,12 @@ def _generate_field_map(cls) -> dict[str, Field]:
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
-    annotations = cls.__dict__.get("__annotations__", dict())
+    annotations = klass.__dict__.get("__annotations__", dict())
 
     for name in annotations:
         # get the value associated with the type hint
         # in essence will skip any non type-hinted attributes
-        value = getattr(cls, name, _NOT_SET)
+        value = getattr(klass, name, _NOT_SET)
         # at this point we stick to the type hint provided by the user
         # inconsistency between the type hint and the value will be handled later
         type = annotations[name]
@@ -157,7 +157,7 @@ def _generate_field_map(cls) -> dict[str, Field]:
                 # as a proxy for immutability, which is not the case for `JAX` arrays
                 # which are immutable but do not have a `__hash__` method
                 msg = f"mutable value= {(value)} is not allowed as a value"
-                msg += f" for field `{name}` in class `{cls.__name__}`.\n"
+                msg += f" for field `{name}` in class `{klass.__name__}`.\n"
                 msg += f" use `field(default_factory=lambda:{value})` instead"
                 raise TypeError(msg)
 
@@ -210,12 +210,12 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
     return body
 
 
-def _generate_init(cls):
+def _generate_init(klass):
     # generate the field map for the class
-    FIELD_MAP = _generate_field_map(cls)
+    FIELD_MAP = _generate_field_map(klass)
     # generate init method
     local_namespace = dict()
-    global_namespace = sys.modules[cls.__module__].__dict__
+    global_namespace = sys.modules[klass.__module__].__dict__
 
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
@@ -245,3 +245,15 @@ def _dataclass_like_fields(node):
     if dc.is_dataclass(node):
         return dc.fields(node)
     return getattr(node, _FIELD_MAP).values()
+
+
+def _transform_to_dataclass(klass):
+    # add custom `dataclass` field_map and frozen attributes to the class
+    setattr(klass, _FIELD_MAP, _generate_field_map(klass))
+    setattr(klass, _FROZEN, True)
+    
+    if "__init__" not in vars(klass):
+        # generate the init method in case it is not defined
+        setattr(klass, "__init__", _generate_init(klass))
+    
+    return klass

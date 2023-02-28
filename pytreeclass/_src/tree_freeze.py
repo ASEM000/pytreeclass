@@ -75,8 +75,8 @@ class FrozenWrapper(_Wrapper):
         return (None,), _HashableWrapper(self.unwrap())
 
     @classmethod
-    def tree_unflatten(cls, treedef, _):
-        self = object.__new__(cls)
+    def tree_unflatten(klass, treedef, _):
+        self = object.__new__(klass)
         self.__dict__.update(__wrapped__=treedef.unwrap())
         return self
 
