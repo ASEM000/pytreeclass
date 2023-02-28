@@ -19,7 +19,7 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _apply_callbacks,
     _generate_field_map,
-    _generate_init_method,
+    _generate_init,
 )
 from pytreeclass._src.tree_freeze import _hash_node, unfreeze
 from pytreeclass._src.tree_indexer import _tree_indexer, bcmap
@@ -62,7 +62,7 @@ def _delattr(tree, key: str) -> None:
 def _new_wrapper(new_func):
     @ft.wraps(new_func)
     def new_method(cls, *_, **__) -> PyTree:
-        self = object.__new__(cls)
+        self = new_func(cls)
         for field in getattr(cls, _FIELD_MAP).values():
             if field.default is not _NOT_SET:
                 self.__dict__[field.name] = field.default
@@ -87,7 +87,7 @@ def _init_subclass_wrapper(init_subclass_func):
         # >>> tree = B()
         # >>> jax.tree_leaves(tree)
         # [1]
-        # however if we decorate `B` with `treeclass` then it will be registered
+        # however if we decorate `B` with `treeclass` then the fields of `B` will be registered as leaves
         # >>> @treeclass
         # ... class B(A):
         # ...    b:int=2
@@ -165,9 +165,8 @@ def _unflatten(cls, treedef, leaves):
 
 
 def _register_treeclass(cls):
-    if cls in _registry:
-        return cls
-    jtu.register_pytree_node(cls, _flatten, ft.partial(_unflatten, cls))
+    if cls not in _registry:
+        jtu.register_pytree_node(cls, _flatten, ft.partial(_unflatten, cls))
     return cls
 
 
@@ -210,18 +209,15 @@ def treeclass(cls):
             # even though it is being overriden by the decorator
             raise AttributeError(f"Cannot define `{method_name}` in {cls.__name__}.")
 
-    # treeclass constants
-    FIELD_MAP = _generate_field_map(cls)
-
     attrs = dict()
 
     # data class attributes
-    attrs[_FIELD_MAP] = FIELD_MAP
+    attrs[_FIELD_MAP] = _generate_field_map(cls)
     attrs[_FROZEN] = True
 
     # class initialization
     _new = getattr(cls, "__new__")
-    _init = vars(cls).get("__init__", _generate_init_method(cls, FIELD_MAP))
+    _init = vars(cls).get("__init__", _generate_init(cls))
     _init_subclass = getattr(cls, "__init_subclass__")
 
     attrs["__new__"] = _new_wrapper(_new)

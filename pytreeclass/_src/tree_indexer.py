@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import copy
 import functools as ft
-import math
-import operator as op
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
@@ -14,7 +12,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_freeze import _call_context, _tree_hash
+from pytreeclass._src.tree_freeze import _call_context
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
@@ -381,6 +379,7 @@ class _Partial(ft.partial):
         return self.func(*args, *iargs, **keywords)
 
 
+@ft.lru_cache(maxsize=None)
 def bcmap(
     func: Callable[..., Any], *, is_leaf: Callable[[Any], bool] | None = None
 ) -> Callable:
@@ -478,54 +477,3 @@ def bcmap(
     docs = f"Broadcasted version of {func.__name__}\n{func.__doc__}"
     wrapper.__doc__ = docs
     return wrapper
-
-
-class _TreeOperator:
-    __abs__ = bcmap(op.abs)
-    __add__ = bcmap(op.add)
-    __and__ = bcmap(op.and_)
-    __ceil__ = bcmap(math.ceil)
-    __copy__ = _tree_copy
-    __divmod__ = bcmap(divmod)
-    __eq__ = bcmap(op.eq)
-    __floor__ = bcmap(math.floor)
-    __floordiv__ = bcmap(op.floordiv)
-    __ge__ = bcmap(op.ge)
-    __gt__ = bcmap(op.gt)
-    __hash__ = _tree_hash
-    __inv__ = bcmap(op.inv)
-    __invert__ = bcmap(op.invert)
-    __le__ = bcmap(op.le)
-    __lshift__ = bcmap(op.lshift)
-    __lt__ = bcmap(op.lt)
-    __matmul__ = bcmap(op.matmul)
-    __mod__ = bcmap(op.mod)
-    __mul__ = bcmap(op.mul)
-    __ne__ = bcmap(op.ne)
-    __neg__ = bcmap(op.neg)
-    __or__ = bcmap(op.or_)
-    __pos__ = bcmap(op.pos)
-    __pow__ = bcmap(op.pow)
-    __radd__ = bcmap(op.add)
-    __rand__ = bcmap(op.and_)
-    __rdivmod__ = bcmap(divmod)
-    __rfloordiv__ = bcmap(op.floordiv)
-    __rlshift__ = bcmap(op.lshift)
-    __rmatmul__ = bcmap(op.matmul)
-    __rmod__ = bcmap(op.mod)
-    __rmul__ = bcmap(op.mul)
-    __ror__ = bcmap(op.or_)
-    __round__ = bcmap(round)
-    __rpow__ = bcmap(op.pow)
-    __rrshift__ = bcmap(op.rshift)
-    __rshift__ = bcmap(op.rshift)
-    __rsub__ = bcmap(op.sub)
-    __rtruediv__ = bcmap(op.truediv)
-    __rxor__ = bcmap(op.xor)
-    __sub__ = bcmap(op.sub)
-    __truediv__ = bcmap(op.truediv)
-    __xor__ = bcmap(op.xor)
-
-
-class _TreeIndexer:
-    at = property(_tree_indexer)

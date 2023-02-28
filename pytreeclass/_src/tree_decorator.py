@@ -210,7 +210,9 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
     return body
 
 
-def _generate_init_method(cls, FIELD_MAP):
+def _generate_init(cls):
+    # generate the field map for the class
+    FIELD_MAP = _generate_field_map(cls)
     # generate init method
     local_namespace = dict()
     global_namespace = sys.modules[cls.__module__].__dict__
