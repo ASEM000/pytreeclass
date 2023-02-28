@@ -134,6 +134,8 @@ def _init_wrapper(init_func):
                 # like in `dataclasses` but we raise it here for better error message.
                 raise AttributeError(f"field=`{field.name}` is not initialized.")
 
+        # delete the shadowing `__dict__` attribute to
+        # restore the frozen behavior
         del self.__dict__[_FROZEN]
         return output
 
@@ -217,11 +219,12 @@ def treeclass(cls):
 
     # class initialization
     _new = getattr(cls, "__new__")
-    _init = vars(cls).get("__init__", _generate_init(cls))
-    _init_subclass = getattr(cls, "__init_subclass__")
-
     attrs["__new__"] = _new_wrapper(_new)
+
+    _init = vars(cls).get("__init__", _generate_init(cls))
     attrs["__init__"] = _init_wrapper(_init)
+
+    _init_subclass = getattr(cls, "__init_subclass__")
     attrs["__init_subclass__"] = classmethod(_init_subclass_wrapper(_init_subclass))
 
     # immutable attributes
@@ -286,6 +289,7 @@ def treeclass(cls):
 
     for key in attrs:
         setattr(cls, key, attrs[key])
+
     return _register_treeclass(cls)
 
 
