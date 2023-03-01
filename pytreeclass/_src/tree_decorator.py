@@ -237,6 +237,14 @@ def _is_dataclass_like(node):
     return dc.is_dataclass(node) or hasattr(node, _FIELD_MAP)
 
 
+def fields(node):
+    """Get the fields of a dataclass-like object."""
+    if not hasattr(node, _FIELD_MAP):
+        raise TypeError(f"Cannot get fields from {node!r}.")
+    field_map = getattr(node, _FIELD_MAP, {})
+    return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))
+
+
 def _dataclass_like_fields(node):
     """Get the fields of a dataclass-like object."""
     # maybe include other dataclass-like objects here? (e.g. attrs)
@@ -244,7 +252,7 @@ def _dataclass_like_fields(node):
         raise TypeError(f"Cannot get fields from {node!r}.")
     if dc.is_dataclass(node):
         return dc.fields(node)
-    return getattr(node, _FIELD_MAP).values()
+    return fields(node)
 
 
 def _process_class(klass):
