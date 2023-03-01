@@ -41,7 +41,6 @@ def _node_pprint(node: Any, depth: int, kind: str, width: int) -> str:
         # special case for jitted JAX functions
         return (f"jit({_func_pprint(node)})", depth, kind, width)
     if isinstance(node, (np.ndarray, jnp.ndarray)):
-        # works for numpy arrays, jax arrays
         return _numpy_pprint(node, depth, kind, width)
     if isinstance(node, jax.ShapeDtypeStruct):
         return _shape_dtype_struct_pprint(node, depth, kind, width)

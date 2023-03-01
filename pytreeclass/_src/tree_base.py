@@ -20,21 +20,11 @@ from pytreeclass._src.tree_decorator import (
     _apply_callbacks,
     _process_class,
 )
-from pytreeclass._src.tree_freeze import _hash_node, unfreeze
-from pytreeclass._src.tree_indexer import _tree_indexer, bcmap
+from pytreeclass._src.tree_freeze import _tree_hash, unfreeze
+from pytreeclass._src.tree_indexer import _tree_copy, _tree_indexer, bcmap
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 
 PyTree = Any
-
-
-def _tree_hash(tree: PyTree) -> int:
-    hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
-    return hash((*hashed, jtu.tree_structure(tree)))
-
-
-def _tree_copy(tree: PyTree) -> PyTree:
-    """Return a copy of the tree"""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
 
 
 def _register_treeclass(klass):

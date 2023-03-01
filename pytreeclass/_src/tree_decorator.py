@@ -13,7 +13,7 @@ from typing import Any, Callable, NamedTuple, Sequence
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__frozen__"
-_FIELD_MAP = "_field_map__"
+_FIELD_MAP = "__field_map__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
 
