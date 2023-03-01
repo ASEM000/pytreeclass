@@ -17,9 +17,8 @@ from pytreeclass._src.tree_decorator import (
     _NOT_SET,
     _POST_INIT,
     Field,
-    _transform_to_dataclass,
     _apply_callbacks,
-    _generate_init,
+    _process_class,
 )
 from pytreeclass._src.tree_freeze import _hash_node, unfreeze
 from pytreeclass._src.tree_indexer import _tree_indexer, bcmap
@@ -36,6 +35,12 @@ def _tree_hash(tree: PyTree) -> int:
 def _tree_copy(tree: PyTree) -> PyTree:
     """Return a copy of the tree"""
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
+
+
+def _register_treeclass(klass):
+    if klass not in _registry:
+        jtu.register_pytree_node(klass, _flatten, ft.partial(_unflatten, klass))
+    return klass
 
 
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
@@ -161,16 +166,10 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
 
 def _unflatten(klass, treedef, leaves):
     """Unflatten rule for `jax.tree_unflatten`"""
-    tree = object.__new__(klass)  # do not call klass constructor
+    tree = klass.__new__(klass)  # do not call klass constructor
     tree.__dict__.update(treedef[1])
     tree.__dict__.update(zip(treedef[0], leaves))
     return tree
-
-
-def _register_treeclass(klass):
-    if klass not in _registry:
-        jtu.register_pytree_node(klass, _flatten, ft.partial(_unflatten, klass))
-    return klass
 
 
 def treeclass(klass):
@@ -212,8 +211,9 @@ def treeclass(klass):
             # even though it is being overriden by the decorator
             raise AttributeError(f"Cannot define `{method_name}` in {klass.__name__}.")
 
-    # add _FIELD_MAP and _FROZEN
-    klass = _transform_to_dataclass(klass)
+    # add `_FIELD_MAP`, `_FROZEN` and generate `__init__`
+    # method from fields if not defined.
+    klass = _process_class(klass)
 
     # class initialization
     klass.__new__ = _new_wrapper(klass.__new__)

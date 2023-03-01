@@ -12,8 +12,8 @@ from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
-_FROZEN = "__FROZEN__"
-_FIELD_MAP = "__FIELD_MAP__"
+_FROZEN = "__frozen__"
+_FIELD_MAP = "_field_map__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
 
@@ -247,13 +247,13 @@ def _dataclass_like_fields(node):
     return getattr(node, _FIELD_MAP).values()
 
 
-def _transform_to_dataclass(klass):
+def _process_class(klass):
     # add custom `dataclass` field_map and frozen attributes to the class
     setattr(klass, _FIELD_MAP, _generate_field_map(klass))
     setattr(klass, _FROZEN, True)
-    
+
     if "__init__" not in vars(klass):
         # generate the init method in case it is not defined
         setattr(klass, "__init__", _generate_init(klass))
-    
+
     return klass
