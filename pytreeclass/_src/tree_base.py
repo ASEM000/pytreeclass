@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses as dc
 import functools as ft
 import math
@@ -28,6 +29,12 @@ PyTree = Any
 
 
 def _register_treeclass(klass):
+    # register a treeclass only once
+    # there are two cases where a class is registered twice:
+    # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
+    # second when a class is decorated with `treeclass` and has a parent class that is also decorated with `treeclass`
+    # in that case `__init_subclass__` registers the class before the decorator registers it.
+    # the latter case also can be done using metaclass that registers the class on initialization
     if klass not in _registry:
         jtu.register_pytree_node(klass, _flatten, ft.partial(_unflatten, klass))
     return klass
@@ -65,6 +72,7 @@ def _new_wrapper(new_func):
                 self.__dict__[field.name] = field.default_factory()
         return self
 
+    new_method.__wrapped__ = new_func
     return new_method
 
 
@@ -156,7 +164,8 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
 
 def _unflatten(klass, treedef, leaves):
     """Unflatten rule for `jax.tree_unflatten`"""
-    tree = klass.__new__(klass)  # do not call klass constructor
+    # call the wrapped `__new__` method (non-field initializer)
+    tree = klass.__new__.__wrapped__(klass)
     tree.__dict__.update(treedef[1])
     tree.__dict__.update(zip(treedef[0], leaves))
     return tree
@@ -187,23 +196,19 @@ def treeclass(klass):
     """
 
     if not isinstance(klass, type):
-        # class decorator must be applied to a class
         raise TypeError(f"Expected `class` but got `{type(klass)}`.")
 
-    for method_name in (
-        "__setattr__",
-        "__delattr__",
-        "__getattribute__",
-        "__getattr__",
+    for key, method in zip(
+        ("__delattr__", "__setattr__", "__getattribute__", "__getattr__"),
+        (_delattr, _setattr, _getattr, _getattr),
     ):
-        if method_name in vars(klass):
-            # explicitly ensure that the class does not define these methods
-            # even though it is being overriden by the decorator
-            raise AttributeError(f"Cannot define `{method_name}` in {klass.__name__}.")
+        if key in vars(klass) and vars(klass)[key] is not method:
+            # raise error if the current getattr/setattr/delattr is not immutable
+            raise AttributeError(f"Cannot define `{key}` in {klass.__name__}.")
 
     # add `_FIELD_MAP`, `_FROZEN` and generate `__init__`
     # method from fields if not defined.
-    klass = _process_class(klass)
+    klass = _process_class(copy.deepcopy(klass))
 
     # class initialization
     klass.__new__ = _new_wrapper(klass.__new__)
@@ -222,7 +227,7 @@ def treeclass(klass):
     # indexing and masking
     klass.at = property(_tree_indexer)
 
-    # hasing and copying
+    # hashing and copying
     klass.__copy__ = _tree_copy
     klass.__hash__ = _tree_hash
 

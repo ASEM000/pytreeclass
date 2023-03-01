@@ -9,13 +9,15 @@ import dataclasses as dc
 import functools as ft
 import sys
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, NamedTuple, Sequence
+from typing import Any, Callable, NamedTuple, Protocol, Sequence, runtime_checkable
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__frozen__"
 _FIELD_MAP = "__field_map__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
+_ANNOTATIONS = {"__annotations__": {_FIELD_MAP: dict}}
+TreeClass = runtime_checkable(type("TreeClass", (Protocol,), _ANNOTATIONS))
 
 
 class Field(NamedTuple):
@@ -234,12 +236,12 @@ def _generate_init(klass):
 
 def _is_dataclass_like(node):
     # maybe include other dataclass-like objects here? (e.g. attrs)
-    return dc.is_dataclass(node) or hasattr(node, _FIELD_MAP)
+    return dc.is_dataclass(node) or isinstance(node, TreeClass)
 
 
 def fields(node):
     """Get the fields of a dataclass-like object."""
-    if not hasattr(node, _FIELD_MAP):
+    if not isinstance(node, TreeClass):
         raise TypeError(f"Cannot get fields from {node!r}.")
     field_map = getattr(node, _FIELD_MAP, {})
     return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))
