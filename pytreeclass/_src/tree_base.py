@@ -283,6 +283,7 @@ def _process_optional_methods(klass):
 
     for key in attrs:
         if key not in vars(klass):
+            # do not override any existing methods
             setattr(klass, key, attrs[key])
     return klass
 

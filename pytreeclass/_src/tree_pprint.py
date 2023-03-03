@@ -244,7 +244,7 @@ def _node_type_pprint(node: type, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def tree_repr(tree: PyTree, *, width: int = 60, indent: int = 2) -> str:
+def tree_repr(tree: PyTree, *, width: int = 80, indent: int = 2) -> str:
     """Prertty print dataclass tree `__repr__`
 
     Args:
@@ -255,7 +255,7 @@ def tree_repr(tree: PyTree, *, width: int = 60, indent: int = 2) -> str:
     return _node_pprint(tree, 0, kind="repr", width=width).expandtabs(indent)
 
 
-def tree_str(tree: PyTree, *, width: int = 60, indent: int = 2) -> str:
+def tree_str(tree: PyTree, *, width: int = 80, indent: int = 2) -> str:
     """Prertty print dataclass tree `__str__`
 
     Args:
