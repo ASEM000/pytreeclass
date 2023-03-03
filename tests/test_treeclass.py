@@ -428,3 +428,18 @@ def test_super():
             super().__init__()
 
     Test()
+
+
+def test_optional_attrs():
+    @pytc.treeclass
+    class Test:
+        def __repr__(self):
+            return "a"
+
+        def __or__(self, other):
+            return 1
+
+    tree = Test()
+
+    assert tree.__repr__() == "a"
+    assert tree | tree == 1

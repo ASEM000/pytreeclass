@@ -1,6 +1,12 @@
 from pytreeclass._src.tree_base import is_tree_equal, treeclass
 from pytreeclass._src.tree_decorator import TreeClass, field, fields
-from pytreeclass._src.tree_freeze import freeze, is_frozen, is_nondiff, unfreeze
+from pytreeclass._src.tree_freeze import (
+    FrozenWrapper,
+    freeze,
+    is_frozen,
+    is_nondiff,
+    unfreeze,
+)
 from pytreeclass._src.tree_indexer import bcmap
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
@@ -29,6 +35,7 @@ __all__ = (
     "is_frozen",
     "freeze",
     "unfreeze",
+    "FrozenWrapper",
 )
 
 __version__ = "0.2.0b3"

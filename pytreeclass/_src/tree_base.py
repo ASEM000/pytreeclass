@@ -17,9 +17,11 @@ from pytreeclass._src.tree_decorator import (
     _FROZEN,
     _NOT_SET,
     _POST_INIT,
+    _WRAPPED,
     Field,
     _apply_callbacks,
-    _process_class,
+    _generate_field_map,
+    _generate_init,
 )
 from pytreeclass._src.tree_freeze import _tree_hash, unfreeze
 from pytreeclass._src.tree_indexer import _tree_copy, _tree_indexer, bcmap
@@ -74,7 +76,7 @@ def _new_wrapper(new_func):
 
     # wrap the original `new_func`, to use it later in `tree_unflatten`
     # to avoid repeating iterating over fields and setting default values
-    new_method.__wrapped__ = new_func
+    setattr(new_method, _WRAPPED, new_func)
     return new_method
 
 
@@ -175,10 +177,114 @@ def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
 def _unflatten(klass, treedef, leaves):
     """Unflatten rule for `jax.tree_unflatten`"""
     # call the wrapped `__new__` method (non-field initializer)
-    tree = klass.__new__.__wrapped__(klass)
+    tree = getattr(klass.__new__, _WRAPPED)(klass)
     vars(tree).update(treedef[1])
     vars(tree).update(zip(treedef[0], leaves))
     return tree
+
+
+def _validate_class(klass):
+    if not isinstance(klass, type):
+        raise TypeError(f"Expected `class` but got `{type(klass)}`.")
+
+    for key, method in zip(
+        ("__delattr__", "__setattr__", "__getattribute__", "__getattr__"),
+        (_delattr, _setattr, _getattr, _getattr),
+    ):
+        if key in vars(klass) and vars(klass)[key] is not method:
+            # raise error if the current getattr/setattr/delattr is not immutable
+            raise AttributeError(f"Cannot define `{key}` in {klass.__name__}.")
+
+    return klass
+
+
+def _treeclass_transform(klass):
+
+    # add custom `dataclass` field_map and frozen attributes to the class
+    setattr(klass, _FIELD_MAP, _generate_field_map(klass))
+    setattr(klass, _FROZEN, True)
+
+    if "__init__" not in vars(klass):
+        # generate the init method in case it is not defined
+        setattr(klass, "__init__", _generate_init(klass))
+
+    # class initialization
+    setattr(klass, "__new__", _new_wrapper(klass.__new__))
+    setattr(klass, "__init__", _init_wrapper(klass.__init__))
+    setattr(klass, "__init_subclass__", _init_sub_wrapper(klass.__init_subclass__))
+
+    # immutable attributes
+    setattr(klass, "__getattribute__", _getattr)
+    setattr(klass, "__setattr__", _setattr)
+    setattr(klass, "__delattr__", _delattr)
+
+    return klass
+
+
+def _process_optional_methods(klass):
+    # optional attributes
+    attrs = dict()
+
+    # pretty printing
+    attrs["__repr__"] = tree_repr
+    attrs["__str__"] = tree_str
+
+    # indexing and masking
+    attrs["at"] = property(_tree_indexer)
+
+    # hashing and copying
+    attrs["__copy__"] = _tree_copy
+    attrs["__hash__"] = _tree_hash
+
+    # math operations
+    attrs["__abs__"] = bcmap(op.abs)
+    attrs["__add__"] = bcmap(op.add)
+    attrs["__and__"] = bcmap(op.and_)
+    attrs["__ceil__"] = bcmap(math.ceil)
+    attrs["__divmod__"] = bcmap(divmod)
+    attrs["__eq__"] = bcmap(op.eq)
+    attrs["__floor__"] = bcmap(math.floor)
+    attrs["__floordiv__"] = bcmap(op.floordiv)
+    attrs["__ge__"] = bcmap(op.ge)
+    attrs["__gt__"] = bcmap(op.gt)
+    attrs["__int__"] = bcmap(int)
+    attrs["__invert__"] = bcmap(op.invert)
+    attrs["__le__"] = bcmap(op.le)
+    attrs["__lshift__"] = bcmap(op.lshift)
+    attrs["__lt__"] = bcmap(op.lt)
+    attrs["__matmul__"] = bcmap(op.matmul)
+    attrs["__mod__"] = bcmap(op.mod)
+    attrs["__mul__"] = bcmap(op.mul)
+    attrs["__ne__"] = bcmap(op.ne)
+    attrs["__neg__"] = bcmap(op.neg)
+    attrs["__or__"] = bcmap(op.or_)
+    attrs["__pos__"] = bcmap(op.pos)
+    attrs["__pow__"] = bcmap(op.pow)
+    attrs["__radd__"] = bcmap(op.add)
+    attrs["__rand__"] = bcmap(op.and_)
+    attrs["__rdivmod__"] = bcmap(divmod)
+    attrs["__rfloordiv__"] = bcmap(ft.wraps(op.floordiv)(lambda x, y: op.floordiv(y, x)))  # fmt: skip
+    attrs["__rlshift__"] = bcmap(ft.wraps(op.lshift)(lambda x, y: op.lshift(y, x)))
+    attrs["__rmatmul__"] = bcmap(ft.wraps(op.matmul)(lambda x, y: op.matmul(y, x)))
+    attrs["__rmod__"] = bcmap(ft.wraps(op.mod)(lambda x, y: op.mod(y, x)))
+    attrs["__rmul__"] = bcmap(op.mul)
+    attrs["__ror__"] = bcmap(op.or_)
+    attrs["__round__"] = bcmap(round)
+    attrs["__rpow__"] = bcmap(ft.wraps(op.pow)(lambda x, y: op.pow(y, x)))
+    attrs["__rrshift__"] = bcmap(ft.wraps(op.rshift)(lambda x, y: op.rshift(y, x)))
+    attrs["__rshift__"] = bcmap(op.rshift)
+    attrs["__rsub__"] = bcmap(ft.wraps(op.sub)(lambda x, y: op.sub(y, x)))
+    attrs["__rtruediv__"] = bcmap(ft.wraps(op.truediv)(lambda x, y: op.truediv(y, x)))
+    attrs["__rxor__"] = bcmap(op.xor)
+    attrs["__sub__"] = bcmap(op.sub)
+    attrs["__truediv__"] = bcmap(op.truediv)
+    attrs["__trunc__"] = bcmap(math.trunc)
+    attrs["__xor__"] = bcmap(op.xor)
+
+    for key in attrs:
+        if key not in vars(klass):
+            setattr(klass, key, attrs[key])
+    return klass
 
 
 def treeclass(klass):
@@ -204,87 +310,21 @@ def treeclass(klass):
     Raises:
         TypeError: if the input class is not a `class`
     """
+    # check if the input is a valid class
+    # in essence, it should be a type with immutable getters, setters and delters
+    klass = _validate_class(klass)
 
-    if not isinstance(klass, type):
-        raise TypeError(f"Expected `class` but got `{type(klass)}`.")
+    # add the immutable getters, setters and delters
+    # and generate the `__init__` method if not present
+    # generate fields from type annotations
+    klass = _treeclass_transform(copy.deepcopy(klass))
 
-    for key, method in zip(
-        ("__delattr__", "__setattr__", "__getattribute__", "__getattr__"),
-        (_delattr, _setattr, _getattr, _getattr),
-    ):
-        if key in vars(klass) and vars(klass)[key] is not method:
-            # raise error if the current getattr/setattr/delattr is not immutable
-            raise AttributeError(f"Cannot define `{key}` in {klass.__name__}.")
+    # add the optional methods to the class
+    # optional methods are math operations, indexing and masking,
+    # hashing and copying, and printing
+    klass = _process_optional_methods(klass)
 
-    # add `_FIELD_MAP`, `_FROZEN` and generate `__init__`
-    # method from fields if not defined.
-    klass = _process_class(copy.deepcopy(klass))
-
-    # class initialization
-    klass.__new__ = _new_wrapper(klass.__new__)
-    klass.__init__ = _init_wrapper(klass.__init__)
-    klass.__init_subclass__ = _init_sub_wrapper(klass.__init_subclass__)
-
-    # immutable attributes
-    klass.__getattribute__ = _getattr
-    klass.__setattr__ = _setattr
-    klass.__delattr__ = _delattr
-
-    # pretty printing
-    klass.__repr__ = tree_repr
-    klass.__str__ = tree_str
-
-    # indexing and masking
-    klass.at = property(_tree_indexer)
-
-    # hashing and copying
-    klass.__copy__ = _tree_copy
-    klass.__hash__ = _tree_hash
-
-    # math operations
-    klass.__abs__ = bcmap(op.abs)
-    klass.__add__ = bcmap(op.add)
-    klass.__and__ = bcmap(op.and_)
-    klass.__ceil__ = bcmap(math.ceil)
-    klass.__divmod__ = bcmap(divmod)
-    klass.__eq__ = bcmap(op.eq)
-    klass.__floor__ = bcmap(math.floor)
-    klass.__floordiv__ = bcmap(op.floordiv)
-    klass.__ge__ = bcmap(op.ge)
-    klass.__gt__ = bcmap(op.gt)
-    klass.__inv__ = bcmap(op.inv)
-    klass.__invert__ = bcmap(op.invert)
-    klass.__le__ = bcmap(op.le)
-    klass.__lshift__ = bcmap(op.lshift)
-    klass.__lt__ = bcmap(op.lt)
-    klass.__matmul__ = bcmap(op.matmul)
-    klass.__mod__ = bcmap(op.mod)
-    klass.__mul__ = bcmap(op.mul)
-    klass.__ne__ = bcmap(op.ne)
-    klass.__neg__ = bcmap(op.neg)
-    klass.__or__ = bcmap(op.or_)
-    klass.__pos__ = bcmap(op.pos)
-    klass.__pow__ = bcmap(op.pow)
-    klass.__radd__ = bcmap(op.add)
-    klass.__rand__ = bcmap(op.and_)
-    klass.__rdivmod__ = bcmap(divmod)
-    klass.__rfloordiv__ = bcmap(op.floordiv)
-    klass.__rlshift__ = bcmap(op.lshift)
-    klass.__rmatmul__ = bcmap(op.matmul)
-    klass.__rmod__ = bcmap(op.mod)
-    klass.__rmul__ = bcmap(op.mul)
-    klass.__ror__ = bcmap(op.or_)
-    klass.__round__ = bcmap(round)
-    klass.__rpow__ = bcmap(op.pow)
-    klass.__rrshift__ = bcmap(op.rshift)
-    klass.__rshift__ = bcmap(op.rshift)
-    klass.__rsub__ = bcmap(op.sub)
-    klass.__rtruediv__ = bcmap(op.truediv)
-    klass.__rxor__ = bcmap(op.xor)
-    klass.__sub__ = bcmap(op.sub)
-    klass.__truediv__ = bcmap(op.truediv)
-    klass.__xor__ = bcmap(op.xor)
-
+    # add the class to the `JAX` registry
     return _register_treeclass(klass)
 
 

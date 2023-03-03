@@ -268,15 +268,3 @@ def _dataclass_like_fields(node):
     if dc.is_dataclass(node):
         return dc.fields(node)
     return fields(node)
-
-
-def _process_class(klass):
-    # add custom `dataclass` field_map and frozen attributes to the class
-    setattr(klass, _FIELD_MAP, _generate_field_map(klass))
-    setattr(klass, _FROZEN, True)
-
-    if "__init__" not in vars(klass):
-        # generate the init method in case it is not defined
-        setattr(klass, "__init__", _generate_init(klass))
-
-    return klass
