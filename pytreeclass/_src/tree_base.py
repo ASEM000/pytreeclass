@@ -34,7 +34,7 @@ def _register_treeclass(klass):
     # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
     # second when a class is decorated with `treeclass` and has a parent class that is also decorated with `treeclass`
     # in that case `__init_subclass__` registers the class before the decorator registers it.
-    # the latter case also can be done using metaclass that registers the class on initialization
+    # this can be done using metaclass that registers the class on initialization
     if klass not in _registry:
         jtu.register_pytree_node(klass, _flatten, ft.partial(_unflatten, klass))
     return klass
@@ -46,7 +46,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise dc.FrozenInstanceError(msg)
 
-    tree.__dict__[key] = value
+    vars(tree)[key] = value
 
     if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
         field = Field(name=key, type=type(value))  # type: ignore
@@ -58,7 +58,7 @@ def _delattr(tree, key: str) -> None:
     """Delete the attribute of the  if tree is not frozen"""
     if getattr(tree, _FROZEN):
         raise dc.FrozenInstanceError(f"Cannot delete {key}.")
-    del tree.__dict__[key]
+    del vars(tree)[key]
 
 
 def _new_wrapper(new_func):
@@ -67,11 +67,13 @@ def _new_wrapper(new_func):
         self = new_func(klass)
         for field in getattr(klass, _FIELD_MAP).values():
             if field.default is not _NOT_SET:
-                self.__dict__[field.name] = field.default
+                vars(self)[field.name] = field.default
             elif field.default_factory is not None:
-                self.__dict__[field.name] = field.default_factory()
+                vars(self)[field.name] = field.default_factory()
         return self
 
+    # wrap the original `new_func`, to use it later in `tree_unflatten`
+    # to avoid repeating iterating over fields and setting default values
     new_method.__wrapped__ = new_func
     return new_method
 
@@ -109,11 +111,11 @@ def _init_sub_wrapper(init_subclass_func):
 def _init_wrapper(init_func):
     @ft.wraps(init_func)
     def init_method(self, *a, **k) -> None:
-        self.__dict__[_FROZEN] = False
+        vars(self)[_FROZEN] = False
         output = init_func(self, *a, **k)
 
         # call callbacks on fields that are initialized
-        self.__dict__[_FROZEN] = False
+        vars(self)[_FROZEN] = False
         _apply_callbacks(self, init=True)
 
         # in case __post_init__ is defined then call it
@@ -124,13 +126,21 @@ def _init_wrapper(init_func):
             # then defreeze it first and call it
             # this behavior is differet to `dataclasses` with `frozen=True`
             # but similar if `frozen=False`
-            # self.__dict__[_FROZEN] = False
+            # vars(self)[_FROZEN] = False
+            # the following code will raise FrozenInstanceError in `dataclasses`
+            # but it will work in `treeclass`,
+            # i.e. `treeclass` defreezes the tree after `__post_init__`
+            # >>> @dc.dataclass(frozen=True)
+            # ... class Test:
+            # ...    a:int = 1
+            # ...    def __post_init__(self):
+            # ...        self.b = 1
             output = getattr(self, _POST_INIT)()
             # call validation on fields that are not initialized
-            self.__dict__[_FROZEN] = False
+            vars(self)[_FROZEN] = False
             _apply_callbacks(self, init=False)
 
-        # handle freezing values and uninitialized fields
+        # handle uninitialized fields
         for field in getattr(self, _FIELD_MAP).values():
             if field.name not in vars(self):
                 # at this point, all fields should be initialized
@@ -140,7 +150,7 @@ def _init_wrapper(init_func):
 
         # delete the shadowing `__dict__` attribute to
         # restore the frozen behavior
-        del self.__dict__[_FROZEN]
+        del vars(self)[_FROZEN]
         return output
 
     return init_method
@@ -166,8 +176,8 @@ def _unflatten(klass, treedef, leaves):
     """Unflatten rule for `jax.tree_unflatten`"""
     # call the wrapped `__new__` method (non-field initializer)
     tree = klass.__new__.__wrapped__(klass)
-    tree.__dict__.update(treedef[1])
-    tree.__dict__.update(zip(treedef[0], leaves))
+    vars(tree).update(treedef[1])
+    vars(tree).update(zip(treedef[0], leaves))
     return tree
 
 

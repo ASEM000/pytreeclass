@@ -10,7 +10,7 @@ from typing import Any
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN, _WRAPPED
 
 PyTree = Any
 
@@ -35,14 +35,14 @@ def _tree_hash(tree: PyTree) -> int:
 class _Wrapper:
     def __init__(self, x: Any):
         # disable composition of Wrappers
-        self.__wrapped__ = unfreeze(x)
+        setattr(self, _WRAPPED, unfreeze(x))
 
     def unwrap(self):
-        return self.__wrapped__
+        return vars(self)[_WRAPPED]
 
     def __setattr__(self, key, value):
         # allow setting the wrapped value only once.
-        if "__wrapped__" in self.__dict__:
+        if _WRAPPED in vars(self):
             raise dc.FrozenInstanceError("Cannot assign to frozen instance.")
         super().__setattr__(key, value)
 
@@ -77,7 +77,7 @@ class FrozenWrapper(_Wrapper):
     @classmethod
     def tree_unflatten(klass, treedef, _):
         self = object.__new__(klass)
-        self.__dict__.update(__wrapped__=treedef.unwrap())
+        vars(self)[_WRAPPED] = treedef.unwrap()
         return self
 
 
@@ -90,7 +90,7 @@ def _call_context(tree: PyTree):
         # instance variable to temporarily disable the frozen behavior
         # after the context manager exits, the instance variable will be deleted
         # and the class attribute will be used again.
-        tree.__dict__[_FROZEN] = False
+        vars(tree)[_FROZEN] = False
         for key in getattr(tree, _FIELD_MAP):
             mutate_step(getattr(tree, key))
         return tree
@@ -101,7 +101,7 @@ def _call_context(tree: PyTree):
         if _FROZEN not in vars(tree):
             return tree
 
-        del tree.__dict__[_FROZEN]
+        del vars(tree)[_FROZEN]
         for key in getattr(tree, _FIELD_MAP):
             immutate_step(getattr(tree, key))
         return tree

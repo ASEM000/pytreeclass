@@ -16,8 +16,13 @@ _FROZEN = "__frozen__"
 _FIELD_MAP = "__field_map__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
-_ANNOTATIONS = {"__annotations__": {_FIELD_MAP: dict}}
-TreeClass = runtime_checkable(type("TreeClass", (Protocol,), _ANNOTATIONS))
+_WRAPPED = "__wrapped__"
+
+
+@runtime_checkable
+class TreeClass(Protocol):
+    __field_map__: dict[str, Field]
+    __frozen__: bool
 
 
 class Field(NamedTuple):
@@ -90,16 +95,24 @@ def field(
 
 
 def _apply_callbacks(tree, init: bool = True):
+
     for field in getattr(tree, _FIELD_MAP).values():
         # init means that we are validating fields that are initialized
-        if field.init is not init or field.callbacks is None:
+        if field.init is not init:
+            # for example, if init is True, we only want to validate fields
+            # that are marked as `init=True` i.e. fields that are initialized
+            # in the __init__ function
+            continue
+
+        if field.callbacks is None:
+            # no callbacks to apply
             continue
 
         for callback in field.callbacks:
             try:
                 # callback is a function that takes the value of the field
                 # and returns a modified value
-                value = callback(getattr(tree, field.name))
+                value = callback(vars(tree)[field.name])
                 setattr(tree, field.name, value)
             except Exception as e:
                 stage = "__init__" if init else "__post_init__"
@@ -125,7 +138,7 @@ def _generate_field_map(klass) -> dict[str, Field]:
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
-    annotations = klass.__dict__.get("__annotations__", dict())
+    annotations = vars(klass).get("__annotations__", dict())
 
     for name in annotations:
         # get the value associated with the type hint
@@ -217,7 +230,7 @@ def _generate_init(klass):
     FIELD_MAP = _generate_field_map(klass)
     # generate init method
     local_namespace = dict()
-    global_namespace = sys.modules[klass.__module__].__dict__
+    global_namespace = vars(sys.modules[klass.__module__])
 
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
