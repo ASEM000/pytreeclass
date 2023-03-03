@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses as dc
+import functools as ft
 import hashlib
 import operator as op
 from contextlib import contextmanager
@@ -60,7 +61,6 @@ class _HashableWrapper(_Wrapper):
         return _hash_node(self.unwrap())
 
 
-@jtu.register_pytree_node_class
 class FrozenWrapper(_Wrapper):
     def __eq__(self, rhs: Any) -> bool:
         return op.eq(self.unwrap(), rhs)
@@ -71,14 +71,18 @@ class FrozenWrapper(_Wrapper):
     def __repr__(self) -> str:
         return f"#{self.unwrap()!r}"
 
-    def tree_flatten(self):
-        return (None,), _HashableWrapper(self.unwrap())
 
-    @classmethod
-    def tree_unflatten(klass, treedef, _):
-        self = object.__new__(klass)
-        vars(self)[_WRAPPED] = treedef.unwrap()
-        return self
+def _flatten(tree):
+    return (None,), _HashableWrapper(tree.unwrap())
+
+
+def _unflatten(klass, treedef, _):
+    tree = object.__new__(klass)
+    vars(tree)[_WRAPPED] = treedef.unwrap()
+    return tree
+
+
+jtu.register_pytree_node(FrozenWrapper, _flatten, ft.partial(_unflatten, FrozenWrapper))
 
 
 @contextmanager
