@@ -21,13 +21,32 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _apply_callbacks,
     _generate_field_map,
-    _generate_init,
+    _generate_init
 )
 from pytreeclass._src.tree_freeze import _tree_hash, unfreeze
 from pytreeclass._src.tree_indexer import _tree_copy, _tree_indexer, bcmap
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 
 PyTree = Any
+
+
+def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
+    """Flatten rule for `jax.tree_flatten`"""
+    # in essence anything not declared in dataclass fields will be considered static
+    static, dynamic = dict(vars(tree)), dict()
+    for key in getattr(tree, _FIELD_MAP):
+        dynamic[key] = static.pop(key)
+
+    return dynamic.values(), (dynamic.keys(), static)
+
+
+def _unflatten(klass, treedef, leaves):
+    """Unflatten rule for `jax.tree_unflatten`"""
+    # call the wrapped `__new__` method (non-field initializer)
+    tree = getattr(klass.__new__, _WRAPPED)(klass)
+    vars(tree).update(treedef[1])
+    vars(tree).update(zip(treedef[0], leaves))
+    return tree
 
 
 def _register_treeclass(klass):
@@ -61,6 +80,15 @@ def _delattr(tree, key: str) -> None:
     if getattr(tree, _FROZEN):
         raise dc.FrozenInstanceError(f"Cannot delete {key}.")
     del vars(tree)[key]
+
+
+def _getattr(tree, key: str) -> Any:
+    # avoid non-scalar error, raised by `jax` transformation
+    # if a frozen value is returned.
+    value = object.__getattribute__(tree, key)
+    if key in getattr(type(tree), _FIELD_MAP):
+        return unfreeze(value)
+    return value
 
 
 def _new_wrapper(new_func):
@@ -156,31 +184,6 @@ def _init_wrapper(init_func):
         return output
 
     return init_method
-
-
-def _getattr(tree, key: str) -> Any:
-    # avoid non-scalar error, raised by `jax` transformation
-    # if a frozen value is returned.
-    return unfreeze(object.__getattribute__(tree, key))
-
-
-def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
-    """Flatten rule for `jax.tree_flatten`"""
-    # in essence anything not declared in dataclass fields will be considered static
-    static, dynamic = dict(vars(tree)), dict()
-    for key in getattr(tree, _FIELD_MAP):
-        dynamic[key] = static.pop(key)
-
-    return dynamic.values(), (dynamic.keys(), static)
-
-
-def _unflatten(klass, treedef, leaves):
-    """Unflatten rule for `jax.tree_unflatten`"""
-    # call the wrapped `__new__` method (non-field initializer)
-    tree = getattr(klass.__new__, _WRAPPED)(klass)
-    vars(tree).update(treedef[1])
-    vars(tree).update(zip(treedef[0], leaves))
-    return tree
 
 
 def _validate_class(klass):
@@ -284,6 +287,7 @@ def _process_optional_methods(klass):
     for key in attrs:
         if key not in vars(klass):
             # do not override any existing methods
+            # this behavior similar to `dataclasses.dataclass`
             setattr(klass, key, attrs[key])
     return klass
 
