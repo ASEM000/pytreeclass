@@ -107,7 +107,7 @@ def _magic_callable_delegator(method: Callable) -> Callable:
 
 
 @ft.lru_cache(maxsize=None)
-def _get_frozen_class(klass: type) -> type:
+def _create_frozen_class(klass: type) -> type:
     # the idea here is to create a new delegation class for each type
     # to be able to access wrapped value without the need to call `unwrap`
     # while freezing the value to avoid updating it by `jax` transformations.
@@ -193,7 +193,7 @@ def freeze(wrapped: Any) -> FrozenWrapper:
         value:	 4.0
         grad:	 Test(a=#2.0)
     """
-    return _get_frozen_class(type(wrapped))(wrapped)
+    return _create_frozen_class(type(wrapped))(wrapped)
 
 
 def unfreeze(x: Any) -> Any:
