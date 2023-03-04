@@ -198,24 +198,24 @@ def test_delattr():
         t.delete("a")
 
 
-def test_getattr():
-    with pytest.raises(AttributeError):
+# def test_getattr():
+#     with pytest.raises(AttributeError):
 
-        @pytc.treeclass
-        class L2:
-            a: int = 1
+#         @pytc.treeclass
+#         class L2:
+#             a: int = 1
 
-            def __getattribute__(self, __name: str):
-                pass
+#             def __getattribute__(self, __name: str):
+#                 pass
 
-    with pytest.raises(AttributeError):
+#     with pytest.raises(AttributeError):
 
-        @pytc.treeclass
-        class L3:
-            a: int = 1
+#         @pytc.treeclass
+#         class L3:
+#             a: int = 1
 
-            def __getattribute__(self, __name: str):
-                pass
+#             def __getattribute__(self, __name: str):
+#                 pass
 
 
 # def test_treeclass_decorator_arguments():
@@ -393,7 +393,7 @@ def test_treeclass_frozen_field():
 
     t = Test(1)
 
-    assert t.a == 1
+    assert t.a == pytc.freeze(1)
     assert jtu.tree_leaves(t) == []
 
 

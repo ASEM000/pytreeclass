@@ -21,9 +21,9 @@ from pytreeclass._src.tree_decorator import (
     Field,
     _apply_callbacks,
     _generate_field_map,
-    _generate_init
+    _generate_init,
 )
-from pytreeclass._src.tree_freeze import _tree_hash, unfreeze
+from pytreeclass._src.tree_freeze import _tree_hash
 from pytreeclass._src.tree_indexer import _tree_copy, _tree_indexer, bcmap
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 
@@ -80,15 +80,6 @@ def _delattr(tree, key: str) -> None:
     if getattr(tree, _FROZEN):
         raise dc.FrozenInstanceError(f"Cannot delete {key}.")
     del vars(tree)[key]
-
-
-def _getattr(tree, key: str) -> Any:
-    # avoid non-scalar error, raised by `jax` transformation
-    # if a frozen value is returned.
-    value = object.__getattribute__(tree, key)
-    if key in getattr(type(tree), _FIELD_MAP):
-        return unfreeze(value)
-    return value
 
 
 def _new_wrapper(new_func):
@@ -190,10 +181,7 @@ def _validate_class(klass):
     if not isinstance(klass, type):
         raise TypeError(f"Expected `class` but got `{type(klass)}`.")
 
-    for key, method in zip(
-        ("__delattr__", "__setattr__", "__getattribute__", "__getattr__"),
-        (_delattr, _setattr, _getattr, _getattr),
-    ):
+    for key, method in zip(("__delattr__", "__setattr__"), (_delattr, _setattr)):
         if key in vars(klass) and vars(klass)[key] is not method:
             # raise error if the current getattr/setattr/delattr is not immutable
             raise AttributeError(f"Cannot define `{key}` in {klass.__name__}.")
@@ -217,7 +205,6 @@ def _treeclass_transform(klass):
     setattr(klass, "__init_subclass__", _init_sub_wrapper(klass.__init_subclass__))
 
     # immutable attributes
-    setattr(klass, "__getattribute__", _getattr)
     setattr(klass, "__setattr__", _setattr)
     setattr(klass, "__delattr__", _delattr)
 
