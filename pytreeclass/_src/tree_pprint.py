@@ -227,7 +227,7 @@ def _dataclass_like_pprint(node, depth: int, kind: str, width: int) -> str:
     name = node.__class__.__name__
     fields = _dataclass_like_fields(node)
     # we use vars here to avoid unfreezing it in case it is frozen
-    vs = (getattr(node, f.name) for f in fields if f.repr)
+    vs = (vars(node)[f.name] for f in fields if f.repr)
     fs = (f for f in fields if f.repr)
     fmt = (f"{f.name}={_node_pprint(v,depth+1,kind,width)}" for f, v in zip(fs, vs))
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import copy
-import dataclasses as dc
 import functools as ft
 import hashlib
 from contextlib import contextmanager
-from typing import Any, Callable
+from typing import Any
 
 import jax.tree_util as jtu
 import numpy as np
@@ -13,12 +12,6 @@ import numpy as np
 from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN, _WRAPPED
 
 PyTree = Any
-
-_SKIP_ATTRS = ["__new__", "__init__", "__class__", "__dict__"]  # class initalization
-_SKIP_ATTRS += ["__repr__", "__str__"]  # pretty printing
-_SKIP_ATTRS += ["__getattribute__", "__getattr__", "__setattr__", "__delattr__"]
-_SKIP_ATTRS += ["__eq__"]  # equality
-_SKIP_ATTRS += [_WRAPPED, "unwrap"]  # unwrap constants
 
 
 def _hash_node(node: PyTree) -> int:
@@ -38,10 +31,10 @@ def _tree_hash(tree: PyTree) -> int:
     return hash((*hashed, jtu.tree_structure(tree)))
 
 
-class _ImmutableWrapper:
+class ImmutableWrapper:
     def __init__(self, x: Any):
         # disable composition of Wrappers
-        vars(self)[_WRAPPED] = x.unwrap() if isinstance(x, _ImmutableWrapper) else x
+        vars(self)[_WRAPPED] = x.unwrap() if isinstance(x, ImmutableWrapper) else x
 
     def unwrap(self):
         return getattr(self, _WRAPPED)
@@ -49,15 +42,20 @@ class _ImmutableWrapper:
     def __setattr__(self, key, value):
         # allow setting the wrapped value only once.
         if _WRAPPED in vars(self):
-            raise dc.FrozenInstanceError("Cannot assign to frozen instance.")
+            raise AttributeError("Cannot assign to frozen instance.")
         super().__setattr__(key, value)
 
     def __delattr__(self, __name: str) -> None:
-        # no deletion allowed
-        raise dc.FrozenInstanceError("Cannot delete from frozen instance.")
+        raise AttributeError("Cannot delete from frozen instance.")
 
 
-class _HashableWrapper(_ImmutableWrapper):
+def _unwrap(wrapped: Any) -> Any:
+    if isinstance(wrapped, ImmutableWrapper):
+        return wrapped.unwrap()
+    return wrapped
+
+
+class _HashableWrapper(ImmutableWrapper):
     # used to wrap metadata to make it hashable
     # this is intended to wrap frozen values to avoid error when comparing
     # the metadata.
@@ -70,6 +68,23 @@ class _HashableWrapper(_ImmutableWrapper):
         return _hash_node(self.unwrap())
 
 
+class FrozenWrapper(ImmutableWrapper):
+    def __getattr__(self, key):
+        # delegate non magical attributes to the wrapped value
+        return getattr(self.unwrap(), key)
+
+    def __repr__(self):
+        return f"#{self.unwrap()!r}"
+
+    def __eq__(self, rhs: Any) -> bool:
+        if not isinstance(rhs, FrozenWrapper):
+            return False
+        return self.unwrap() == rhs.unwrap()
+
+    def __hash__(self) -> int:
+        return hash(self.unwrap())
+
+
 def _flatten(tree):
     return (None,), _HashableWrapper(tree.unwrap())
 
@@ -80,54 +95,7 @@ def _unflatten(klass, treedef, _):
     return tree
 
 
-class FrozenWrapper(_ImmutableWrapper):
-    def __getattr__(self, key):
-        # delegate non magical attributes to the wrapped value
-        return getattr(self.unwrap(), key)
-
-    def __repr__(self):
-        return f"#{self.unwrap()!r}"
-
-    def __init_subclass__(cls) -> None:
-        jtu.register_pytree_node(cls, _flatten, ft.partial(_unflatten, cls))
-
-    def __eq__(self, rhs: Any) -> bool:
-        if not isinstance(rhs, FrozenWrapper):
-            return False
-        return self.unwrap() == rhs.unwrap()
-
-
-@ft.lru_cache(maxsize=None)
-def _magic_callable_delegator(method: Callable) -> Callable:
-    @ft.wraps(method)
-    def method_frozen_wrapper(self, *a, **k):
-        return method(self.unwrap(), *a, **k)
-
-    return method_frozen_wrapper
-
-
-@ft.lru_cache(maxsize=None)
-def _create_frozen_class(klass: type) -> type:
-    # the idea here is to create a new delegation class for each type
-    # to be able to access wrapped value without the need to call `unwrap`
-    # while freezing the value to avoid updating it by `jax` transformations.
-    # this function should be called only once per type as it is cached
-    # this is to avoid creating a new delegation class for each instance
-    klass_name = f"#{klass.__name__}"
-
-    # create a new delegation class and register it with jax
-    # the attrs are the magic methods that can not be delegated using
-    # `getattr`/`getattribute`
-    attrs = dict()
-
-    for key in vars(klass):
-        if key.startswith("__") and key.endswith("__") and key not in _SKIP_ATTRS:
-            # handle magic methods as it is not possible to delegate them
-            # using `getattr`/`getattribute`
-            value = getattr(klass, key)
-            attrs[key] = _magic_callable_delegator(value) if callable(value) else value
-
-    return type(klass_name, (FrozenWrapper,), attrs)
+jtu.register_pytree_node(FrozenWrapper, _flatten, ft.partial(_unflatten, FrozenWrapper))
 
 
 def freeze(wrapped: Any) -> FrozenWrapper:
@@ -137,19 +105,6 @@ def freeze(wrapped: Any) -> FrozenWrapper:
         >>> import jax
         >>> import pytreeclass as pytc
         >>> import jax.tree_util as jtu
-
-        ** Interacting with frozen values **
-        >>> # Frozen values are marked with a `#` prefix in the repr and class name
-        >>> a = pytc.freeze(2.)
-        >>> a
-        #2.0
-
-        >>> b = pytc.freeze([1,2,3])
-        >>> b + [4,5,6]
-        [1, 2, 3, 4, 5, 6]
-        >>> # b is not updated, however when interacting with a frozen value
-        >>> # the output is not frozen, this behaviour is to enable getting values from
-        >>> # the wrapped value without the need to unwrap it.
 
         ** usage with `jax.tree_util.tree_leaves` **
         >>> # no leaves for a wrapped value
@@ -193,7 +148,7 @@ def freeze(wrapped: Any) -> FrozenWrapper:
         value:	 4.0
         grad:	 Test(a=#2.0)
     """
-    return _create_frozen_class(type(wrapped))(wrapped)
+    return FrozenWrapper(wrapped)
 
 
 def unfreeze(x: Any) -> Any:

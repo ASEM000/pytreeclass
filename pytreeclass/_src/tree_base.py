@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import dataclasses as dc
 import functools as ft
 import math
 import operator as op
@@ -23,7 +22,7 @@ from pytreeclass._src.tree_decorator import (
     _generate_field_map,
     _generate_init,
 )
-from pytreeclass._src.tree_freeze import _tree_hash
+from pytreeclass._src.tree_freeze import _tree_hash, _unwrap
 from pytreeclass._src.tree_indexer import _tree_copy, _tree_indexer, bcmap
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 
@@ -61,11 +60,28 @@ def _register_treeclass(klass):
     return klass
 
 
+def _getattr_wrapper(getattr_func):
+    @ft.wraps(getattr_func)
+    def getattr_method(tree, key: str) -> Any:
+        # unwrap the value if it is instance of `ImmutableWrapper`
+        # this is done to allow for easy wrapping of the tree
+        # without having to unwrap the tree every time.
+        # otherwise, we have to mark the field as metadata
+        # as found in pytc v0.1.0, and other `dataclass`-based libraries
+        # this apporach is more flexible, and allows for easy wrapping of the tree
+        # because its not part of class definition like the other libraries ,
+        # but rather a runtime operation
+        value = getattr_func(tree, key)
+        return _unwrap(value)
+
+    return getattr_method
+
+
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
     """Set the attribute of the tree if the tree is not frozen"""
     if getattr(tree, _FROZEN):
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
-        raise dc.FrozenInstanceError(msg)
+        raise AttributeError(msg)
 
     vars(tree)[key] = value
 
@@ -78,7 +94,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
 def _delattr(tree, key: str) -> None:
     """Delete the attribute of the  if tree is not frozen"""
     if getattr(tree, _FROZEN):
-        raise dc.FrozenInstanceError(f"Cannot delete {key}.")
+        raise AttributeError(f"Cannot delete {key}.")
     del vars(tree)[key]
 
 
@@ -199,10 +215,14 @@ def _treeclass_transform(klass):
         # generate the init method in case it is not defined by the user
         setattr(klass, "__init__", _generate_init(klass))
 
-    # class initialization
+    # class initialization wrapper
+    if "__getattr__" in vars(klass):
+        setattr(klass, "__getattr__", _getattr_wrapper(klass.__getattr__))
+
     setattr(klass, "__new__", _new_wrapper(klass.__new__))
     setattr(klass, "__init__", _init_wrapper(klass.__init__))
     setattr(klass, "__init_subclass__", _init_sub_wrapper(klass.__init_subclass__))
+    setattr(klass, "__getattribute__", _getattr_wrapper(klass.__getattribute__))
 
     # immutable attributes similar to `dataclasses`
     setattr(klass, "__setattr__", _setattr)

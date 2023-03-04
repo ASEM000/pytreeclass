@@ -2,6 +2,7 @@ from pytreeclass._src.tree_base import is_tree_equal, treeclass
 from pytreeclass._src.tree_decorator import TreeClass, field, fields
 from pytreeclass._src.tree_freeze import (
     FrozenWrapper,
+    ImmutableWrapper,
     freeze,
     is_frozen,
     is_nondiff,
@@ -36,6 +37,7 @@ __all__ = (
     "freeze",
     "unfreeze",
     "FrozenWrapper",
+    "ImmutableWrapper",
 )
 
-__version__ = "0.2.0b3"
+__version__ = "0.2.0b4"

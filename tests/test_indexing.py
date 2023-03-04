@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import dataclasses as dc
-
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -556,5 +554,5 @@ def test_mutable_context():
     with _call_context(t) as tx:
         tx.delete("a")
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(AttributeError):
         t.delete("a")

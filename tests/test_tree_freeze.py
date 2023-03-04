@@ -1,4 +1,3 @@
-import dataclasses as dc
 from typing import Any, Callable
 
 import jax
@@ -132,10 +131,10 @@ def test_freeze_with_ops():
     t = Test()
     assert jtu.tree_leaves(t) == [1]
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(AttributeError):
         jtu.tree_map(pytc.freeze, t).a = 1
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(AttributeError):
         jtu.tree_map(pytc.unfreeze, t).a = 1
 
     hash(t)
@@ -399,7 +398,7 @@ def test_wrapper():
     # test immutability
     frozen_value = pytc.freeze(1)
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(AttributeError):
         frozen_value.__wrapped__ = 2
 
     assert pytc.freeze(1) == pytc.freeze(1)

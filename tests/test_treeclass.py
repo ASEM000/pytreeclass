@@ -182,7 +182,7 @@ def test_delattr():
 
     t = L0()
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(AttributeError):
         del t.a
 
     @pytc.treeclass
@@ -194,7 +194,7 @@ def test_delattr():
 
     t = L2()
 
-    with pytest.raises(dc.FrozenInstanceError):
+    with pytest.raises(AttributeError):
         t.delete("a")
 
 
@@ -393,7 +393,7 @@ def test_treeclass_frozen_field():
 
     t = Test(1)
 
-    assert t.a == pytc.freeze(1)
+    assert t.a == 1
     assert jtu.tree_leaves(t) == []
 
 
