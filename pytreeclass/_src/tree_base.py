@@ -9,7 +9,6 @@ from typing import Any
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
-from jax._src.tree_util import _registry
 
 from pytreeclass._src.tree_decorator import (
     _FIELD_MAP,
@@ -48,15 +47,15 @@ def _unflatten(klass, treedef, leaves):
     return tree
 
 
+@ft.lru_cache(maxsize=None)
 def _register_treeclass(klass):
-    # register a treeclass only once
-    # there are two cases where a class is registered twice:
+    # register a treeclass only once by using `lru_cache`
+    # there are two cases where a class is registered more than once:
     # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
     # second when a class is decorated with `treeclass` and has a parent class that is also decorated with `treeclass`
     # in that case `__init_subclass__` registers the class before the decorator registers it.
-    # this can be done using metaclass that registers the class on initialization
-    if klass not in _registry:
-        jtu.register_pytree_node(klass, _flatten, ft.partial(_unflatten, klass))
+    # this can be also be done using metaclass that registers the class on initialization
+    jtu.register_pytree_node(klass, _flatten, ft.partial(_unflatten, klass))
     return klass
 
 
