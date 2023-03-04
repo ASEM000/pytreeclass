@@ -196,7 +196,7 @@ def _treeclass_transform(klass):
     setattr(klass, _FROZEN, True)
 
     if "__init__" not in vars(klass):
-        # generate the init method in case it is not defined
+        # generate the init method in case it is not defined by the user
         setattr(klass, "__init__", _generate_init(klass))
 
     # class initialization
@@ -204,7 +204,7 @@ def _treeclass_transform(klass):
     setattr(klass, "__init__", _init_wrapper(klass.__init__))
     setattr(klass, "__init_subclass__", _init_sub_wrapper(klass.__init_subclass__))
 
-    # immutable attributes
+    # immutable attributes similar to `dataclasses`
     setattr(klass, "__setattr__", _setattr)
     setattr(klass, "__delattr__", _delattr)
 
@@ -273,8 +273,8 @@ def _process_optional_methods(klass):
 
     for key in attrs:
         if key not in vars(klass):
-            # do not override any existing methods
-            # this behavior similar to `dataclasses.dataclass`
+            # do not override any user defined methods
+            # this behavior similar is to `dataclasses.dataclass`
             setattr(klass, key, attrs[key])
     return klass
 
@@ -303,20 +303,20 @@ def treeclass(klass):
         TypeError: if the input class is not a `class`
     """
     # check if the input is a valid class
-    # in essence, it should be a type with immutable getters, setters and delters
+    # in essence, it should be a type with immutable setters and deleters
     klass = _validate_class(klass)
 
-    # add the immutable getters, setters and delters
+    # add the immutable setters and deleters
     # and generate the `__init__` method if not present
     # generate fields from type annotations
     klass = _treeclass_transform(copy.deepcopy(klass))
 
     # add the optional methods to the class
     # optional methods are math operations, indexing and masking,
-    # hashing and copying, and printing
+    # hashing and copying, and pretty printing
     klass = _process_optional_methods(klass)
 
-    # add the class to the `JAX` registry
+    # add the class to the `JAX` registry if not registered
     return _register_treeclass(klass)
 
 
