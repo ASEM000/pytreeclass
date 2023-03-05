@@ -191,7 +191,7 @@ def _init_wrapper(init_func):
         # in case __post_init__ is defined then call it
         # after the tree is initialized
         # here, we assume that __post_init__ is a method
-        if hasattr(self, _POST_INIT):
+        if hasattr(type(self), _POST_INIT):
             # in case we found post_init in super class
             # then defreeze it first and call it
             # this behavior is differet to `dataclasses` with `frozen=True`
@@ -206,7 +206,7 @@ def _init_wrapper(init_func):
             # ...    def __post_init__(self):
             # ...        self.b = 1
             vars(self)[_FROZEN] = False
-            output = getattr(self, _POST_INIT)()
+            output = getattr(type(self), _POST_INIT)(self)
 
         # handle uninitialized fields
         for field in getattr(self, _FIELD_MAP).values():
@@ -218,7 +218,8 @@ def _init_wrapper(init_func):
 
         # delete the shadowing `__dict__` attribute to
         # restore the frozen behavior
-        del vars(self)[_FROZEN]
+        if _FROZEN in vars(self):
+            del vars(self)[_FROZEN]
         return output
 
     return init_method
