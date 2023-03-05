@@ -100,32 +100,6 @@ def field(
     )
 
 
-def _apply_callbacks(tree, init: bool = True):
-
-    for field in getattr(tree, _FIELD_MAP).values():
-        # init means that we are validating fields that are initialized
-        if field.init is not init:
-            # for example, if init is True, we only want to validate fields
-            # that are marked as `init=True` i.e. fields that are initialized
-            # in the __init__ function
-            continue
-
-        if field.callbacks is None:
-            # no callbacks to apply
-            continue
-
-        for callback in field.callbacks:
-            try:
-                # callback is a function that takes the value of the field
-                # and returns a modified value
-                value = callback(vars(tree)[field.name])
-                setattr(tree, field.name, value)
-            except Exception as e:
-                stage = "__init__" if init else "__post_init__"
-                msg = f"Error at `{stage}` for field=`{field.name}`:\n{e}"
-                raise type(e)(msg)
-
-
 @ft.lru_cache(maxsize=None)
 def _generate_field_map(klass) -> dict[str, Field]:
     # get all the fields of the class and its base classes

@@ -17,7 +17,6 @@ from pytreeclass._src.tree_decorator import (
     _POST_INIT,
     _WRAPPED,
     Field,
-    _apply_callbacks,
     _generate_field_map,
     _generate_init,
 )
@@ -102,6 +101,22 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise AttributeError(msg)
 
+    # check if the key is a field name
+    if key in getattr(tree, _FIELD_MAP):
+        # check if there is a callback associated with the field
+        callbacks = getattr(tree, _FIELD_MAP)[key].callbacks
+
+        if callbacks is not None:
+            for callback in callbacks:
+                try:
+                    # callback is a function that takes the value of the field
+                    # and returns a modified value
+                    value = callback(value)
+                except Exception as e:
+                    msg = f"Error for field=`{key}`:\n{e}"
+                    raise type(e)(msg)
+
+    # set the value
     vars(tree)[key] = value
 
     if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
@@ -126,6 +141,9 @@ def _new_wrapper(new_func):
                 vars(self)[field.name] = field.default
             elif field.default_factory is not None:
                 vars(self)[field.name] = field.default_factory()
+
+        # set the tree as not frozen to enable
+        vars(self)[_FROZEN] = False
         return self
 
     # wrap the original `new_func`, to use it later in `tree_unflatten`
@@ -172,7 +190,6 @@ def _init_wrapper(init_func):
 
         # call callbacks on fields that are initialized
         vars(self)[_FROZEN] = False
-        _apply_callbacks(self, init=True)
 
         # in case __post_init__ is defined then call it
         # after the tree is initialized
@@ -194,7 +211,6 @@ def _init_wrapper(init_func):
             output = getattr(self, _POST_INIT)()
             # call validation on fields that are not initialized
             vars(self)[_FROZEN] = False
-            _apply_callbacks(self, init=False)
 
         # handle uninitialized fields
         for field in getattr(self, _FIELD_MAP).values():
