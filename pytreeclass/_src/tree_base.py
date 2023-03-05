@@ -205,6 +205,7 @@ def _init_wrapper(init_func):
             # ...    a:int = 1
             # ...    def __post_init__(self):
             # ...        self.b = 1
+            vars(self)[_FROZEN] = False
             output = getattr(self, _POST_INIT)()
 
         # handle uninitialized fields
