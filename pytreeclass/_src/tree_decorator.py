@@ -36,6 +36,7 @@ class Field(NamedTuple):
     init: bool = True
     repr: bool = True
     kw_only: bool = False
+    pos_only: bool = False
     metadata: MappingProxyType | None = None
     callbacks: Sequence[Callable] | None = None
 
@@ -47,6 +48,7 @@ def field(
     init: bool = True,
     repr: bool = True,
     kw_only: bool = False,
+    pos_only: bool = False,
     metadata: dict | None = None,
     callbacks: Sequence[Callable] | None = None,
 ):
@@ -63,6 +65,9 @@ def field(
     if default is not _NOT_SET and default_factory is not None:
         # this is the similar behavior to `dataclasses`
         raise ValueError("Cannot specify both `default` and `default_factory`")
+
+    if kw_only is True and pos_only is True:
+        raise ValueError("Cannot specify both `kw_only=True` and `pos_only=True`")
 
     # check metadata is a dict
     if isinstance(metadata, dict):
@@ -90,6 +95,7 @@ def field(
         init=init,
         repr=repr,
         kw_only=kw_only,
+        pos_only=pos_only,
         metadata=metadata,
         callbacks=callbacks,
     )
@@ -197,8 +203,9 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
         mark0 = f"FIELD_MAP['{key}'].default"
         mark1 = f"self.{key}"
 
-        # add keyword marker in we have a `kw_only` field
-        head += "*, " if (field.kw_only and "*" not in head and field.init) else ""
+        if field.kw_only and "*" not in head and field.init:
+            # if the field is keyword only, and we have not added the `*` yet
+            head += "*, "
 
         if field.default is not _NOT_SET:
             # we add the default into the function head (def f(.. x= default_value))
@@ -216,12 +223,20 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
             head += f"{key}, " if field.init else ""
             body += f"{mark1}={key}; " if field.init else ""
 
+        if field.pos_only and field.init:
+            # if the field is positional only, we add a "/" marker after it
+            if "/," in head:
+                head = head.replace("/,", "")
+
+            head += "/, "
+
     # in case no field is initialized, we add a pass statement to the body
     # to avoid syntax error in the generated code
     body += "pass"
     # add the body to the head
     body = " def __init__(self, " + head[:-2] + "):" + body
     # use closure to be able to reference default values of all types
+    print(body)
     body = f"def closure(FIELD_MAP):\n{body}\n return __init__"
     return body
 

@@ -26,6 +26,63 @@ def test_field():
 
     assert getattr(Test(), _FIELD_MAP)["a"].metadata["a"] == 1
 
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(default=1, pos_only=True)
+        b: int = 2
+
+    with pytest.raises(TypeError):
+        # positonal only for a
+        Test(a=1, b=2)
+
+    assert Test(1, b=2).a == 1
+    assert Test(1, 2).b == 2
+
+    # keyword only
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(default=1, kw_only=True)
+        b: int = 2
+
+    with pytest.raises(TypeError):
+        Test(1, 2)
+
+    with pytest.raises(TypeError):
+        Test(1, b=2)
+
+    assert Test(a=1, b=2).a == 1
+
+    with pytest.raises(ValueError):
+        # keyword only and pos_only are mutually exclusive
+        @pytc.treeclass
+        class Test:
+            a: int = pytc.field(default=1, pos_only=True, kw_only=True)
+
+    # pos_only, kw_only
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(default=1, pos_only=True)
+        b: int = pytc.field(default=2, kw_only=True)
+
+    with pytest.raises(TypeError):
+        Test(1, 2)
+
+    assert Test(1, b=2).b == 2
+
+    with pytest.raises(TypeError):
+        Test(a=1, b=2)
+
+    # test when init is False
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(default=1, init=False, kw_only=True)
+        b: int = 2
+
+    with pytest.raises(TypeError):
+        Test(1, 2)
+
+    assert Test(b=2).a == 1
+
 
 def test_field_nondiff():
     @pytc.treeclass
