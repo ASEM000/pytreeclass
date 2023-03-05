@@ -236,7 +236,6 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
     # add the body to the head
     body = " def __init__(self, " + head[:-2] + "):" + body
     # use closure to be able to reference default values of all types
-    print(body)
     body = f"def closure(FIELD_MAP):\n{body}\n return __init__"
     return body
 
