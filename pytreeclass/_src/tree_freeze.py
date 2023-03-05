@@ -9,7 +9,7 @@ from typing import Any
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN, _WRAPPED
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN, _WRAPPED, TreeClass
 
 PyTree = Any
 
@@ -49,10 +49,10 @@ class ImmutableWrapper:
         raise AttributeError("Cannot delete from frozen instance.")
 
 
-def _unwrap(wrapped: Any) -> Any:
-    if isinstance(wrapped, ImmutableWrapper):
-        return wrapped.unwrap()
-    return wrapped
+def _tree_map_unwrap(value):
+    unwrap = lambda x: x.unwrap() if isinstance(x, ImmutableWrapper) else x
+    is_leaf = lambda x: isinstance(x, (ImmutableWrapper, TreeClass))
+    return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
 
 
 class _HashableWrapper(ImmutableWrapper):
