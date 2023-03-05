@@ -188,9 +188,6 @@ def _init_wrapper(init_func):
         vars(self)[_FROZEN] = False
         output = init_func(self, *a, **k)
 
-        # call callbacks on fields that are initialized
-        vars(self)[_FROZEN] = False
-
         # in case __post_init__ is defined then call it
         # after the tree is initialized
         # here, we assume that __post_init__ is a method
@@ -209,8 +206,6 @@ def _init_wrapper(init_func):
             # ...    def __post_init__(self):
             # ...        self.b = 1
             output = getattr(self, _POST_INIT)()
-            # call validation on fields that are not initialized
-            vars(self)[_FROZEN] = False
 
         # handle uninitialized fields
         for field in getattr(self, _FIELD_MAP).values():
