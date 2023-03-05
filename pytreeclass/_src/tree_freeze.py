@@ -51,6 +51,8 @@ class ImmutableWrapper:
 
 def _tree_map_unwrap(value):
     unwrap = lambda x: x.unwrap() if isinstance(x, ImmutableWrapper) else x
+    # skip wrapping `TreeClass` instances
+    # as they are handling the unwrapping themselves
     is_leaf = lambda x: isinstance(x, (ImmutableWrapper, TreeClass))
     return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
 
