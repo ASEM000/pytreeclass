@@ -43,7 +43,7 @@ class Field(NamedTuple):
 def field(
     *,
     default: Any | _NOT_SET = _NOT_SET,
-    default_factory: Any | None = None,
+    default_factory: Callable | None = None,
     init: bool = True,
     repr: bool = True,
     kw_only: bool = False,
