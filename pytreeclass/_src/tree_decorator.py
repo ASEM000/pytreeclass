@@ -268,7 +268,6 @@ def _is_dataclass_like(node):
 
 
 def fields(node):
-    """Get the fields of a dataclass-like object."""
     if not isinstance(node, TreeClass):
         raise TypeError(f"Cannot get fields from {node!r}.")
     field_map = getattr(node, _FIELD_MAP, {})

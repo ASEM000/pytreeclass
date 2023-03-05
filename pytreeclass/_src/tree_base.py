@@ -64,18 +64,24 @@ def _getattr_wrapper(getattr_func):
     @ft.wraps(getattr_func)
     def getattr_method(tree, key: str) -> Any:
         # unwrap the value if it is instance of `ImmutableWrapper`
-        # this is done to allow for easy wrapping of the tree
-        # without having to unwrap the tree every time.
-        # alternatively we can mark a certain field in their metadata
-        # and use this marker during the tree_flatten/tree_unflatten
-        # to manage what gets updated and what doesn't
-        # the mentioned approach is used in `flax.struct.dataclass` and previous version
-        # of `treeclass`, However, it is not as flexible as the current approach.
+        # this current approach replaces the older metdata based approach
+        # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`
+        # the metadata approach is defined at class variable and can not be changed at runtime
+        # the current approach is more flexible because it can be changed at runtime using `tree_map` or by using `at`
+        # moreover, metadata-based approach falls short when handling nested data structures values.
+        # for example if a field value is a tuple of (1, 2, 3), then metadata-based approach will only be able
+        # to freeze the whole tuple, but not its elements.
+        # with the current approach, we can use `tree_map`/ or direct application to freeze certain tuple elements
+        # and leave the rest of the tuple as is.
+        # another pro of the current approach is that the field metadata is not checked during flattening/unflattening
+        # so inessence, it's more efficient than the metadata-based approach during applying `jax` transformations
+        # that flatten/unflatten the tree.
         value = getattr_func(tree, key)
 
         if key in getattr_func(tree, _VARS):
-            # unwrap instance variables
+            # unwrap non-Treeclass instance variables
             return _tree_map_unwrap(value)
+        # return the value as is if it is not an instance variable
         return value
 
     return getattr_method
@@ -91,7 +97,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
 
     if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
         field = Field(name=key, type=type(value))  # type: ignore
-        # register it to dataclass fields
+        # register it to field map, to avoid re-registering it in field_map
         getattr(tree, _FIELD_MAP)[key] = field
 
 
@@ -214,6 +220,7 @@ def _treeclass_transform(klass):
     # add custom `dataclass` field_map and frozen attributes to the class
     setattr(klass, _FIELD_MAP, _generate_field_map(klass))
     setattr(klass, _FROZEN, True)
+    setattr(klass, "__match_args__", tuple(getattr(klass, _FIELD_MAP).keys()))
 
     if "__init__" not in getattr(klass, _VARS):
         # generate the init method in case it is not defined by the user
