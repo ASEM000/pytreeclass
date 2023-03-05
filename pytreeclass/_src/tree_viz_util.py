@@ -106,7 +106,7 @@ def _tree_trace(tree: PyTree, depth=float("inf")) -> list[NodeInfo]:
             reprs = (info.repr,) * len(info.node)
             frozen = (is_frozen(leaf) or info.frozen for leaf in leaves)
         elif isinstance(info.node, dict):
-            names = (f"{key}" for key in info.node)
+            names = (f"['{key}']" for key in info.node)
             reprs = (info.repr,) * len(info.node)
             frozen = (is_frozen(leaf) or info.frozen for leaf in leaves)
         elif isinstance(info.node, (list, tuple)):
