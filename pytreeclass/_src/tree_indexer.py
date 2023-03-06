@@ -12,6 +12,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
+from pytreeclass._src.tree_decorator import _VARS
 from pytreeclass._src.tree_freeze import _call_context
 
 PyTree = Any
@@ -176,7 +177,7 @@ def _tree_set_at_str(
 
         if depth > 0:
             # non-leaf parent case setting the connection between the parent and the child
-            vars(parent)[child_name] = value
+            getattr(parent, _VARS)[child_name] = value
             return tree if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
         # leaf parent case
@@ -193,7 +194,7 @@ def _tree_set_at_str(
         # masking the parent = False, and child = True
         child_mask = getattr(parent_mask, child_name)
         child_mask = jtu.tree_map(lambda _: True, child_mask)
-        vars(parent_mask)[child_name] = child_mask
+        getattr(parent_mask, _VARS)[child_name] = child_mask
         parent = _tree_set_at_pytree(parent, parent_mask, set_value, is_leaf=is_leaf)
         return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
@@ -218,7 +219,7 @@ def _tree_apply_at_str(
 
         if depth > 0:
             # non-leaf parent case setting the connection between the parent and the child
-            vars(parent)[child_name] = value
+            getattr(parent, _VARS)[child_name] = value
             return tree if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 
         # leaf parent case
@@ -235,7 +236,7 @@ def _tree_apply_at_str(
         # masking the parent = False, and child = True
         child_mask = getattr(parent_mask, child_name)
         child_mask = jtu.tree_map(lambda _: True, child_mask)
-        vars(parent_mask)[child_name] = child_mask
+        getattr(parent_mask, _VARS)[child_name] = child_mask
         parent = _tree_apply_at_pytree(parent, parent_mask, func, is_leaf=is_leaf)
         return parent if len(path) == 1 else recurse(path[:-1], parent, depth + 1)
 

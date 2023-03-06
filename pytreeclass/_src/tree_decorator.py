@@ -17,6 +17,7 @@ _FIELD_MAP = "__field_map__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
 _WRAPPED = "__wrapped__"
+_VARS = "__dict__"
 
 
 @runtime_checkable
@@ -118,7 +119,7 @@ def _generate_field_map(klass) -> dict[str, Field]:
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
-    annotations = vars(klass).get("__annotations__", dict())
+    annotations = getattr(klass, _VARS).get("__annotations__", dict())
 
     for name in annotations:
         # get the value associated with the type hint
@@ -218,7 +219,7 @@ def _generate_init(klass):
     FIELD_MAP = _generate_field_map(klass)
     # generate init method
     local_namespace = dict()
-    global_namespace = vars(sys.modules[klass.__module__])
+    global_namespace = getattr(sys.modules[klass.__module__], _VARS)
 
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`

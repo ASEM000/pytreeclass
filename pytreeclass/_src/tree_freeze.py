@@ -9,7 +9,7 @@ from typing import Any
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN, _WRAPPED
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN, _VARS, _WRAPPED
 
 PyTree = Any
 
@@ -31,34 +31,31 @@ def _tree_hash(tree: PyTree) -> int:
     return hash((*hashed, jtu.tree_structure(tree)))
 
 
+def _unwrap(value: Any) -> Any:
+    return value.unwrap() if isinstance(value, ImmutableWrapper) else value
+
+
 class ImmutableWrapper:
     def __init__(self, x: Any):
         # disable composition of Wrappers
-        vars(self)[_WRAPPED] = x.unwrap() if isinstance(x, ImmutableWrapper) else x
+        getattr(self, _VARS)[_WRAPPED] = _unwrap(x)
 
     def unwrap(self):
         return getattr(self, _WRAPPED)
 
     def __setattr__(self, key, value):
         # allow setting the wrapped value only once.
-        if _WRAPPED in vars(self):
+        if _WRAPPED in getattr(self, _VARS):
             raise AttributeError("Cannot assign to frozen instance.")
         super().__setattr__(key, value)
 
-    def __delattr__(self, __name: str) -> None:
+    def __delattr__(self, _: str) -> None:
         raise AttributeError("Cannot delete from frozen instance.")
 
 
-def _is_wrapper_or_treeclass(value: Any) -> bool:
-    return isinstance(value, ImmutableWrapper) or hasattr(value, _FIELD_MAP)
-
-
-def _unwrap(value: Any) -> Any:
-    return value.unwrap() if isinstance(value, ImmutableWrapper) else value
-
-
-def _tree_map_unwrap(value):
-    return jtu.tree_map(_unwrap, value, is_leaf=_is_wrapper_or_treeclass)
+def _tree_unwrap(value):
+    is_leaf = lambda x: isinstance(x, ImmutableWrapper) or hasattr(x, _FIELD_MAP)
+    return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
 
 class _HashableWrapper(ImmutableWrapper):
@@ -97,7 +94,7 @@ def _flatten(tree):
 
 def _unflatten(klass, treedef, _):
     tree = object.__new__(klass)
-    vars(tree)[_WRAPPED] = treedef.unwrap()
+    getattr(tree, _VARS)[_WRAPPED] = treedef.unwrap()
     return tree
 
 
@@ -200,7 +197,7 @@ def _call_context(tree: PyTree):
         # instance variable to temporarily disable the frozen behavior
         # after the context manager exits, the instance variable will be deleted
         # and the class attribute will be used again.
-        vars(tree)[_FROZEN] = False
+        getattr(tree, _VARS)[_FROZEN] = False
         for key in getattr(tree, _FIELD_MAP):
             mutate_step(getattr(tree, key))
         return tree
@@ -208,10 +205,10 @@ def _call_context(tree: PyTree):
     def immutate_step(tree):
         if not hasattr(tree, _FIELD_MAP):
             return tree
-        if _FROZEN not in vars(tree):
+        if _FROZEN not in getattr(tree, _VARS):
             return tree
 
-        del vars(tree)[_FROZEN]
+        del getattr(tree, _VARS)[_FROZEN]
         for key in getattr(tree, _FIELD_MAP):
             immutate_step(getattr(tree, key))
         return tree

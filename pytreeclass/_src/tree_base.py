@@ -15,12 +15,13 @@ from pytreeclass._src.tree_decorator import (
     _FROZEN,
     _NOT_SET,
     _POST_INIT,
+    _VARS,
     _WRAPPED,
     Field,
     _generate_field_map,
     _generate_init,
 )
-from pytreeclass._src.tree_freeze import _tree_hash, _tree_map_unwrap
+from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
 from pytreeclass._src.tree_indexer import _tree_copy, _tree_indexer, bcmap
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 
@@ -30,7 +31,7 @@ PyTree = Any
 def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
     """Flatten rule for `jax.tree_flatten`"""
     # in essence anything not declared in dataclass fields will be considered static
-    static, dynamic = dict(vars(tree)), dict()
+    static, dynamic = dict(getattr(tree, _VARS)), dict()
     for key in getattr(tree, _FIELD_MAP):
         dynamic[key] = static.pop(key)
 
@@ -41,8 +42,8 @@ def _unflatten(klass, treedef, leaves):
     """Unflatten rule for `jax.tree_unflatten`"""
     # call the wrapped `__new__` method (non-field initializer)
     tree = getattr(klass.__new__, _WRAPPED)(klass)
-    vars(tree).update(treedef[1])
-    vars(tree).update(zip(treedef[0], leaves))
+    getattr(tree, _VARS).update(treedef[1])
+    getattr(tree, _VARS).update(zip(treedef[0], leaves))
     return tree
 
 
@@ -84,13 +85,9 @@ def _getattr_wrapper(getattr_func):
         # >>> tree.a
         # 1  # the value is unwrapped when accessed directly
         value = getattr_func(tree, key)
-
-        if key in getattr_func(tree, "__dict__"):
-            # unwrap non-`TreeClass`` instance variables
-            # so the getattr will always return unwrapped values.
-            return _tree_map_unwrap(value)
-        # return the value as is if it is not an instance variable
-        return value
+        # unwrap non-`TreeClass` instance variables
+        # so the getattr will always return unwrapped values.
+        return _tree_unwrap(value) if key in getattr_func(tree, _VARS) else value
 
     return getattr_method
 
@@ -117,7 +114,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
                     raise type(e)(msg)
 
     # set the value
-    vars(tree)[key] = value
+    getattr(tree, _VARS)[key] = value
 
     if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
         field = Field(name=key, type=type(value))  # type: ignore
@@ -129,22 +126,22 @@ def _delattr(tree, key: str) -> None:
     """Delete the attribute of the  if tree is not frozen"""
     if getattr(tree, _FROZEN):
         raise AttributeError(f"Cannot delete {key}.")
-    del vars(tree)[key]
+    del getattr(tree, _VARS)[key]
 
 
 def _new_wrapper(new_func):
     @ft.wraps(new_func)
     def new_method(klass, *_, **__) -> PyTree:
-        self = new_func(klass)
+        tree = new_func(klass)
         for field in getattr(klass, _FIELD_MAP).values():
             if field.default is not _NOT_SET:
-                vars(self)[field.name] = field.default
+                getattr(tree, _VARS)[field.name] = field.default
             elif field.default_factory is not None:
-                vars(self)[field.name] = field.default_factory()
+                getattr(tree, _VARS)[field.name] = field.default_factory()
 
         # set the tree as not frozen to enable
-        vars(self)[_FROZEN] = False
-        return self
+        getattr(tree, _VARS)[_FROZEN] = False
+        return tree
 
     # wrap the original `new_func`, to use it later in `tree_unflatten`
     # to avoid repeating iterating over fields and setting default values
@@ -184,14 +181,14 @@ def _init_sub_wrapper(init_subclass_func):
 
 def _init_wrapper(init_func):
     @ft.wraps(init_func)
-    def init_method(self, *a, **k) -> None:
-        vars(self)[_FROZEN] = False
-        output = init_func(self, *a, **k)
+    def init_method(tree, *a, **k) -> None:
+        getattr(tree, _VARS)[_FROZEN] = False
+        output = init_func(tree, *a, **k)
 
         # in case __post_init__ is defined then call it
         # after the tree is initialized
         # here, we assume that __post_init__ is a method
-        if hasattr(type(self), _POST_INIT):
+        if hasattr(type(tree), _POST_INIT):
             # in case we found post_init in super class
             # then defreeze it first and call it
             # this behavior is differet to `dataclasses` with `frozen=True`
@@ -205,12 +202,12 @@ def _init_wrapper(init_func):
             # ...    a:int = 1
             # ...    def __post_init__(self):
             # ...        self.b = 1
-            vars(self)[_FROZEN] = False
-            output = getattr(type(self), _POST_INIT)(self)
+            getattr(tree, _VARS)[_FROZEN] = False
+            output = getattr(type(tree), _POST_INIT)(tree)
 
         # handle uninitialized fields
-        for field in getattr(self, _FIELD_MAP).values():
-            if field.name not in vars(self):
+        for field in getattr(tree, _FIELD_MAP).values():
+            if field.name not in getattr(tree, _VARS):
                 # at this point, all fields should be initialized
                 # in principle, this error will be caught when invoking `repr`/`str`
                 # like in `dataclasses` but we raise it here for better error message.
@@ -218,8 +215,8 @@ def _init_wrapper(init_func):
 
         # delete the shadowing `__dict__` attribute to
         # restore the frozen behavior
-        if _FROZEN in vars(self):
-            del vars(self)[_FROZEN]
+        if _FROZEN in getattr(tree, _VARS):
+            del getattr(tree, _VARS)[_FROZEN]
         return output
 
     return init_method
@@ -230,7 +227,7 @@ def _validate_class(klass):
         raise TypeError(f"Expected `class` but got `{type(klass)}`.")
 
     for key, method in zip(("__delattr__", "__setattr__"), (_delattr, _setattr)):
-        if key in vars(klass) and vars(klass)[key] is not method:
+        if key in getattr(klass, _VARS) and getattr(klass, _VARS)[key] is not method:
             # raise error if the current setattr/delattr is not immutable
             raise AttributeError(f"Cannot define `{key}` in {klass.__name__}.")
 
@@ -244,12 +241,12 @@ def _treeclass_transform(klass):
     setattr(klass, _FROZEN, True)
     setattr(klass, "__match_args__", tuple(getattr(klass, _FIELD_MAP).keys()))
 
-    if "__init__" not in vars(klass):
+    if "__init__" not in getattr(klass, _VARS):
         # generate the init method in case it is not defined by the user
         setattr(klass, "__init__", _generate_init(klass))
 
     # class initialization wrapper
-    if "__getattr__" in vars(klass):
+    if "__getattr__" in getattr(klass, _VARS):
         setattr(klass, "__getattr__", _getattr_wrapper(klass.__getattr__))
 
     setattr(klass, "__new__", _new_wrapper(klass.__new__))
@@ -325,7 +322,7 @@ def _process_optional_methods(klass):
     attrs["__xor__"] = bcmap(op.xor)
 
     for key in attrs:
-        if key not in vars(klass):
+        if key not in getattr(klass, _VARS):
             # do not override any user defined methods
             # this behavior similar is to `dataclasses.dataclass`
             setattr(klass, key, attrs[key])
