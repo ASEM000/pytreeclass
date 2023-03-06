@@ -4,7 +4,7 @@ import copy
 import functools as ft
 import hashlib
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, Sequence
 
 import jax.tree_util as jtu
 import numpy as np
@@ -14,7 +14,7 @@ from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN, _VARS, _WRAPPED
 PyTree = Any
 
 
-def _hash_node(node: PyTree) -> int:
+def _hash_node(node: Any) -> int:
     if hasattr(node, "dtype") and hasattr(node, "shape"):
         return hashlib.sha256(np.array(node).tobytes()).hexdigest()
     if isinstance(node, set):
@@ -36,14 +36,14 @@ def _unwrap(value: Any) -> Any:
 
 
 class ImmutableWrapper:
-    def __init__(self, x: Any):
+    def __init__(self, x: Any) -> None:
         # disable composition of Wrappers
         getattr(self, _VARS)[_WRAPPED] = _unwrap(x)
 
-    def unwrap(self):
+    def unwrap(self) -> Any:
         return getattr(self, _WRAPPED)
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key, value) -> None:
         # allow setting the wrapped value only once.
         if _WRAPPED in getattr(self, _VARS):
             raise AttributeError("Cannot assign to frozen instance.")
@@ -53,7 +53,7 @@ class ImmutableWrapper:
         raise AttributeError("Cannot delete from frozen instance.")
 
 
-def _tree_unwrap(value):
+def _tree_unwrap(value: PyTree) -> PyTree:
     is_leaf = lambda x: isinstance(x, ImmutableWrapper) or hasattr(x, _FIELD_MAP)
     return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
@@ -67,7 +67,7 @@ class _HashableWrapper(ImmutableWrapper):
             return False
         return _hash_node(self.unwrap()) == _hash_node(rhs.unwrap())
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return _hash_node(self.unwrap())
 
 
@@ -88,11 +88,11 @@ class FrozenWrapper(ImmutableWrapper):
         return hash(self.unwrap())
 
 
-def _flatten(tree):
+def _flatten(tree: Any) -> tuple[tuple, Any]:
     return (None,), _HashableWrapper(tree.unwrap())
 
 
-def _unflatten(klass, treedef, _):
+def _unflatten(klass: type, treedef: jtu.PyTreeDef, _: Sequence[Any]) -> PyTree:
     tree = object.__new__(klass)
     getattr(tree, _VARS)[_WRAPPED] = treedef.unwrap()
     return tree
@@ -173,7 +173,7 @@ def unfreeze(x: Any) -> Any:
     return x.unwrap() if isinstance(x, FrozenWrapper) else x
 
 
-def is_frozen(wrapped):
+def is_frozen(wrapped: Any) -> bool:
     return isinstance(wrapped, FrozenWrapper)
 
 
@@ -190,7 +190,7 @@ def is_nondiff(node: Any) -> bool:
 
 @contextmanager
 def _call_context(tree: PyTree):
-    def mutate_step(tree):
+    def mutate_step(tree: PyTree):
         if not hasattr(tree, _FIELD_MAP):
             return tree
         # shadow the class _FROZEN attribute with an

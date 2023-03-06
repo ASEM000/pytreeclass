@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dataclasses as dc
 import functools as ft
+import inspect
 import sys
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Protocol, Sequence, runtime_checkable
@@ -24,6 +25,11 @@ _VARS = "__dict__"
 class TreeClass(Protocol):
     __field_map__: dict[str, Field]
     __frozen__: bool
+
+
+@ft.lru_cache
+def _is_one_arg_func(func: Callable) -> bool:
+    return len(inspect.signature(func).parameters) == 1
 
 
 class Field(NamedTuple):
@@ -51,7 +57,7 @@ def field(
     pos_only: bool = False,
     metadata: dict | None = None,
     callbacks: Sequence[Callable] | None = None,
-):
+) -> Field:
     """
     default: The default value of the field.
     default_factory: A 0-argument function called to initialize a field's value.
@@ -82,6 +88,10 @@ def field(
                 msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
                 msg += f" at index={index}"
                 raise TypeError(msg)
+            if not _is_one_arg_func(callback):
+                msg = "`callbacks` must be a Sequence of functions with 1 argument, that takes the value as argument"
+                msg += f"got {type(callbacks)} at index={index}"
+                raise TypeError(msg)
     elif callbacks is not None:
         msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
         raise TypeError(msg)
@@ -102,7 +112,7 @@ def field(
 
 
 @ft.lru_cache(maxsize=None)
-def _generate_field_map(klass) -> dict[str, Field]:
+def _generate_field_map(klass: type) -> dict[str, Field]:
     # get all the fields of the class and its base classes
     # get the fields of the class and its base classes
     FIELD_MAP = dict()
@@ -214,7 +224,7 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
     return body
 
 
-def _generate_init(klass):
+def _generate_init(klass: type) -> type:
     # generate the field map for the class
     FIELD_MAP = _generate_field_map(klass)
     # generate init method
@@ -236,12 +246,12 @@ def _generate_init(klass):
     )
 
 
-def _is_dataclass_like(node):
+def _is_dataclass_like(node: Any) -> bool:
     # maybe include other dataclass-like objects here? (e.g. attrs)
     return dc.is_dataclass(node) or isinstance(node, TreeClass)
 
 
-def fields(node):
+def fields(node: Any) -> Sequence[Field]:
     if not isinstance(node, TreeClass):
         raise TypeError(f"Cannot get fields from {node!r}.")
     field_map = getattr(node, _FIELD_MAP, {})

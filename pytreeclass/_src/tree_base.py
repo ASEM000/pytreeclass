@@ -4,7 +4,7 @@ import copy
 import functools as ft
 import math
 import operator as op
-from typing import Any
+from typing import Any, Callable
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -42,6 +42,8 @@ def _unflatten(klass, treedef, leaves):
     """Unflatten rule for `jax.tree_unflatten`"""
     # call the wrapped `__new__` method (non-field initializer)
     tree = getattr(klass.__new__, _WRAPPED)(klass)
+    # update through vars, to avoid calling the `setattr` method
+    # that will iterate over the fields
     getattr(tree, _VARS).update(treedef[1])
     getattr(tree, _VARS).update(zip(treedef[0], leaves))
     return tree
@@ -98,6 +100,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise AttributeError(msg)
 
+    # apply the callbacks on setting the value
     # check if the key is a field name
     if key in getattr(tree, _FIELD_MAP):
         # check if there is a callback associated with the field
@@ -129,9 +132,9 @@ def _delattr(tree, key: str) -> None:
     del getattr(tree, _VARS)[key]
 
 
-def _new_wrapper(new_func):
+def _new_wrapper(new_func: Callable) -> Callable:
     @ft.wraps(new_func)
-    def new_method(klass, *_, **__) -> PyTree:
+    def new_method(klass: type, *_, **__) -> PyTree:
         tree = new_func(klass)
         for field in getattr(klass, _FIELD_MAP).values():
             if field.default is not _NOT_SET:
@@ -149,10 +152,10 @@ def _new_wrapper(new_func):
     return new_method
 
 
-def _init_sub_wrapper(init_subclass_func):
+def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
     @classmethod
     @ft.wraps(init_subclass_func)
-    def _init_subclass(klass) -> None:
+    def _init_subclass(klass: type) -> None:
         # Non-decorated subclasses uses the base `treeclass` leaves only
         # this behavior is aligned with `dataclasses` not registering non-decorated
         # subclasses dataclass fields. for example:
@@ -179,7 +182,7 @@ def _init_sub_wrapper(init_subclass_func):
     return _init_subclass
 
 
-def _init_wrapper(init_func):
+def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
     def init_method(tree, *a, **k) -> None:
         getattr(tree, _VARS)[_FROZEN] = False
@@ -222,7 +225,7 @@ def _init_wrapper(init_func):
     return init_method
 
 
-def _validate_class(klass):
+def _validate_class(klass: type) -> type:
     if not isinstance(klass, type):
         raise TypeError(f"Expected `class` but got `{type(klass)}`.")
 
@@ -234,7 +237,7 @@ def _validate_class(klass):
     return klass
 
 
-def _treeclass_transform(klass):
+def _treeclass_transform(klass: type) -> type:
 
     # add custom `dataclass` field_map and frozen attributes to the class
     setattr(klass, _FIELD_MAP, _generate_field_map(klass))
