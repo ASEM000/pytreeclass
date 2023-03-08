@@ -154,9 +154,6 @@ def _tree_set_at_str(
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTree:
     """Applies a function to a certain attribute of a tree based on a where using jax.tree_map and a mask."""
-    # In essence this function retrieves the direct parent of the attribute
-    # and applies the function to the attribute using a mask, that is False for all except at the attribute
-
     def map_func(trace, leaf):
         return set_value if where == trace.names[: len(where)] else leaf
 
@@ -170,9 +167,6 @@ def _tree_apply_at_str(
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTree:
     """Applies a function to a certain attribute of a tree based on a path using jax.tree_map and a mask."""
-
-    # In essence this function retrieves the direct parent of the attribute
-    # and applies the function to the attribute using a mask, that is False for all except at the attribute
     def map_func(trace, leaf):
         return func(leaf) if where == trace.names[: len(where)] else leaf
 
