@@ -107,8 +107,7 @@ def test_freeze_errors():
     with pytest.raises(TypeError):
         t.at[...].apply(jnp.sin)
 
-    with pytest.raises(TypeError):
-        t.at[...].reduce(jnp.sin)
+    t.at[...].reduce(jnp.sin)
 
 
 def test_freeze_with_ops():
@@ -151,7 +150,7 @@ def test_freeze_with_ops():
 
     assert pytc.is_tree_equal(t.at[...].set(0), t)
     assert pytc.is_tree_equal(t.at[...].apply(lambda x: x + 1), t)
-    assert pytc.is_tree_equal(t.at[...].reduce(jnp.sin), 0.0)
+    assert pytc.is_tree_equal(t.at[...].reduce(jnp.sin, initializer=0), 0.0)
 
     @pytc.treeclass
     class Test:

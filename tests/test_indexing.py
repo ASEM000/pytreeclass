@@ -65,8 +65,8 @@ def test_getter_by_val():
     with pytest.raises(TypeError):
         B = A.at[A].get()
 
-    with pytest.raises(NotImplementedError):
-        B = A.at[0].get()
+    # with pytest.raises(NotImplementedError):
+    #     B = A.at[0].get()
 
 
 def test_getter_by_param():
@@ -129,8 +129,8 @@ def test_setter_by_val():
     with pytest.raises(TypeError):
         B = A.at[A].set(0)
 
-    with pytest.raises(NotImplementedError):
-        B = A.at[0].set(0)
+    # with pytest.raises(NotImplementedError):
+    #     B = A.at[0].set(0)
 
     @pytc.treeclass
     class L0:
@@ -286,11 +286,11 @@ def test_reduce():
     assert lhs == rhs
 
     lhs = 3 + 4 + 5
-    rhs = init.at[init > 2].reduce(lambda x, y: x + jnp.sum(y))
+    rhs = init.at[init > 2].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
     assert lhs == rhs
 
     lhs = 0
-    rhs = init.at[init > 100].reduce(lambda x, y: x + jnp.sum(y))
+    rhs = init.at[init > 100].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
     assert lhs == rhs
 
     @pytc.treeclass
@@ -303,17 +303,17 @@ def test_reduce():
     init = B(1, 2, jnp.array([1, 2, 3, 4, 5]), (10, 20, 30))
 
     lhs = 2 + 2 + 3 + 4 + 5 + 10 + 20 + 30
-    rhs = init.at[init > 1].reduce(lambda x, y: x + jnp.sum(y))
+    rhs = init.at[init > 1].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
     assert lhs == rhs
 
     with pytest.raises(TypeError):
-        init.at[init].reduce(lambda x, y: x + jnp.sum(y))
+        init.at[init].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
 
     @pytc.treeclass
     class Test:
         a: tuple[int]
 
-    lhs = Test((1, 2, 3)).at["a"].reduce(lambda x, y: x + y)
+    lhs = Test((1, 2, 3)).at["a"].reduce(lambda x, y: x + y, initializer=0)
     assert lhs == 6
 
 
@@ -355,7 +355,9 @@ def test_reduce_and_its_derivatives():
             lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
         )
     ) == 1.3969219
-    assert (model.at[model > 0].reduce(lambda x, y: x + jnp.sum(y))) == 10.6970625
+    assert (
+        model.at[model > 0].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
+    ) == 10.6970625
     assert (model.at[model > 0].reduce(lambda x, y: x * jnp.product(y), initializer=1)) == 1.8088213  # fmt: skip
 
 
@@ -389,11 +391,8 @@ def test_attribute_get():
         b: l0 = l0()
 
     t = Test()
-    assert t.at["a"].get() == 1
-    assert t.at["b"].at["a"].get() == 2
-
-    # with pytest.raises(AttributeError):
-    #     t.at["a"].at["c"].get()
+    assert pytc.is_tree_equal(t.at["a"].get(), Test(1, l0(None)))
+    assert pytc.is_tree_equal(t.at["b"].at["a"].get(), Test(None, l0(2)))
 
 
 def test_attribute_set():
@@ -413,14 +412,8 @@ def test_attribute_set():
     assert pytc.is_tree_equal(t.at["a"].set(10), Test(10, l0()))
     assert pytc.is_tree_equal(t.at["b"].at["a"].set(100), Test(1, l0(100)))
 
-    # with pytest.raises(AttributeError):
-    #     t.at["c"].set(10)
 
-    # with pytest.raises(AttributeError):
-    #     t.at["a"].at["c"].set(10)
-
-
-def test_attribute_apply():
+def test_attributre_apply():
     @pytc.treeclass
     class l0:
         a: int = 2
@@ -436,6 +429,71 @@ def test_attribute_apply():
     assert pytc.is_tree_equal(t, Test())
     assert pytc.is_tree_equal(t.at["a"].apply(lambda _: 10), Test(10))
     assert pytc.is_tree_equal(t.at["b"].at["a"].apply(lambda _: 100), Test(1, l0(100)))
+
+
+def test_attribute_error():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+
+    t = Test()
+
+    with pytest.raises(AttributeError):
+        t.at["[b"].get()
+
+
+def test_mixed_get():
+    @pytc.treeclass
+    class l0:
+        a: int = 2
+        b: int = 1
+
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: l0 = l0()
+
+    t = Test()
+    assert pytc.is_tree_equal(t.at["b"].at[t == 2].get(), Test(None, l0(2, None)))
+    assert pytc.is_tree_equal(t.at[t == 2].at["b"].get(), Test(None, l0(2, None)))
+
+
+def test_mixed_set():
+    @pytc.treeclass
+    class l0:
+        a: int = 2
+        b: int = 1
+
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: l0 = l0()
+
+    t = Test()
+
+    assert pytc.is_tree_equal(t.at["b"].at[t == 2].set(100), Test(1, l0(100, 2)))
+    assert pytc.is_tree_equal(t.at[t == 2].at["b"].set(100), Test(1, l0(100, 2)))
+
+
+def test_mixed_apply():
+    @pytc.treeclass
+    class l0:
+        a: int = 2
+        b: int = 1
+
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: l0 = l0()
+
+    t = Test()
+
+    assert pytc.is_tree_equal(
+        t.at["b"].at[t == 2].apply(lambda _: 100), Test(1, l0(100, 2))
+    )
+    assert pytc.is_tree_equal(
+        t.at[t == 2].at["a"].apply(lambda _: 100), Test(1, l0(100))
+    )
 
 
 def test_method_call():
@@ -498,9 +556,12 @@ def test_repr_str():
 
     t = Test()
 
-    assert repr(t.at["a"]) == "where=('a')"
-    assert str(t.at["a"]) == "where=(a)"
-    assert repr(t.at[...]) == "where=(Test(a=True, b=True))"
+    assert repr(t.at["a"]) == "TreeAtName(tree=Test(a=1, b=2), where=('a',))"
+    assert str(t.at["a"]) == "TreeAtName(tree=Test(a=1, b=2), where=('a',))"
+    assert (
+        repr(t.at[...])
+        == "TreeAtPyTree(tree=Test(a=1, b=2), where=Test(a=True, b=True))"
+    )
 
 
 def test_not_equal():

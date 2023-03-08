@@ -40,11 +40,11 @@ class _TraceRegistryEntry(NamedTuple):
 
 
 class LeafTrace(NamedTuple):
-    names: Sequence[str]  # name of the node in each level
-    types: Sequence[type]  # type of the node in each level
-    index: Sequence[int]  # index of the node in the tree in each level
-    width: Sequence[int]  # number of children in each level
-    omits: Sequence[bool]  # a flag to indicate if the node is omitted in each level
+    names: tuple[str, ...]  # name of the node in each level
+    types: tuple[type, ...]  # type of the node in each level
+    index: tuple[int, ...]  # index of the node in the tree in each level
+    width: tuple[int, ...]  # number of children in each level
+    omits: tuple[bool, ...]  # a flag to indicate if the node is omitted in each level
 
 
 EmptyTrace = LeafTrace((), (), (), (), ())
@@ -89,6 +89,7 @@ def flatten_one_trace_level(
         )
 
     elif isinstance(tree, tuple) and hasattr(tree, "_fields"):
+        # this conforms to the `jax` convention for namedtuples
         leaves = [getattr(tree, field) for field in tree._fields]
         traces = _namedtuple_trace_func(tree)
 
@@ -106,6 +107,7 @@ def flatten_one_trace_level(
             tree_trace=LeafTrace(names, types, index, width, omits),
             tree=leaf,
             is_leaf=is_leaf,
+            # `None` depth is max depth
             depth=(depth - 1) if depth is not None else None,
         )
 
@@ -155,7 +157,7 @@ def _jaxable_trace_func(tree: Any) -> Sequence[LeafTrace]:
     # fallback trace function in case no trace function is registered for a given
     # class in the `trace` registry
     # get leaves from the `jax` registry
-    leaves = _registry.get(type(tree)).to_iter(tree)
+    leaves, _ = _registry.get(type(tree)).to_iter(tree)
     traces = []
     for i, leaf in enumerate(leaves):
         traces += [LeafTrace([f"leaf_{i}"], [type(leaf)], [i], [len(leaves)], [False])]
