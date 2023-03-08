@@ -55,8 +55,8 @@ def _tree_trace(tree):
     klass = ([type(leaf)] for leaf in leaves)
     index = ([i] for i in range(len(leaves)))
     width = ([len(leaves)] for _ in range(len(leaves)))
-    omits = ([not getattr(tree, _FIELD_MAP)[key].repr] for key in keys)
-    return [LeafTrace(*args) for args in zip(names, klass, index, width, omits)]
+    metas = ([{"repr": getattr(tree, _FIELD_MAP)[key].repr}] for key in keys)
+    return [LeafTrace(*args) for args in zip(names, klass, index, width, metas)]
 
 
 @ft.lru_cache(maxsize=None)

@@ -237,6 +237,13 @@ def _node_type_pprint(node: type, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
+def _should_omit_trace(trace: LeafTrace) -> bool:
+    for meta in trace.metas:
+        if isinstance(meta, dict) and "repr" in meta:
+            return meta["repr"] is False
+    return False
+
+
 def tree_repr(tree: PyTree, *, width: int = 80, indent: int = 2) -> str:
     """Prertty print dataclass tree `__repr__`
 
@@ -304,7 +311,7 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
     fmt = f"{tree.__class__.__name__}"
 
     for i, (trace, leaf) in enumerate(zip(traces, leaves)):
-        if any(trace.omits):
+        if _should_omit_trace(trace):
             continue
 
         # iterate over the leaves `NodeInfo` object
@@ -361,7 +368,7 @@ def tree_mermaid(tree: PyTree, depth=None, width: int = 60) -> str:
     cur_id = None
 
     for trace, leaf in zip(traces, leaves):
-        if any(trace.omits):
+        if _should_omit_trace(trace):
             continue
 
         count, size = _calculate_leaf_trace_stats(trace, leaf)
@@ -696,7 +703,7 @@ def tree_summary(tree: PyTree, *, depth=None, width: int = 60) -> str:
     traces = traces if len(traces) > 1 else ()
 
     for trace, leaf in zip(traces, leaves):
-        if any(trace.omits):
+        if _should_omit_trace(trace):
             continue
 
         path = ".".join(_node_pprint(i, 0, "str", width) for i in trace.names)

@@ -40,11 +40,11 @@ class _TraceRegistryEntry(NamedTuple):
 
 
 class LeafTrace(NamedTuple):
-    names: tuple[str, ...]  # name of the node in each level
-    types: tuple[type, ...]  # type of the node in each level
-    index: tuple[int, ...]  # index of the node in the tree in each level
-    width: tuple[int, ...]  # number of children in each level
-    omits: tuple[bool, ...]  # a flag to indicate if the node is omitted in each level
+    names: Sequence[str]  # name of the node in each level
+    types: Sequence[type] # type of the node in each level
+    index: Sequence[int]  # index of the node in the tree in each level
+    width: Sequence[int]  # number of children in each level
+    metas: Sequence[Any]  # metadata for each level for a node
 
 
 EmptyTrace = LeafTrace((), (), (), (), ())
@@ -102,9 +102,9 @@ def flatten_one_trace_level(
         types = (*tree_trace.types, *trace.types)
         index = (*tree_trace.index, *trace.index)
         width = (*tree_trace.width, *trace.width)
-        omits = (*tree_trace.omits, *trace.omits)
+        metas = (*tree_trace.metas, *trace.metas)
         yield from flatten_one_trace_level(
-            tree_trace=LeafTrace(names, types, index, width, omits),
+            tree_trace=LeafTrace(names, types, index, width, metas),
             tree=leaf,
             is_leaf=is_leaf,
             # `None` depth is max depth
@@ -131,8 +131,8 @@ def _sequence_trace_func(tree: Sequence) -> Sequence[LeafTrace]:
     types = ([type(value)] for value in tree)
     index = ([i] for i in range(len(tree)))
     width = ([len(tree)] for _ in range(len(tree)))
-    omits = ([False] for _ in range(len(tree)))
-    return [LeafTrace(*x) for x in zip(names, types, index, width, omits)]
+    metas = ([None] for _ in range(len(tree)))
+    return [LeafTrace(*x) for x in zip(names, types, index, width, metas)]
 
 
 def _dict_trace_func(tree: dict) -> Sequence[LeafTrace]:
@@ -140,8 +140,8 @@ def _dict_trace_func(tree: dict) -> Sequence[LeafTrace]:
     types = ([type(tree[key])] for key in tree)
     index = ([i] for i in range(len(tree)))
     width = ([len(tree)] for _ in range(len(tree)))
-    omits = ([k.startswith("_")] for k in tree)  # omits keys starting with `_`
-    return [LeafTrace(*x) for x in zip(names, types, index, width, omits)]
+    metas = ([{"repr": not k.startswith("_")}] for k in tree)
+    return [LeafTrace(*x) for x in zip(names, types, index, width, metas)]
 
 
 def _namedtuple_trace_func(tree: Any):
@@ -149,8 +149,8 @@ def _namedtuple_trace_func(tree: Any):
     types = ([type(getattr(tree, field))] for field in tree._fields)
     index = ([i] for i in range(len(tree)))
     width = ([len(tree)] for _ in range(len(tree)))
-    omits = ([False] for k in tree._fields)  # _ is not allowed in field names
-    return [LeafTrace(*x) for x in zip(names, types, index, width, omits)]
+    metas = ([None] for k in tree._fields)  # _ is not allowed in field names
+    return [LeafTrace(*x) for x in zip(names, types, index, width, metas)]
 
 
 def _jaxable_trace_func(tree: Any) -> Sequence[LeafTrace]:
@@ -160,7 +160,7 @@ def _jaxable_trace_func(tree: Any) -> Sequence[LeafTrace]:
     leaves, _ = _registry.get(type(tree)).to_iter(tree)
     traces = []
     for i, leaf in enumerate(leaves):
-        traces += [LeafTrace([f"leaf_{i}"], [type(leaf)], [i], [len(leaves)], [False])]
+        traces += [LeafTrace([f"leaf_{i}"], [type(leaf)], [i], [len(leaves)], [None])]
     return traces
 
 
