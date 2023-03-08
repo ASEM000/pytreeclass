@@ -4,13 +4,14 @@ import jax
 import jax.tree_util as jtu
 import pytest
 
-from pytreeclass._src.tree_pprint import _func_pprint, _node_pprint, _slice_pprint
-from pytreeclass._src.tree_viz_util import (
-    _calculate_node_info_stats,
+from pytreeclass._src.tree_pprint import (
     _format_count,
     _format_size,
+    _func_pprint,
     _hbox,
     _hstack,
+    _node_pprint,
+    _slice_pprint,
     _table,
     _vbox,
 )
@@ -19,7 +20,6 @@ from pytreeclass._src.tree_viz_util import (
 
 
 def test_vbox():
-
     assert _vbox("a", " a", "a ") == "┌──┐\n│a │\n├──┤\n│ a│\n├──┤\n│a │\n└──┘"
     assert _vbox("a", "b") == "┌─┐\n│a│\n├─┤\n│b│\n└─┘"
 
@@ -81,8 +81,3 @@ def test_slice_pprint():
     assert _slice_pprint(slice(0, 2, 2), 0, "str", 60) == "[0:2:2]"
     assert _slice_pprint(slice(None, 1, 2), 0, "str", 60) == "[:1:2]"
     assert _slice_pprint(slice(1, None, 2), 0, "str", 60) == "[1::2]"
-
-
-def test_calculate_node_info_stats():
-    with pytest.raises(TypeError):
-        _calculate_node_info_stats(1)

@@ -18,7 +18,6 @@ def _get_version():
 
 
 def _parse_requirements(path):
-
     with open(os.path.join(_CURRENT_DIR, path)) as f:
         return [
             line.rstrip() for line in f if not (line.isspace() or line.startswith("#"))

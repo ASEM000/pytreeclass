@@ -11,7 +11,6 @@ from pytreeclass._src.tree_decorator import _FIELD_MAP, _dataclass_like_fields
 
 
 def test_field():
-
     with pytest.raises(ValueError):
         pytc.field(default=1, default_factory=lambda: 1)
 
@@ -114,7 +113,6 @@ def test_field_nondiff():
             a=pytc.freeze(jnp.array([1, 2, 3])),
             b=pytc.freeze(jnp.array([4, 5, 6])),
         ):
-
             self.a = a
             self.b = b
 
@@ -287,7 +285,6 @@ def test_delattr():
 
 
 def test_is_tree_equal():
-
     assert pytc.is_tree_equal(1, 1)
     assert pytc.is_tree_equal(1, 2) is False
     assert pytc.is_tree_equal(1, 2.0) is False
@@ -339,7 +336,6 @@ def test_params():
 
 
 def test_mutable_field():
-
     with pytest.raises(TypeError):
 
         @pytc.treeclass
@@ -356,7 +352,6 @@ def test_non_class_input():
 
 
 def test_setattr_delattr():
-
     with pytest.raises(AttributeError):
 
         @pytc.treeclass
