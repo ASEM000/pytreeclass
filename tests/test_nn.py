@@ -12,7 +12,6 @@ import pytreeclass as pytc
 def test_nn():
     @pytc.treeclass
     class Linear:
-
         weight: jnp.ndarray
         bias: jnp.ndarray
 
@@ -65,7 +64,6 @@ def test_nn():
 def test_nn_with_func_input():
     @pytc.treeclass
     class Linear:
-
         weight: jnp.ndarray
         bias: jnp.ndarray
         act_func: Callable
@@ -90,7 +88,6 @@ def test_nn_with_func_input():
 def test_compact_nn():
     @pytc.treeclass
     class Linear:
-
         weight: jnp.ndarray
         bias: jnp.ndarray
 
@@ -106,7 +103,6 @@ def test_compact_nn():
     @pytc.treeclass
     class StackedLinear:
         def __init__(self, key, in_dim, out_dim, hidden_dim):
-
             keys = jax.random.split(key, 3)
 
             self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
@@ -147,7 +143,6 @@ def test_compact_nn():
 def test_freeze_nondiff():
     @pytc.treeclass
     class Linear:
-
         weight: jnp.ndarray
         bias: jnp.ndarray
         count: int = 0

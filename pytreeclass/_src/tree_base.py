@@ -24,22 +24,13 @@ from pytreeclass._src.tree_decorator import (
 from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
 from pytreeclass._src.tree_indexer import _tree_copy, _tree_indexer, bcmap
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
+from pytreeclass._src.tree_trace import LeafTrace, register_pytree_node_trace
 
 PyTree = Any
 
 
-def _flatten(tree) -> tuple[Any, tuple[str, dict[str, Any]]]:
-    """Flatten rule for `jax.tree_flatten`"""
-    # in essence anything not declared in dataclass fields will be considered static
-    static, dynamic = dict(getattr(tree, _VARS)), dict()
-    for key in getattr(tree, _FIELD_MAP):
-        dynamic[key] = static.pop(key)
-
-    return dynamic.values(), (dynamic.keys(), static)
-
-
-def _unflatten(klass, treedef, leaves):
-    """Unflatten rule for `jax.tree_unflatten`"""
+def _tree_unflatten(klass: type, treedef: jtu.PyTreeDef, leaves: list[Any]):
+    """Unflatten rule for `treeclass` to use with `jax.tree_unflatten`"""
     # call the wrapped `__new__` method (non-field initializer)
     tree = getattr(klass.__new__, _WRAPPED)(klass)
     # update through vars, to avoid calling the `setattr` method
@@ -47,6 +38,24 @@ def _unflatten(klass, treedef, leaves):
     getattr(tree, _VARS).update(treedef[1])
     getattr(tree, _VARS).update(zip(treedef[0], leaves))
     return tree
+
+
+def _tree_flatten(tree):
+    """Flatten rule for `treeclass` to use with `jax.tree_flatten`"""
+    static, dynamic = dict(getattr(tree, _VARS)), dict()
+    for key in getattr(tree, _FIELD_MAP):
+        dynamic[key] = static.pop(key)
+    return dynamic.values(), (dynamic.keys(), static)
+
+
+def _tree_trace(tree):
+    """Trace flatten rule for to be used with the `tree_trace` module"""
+    leaves, (keys, _) = _tree_flatten(tree)
+    names = ((f"{key}",) for key in keys)
+    types = ((type(leaf),) for leaf in leaves)
+    index = ((i,) for i in reversed(range(len(leaves))))
+    hidden = ((not getattr(tree, _FIELD_MAP)[key].repr,) for key in keys)
+    return [LeafTrace(*args) for args in zip(names, types, index, hidden)]
 
 
 @ft.lru_cache(maxsize=None)
@@ -58,7 +67,8 @@ def _register_treeclass(klass):
     # in that case `__init_subclass__` registers the class before the decorator registers it.
     # this can be also be done using metaclass that registers the class on initialization
     # but we are trying to stay away from deep magic.
-    jtu.register_pytree_node(klass, _flatten, ft.partial(_unflatten, klass))
+    jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))
+    register_pytree_node_trace(klass, _tree_trace)
     return klass
 
 
@@ -238,7 +248,6 @@ def _validate_class(klass: type) -> type:
 
 
 def _treeclass_transform(klass: type) -> type:
-
     # add custom `dataclass` field_map and frozen attributes to the class
     setattr(klass, _FIELD_MAP, _generate_field_map(klass))
     setattr(klass, _FROZEN, True)
@@ -381,7 +390,7 @@ def is_tree_equal(lhs: Any, rhs: Any) -> bool:
     if not (lhs_treedef == rhs_treedef):
         return False
 
-    for (lhs, rhs) in zip(lhs_leaves, rhs_leaves):
+    for lhs, rhs in zip(lhs_leaves, rhs_leaves):
         if isinstance(lhs, (jnp.ndarray, np.ndarray)):
             if isinstance(rhs, (jnp.ndarray, np.ndarray)):
                 if not np.array_equal(lhs, rhs):

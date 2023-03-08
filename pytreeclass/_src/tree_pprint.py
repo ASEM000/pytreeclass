@@ -4,8 +4,10 @@ import ctypes
 import functools as ft
 import inspect
 import math
+import sys
+from itertools import chain
 from types import FunctionType
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -15,17 +17,9 @@ from jax._src.custom_derivatives import custom_jvp
 from jaxlib.xla_extension import CompiledFunction
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_freeze import is_frozen
-from pytreeclass._src.tree_viz_util import (
-    _calculate_node_info_stats,
-    _dataclass_like_fields,
-    _format_count,
-    _format_size,
-    _format_width,
-    _is_dataclass_like,
-    _table,
-    _tree_trace,
-)
+from pytreeclass._src.tree_decorator import _dataclass_like_fields, _is_dataclass_like
+from pytreeclass._src.tree_freeze import is_frozen, unfreeze
+from pytreeclass._src.tree_trace import LeafTrace, tree_leaves_with_trace
 
 PyTree = Any
 MAX_DEPTH = float("inf")
@@ -306,20 +300,21 @@ def tree_diagram(tree, depth: int = MAX_DEPTH, width: int = 60):
     if not (isinstance(depth, int) or depth is MAX_DEPTH):
         raise TypeError(f"depth must be an integer, got {type(depth)}")
 
-    infos = _tree_trace(tree, depth)
+    traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen, depth=depth))
+
     fmt = f"{tree.__class__.__name__}"
 
-    for i, info in enumerate(infos):
-        # iterate over the leaves `NodeInfo` object
-        if not info.repr:
+    for i, (trace, leaf) in enumerate(zip(traces, leaves)):
+        if any(trace.hidden):
             continue
 
-        max_depth = len(info.names)
-        index = info.index
+        # iterate over the leaves `NodeInfo` object
+        max_depth = len(trace.names)
+        index = trace.index
 
-        for depth, (name, type_) in enumerate(zip(info.names, info.types)):
+        for depth, (name, type_) in enumerate(zip(trace.names, trace.types)):
             # skip printing the common parent node twice
-            if i > 0 and infos[i - 1].names[: depth + 1] == info.names[: depth + 1]:
+            if i > 0 and traces[i - 1].names[: depth + 1] == trace.names[: depth + 1]:
                 continue
 
             is_last = depth == max_depth - 1
@@ -327,15 +322,336 @@ def tree_diagram(tree, depth: int = MAX_DEPTH, width: int = 60):
             fmt += "\n\t"
             fmt += "".join(("" if index[i] == 0 else "│") + "\t" for i in range(depth))
             fmt += "├" if not index[depth] == 0 else "└"
-            mark = "#" if (info.frozen and is_last) else "─"
-            fmt += f"{mark}─ {_node_pprint(name,0,'str',width )}"
+            fmt += f"── {_node_pprint(name,0,'str',width )}"
             fmt += (
-                f"={_node_pprint(info.node,depth+2,'repr',width)}"
+                f"={_node_pprint(leaf,depth+2,'repr',width)}"
                 if is_last
                 else f":{type_.__name__}"
             )
 
     return fmt.expandtabs(4)
+
+
+def tree_mermaid(tree: PyTree, depth=MAX_DEPTH, width: int = 60) -> str:
+    # def _generate_mermaid_link(mermaid_string: str) -> str:
+    #     """generate a one-time link mermaid diagram"""
+    #     url_val = "https://pytreeclass.herokuapp.com/generateTemp"
+    #     request = requests.post(url_val, json={"description": mermaid_string})
+    #     generated_id = request.json()["id"]
+    #     generated_html = f"https://pytreeclass.herokuapp.com/temp/?id={generated_id}"
+    #     return f"Open URL in browser: {generated_html}"
+
+    """generate a mermaid diagram syntax of a pytree"""
+    if not (isinstance(depth, int) or depth is MAX_DEPTH):
+        raise TypeError(f"depth must be an integer, got {type(depth)}")
+
+    def bold_text(text: str) -> str:
+        # bold a text in ansci code
+        return "<b>" + text + "</b>"
+
+    def node_id(input):
+        """hash a value by its location in a tree. used to connect values in mermaid"""
+        return ctypes.c_size_t(hash(input)).value
+
+    traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen, depth=depth))
+    # in case of a single node tree or depth=0, avoid printing the node twice
+    # once for the trace and once for the summary
+
+    root_id = node_id((0, 0, -1, 0))
+    fmt = f"flowchart LR\n\tid{root_id}({bold_text(tree.__class__.__name__)})"
+    cur_id = None
+
+    for trace, leaf in zip(traces, leaves):
+        if any(trace.hidden):
+            continue
+
+        count, size = _calculate_leaf_trace_stats(trace, leaf)
+        count = _format_count(count) + " leaf"
+        size = _format_size(size)
+
+        for depth, (name, type_) in enumerate(zip(trace.names, trace.types)):
+            name = _node_pprint(name, 0, "str", width)
+
+            prev_id = root_id if depth == 0 else cur_id
+            cur_id = node_id((depth, tuple(trace.index), prev_id))
+            fmt += f"\n\tid{prev_id}"
+            stats = f'|"{count}<br>{size}"|' if depth == len(trace.names) - 1 else ""
+            fmt += "--->" + stats
+            is_last = depth == len(trace.names) - 1
+            value = f"={_node_pprint(leaf,0,'repr',width)}" if is_last else ""
+            fmt += f'id{cur_id}("{bold_text(name)}:{type_.__name__}{value}")'
+
+    return fmt.expandtabs(4)
+
+
+def _format_width(string, width=60):
+    """strip newline/tab characters if less than max width"""
+    children_length = len(string) - string.count("\n") - string.count("\t")
+    if children_length > width:
+        return string
+    return string.replace("\n", "").replace("\t", "")
+
+
+def _format_size(node_size, newline=False):
+    """return formatted size from inexact(exact) complex number
+
+    Examples:
+        >>> _format_size(1024)
+        '1.00KB'
+        >>> _format_size(1024**2)
+        '1.00MB'
+    """
+    mark = "\n" if newline else ""
+    order_kw = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+
+    if isinstance(node_size, complex):
+        # define order of magnitude
+        real_size_order = int(math.log(max(node_size.real, 1), 1024))
+        imag_size_order = int(math.log(max(node_size.imag, 1), 1024))
+        fmt = f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
+        fmt += f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
+        return fmt
+
+    if isinstance(node_size, (float, int)):
+        size_order = int(math.log(node_size, 1024)) if node_size > 0 else 0
+        return f"{(node_size)/(1024**size_order):.2f}{order_kw[size_order]}"
+
+    raise TypeError(f"node_size must be int or float, got {type(node_size)}")
+
+
+def _format_count(node_count, newline=False):
+    """return formatted count from inexact(exact) complex number
+
+    Examples:
+        >>> _format_count(1024)
+        '1,024'
+
+        >>> _format_count(1024**2)
+        '1,048,576'
+    """
+
+    mark = "\n" if newline else ""
+
+    if isinstance(node_count, complex):
+        return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
+
+    if isinstance(node_count, (float, int)):
+        return f"{int(node_count):,}"
+
+    raise TypeError(f"node_count must be int or float, got {type(node_count)}")
+
+
+def _calculate_leaf_trace_stats(
+    trace: LeafTrace, tree: Any
+) -> tuple[int | complex, int | complex]:
+    # calcuate some stats of a single subtree defined by the `NodeInfo` objects
+    # for each subtree, we will calculate the types distribution and their size
+    # stats = defaultdict(lambda: [0, 0])
+    if not isinstance(trace, LeafTrace):
+        raise TypeError(f"Expected `LeafTrace` object, but got {type(trace)}")
+
+    count = size = 0
+
+    traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen))
+
+    for trace, leaf in zip(traces, leaves):
+        # unfrozen leaf
+        leaf_ = unfreeze(leaf)
+        # array count is the product of the shape. if the node is not an array, then the count is 1
+        count_ = int(np.array(leaf_.shape).prod()) if hasattr(leaf_, "shape") else 1
+        size_ = leaf_.nbytes if hasattr(leaf_, "nbytes") else sys.getsizeof(leaf_)
+
+        if is_frozen(tree) or is_frozen(leaf):
+            count_ = complex(0, count_)
+            size_ = complex(0, size_)
+
+        count += count_
+        size += size_
+
+    return (count, size)
+
+
+# table printing
+
+
+def _hbox(*text) -> str:
+    """Create horizontally stacked text boxes
+
+    Examples:
+        >>> _hbox("a","b")
+        ┌─┬─┐
+        │a│b│
+        └─┴─┘
+    """
+    boxes = list(map(_vbox, text))
+    boxes = [(box).split("\n") for box in boxes]
+    max_col_height = max([len(b) for b in boxes])
+    boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
+    return "\n".join([_resolve_line(line) for line in zip(*boxes)])
+
+
+def _vbox(*text: tuple[str, ...]) -> str:
+    """Create vertically stacked text boxes
+
+    Returns:
+        str: stacked boxes string
+
+    Examples:
+        >>> _vbox("a","b")
+        ┌───┐
+        │a  │
+        ├───┤
+        │b  │
+        └───┘
+
+        >>> _vbox("a","","a")
+        ┌───┐
+        │a  │
+        ├───┤
+        │   │
+        ├───┤
+        │a  │
+        └───┘
+    """
+
+    max_width = (
+        max(chain.from_iterable([[len(t) for t in item.split("\n")] for item in text]))
+        + 0
+    )
+
+    top = f"┌{'─'*max_width}┐"
+    line = f"├{'─'*max_width}┤"
+    side = [
+        "\n".join([f"│{t}{' '*(max_width-len(t))}│" for t in item.split("\n")])
+        for item in text
+    ]
+    btm = f"└{'─'*max_width}┘"
+
+    fmt = ""
+
+    for i, s in enumerate(side):
+        if i == 0:
+            fmt += f"{top}\n{s}\n{line if len(side)>1 else btm}"
+
+        elif i == len(side) - 1:
+            fmt += f"\n{s}\n{btm}"
+
+        else:
+            fmt += f"\n{s}\n{line}"
+
+    return fmt
+
+
+def _hstack(*boxes):
+    """Create horizontally stacked text boxes
+
+    Examples:
+        >>> print(_hstack(_hbox("a"),_vbox("b","c")))
+        ┌─┬─┐
+        │a│b│
+        └─┼─┤
+          │c│
+          └─┘
+    """
+    boxes = [(box).split("\n") for box in boxes]
+    max_col_height = max([len(b) for b in boxes])
+    # expand height of each col before merging
+    boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
+    FMT = ""
+
+    _cells = tuple(zip(*boxes))
+
+    for i, line in enumerate(_cells):
+        FMT += _resolve_line(line) + ("\n" if i != (len(_cells) - 1) else "")
+
+    return FMT
+
+
+def _resolve_line(cols: Sequence[str]) -> str:
+    """combine columns of single line by merging their borders
+
+    Args:
+        cols (Sequence[str,...]): Sequence of single line column string
+
+    Returns:
+        str: resolved column string
+
+    Example:
+        >>> _resolve_line(['ab','b│','│c'])
+        'abb│c'
+
+        >>> _resolve_line(['ab','b┐','┌c'])
+        'abb┬c'
+
+    """
+
+    cols = list(map(list, cols))  # convert each col to col of chars
+    alpha = ["│", "┌", "┐", "└", "┘", "┤", "├"]
+
+    for index in range(len(cols) - 1):
+        if cols[index][-1] == "┐" and cols[index + 1][0] in ["┌", "─"]:
+            cols[index][-1] = "┬"
+            cols[index + 1].pop(0)
+
+        elif cols[index][-1] == "┘" and cols[index + 1][0] in ["└", "─"]:
+            cols[index][-1] = "┴"
+            cols[index + 1].pop(0)
+
+        elif cols[index][-1] == "┤" and cols[index + 1][0] in ["├", "─", "└"]:  #
+            cols[index][-1] = "┼"
+            cols[index + 1].pop(0)
+
+        elif cols[index][-1] in ["┘", "┐", "─"] and cols[index + 1][0] in ["├"]:
+            cols[index][-1] = "┼"
+            cols[index + 1].pop(0)
+
+        elif cols[index][-1] == "─" and cols[index + 1][0] == "└":
+            cols[index][-1] = "┴"
+            cols[index + 1].pop(0)
+
+        elif cols[index][-1] == "─" and cols[index + 1][0] == "┌":
+            cols[index][-1] = "┬"
+            cols[index + 1].pop(0)
+
+        elif cols[index][-1] == "│" and cols[index + 1][0] == "─":
+            cols[index][-1] = "├"
+            cols[index + 1].pop(0)
+
+        elif cols[index][-1] == " ":
+            cols[index].pop()
+
+        elif cols[index][-1] in alpha and cols[index + 1][0] in [*alpha, " "]:
+            cols[index + 1].pop(0)
+
+    return "".join(map(lambda x: "".join(x), cols))
+
+
+def _table(lines: Sequence[str]) -> str:
+    """create a table with self aligning rows and cols
+
+    Args:
+        lines (Sequence[str,...]): list of lists of cols values
+
+    Returns:
+        str: box string
+
+    Example:
+        >>> col1 = ['1\n','2']
+        >>> col2 = ['3','4000']
+        >>> print(_table([col1,col2]))
+        ┌─┬────────┐
+        │1│3       │
+        │ │        │
+        ├─┼────────┤
+        │2│40000000│
+        └─┴────────┘
+    """
+    for i, _cells in enumerate(zip(*lines)):
+        max_cell_height = max(map(lambda x: x.count("\n"), _cells))
+        for j in range(len(_cells)):
+            lines[j][i] += "\n" * (max_cell_height - lines[j][i].count("\n"))
+
+    return _hstack(*(_vbox(*col) for col in lines))
 
 
 def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
@@ -375,25 +691,23 @@ def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
 
     ROWS = [["Name", "Type", "Count", "Size"]]
 
-    # traverse the tree and collect info about each node
-    infos = _tree_trace(tree, depth)
+    traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen, depth=depth))
     # in case of a single node tree or depth=0, avoid printing the node twice
     # once for the trace and once for the summary
-    infos = infos if len(infos) > 1 else ()
+    traces = traces if len(traces) > 1 else ()
 
-    for info in infos:
-        if not info.repr:
-            # skip nodes that are not repr
+    for trace, leaf in zip(traces, leaves):
+        if any(trace.hidden):
             continue
 
-        path = ".".join(_node_pprint(i, 0, "str", width) for i in info.names)
+        path = ".".join(_node_pprint(i, 0, "str", width) for i in trace.names)
         row = [path.replace("].", "]").replace(".[", "[")]
 
         # type name row
-        row += [_node_type_pprint(pytc.unfreeze(info.node), 0, "str", width)]
+        row += [_node_type_pprint(pytc.unfreeze(leaf), 0, "str", width)]
 
         # count and size row
-        count, size = _calculate_node_info_stats(info)
+        count, size = _calculate_leaf_trace_stats(trace, leaf)
         leaves_count = _format_count(count.real + count.imag)
         leaves_size = _format_size(size.real + size.imag)
 
@@ -407,10 +721,10 @@ def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
     COUNT = [complex(0), complex(0)]  # non-frozen, frozen
     SIZE = [complex(0), complex(0)]
 
-    for info in _tree_trace(tree):
-        count, size = _calculate_node_info_stats(info)
-        COUNT[info.frozen] += count
-        SIZE[info.frozen] += size
+    for trace, leaf in tree_leaves_with_trace(tree, is_leaf=is_frozen):
+        count, size = _calculate_leaf_trace_stats(trace, leaf)
+        COUNT[is_frozen(leaf)] += count
+        SIZE[is_frozen(leaf)] += size
 
     unfrozen_count = COUNT[0].real + COUNT[0].imag
     frozen_count = COUNT[1].real + COUNT[1].imag
@@ -440,53 +754,3 @@ def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
     COLS = [list(c) for c in zip(*ROWS)]
     layer_table = _table(COLS)
     return layer_table.expandtabs(8)
-
-
-def tree_mermaid(tree: PyTree, depth=MAX_DEPTH, width: int = 60) -> str:
-    # def _generate_mermaid_link(mermaid_string: str) -> str:
-    #     """generate a one-time link mermaid diagram"""
-    #     url_val = "https://pytreeclass.herokuapp.com/generateTemp"
-    #     request = requests.post(url_val, json={"description": mermaid_string})
-    #     generated_id = request.json()["id"]
-    #     generated_html = f"https://pytreeclass.herokuapp.com/temp/?id={generated_id}"
-    #     return f"Open URL in browser: {generated_html}"
-
-    """generate a mermaid diagram syntax of a pytree"""
-    if not (isinstance(depth, int) or depth is MAX_DEPTH):
-        raise TypeError(f"depth must be an integer, got {type(depth)}")
-
-    def bold_text(text: str) -> str:
-        # bold a text in ansci code
-        return "<b>" + text + "</b>"
-
-    def node_id(input):
-        """hash a value by its location in a tree. used to connect values in mermaid"""
-        return ctypes.c_size_t(hash(input)).value
-
-    infos = _tree_trace(tree, depth)
-
-    root_id = node_id((0, 0, -1, 0))
-    fmt = f"flowchart LR\n\tid{root_id}({bold_text(tree.__class__.__name__)})"
-    cur_id = None
-
-    for info in infos:
-        if not info.repr:
-            continue
-
-        count, size = _calculate_node_info_stats(info)
-        count = _format_count(count) + " leaf"
-        size = _format_size(size)
-
-        for depth, (name, type_) in enumerate(zip(info.names, info.types)):
-            name = _node_pprint(name, 0, "str", width)
-            prev_id = root_id if depth == 0 else cur_id
-            cur_id = node_id((depth, tuple(info.index), prev_id))
-            mark = "-..-" if info.frozen else "--->"
-            fmt += f"\n\tid{prev_id}"
-            stats = f'|"{count}<br>{size}"|' if depth == len(info.names) - 1 else ""
-            fmt += f"{mark}" + stats
-            is_last = depth == len(info.names) - 1
-            value = f"={_node_pprint(info.node,0,'repr',width)}" if is_last else ""
-            fmt += f'id{cur_id}("{bold_text(name)}:{type_.__name__}{value}")'
-
-    return fmt.expandtabs(4)
