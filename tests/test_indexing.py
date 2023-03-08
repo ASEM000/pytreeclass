@@ -442,6 +442,57 @@ def test_attribute_error():
         t.at["[b"].get()
 
 
+def test_indexget():
+    @pytc.treeclass
+    class l0:
+        a: int = 2
+
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: l0 = l0()
+
+    t = Test()
+    assert pytc.is_tree_equal(t.at[0].get(), Test(1, l0(None)))
+    assert pytc.is_tree_equal(t.at[1].at[0].get(), Test(None, l0(2)))
+
+
+def test_index_set():
+    @pytc.treeclass
+    class l0:
+        a: int = 2
+
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: l0 = l0()
+
+    t = Test()
+    t.at["a"].set(10)
+
+    assert pytc.is_tree_equal(t, Test())
+    assert pytc.is_tree_equal(t.at[0].set(10), Test(10, l0()))
+    assert pytc.is_tree_equal(t.at[1].at[0].set(100), Test(1, l0(100)))
+
+
+def test_index_apply():
+    @pytc.treeclass
+    class l0:
+        a: int = 2
+
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: l0 = l0()
+
+    t = Test()
+    t.at["a"].apply(lambda _: 10)
+
+    assert pytc.is_tree_equal(t, Test())
+    assert pytc.is_tree_equal(t.at[0].apply(lambda _: 10), Test(10))
+    assert pytc.is_tree_equal(t.at[1].at[0].apply(lambda _: 100), Test(1, l0(100)))
+
+
 def test_mixed_get():
     @pytc.treeclass
     class l0:
@@ -454,8 +505,8 @@ def test_mixed_get():
         b: l0 = l0()
 
     t = Test()
-    assert pytc.is_tree_equal(t.at["b"].at[t == 2].get(), Test(None, l0(2, None)))
-    assert pytc.is_tree_equal(t.at[t == 2].at["b"].get(), Test(None, l0(2, None)))
+    assert pytc.is_tree_equal(t.at[1].at[t == 2].get(), Test(None, l0(2, None)))
+    assert pytc.is_tree_equal(t.at[t == 2].at[1].get(), Test(None, l0(2, None)))
 
 
 def test_mixed_set():
@@ -473,6 +524,10 @@ def test_mixed_set():
 
     assert pytc.is_tree_equal(t.at["b"].at[t == 2].set(100), Test(1, l0(100, 2)))
     assert pytc.is_tree_equal(t.at[t == 2].at["b"].set(100), Test(1, l0(100, 2)))
+    assert pytc.is_tree_equal(t.at[1].at[t == 2].set(100), Test(1, l0(100, 2)))
+    assert pytc.is_tree_equal(t.at[t == 2].at[1].set(100), Test(1, l0(100, 2)))
+    assert pytc.is_tree_equal(t.at["b"].at[0].set(100), Test(1, l0(100, 2)))
+    assert pytc.is_tree_equal(t.at[0].at["b"].set(100), Test(1, l0(100, 2)))
 
 
 def test_mixed_apply():
@@ -494,6 +549,13 @@ def test_mixed_apply():
     assert pytc.is_tree_equal(
         t.at[t == 2].at["a"].apply(lambda _: 100), Test(1, l0(100))
     )
+
+    assert pytc.is_tree_equal(
+        t.at[1].at[t == 2].apply(lambda _: 100), Test(1, l0(100, 2))
+    )
+    assert pytc.is_tree_equal(t.at[t == 2].at[0].apply(lambda _: 100), Test(1, l0(100)))
+    assert pytc.is_tree_equal(t.at["b"].at[0].apply(lambda _: 100), Test(1, l0(100, 2)))
+    assert pytc.is_tree_equal(t.at[0].at["a"].apply(lambda _: 100), Test(1, l0(100)))
 
 
 def test_method_call():
@@ -556,11 +618,10 @@ def test_repr_str():
 
     t = Test()
 
-    assert repr(t.at["a"]) == "TreeAtName(tree=Test(a=1, b=2), where=('a',))"
-    assert str(t.at["a"]) == "TreeAtName(tree=Test(a=1, b=2), where=('a',))"
+    assert repr(t.at["a"]) == "TreeAtPath(tree=Test(a=1, b=2), where=('a',))"
+    assert str(t.at["a"]) == "TreeAtPath(tree=Test(a=1, b=2), where=('a',))"
     assert (
-        repr(t.at[...])
-        == "TreeAtPyTree(tree=Test(a=1, b=2), where=Test(a=True, b=True))"
+        repr(t.at[...]) == "TreeAtMask(tree=Test(a=1, b=2), where=Test(a=True, b=True))"
     )
 
 
