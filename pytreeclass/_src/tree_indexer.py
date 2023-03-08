@@ -160,7 +160,7 @@ def _at_mask(tree: PyTree, where: PyTree) -> PyTree:
     class TreeAtMask(_TreeAtMask):
         def __getitem__(lhs_self, rhs_where: str | int | PyTree):
             if isinstance(rhs_where, (str, int)):
-                # promote `rhs` name path to boolean mask
+                # promote `rhs` path to boolean mask
                 mask = lhs_self.tree != lhs_self.tree
                 mask = mask.at[rhs_where].set(True)
                 rhs_where = mask
@@ -170,8 +170,6 @@ def _at_mask(tree: PyTree, where: PyTree) -> PyTree:
 
         def __getattr__(lhs_self, name):
             # support for nested `.at`
-            # e.g. `tree.at[tree>0].at[tree == str ]
-            # corrsponds to (tree>0 and tree == str`)
             if name == "at":
                 # pass the current where condition to the next level
                 return TreeAtMask(tree=tree, where=lhs_self.where)
@@ -186,9 +184,6 @@ def _at_mask(tree: PyTree, where: PyTree) -> PyTree:
 # tree indexing by name or index  path
 
 
-# tree indexing by name/int path
-
-
 def _get_at_path(
     tree: PyTree,
     where: tuple[int | str, ...],
@@ -200,19 +195,11 @@ def _get_at_path(
     def map_func(trace, leaf):
         for i, item in enumerate(where):
             if i >= len(trace.index):
-                # check if the path is less than
-                # the tree depth
                 return None
-
-            if isinstance(item, int):
-                # integer marks a node index
-                if trace.index[i] != item:
-                    return None
-            elif isinstance(item, str):
-                # string marks a node name
-                if trace.names[i] != item:
-                    return None
-
+            if isinstance(item, int) and trace.index[i] != item:
+                return None
+            if isinstance(item, str) and trace.names[i] != item:
+                return None
         return leaf
 
     return tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
@@ -235,7 +222,6 @@ def _set_at_path(
                 return leaf
             if isinstance(item, str) and trace.names[i] != item:
                 return leaf
-
         return set_value
 
     return tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
@@ -258,7 +244,6 @@ def _apply_at_path(
                 return leaf
             if isinstance(item, str) and trace.names[i] != item:
                 return leaf
-
         return func(leaf)
 
     return tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
@@ -278,15 +263,12 @@ def _reduce_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if isinstance(item, int):
-                # integer marks a node index
-                if trace.index[i] != item:
-                    return None
-            elif isinstance(item, str):
-                # string marks a node name
-                if trace.names[i] != item:
-                    return None
-
+            if i >= len(trace.index):
+                return None
+            if isinstance(item, int) and trace.index[i] != item:
+                return None
+            if isinstance(item, str) and trace.names[i] != item:
+                return None
         return leaf
 
     tree = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
