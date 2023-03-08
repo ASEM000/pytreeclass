@@ -22,7 +22,6 @@ from pytreeclass._src.tree_freeze import is_frozen, unfreeze
 from pytreeclass._src.tree_trace import LeafTrace, tree_leaves_with_trace
 
 PyTree = Any
-MAX_DEPTH = float("inf")
 
 
 def _node_pprint(node: Any, depth: int, kind: str, width: int) -> str:
@@ -260,7 +259,7 @@ def tree_str(tree: PyTree, *, width: int = 80, indent: int = 2) -> str:
     return _node_pprint(tree, depth=0, kind="str", width=width).expandtabs(indent)
 
 
-def tree_diagram(tree, depth: int = MAX_DEPTH, width: int = 60):
+def tree_diagram(tree, depth: int | None = None, width: int = 60):
     """Pretty print treeclass tree with tree structure diagram
 
     Args:
@@ -297,42 +296,42 @@ def tree_diagram(tree, depth: int = MAX_DEPTH, width: int = 60):
                 ├── [1]:int=30
                 └── [2]:A=A(x=10, y=(20, 30), z=40)
     """
-    if not (isinstance(depth, int) or depth is MAX_DEPTH):
-        raise TypeError(f"depth must be an integer, got {type(depth)}")
+    if not (isinstance(depth, int) or depth is None):
+        raise TypeError(f"depth must be an integer or `None`, got {type(depth)}")
 
     traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen, depth=depth))
 
     fmt = f"{tree.__class__.__name__}"
 
     for i, (trace, leaf) in enumerate(zip(traces, leaves)):
-        if any(trace.hidden):
+        if any(trace.omits):
             continue
 
         # iterate over the leaves `NodeInfo` object
         max_depth = len(trace.names)
-        index = trace.index
 
         for depth, (name, type_) in enumerate(zip(trace.names, trace.types)):
             # skip printing the common parent node twice
             if i > 0 and traces[i - 1].names[: depth + 1] == trace.names[: depth + 1]:
                 continue
 
-            is_last = depth == max_depth - 1
-
             fmt += "\n\t"
-            fmt += "".join(("" if index[i] == 0 else "│") + "\t" for i in range(depth))
-            fmt += "├" if not index[depth] == 0 else "└"
+            fmt += "".join(
+                ("" if trace.index[i] == (trace.width[i] - 1) else "│") + "\t"
+                for i in range(depth)
+            )
+            fmt += "└" if trace.index[depth] == (trace.width[depth] - 1) else "├"
             fmt += f"── {_node_pprint(name,0,'str',width )}"
             fmt += (
                 f"={_node_pprint(leaf,depth+2,'repr',width)}"
-                if is_last
+                if (depth == max_depth - 1)
                 else f":{type_.__name__}"
             )
 
     return fmt.expandtabs(4)
 
 
-def tree_mermaid(tree: PyTree, depth=MAX_DEPTH, width: int = 60) -> str:
+def tree_mermaid(tree: PyTree, depth=None, width: int = 60) -> str:
     # def _generate_mermaid_link(mermaid_string: str) -> str:
     #     """generate a one-time link mermaid diagram"""
     #     url_val = "https://pytreeclass.herokuapp.com/generateTemp"
@@ -342,8 +341,8 @@ def tree_mermaid(tree: PyTree, depth=MAX_DEPTH, width: int = 60) -> str:
     #     return f"Open URL in browser: {generated_html}"
 
     """generate a mermaid diagram syntax of a pytree"""
-    if not (isinstance(depth, int) or depth is MAX_DEPTH):
-        raise TypeError(f"depth must be an integer, got {type(depth)}")
+    if not (isinstance(depth, int) or depth is None):
+        raise TypeError(f"depth must be an integer or `None`, got {type(depth)}")
 
     def bold_text(text: str) -> str:
         # bold a text in ansci code
@@ -362,7 +361,7 @@ def tree_mermaid(tree: PyTree, depth=MAX_DEPTH, width: int = 60) -> str:
     cur_id = None
 
     for trace, leaf in zip(traces, leaves):
-        if any(trace.hidden):
+        if any(trace.omits):
             continue
 
         count, size = _calculate_leaf_trace_stats(trace, leaf)
@@ -654,7 +653,7 @@ def _table(lines: Sequence[str]) -> str:
     return _hstack(*(_vbox(*col) for col in lines))
 
 
-def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
+def tree_summary(tree: PyTree, *, depth=None, width: int = 60) -> str:
     """Print a summary of a pytree structure
 
     Args:
@@ -674,20 +673,20 @@ def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
 
     Example:
         >>> print(pytc.tree_summary([1,[2,[3]]]))
-        ┌─────────┬────┬─────────────┬─────────────┐
-        │Name     │Type│Count(Frozen)│Size(Frozen) │
-        ├─────────┼────┼─────────────┼─────────────┤
-        │[0]      │int │1(0)         │28.00B(0.00B)│
-        ├─────────┼────┼─────────────┼─────────────┤
-        │[1][0]   │int │1(0)         │28.00B(0.00B)│
-        ├─────────┼────┼─────────────┼─────────────┤
-        │[1][1][0]│int │1(0)         │28.00B(0.00B)│
-        ├─────────┼────┼─────────────┼─────────────┤
-        │Σ        │list│3(0)         │84.00B(0.00B)│
-        └─────────┴────┴─────────────┴─────────────┘
+        ┌─────────┬────┬─────┬──────┐
+        │Name     │Type│Count│Size  │
+        ├─────────┼────┼─────┼──────┤
+        │[0]      │int │1    │28.00B│
+        ├─────────┼────┼─────┼──────┤
+        │[1][0]   │int │1    │28.00B│
+        ├─────────┼────┼─────┼──────┤
+        │[1][1][0]│int │1    │28.00B│
+        ├─────────┼────┼─────┼──────┤
+        │Σ        │list│3    │84.00B│
+        └─────────┴────┴─────┴──────┘
     """
-    if not (isinstance(depth, int) or depth is MAX_DEPTH):
-        raise TypeError(f"depth must be an integer, got {type(depth)}")
+    if not (isinstance(depth, int) or depth is None):
+        raise TypeError(f"depth must be an integer or `None`, got {type(depth)}")
 
     ROWS = [["Name", "Type", "Count", "Size"]]
 
@@ -697,7 +696,7 @@ def tree_summary(tree: PyTree, *, depth=MAX_DEPTH, width: int = 60) -> str:
     traces = traces if len(traces) > 1 else ()
 
     for trace, leaf in zip(traces, leaves):
-        if any(trace.hidden):
+        if any(trace.omits):
             continue
 
         path = ".".join(_node_pprint(i, 0, "str", width) for i in trace.names)

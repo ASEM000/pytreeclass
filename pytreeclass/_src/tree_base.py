@@ -51,11 +51,12 @@ def _tree_flatten(tree):
 def _tree_trace(tree):
     """Trace flatten rule for to be used with the `tree_trace` module"""
     leaves, (keys, _) = _tree_flatten(tree)
-    names = ((f"{key}",) for key in keys)
-    types = ((type(leaf),) for leaf in leaves)
-    index = ((i,) for i in reversed(range(len(leaves))))
-    hidden = ((not getattr(tree, _FIELD_MAP)[key].repr,) for key in keys)
-    return [LeafTrace(*args) for args in zip(names, types, index, hidden)]
+    names = ([f"{key}"] for key in keys)
+    klass = ([type(leaf)] for leaf in leaves)
+    index = ([i] for i in range(len(leaves)))
+    width = ([len(leaves)] for _ in range(len(leaves)))
+    omits = ([not getattr(tree, _FIELD_MAP)[key].repr] for key in keys)
+    return [LeafTrace(*args) for args in zip(names, klass, index, width, omits)]
 
 
 @ft.lru_cache(maxsize=None)

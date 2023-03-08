@@ -11,15 +11,6 @@ from jax._src.tree_util import _registry
 # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
 
 
-# This code extends the `jax.tree_util` module to support `tree_viz` and `tree_indexer` functionality.
-# It defines a `LeafTrace` namedtuple that identifies a node in a tree and provides the (1) name path,
-# (2) type path, (3) index path, and a (4) hidden flag for each level of the tree. The module also registers node
-# trace flatten functions for different Python data types using the `_TraceRegistryEntry` namedtuple.
-# It provides functions such as `tree_leaves_with_trace`, `tree_flatten_with_trace`, and `tree_map_with_trace`
-# that are similar to their `jax.tree_util` counterparts but also include the `LeafTrace` objects.
-# moreover, the tracing can provide extra functionality to relate between differnt nodes in the tree through
-# the `LeafTrace` objects.
-
 # ** Example usage **
 # >>> tree = {"a": {"b": ([1, 2])}}
 
@@ -35,9 +26,8 @@ from jax._src.tree_util import _registry
 
 # >>> for trace,leaf in tree_leaves_with_trace(tree):
 # ...    print(trace.index)
-# (0, 0, 1)
 # (0, 0, 0)
-# ** note ** the index is reversed for each level of the tree so that the last child is always 0
+# (0, 0, 1)
 
 
 PyTree = Any
@@ -50,36 +40,38 @@ class _TraceRegistryEntry(NamedTuple):
 
 
 class LeafTrace(NamedTuple):
-    names: tuple[str, ...]  # name path in each level of the tree
-    types: tuple[type, ...]  # types of nodes in each level
-    index: tuple[int, ...]  # reversed index of the node in each level. last child:=0
-    hidden: tuple[bool, ...]  # wheather to omit this trace at this level
+    names: Sequence[str]  # name of the node in each level
+    types: Sequence[type]  # type of the node in each level
+    index: Sequence[int]  # index of the node in the tree in each level
+    width: Sequence[int]  # number of children in each level
+    omits: Sequence[bool]  # a flag to indicate if the node is omitted in each level
 
 
-EmptyTrace = LeafTrace((), (), (), ())
+EmptyTrace = LeafTrace((), (), (), (), ())
 
 
 def register_pytree_node_trace(
     klass: type, trace_func: Callable[[Any], Sequence[LeafTrace]]
 ):
     if not isinstance(klass, type):
-        raise TypeError(f"Expected `klass` to be a type, got {type(klass)}")
+        raise TypeError(f"Expected `klass` to be a type, got {type(klass)}.")
     if klass in _trace_registry:
-        raise ValueError(f"Node trace flatten function for {klass} already registered")
+        raise ValueError(f"Node trace flatten function for {klass} already registered.")
     # register the node trace flatten function to the node trace registry
     _trace_registry[klass] = _TraceRegistryEntry(trace_func)
 
 
 def flatten_one_trace_level(
-    trace: LeafTrace,
+    tree_trace: LeafTrace,
     tree: PyTree,
     *,
     is_leaf: Callable[[Any], bool] | None,
     depth: int | None,
 ):
     # addition to `is_leaf` condtion , `depth`` is also useful for `tree_viz` utils
+    # However, can not be used for any function that works with `treedef` objects
     if (is_leaf is not None and is_leaf(tree)) or (depth is not None and depth < 1):
-        yield trace, tree
+        yield tree_trace, tree
         return
 
     leaves_handler = _registry.get(type(tree))
@@ -87,32 +79,35 @@ def flatten_one_trace_level(
     if leaves_handler:
         leaves, _ = leaves_handler.to_iter(tree)
 
-        if type(tree) in _trace_registry:
-            # trace handler for the current tree
-            # defaults to `_registered_jax_trace_func`
-            traces = _trace_registry[type(tree)].to_iter(tree)
-        else:
-            # in case where a class is registered in `jax` but not in `trace` registry
-            # then fill the trace with arbitrary `LeafTrace` objects
-            traces = _registered_jax_trace_func(tree)
+        # if type(tree) in _trace_registry:
+        # trace handler for the current tree
+        # defaults to `_jaxable_trace_func`
+        traces = (
+            _trace_registry[type(tree)].to_iter(tree)
+            if type(tree) in _trace_registry
+            else _jaxable_trace_func(tree)
+        )
 
-        for leaf_trace, leaf in zip(traces, leaves):
-            names = (*trace.names, *leaf_trace.names)
-            types = (*trace.types, *leaf_trace.types)
-            index = (*trace.index, *leaf_trace.index)
-            hidden = (*trace.hidden, *leaf_trace.hidden)
-            yield from flatten_one_trace_level(
-                trace=LeafTrace(names, types, index, hidden),
-                tree=leaf,
-                is_leaf=is_leaf,
-                depth=(depth - 1) if depth is not None else None,
-            )
+    elif isinstance(tree, tuple) and hasattr(tree, "_fields"):
+        leaves = [getattr(tree, field) for field in tree._fields]
+        traces = _namedtuple_trace_func(tree)
 
-    # TODO: add support for namedtuple following `jax.tree_util` code
-
-    # following code is adapted from jax.tree_util
     elif tree is not None:
-        yield (trace, tree)
+        yield (tree_trace, tree)
+        return
+
+    for trace, leaf in zip(traces, leaves):
+        names = (*tree_trace.names, *trace.names)
+        types = (*tree_trace.types, *trace.types)
+        index = (*tree_trace.index, *trace.index)
+        width = (*tree_trace.width, *trace.width)
+        omits = (*tree_trace.omits, *trace.omits)
+        yield from flatten_one_trace_level(
+            tree_trace=LeafTrace(names, types, index, width, omits),
+            tree=leaf,
+            is_leaf=is_leaf,
+            depth=(depth - 1) if depth is not None else None,
+        )
 
 
 def tree_leaves_with_trace(
@@ -125,38 +120,45 @@ def tree_leaves_with_trace(
 def tree_flatten_with_trace(tree: PyTree, is_leaf: Callable[[Any], bool] | None = None):
     """Similar to jax.tree_util.tree_flatten` but returns the `LeafTrace` objects too as well"""
     tree_def = jtu.tree_structure(tree, is_leaf=is_leaf)
-    leaves_trace = tree_leaves_with_trace(tree, is_leaf=is_leaf)
-    return leaves_trace, tree_def
+    traces_leaves = tree_leaves_with_trace(tree, is_leaf=is_leaf)
+    return traces_leaves, tree_def
 
 
 def _sequence_trace_func(tree: Sequence) -> Sequence[LeafTrace]:
-    names = ((f"[{i}]",) for i in range(len(tree)))
-    types = ((type(value),) for value in tree)
-    index = ((i,) for i in reversed(range(len(tree))))
-    hidden = ((False,) for _ in range(len(tree)))
-    return [LeafTrace(*x) for x in zip(names, types, index, hidden)]
+    names = ([f"[{i}]"] for i in range(len(tree)))
+    types = ([type(value)] for value in tree)
+    index = ([i] for i in range(len(tree)))
+    width = ([len(tree)] for _ in range(len(tree)))
+    omits = ([False] for _ in range(len(tree)))
+    return [LeafTrace(*x) for x in zip(names, types, index, width, omits)]
 
 
 def _dict_trace_func(tree: dict) -> Sequence[LeafTrace]:
-    names = ((f"['{k}']",) for k in tree)
-    types = ((type(tree[key]),) for key in tree)
-    index = ((i,) for i in reversed(range(len(tree))))
-    hidden = ((k.startswith("_"),) for k in tree)  # omit keys starting with `_`
-    return [LeafTrace(*x) for x in zip(names, types, index, hidden)]
+    names = ([f"['{k}']"] for k in tree)
+    types = ([type(tree[key])] for key in tree)
+    index = ([i] for i in range(len(tree)))
+    width = ([len(tree)] for _ in range(len(tree)))
+    omits = ([k.startswith("_")] for k in tree)  # omits keys starting with `_`
+    return [LeafTrace(*x) for x in zip(names, types, index, width, omits)]
 
 
-def _registered_jax_trace_func(tree: Any) -> Sequence[LeafTrace]:
+def _namedtuple_trace_func(tree: Any):
+    names = ([f"['{field}']"] for field in tree._fields)
+    types = ([type(getattr(tree, field))] for field in tree._fields)
+    index = ([i] for i in range(len(tree)))
+    width = ([len(tree)] for _ in range(len(tree)))
+    omits = ([False] for k in tree._fields)  # _ is not allowed in field names
+    return [LeafTrace(*x) for x in zip(names, types, index, width, omits)]
+
+
+def _jaxable_trace_func(tree: Any) -> Sequence[LeafTrace]:
     # fallback trace function in case no trace function is registered for a given
     # class in the `trace` registry
     # get leaves from the `jax` registry
     leaves = _registry.get(type(tree)).to_iter(tree)
     traces = []
     for i, leaf in enumerate(leaves):
-        names = (f"leaf_{i}",)
-        types = (type(leaf),)
-        index = (len(leaves) - i - 1,)
-        hidden = (False,)
-        traces += [LeafTrace(names, types, index, hidden)]
+        traces += [LeafTrace([f"leaf_{i}"], [type(leaf)], [i], [len(leaves)], [False])]
     return traces
 
 
