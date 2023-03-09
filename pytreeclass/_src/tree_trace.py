@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict, defaultdict
 from typing import Any, Callable, NamedTuple, Sequence
 
 import jax.tree_util as jtu
@@ -164,9 +165,12 @@ def _jaxable_trace_func(tree: Any) -> Sequence[LeafTrace]:
     return traces
 
 
+# register trace functions for common types
 register_pytree_node_trace(tuple, _sequence_trace_func)
 register_pytree_node_trace(list, _sequence_trace_func)
 register_pytree_node_trace(dict, _dict_trace_func)
+register_pytree_node_trace(OrderedDict, _dict_trace_func)
+register_pytree_node_trace(defaultdict, _dict_trace_func)
 
 
 def tree_map_with_trace(
