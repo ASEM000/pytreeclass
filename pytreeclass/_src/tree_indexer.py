@@ -356,20 +356,10 @@ def _is_valid_name(s):
 def tree_indexer(tree: PyTree) -> PyTree:
     class AtIndexer:
         def __getitem__(_, where):
-            if isinstance(where, str):
-                if not _is_valid_name(where):
-                    # while `where` does not strictly need to be a valid python
-                    # attribute name, it is a good idea to enforce this to avoid
-                    # confusion. for instance indexing for a list can be done
-                    # like tree.at["[0]"], as the trace name for a list item is
-                    # "[0]". However, this should be avoided.and integer indexing
-                    # should be used instead.
-                    raise AttributeError(f"{where} is not a valid attribute name.")
-
-                return _at_path(tree=tree, where=(where,))
-
-            if isinstance(where, int):
-                # the case for indexing based on node index
+            if isinstance(where, (str, int)):
+                # indexing by name or index
+                # name and index rules are defined using
+                # `register_pytree_node_trace_func`
                 return _at_path(tree=tree, where=(where,))
 
             if isinstance(where, type(tree)):

@@ -241,7 +241,8 @@ def _node_type_pprint(node: type, depth: int, kind: Kind, width: int) -> str:
 def _should_omit_trace(trace: LeafTrace) -> bool:
     for meta in trace.metas:
         if isinstance(meta, dict) and "repr" in meta:
-            return meta["repr"] is False
+            if meta["repr"] is False:
+                return True
     return False
 
 

@@ -286,12 +286,15 @@ def _auxiliary_transform(klass: type, *, mask: bool, index: bool) -> type:
     attrs["__repr__"] = tree_repr
     attrs["__str__"] = tree_str
 
-    if index:
-        attrs["at"] = property(tree_indexer)
-
     # hashing and copying
     attrs["__copy__"] = _tree_copy
     attrs["__hash__"] = _tree_hash
+
+    if index:
+        # index defines `at` functionality to
+        # index a PyTree by integer, name, or by a boolean
+        # mask level wise
+        attrs["at"] = property(tree_indexer)
 
     if mask:
         attrs["__abs__"] = bcmap(op.abs)
