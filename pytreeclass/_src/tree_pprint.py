@@ -87,10 +87,10 @@ def _shape_dtype_struct_pprint(
 
     shape = (
         f"{node.shape}".replace(",", "")
-        .replace("(", "{")
-        .replace(")", "}")
-        .replace(" ", "x")
-        .replace("{}", "{0}")
+        .replace("(", "[")
+        .replace(")", "]")
+        .replace(" ", ",")
+        .replace("[]", "[0]")
     )
     if issubclass(node.dtype.type, np.integer):
         fmt = f"{node.dtype}".replace("int", "i") + shape
@@ -119,24 +119,18 @@ def _numpy_pprint(
     # this part of the function is inspired by
     # lovely-jax https://github.com/xl0/lovely-jax
 
-    # get min, max, mean, std of node
+    # handle interval
     low, high = np.min(node), np.max(node)
-    # add brackets to indicate closed/open interval
     interval = "(" if math.isinf(low) else "["
-    # if issubclass(node.dtype.type, np.integer):
-    # if integer, round to nearest integer
-    interval += (
-        f"{low},{high}"
-        if issubclass(node.dtype.type, np.integer)
-        else f"{low:.1f},{high:.1f}"
-    )
+    is_integer = issubclass(node.dtype.type, np.integer)
+    interval += f"{low},{high}" if is_integer else f"{low:.2f},{high:.2f}"
+    interval += ")" if math.isinf(high) else "]"  # resolve closed/open interval
+    interval = interval.replace("inf", "∞")  # replace inf with infinity symbol
 
-    # add brackets to indicate closed/open interval
-    interval += ")" if math.isinf(high) else "]"
-    # replace inf with infinity symbol
-    interval = interval.replace("inf", "∞")
-    # return extended repr
-    return _format_width(f"{base}∈{interval}", width)
+    # handle mean and std
+    mean, std = f"{np.mean(node):.2f}", f"{np.std(node):.2f}"
+
+    return _format_width(f"{base}(μ={mean}, σ={std}, ∈{interval})", width)
 
 
 @ft.lru_cache
@@ -268,6 +262,16 @@ def tree_str(tree: PyTree, *, width: int = 80, indent: int = 2) -> str:
     return _node_pprint(tree, depth=0, kind="str", width=width).expandtabs(indent)
 
 
+def _resolve_names(trace: LeafTrace, width: int) -> str:
+    # given a trace with a tuple of names, we resolve the names
+    # to a single string
+    path = trace.names[0]
+    for name in trace.names[1:]:
+        path += "" if name.startswith("[") else "."
+        path += _node_pprint(name, 0, "str", width)
+    return path
+
+
 def tree_diagram(tree, depth: int | None = None, width: int = 60):
     """Pretty print treeclass tree with tree structure diagram
 
@@ -310,14 +314,11 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
 
     traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen, depth=depth))
 
-    fmt = f"{tree.__class__.__name__}"
+    fmt = f"{type(tree).__name__}"
 
     for i, (trace, leaf) in enumerate(zip(traces, leaves)):
         if _should_omit_trace(trace):
             continue
-
-        # iterate over the leaves `NodeInfo` object
-        max_depth = len(trace.names)
 
         for depth, (name, type_) in enumerate(zip(trace.names, trace.types)):
             # skip printing the common parent node twice
@@ -325,17 +326,30 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
                 continue
 
             fmt += "\n\t"
-            fmt += "".join(
-                ("" if trace.index[i] == (trace.width[i] - 1) else "│") + "\t"
-                for i in range(depth)
-            )
+
+            for di in range(depth):
+                # handle printing the left lines for each depth
+                if trace.index[di] == trace.width[di] - 1:
+                    # do not print the left line
+                    # └── A
+                    #     └── B
+                    fmt += " \t"
+                else:
+                    # print the left line
+                    # ├── A
+                    # │   └── B
+                    # └── C
+                    fmt += "│\t"
+
             fmt += "└" if trace.index[depth] == (trace.width[depth] - 1) else "├"
             fmt += f"── {_node_pprint(name,0,'str',width )}"
-            fmt += (
-                f"={_node_pprint(leaf,depth+2,'repr',width)}"
-                if (depth == max_depth - 1)
-                else f":{type_.__name__}"
-            )
+
+            if depth == len(trace.names) - 1:
+                # if we are at the leaf node, print the value as `=value`
+                fmt += f"={_node_pprint(leaf,depth+2,'repr',width)}"
+            else:
+                # if we are not at the leaf node, print the type as `:type`
+                fmt += f":{type_.__name__}"
 
     return fmt.expandtabs(4)
 
@@ -708,8 +722,7 @@ def tree_summary(tree: PyTree, *, depth=None, width: int = 60) -> str:
         if _should_omit_trace(trace):
             continue
 
-        path = ".".join(_node_pprint(i, 0, "str", width) for i in trace.names)
-        row = [path.replace("].", "]").replace(".[", "[")]
+        row = [_resolve_names(trace, width)]
 
         # type name row
         row += [_node_type_pprint(pytc.unfreeze(leaf), 0, "str", width)]
