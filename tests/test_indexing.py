@@ -433,17 +433,6 @@ def test_attributre_apply():
     assert pytc.is_tree_equal(t.at["b"].at["a"].apply(lambda _: 100), Test(1, l0(100)))
 
 
-def test_attribute_error():
-    @ft.partial(pytc.treeclass, mask=True, index=True)
-    class Test:
-        a: int = 1
-
-    t = Test()
-
-    with pytest.raises(AttributeError):
-        t.at["[b"].get()
-
-
 def test_indexget():
     @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:

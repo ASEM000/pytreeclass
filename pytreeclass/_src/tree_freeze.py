@@ -6,6 +6,7 @@ import hashlib
 from contextlib import contextmanager
 from typing import Any, Sequence
 
+import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
@@ -15,7 +16,7 @@ PyTree = Any
 
 
 def _hash_node(node: Any) -> int:
-    if hasattr(node, "dtype") and hasattr(node, "shape"):
+    if isinstance(node, (jnp.ndarray, np.ndarray)):
         return hashlib.sha256(np.array(node).tobytes()).hexdigest()
     if isinstance(node, set):
         return hash(frozenset(node))
