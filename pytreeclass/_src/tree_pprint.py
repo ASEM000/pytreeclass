@@ -7,7 +7,7 @@ import math
 import sys
 from itertools import chain
 from types import FunctionType
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -22,9 +22,10 @@ from pytreeclass._src.tree_freeze import is_frozen, unfreeze
 from pytreeclass._src.tree_trace import LeafTrace, tree_leaves_with_trace
 
 PyTree = Any
+Kind = Literal["repr", "str"]
 
 
-def _node_pprint(node: Any, depth: int, kind: str, width: int) -> str:
+def _node_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
     if isinstance(node, ft.partial):
         # applies for partial functions including `jax.tree_util.Partial`
         return f"Partial({_func_pprint(node.func, depth,kind,width)})"
@@ -37,7 +38,7 @@ def _node_pprint(node: Any, depth: int, kind: str, width: int) -> str:
         return _numpy_pprint(node, depth, kind, width)
     if isinstance(node, jax.ShapeDtypeStruct):
         return _shape_dtype_struct_pprint(node, depth, kind, width)
-    if hasattr(node, "_fields") and hasattr(node, "_asdict"):
+    if isinstance(node, tuple) and hasattr(node, "_fields"):
         return _namedtuple_pprint(node, depth, kind, width)
     if isinstance(node, list):
         return _list_pprint(node, depth, kind, width)
@@ -56,7 +57,7 @@ def _node_pprint(node: Any, depth: int, kind: str, width: int) -> str:
     return _general_pprint(node, depth, kind, width)
 
 
-def _general_pprint(node: Any, depth: int, kind: str, width: int) -> str:
+def _general_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
     if isinstance(node, object) and node.__class__.__repr__ is not object.__repr__:
         # use custom __repr__ method if available
         fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
@@ -79,7 +80,7 @@ def _general_pprint(node: Any, depth: int, kind: str, width: int) -> str:
 
 
 def _shape_dtype_struct_pprint(
-    node: jax.ShapeDtypeStruct, depth: int, kind: str, width: int
+    node: jax.ShapeDtypeStruct, depth: int, kind: Kind, width: int
 ) -> str:
     """Pretty print jax.ShapeDtypeStruct"""
     del depth, kind
@@ -103,7 +104,7 @@ def _shape_dtype_struct_pprint(
 
 
 def _numpy_pprint(
-    node: np.ndarray | jnp.ndarray, depth: int, kind: str, width: int
+    node: np.ndarray | jnp.ndarray, depth: int, kind: Kind, width: int
 ) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape"""
     if kind == "str":
@@ -139,7 +140,7 @@ def _numpy_pprint(
 
 
 @ft.lru_cache
-def _func_pprint(func: Callable, depth: int, kind: str, width: int) -> str:
+def _func_pprint(func: Callable, depth: int, kind: Kind, width: int) -> str:
     """Pretty print function
 
     Example:
@@ -162,7 +163,7 @@ def _func_pprint(func: Callable, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _slice_pprint(node: slice, depth: int, kind: str, width: int) -> str:
+def _slice_pprint(node: slice, depth: int, kind: Kind, width: int) -> str:
     del depth, kind
     start = node.start if node.start is not None else ""
     stop = node.stop if node.stop is not None else ""
@@ -177,7 +178,7 @@ def _slice_pprint(node: slice, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _list_pprint(node: list, depth: int, kind: str, width: int) -> str:
+def _list_pprint(node: list, depth: int, kind: Kind, width: int) -> str:
     """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,depth+1,kind,width))}" for v in node)
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
@@ -185,7 +186,7 @@ def _list_pprint(node: list, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _tuple_pprint(node: tuple, depth: int, kind: str, width: int) -> str:
+def _tuple_pprint(node: tuple, depth: int, kind: Kind, width: int) -> str:
     """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,depth+1,kind,width))}" for v in node)
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
@@ -193,7 +194,7 @@ def _tuple_pprint(node: tuple, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _set_pprint(node: set, depth: int, kind: str, width: int) -> str:
+def _set_pprint(node: set, depth: int, kind: Kind, width: int) -> str:
     """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,depth+1,kind,width))}" for v in node)
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
@@ -201,14 +202,14 @@ def _set_pprint(node: set, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _dict_pprint(node: dict, depth: int, kind: str, width: int) -> str:
+def _dict_pprint(node: dict, depth: int, kind: Kind, width: int) -> str:
     fmt = (f"{k}:{_node_pprint(v,depth+1,kind,width)}" for k, v in node.items())
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt, width)
 
 
-def _namedtuple_pprint(node, depth: int, kind: str, width: int) -> str:
+def _namedtuple_pprint(node, depth: int, kind: Kind, width: int) -> str:
     items = node._asdict().items()
     fmt = (f"{k}={_node_pprint(v,depth+1,kind,width)}" for k, v in items)
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
@@ -216,7 +217,7 @@ def _namedtuple_pprint(node, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _dataclass_like_pprint(node, depth: int, kind: str, width: int) -> str:
+def _dataclass_like_pprint(node, depth: int, kind: Kind, width: int) -> str:
     name = node.__class__.__name__
     fields = _dataclass_like_fields(node)
     # we use vars here to avoid unfreezing it in case it is frozen
@@ -228,7 +229,7 @@ def _dataclass_like_pprint(node, depth: int, kind: str, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _node_type_pprint(node: type, depth: int, kind: str, width: int) -> str:
+def _node_type_pprint(node: type, depth: int, kind: Kind, width: int) -> str:
     if hasattr(node, "dtype") and hasattr(node, "shape"):
         shape_dype = node.shape, node.dtype
         fmt = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), depth, kind, width)

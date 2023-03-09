@@ -248,28 +248,29 @@ def _validate_class(klass: type) -> type:
     return klass
 
 
-def _treeclass_transform(klass: type) -> type:
+def _dataclass_transform(klass: type) -> type:
     # add custom `dataclass` field_map and frozen attributes to the class
     setattr(klass, _FIELD_MAP, _generate_field_map(klass))
+    # flag for the immutable behavior
     setattr(klass, _FROZEN, True)
-    setattr(klass, "__match_args__", tuple(getattr(klass, _FIELD_MAP).keys()))
 
     if "__init__" not in getattr(klass, _VARS):
         # generate the init method in case it is not defined by the user
         setattr(klass, "__init__", _generate_init(klass))
 
-    # class initialization wrapper
-    if "__getattr__" in getattr(klass, _VARS):
-        setattr(klass, "__getattr__", _getattr_wrapper(klass.__getattr__))
-
-    setattr(klass, "__new__", _new_wrapper(klass.__new__))
-    setattr(klass, "__init__", _init_wrapper(klass.__init__))
-    setattr(klass, "__init_subclass__", _init_sub_wrapper(klass.__init_subclass__))
-    setattr(klass, "__getattribute__", _getattr_wrapper(klass.__getattribute__))
+    for name, wrapper in zip(
+        ("__new__", "__init__", "__init_subclass__", "__getattribute__"),
+        (_new_wrapper, _init_wrapper, _init_sub_wrapper, _getattr_wrapper),
+    ):
+        # wrap the original methods to enable the field initialization,
+        # callback functionality and immutable behavior
+        setattr(klass, name, wrapper(getattr(klass, name)))
 
     # immutable attributes similar to `dataclasses`
     setattr(klass, "__setattr__", _setattr)
     setattr(klass, "__delattr__", _delattr)
+    # used with `match` functionality in python 3.10
+    setattr(klass, "__match_args__", tuple(getattr(klass, _FIELD_MAP).keys()))
 
     return klass
 
@@ -372,7 +373,7 @@ def treeclass(klass):
     # add the immutable setters and deleters
     # and generate the `__init__` method if not present
     # generate fields from type annotations
-    klass = _treeclass_transform(copy.deepcopy(klass))
+    klass = _dataclass_transform(copy.deepcopy(klass))
 
     # add the optional methods to the class
     # optional methods are math operations, indexing and masking,
