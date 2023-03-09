@@ -41,7 +41,7 @@ class _TraceRegistryEntry(NamedTuple):
 
 class LeafTrace(NamedTuple):
     names: Sequence[str]  # name of the node in each level
-    types: Sequence[type] # type of the node in each level
+    types: Sequence[type]  # type of the node in each level
     index: Sequence[int]  # index of the node in the tree in each level
     width: Sequence[int]  # number of children in each level
     metas: Sequence[Any]  # metadata for each level for a node

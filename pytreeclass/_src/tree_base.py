@@ -75,7 +75,7 @@ def _register_treeclass(klass):
 
 def _getattr_wrapper(getattr_func):
     @ft.wraps(getattr_func)
-    def getattr_method(tree, key: str) -> Any:
+    def getattr_method(self, key: str) -> Any:
         # this current approach replaces the older metdata based approach
         # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`.
         # the metadata approach is defined at class variable and can not be changed at runtime while the current
@@ -97,10 +97,10 @@ def _getattr_wrapper(getattr_func):
         # Tree(a=#1)  # frozen value is displayed in the repr with a prefix `#`
         # >>> tree.a
         # 1  # the value is unwrapped when accessed directly
-        value = getattr_func(tree, key)
+        value = getattr_func(self, key)
         # unwrap non-`TreeClass` instance variables
         # so the getattr will always return unwrapped values.
-        return _tree_unwrap(value) if key in getattr_func(tree, _VARS) else value
+        return _tree_unwrap(value) if key in getattr_func(self, _VARS) else value
 
     return getattr_method
 
@@ -195,14 +195,14 @@ def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
 
 def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
-    def init_method(tree, *a, **k) -> None:
-        getattr(tree, _VARS)[_FROZEN] = False
-        output = init_func(tree, *a, **k)
+    def init_method(self, *a, **k) -> None:
+        getattr(self, _VARS)[_FROZEN] = False
+        output = init_func(self, *a, **k)
 
         # in case __post_init__ is defined then call it
         # after the tree is initialized
         # here, we assume that __post_init__ is a method
-        if hasattr(type(tree), _POST_INIT):
+        if hasattr(type(self), _POST_INIT):
             # in case we found post_init in super class
             # then defreeze it first and call it
             # this behavior is differet to `dataclasses` with `frozen=True`
@@ -216,12 +216,12 @@ def _init_wrapper(init_func: Callable) -> Callable:
             # ...    a:int = 1
             # ...    def __post_init__(self):
             # ...        self.b = 1
-            getattr(tree, _VARS)[_FROZEN] = False
-            output = getattr(type(tree), _POST_INIT)(tree)
+            getattr(self, _VARS)[_FROZEN] = False
+            output = getattr(type(self), _POST_INIT)(self)
 
         # handle uninitialized fields
-        for field in getattr(tree, _FIELD_MAP).values():
-            if field.name not in getattr(tree, _VARS):
+        for field in getattr(self, _FIELD_MAP).values():
+            if field.name not in getattr(self, _VARS):
                 # at this point, all fields should be initialized
                 # in principle, this error will be caught when invoking `repr`/`str`
                 # like in `dataclasses` but we raise it here for better error message.
@@ -229,8 +229,8 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
         # delete the shadowing `__dict__` attribute to
         # restore the frozen behavior
-        if _FROZEN in getattr(tree, _VARS):
-            del getattr(tree, _VARS)[_FROZEN]
+        if _FROZEN in getattr(self, _VARS):
+            del getattr(self, _VARS)[_FROZEN]
         return output
 
     return init_method
