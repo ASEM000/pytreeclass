@@ -22,7 +22,7 @@ from pytreeclass._src.tree_decorator import (
     _generate_init,
 )
 from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
-from pytreeclass._src.tree_indexer import _tree_copy, _tree_indexer, bcmap
+from pytreeclass._src.tree_indexer import _tree_copy, bcmap, tree_indexer
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_trace import LeafTrace, register_pytree_node_trace
 
@@ -269,71 +269,74 @@ def _dataclass_transform(klass: type) -> type:
     # immutable attributes similar to `dataclasses`
     setattr(klass, "__setattr__", _setattr)
     setattr(klass, "__delattr__", _delattr)
+
     # used with `match` functionality in python 3.10
-    setattr(klass, "__match_args__", tuple(getattr(klass, _FIELD_MAP).keys()))
+    setattr(klass, "__match_args__", tuple(key for key in getattr(klass, _FIELD_MAP)))
 
     return klass
 
 
-def _process_optional_methods(klass):
-    # optional attributes
+def _auxiliary_transform(klass: type, *, mask: bool, index: bool) -> type:
+    # optional attributes defines pretty printing, hashing,
+    # copying, indexing and math operations
+    # keep the original methods if they are defined by the user
     attrs = dict()
 
     # pretty printing
     attrs["__repr__"] = tree_repr
     attrs["__str__"] = tree_str
 
-    # indexing and masking
-    attrs["at"] = property(_tree_indexer)
+    if index:
+        attrs["at"] = property(tree_indexer)
 
     # hashing and copying
     attrs["__copy__"] = _tree_copy
     attrs["__hash__"] = _tree_hash
 
-    # math operations
-    attrs["__abs__"] = bcmap(op.abs)
-    attrs["__add__"] = bcmap(op.add)
-    attrs["__and__"] = bcmap(op.and_)
-    attrs["__ceil__"] = bcmap(math.ceil)
-    attrs["__divmod__"] = bcmap(divmod)
-    attrs["__eq__"] = bcmap(op.eq)
-    attrs["__floor__"] = bcmap(math.floor)
-    attrs["__floordiv__"] = bcmap(op.floordiv)
-    attrs["__ge__"] = bcmap(op.ge)
-    attrs["__gt__"] = bcmap(op.gt)
-    attrs["__int__"] = bcmap(int)
-    attrs["__invert__"] = bcmap(op.invert)
-    attrs["__le__"] = bcmap(op.le)
-    attrs["__lshift__"] = bcmap(op.lshift)
-    attrs["__lt__"] = bcmap(op.lt)
-    attrs["__matmul__"] = bcmap(op.matmul)
-    attrs["__mod__"] = bcmap(op.mod)
-    attrs["__mul__"] = bcmap(op.mul)
-    attrs["__ne__"] = bcmap(op.ne)
-    attrs["__neg__"] = bcmap(op.neg)
-    attrs["__or__"] = bcmap(op.or_)
-    attrs["__pos__"] = bcmap(op.pos)
-    attrs["__pow__"] = bcmap(op.pow)
-    attrs["__radd__"] = bcmap(op.add)
-    attrs["__rand__"] = bcmap(op.and_)
-    attrs["__rdivmod__"] = bcmap(ft.wraps(divmod)(lambda x, y: divmod(y, x)))
-    attrs["__rfloordiv__"] = bcmap(ft.wraps(op.floordiv)(lambda x, y: y // x))
-    attrs["__rlshift__"] = bcmap(ft.wraps(op.lshift)(lambda x, y: (y << x)))
-    attrs["__rmatmul__"] = bcmap(ft.wraps(op.matmul)(lambda x, y: y @ x))
-    attrs["__rmod__"] = bcmap(ft.wraps(op.mod)(lambda x, y: y % x))
-    attrs["__rmul__"] = bcmap(op.mul)
-    attrs["__ror__"] = bcmap(op.or_)
-    attrs["__round__"] = bcmap(round)
-    attrs["__rpow__"] = bcmap(ft.wraps(op.pow)(lambda x, y: op.pow(y, x)))
-    attrs["__rrshift__"] = bcmap(ft.wraps(op.rshift)(lambda x, y: (y >> x)))
-    attrs["__rshift__"] = bcmap(op.rshift)
-    attrs["__rsub__"] = bcmap(ft.wraps(op.sub)(lambda x, y: (y - x)))
-    attrs["__rtruediv__"] = bcmap(ft.wraps(op.truediv)(lambda x, y: (y / x)))
-    attrs["__rxor__"] = bcmap(op.xor)
-    attrs["__sub__"] = bcmap(op.sub)
-    attrs["__truediv__"] = bcmap(op.truediv)
-    attrs["__trunc__"] = bcmap(math.trunc)
-    attrs["__xor__"] = bcmap(op.xor)
+    if mask:
+        attrs["__abs__"] = bcmap(op.abs)
+        attrs["__add__"] = bcmap(op.add)
+        attrs["__and__"] = bcmap(op.and_)
+        attrs["__ceil__"] = bcmap(math.ceil)
+        attrs["__divmod__"] = bcmap(divmod)
+        attrs["__eq__"] = bcmap(op.eq)
+        attrs["__floor__"] = bcmap(math.floor)
+        attrs["__floordiv__"] = bcmap(op.floordiv)
+        attrs["__ge__"] = bcmap(op.ge)
+        attrs["__gt__"] = bcmap(op.gt)
+        attrs["__int__"] = bcmap(int)
+        attrs["__invert__"] = bcmap(op.invert)
+        attrs["__le__"] = bcmap(op.le)
+        attrs["__lshift__"] = bcmap(op.lshift)
+        attrs["__lt__"] = bcmap(op.lt)
+        attrs["__matmul__"] = bcmap(op.matmul)
+        attrs["__mod__"] = bcmap(op.mod)
+        attrs["__mul__"] = bcmap(op.mul)
+        attrs["__ne__"] = bcmap(op.ne)
+        attrs["__neg__"] = bcmap(op.neg)
+        attrs["__or__"] = bcmap(op.or_)
+        attrs["__pos__"] = bcmap(op.pos)
+        attrs["__pow__"] = bcmap(op.pow)
+        attrs["__radd__"] = bcmap(op.add)
+        attrs["__rand__"] = bcmap(op.and_)
+        attrs["__rdivmod__"] = bcmap(ft.wraps(divmod)(lambda x, y: divmod(y, x)))
+        attrs["__rfloordiv__"] = bcmap(ft.wraps(op.floordiv)(lambda x, y: y // x))
+        attrs["__rlshift__"] = bcmap(ft.wraps(op.lshift)(lambda x, y: (y << x)))
+        attrs["__rmatmul__"] = bcmap(ft.wraps(op.matmul)(lambda x, y: y @ x))
+        attrs["__rmod__"] = bcmap(ft.wraps(op.mod)(lambda x, y: y % x))
+        attrs["__rmul__"] = bcmap(op.mul)
+        attrs["__ror__"] = bcmap(op.or_)
+        attrs["__round__"] = bcmap(round)
+        attrs["__rpow__"] = bcmap(ft.wraps(op.pow)(lambda x, y: op.pow(y, x)))
+        attrs["__rrshift__"] = bcmap(ft.wraps(op.rshift)(lambda x, y: (y >> x)))
+        attrs["__rshift__"] = bcmap(op.rshift)
+        attrs["__rsub__"] = bcmap(ft.wraps(op.sub)(lambda x, y: (y - x)))
+        attrs["__rtruediv__"] = bcmap(ft.wraps(op.truediv)(lambda x, y: (y / x)))
+        attrs["__rxor__"] = bcmap(op.xor)
+        attrs["__sub__"] = bcmap(op.sub)
+        attrs["__truediv__"] = bcmap(op.truediv)
+        attrs["__trunc__"] = bcmap(math.trunc)
+        attrs["__xor__"] = bcmap(op.xor)
 
     for key in attrs:
         if key not in getattr(klass, _VARS):
@@ -343,7 +346,7 @@ def _process_optional_methods(klass):
     return klass
 
 
-def treeclass(klass):
+def treeclass(klass: type, *, mask: bool = True, index: bool = True) -> type:
     """Decorator to convert a class to a `treeclass`
 
     Example:
@@ -378,7 +381,7 @@ def treeclass(klass):
     # add the optional methods to the class
     # optional methods are math operations, indexing and masking,
     # hashing and copying, and pretty printing
-    klass = _process_optional_methods(klass)
+    klass = _auxiliary_transform(klass, mask=mask, index=index)
 
     # add the class to the `JAX` registry if not registered
     return _register_treeclass(klass)

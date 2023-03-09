@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools as ft
+
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -9,7 +11,7 @@ import pytreeclass as pytc
 from pytreeclass._src.tree_indexer import _call_context
 
 
-@pytc.treeclass
+@ft.partial(pytc.treeclass, mask=True, index=True)
 class Test:
     a: float
     b: float
@@ -22,13 +24,13 @@ class Test:
 
 
 def test_getter_by_val():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class level1:
         a: int
         b: int
         c: int
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class level2:
         d: level1
         e: level1
@@ -70,20 +72,20 @@ def test_getter_by_val():
 
 
 def test_getter_by_param():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L1:
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L2:
         a: int = 10
         b: int = 20
@@ -100,13 +102,13 @@ def test_getter_by_param():
 
 
 def test_setter_by_val():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class level1:
         a: int
         b: int
         c: int
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class level2:
         d: level1
         e: level1
@@ -132,20 +134,20 @@ def test_setter_by_val():
     # with pytest.raises(NotImplementedError):
     #     B = A.at[0].set(0)
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L1:
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L2:
         a: int = 10
         b: int = 20
@@ -160,7 +162,7 @@ def test_setter_by_val():
 
 
 def test_apply_and_its_derivatives():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class A:
         a: int
         b: int
@@ -196,20 +198,20 @@ def test_apply_and_its_derivatives():
     with pytest.raises(TypeError):
         init.at[init].apply(lambda x: (x + 1) * 10)
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L1:
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L2:
         a: int = 10
         b: int = 20
@@ -273,7 +275,7 @@ def test_apply_and_its_derivatives():
 
 
 def test_reduce():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class A:
         a: int
         b: int
@@ -293,7 +295,7 @@ def test_reduce():
     rhs = init.at[init > 100].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
     assert lhs == rhs
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class B:
         a: int
         b: int
@@ -309,7 +311,7 @@ def test_reduce():
     with pytest.raises(TypeError):
         init.at[init].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: tuple[int]
 
@@ -318,7 +320,7 @@ def test_reduce():
 
 
 def test_reduce_and_its_derivatives():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
@@ -332,7 +334,7 @@ def test_reduce_and_its_derivatives():
         # def __call__(self, x):
         #     return x @ self.weight + self.bias
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class StackedLinear:
         l1: Linear
         l2: Linear
@@ -362,7 +364,7 @@ def test_reduce_and_its_derivatives():
 
 
 def test_is_leaf():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int
 
@@ -381,11 +383,11 @@ def test_is_leaf():
 
 
 def test_attribute_get():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -396,11 +398,11 @@ def test_attribute_get():
 
 
 def test_attribute_set():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -414,11 +416,11 @@ def test_attribute_set():
 
 
 def test_attributre_apply():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -432,7 +434,7 @@ def test_attributre_apply():
 
 
 def test_attribute_error():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
 
@@ -443,11 +445,11 @@ def test_attribute_error():
 
 
 def test_indexget():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -458,11 +460,11 @@ def test_indexget():
 
 
 def test_index_set():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -476,11 +478,11 @@ def test_index_set():
 
 
 def test_index_apply():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -494,12 +496,12 @@ def test_index_apply():
 
 
 def test_mixed_get():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
         b: int = 1
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -510,12 +512,12 @@ def test_mixed_get():
 
 
 def test_mixed_set():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
         b: int = 1
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -531,12 +533,12 @@ def test_mixed_set():
 
 
 def test_mixed_apply():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class l0:
         a: int = 2
         b: int = 1
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: l0 = l0()
@@ -559,7 +561,7 @@ def test_mixed_apply():
 
 
 def test_method_call():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
 
@@ -576,7 +578,7 @@ def test_method_call():
     with pytest.raises(TypeError):
         t.at["a"]()
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class A:
         a: int
 
@@ -592,7 +594,7 @@ def test_method_call():
 
 
 def test_composed_at():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: jnp.ndarray
 
@@ -611,7 +613,7 @@ def test_composed_at():
 
 
 def test_repr_str():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: int = 2
@@ -626,7 +628,7 @@ def test_repr_str():
 
 
 def test_not_equal():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int = 1
         b: float = 1.0
@@ -637,7 +639,7 @@ def test_not_equal():
 
 
 def test_iterable_node():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: int
 
@@ -646,7 +648,7 @@ def test_iterable_node():
 
 
 # def test_at_set_apply_is_leaf():
-#     @pytc.treeclass
+#     @ft.partial(pytc.treeclass, mask=True, index=True)
 #     class Test:
 #         a: int = 1
 #         b: int = 2
@@ -655,7 +657,7 @@ def test_iterable_node():
 
 
 def test_mutable_context():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class L2:
         a: int = 1
 

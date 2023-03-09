@@ -8,7 +8,7 @@ from pytreeclass._src.tree_freeze import (
     is_nondiff,
     unfreeze,
 )
-from pytreeclass._src.tree_indexer import bcmap
+from pytreeclass._src.tree_indexer import bcmap, tree_indexer
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_mermaid,
@@ -24,7 +24,6 @@ __all__ = (
     "field",
     "fields",
     "is_tree_equal",
-    "bcmap",
     # pprint utils
     "tree_diagram",
     "tree_mermaid",
@@ -38,6 +37,9 @@ __all__ = (
     "unfreeze",
     "FrozenWrapper",
     "ImmutableWrapper",
+    # masking and indexing utils
+    "bcmap",
+    "tree_indexer",
 )
 
 __version__ = "0.2.0b7"

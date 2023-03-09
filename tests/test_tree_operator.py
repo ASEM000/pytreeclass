@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools as ft
 import math
 
 import jax.numpy as jnp
@@ -12,7 +13,7 @@ from pytreeclass._src.tree_indexer import bcmap
 
 
 def test_bcmap():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: tuple[int]
         b: tuple[int]
@@ -46,7 +47,7 @@ def test_bcmap():
 
 
 def test_math_operations():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: float
         b: float
@@ -65,7 +66,7 @@ def test_math_operations():
     assert A.at[...].reduce(lambda x, y: x + jnp.sum(y)) == jnp.array(60)
     assert abs(A) == A
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: float
         b: float
@@ -113,7 +114,7 @@ def test_math_operations():
 
 
 def test_math_operations_errors():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, mask=True, index=True)
     class Test:
         a: float
         b: float

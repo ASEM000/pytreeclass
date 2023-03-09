@@ -353,7 +353,7 @@ def _is_valid_name(s):
     return bool(pattern.match(s))
 
 
-def _tree_indexer(tree: PyTree) -> PyTree:
+def tree_indexer(tree: PyTree) -> PyTree:
     class AtIndexer:
         def __getitem__(_, where):
             if isinstance(where, str):

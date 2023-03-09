@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools as ft
 import sys
 from collections import namedtuple
 
@@ -14,7 +15,7 @@ from pytreeclass import tree_diagram, tree_mermaid, tree_repr, tree_str, tree_su
 _msg = "Object sizes are changed for python 3.11 and above"
 
 
-@pytc.treeclass
+@ft.partial(pytc.treeclass, mask=True, index=True)
 class Repr1:
     a: int = 1
     b: str = "string"
