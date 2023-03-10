@@ -4,7 +4,7 @@ import copy
 import functools as ft
 import math
 import operator as op
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -40,7 +40,7 @@ def _tree_unflatten(klass: type, treedef: jtu.PyTreeDef, leaves: list[Any]):
     return tree
 
 
-def _tree_flatten(tree):
+def _tree_flatten(tree: PyTree) -> tuple[list[Any], tuple[list[str], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`"""
     static, dynamic = dict(getattr(tree, _VARS)), dict()
     for key in getattr(tree, _FIELD_MAP):
@@ -48,15 +48,15 @@ def _tree_flatten(tree):
     return dynamic.values(), (dynamic.keys(), static)
 
 
-def _tree_trace(tree):
-    """Trace flatten rule for to be used with the `tree_trace` module"""
+def _tree_trace(tree: PyTree) -> Sequence[LeafTrace]:
+    """Trace flatten rule to be used with the `tree_trace` module"""
     leaves, (keys, _) = _tree_flatten(tree)
-    names = ([f"{key}"] for key in keys)
-    klass = ([type(leaf)] for leaf in leaves)
-    index = ([i] for i in range(len(leaves)))
-    width = ([len(leaves)] for _ in range(len(leaves)))
-    metas = ([{"repr": getattr(tree, _FIELD_MAP)[key].repr}] for key in keys)
-    return [LeafTrace(*args) for args in zip(names, klass, index, width, metas)]
+    names = (f"{key}" for key in keys)
+    types = (type(leaf) for leaf in leaves)
+    index = range(len(leaves))
+    width = (len(leaves) for _ in range(len(leaves)))
+    metas = ({"repr": getattr(tree, _FIELD_MAP)[key].repr} for key in keys)
+    return [*zip(names, types, index, width, metas)]
 
 
 @ft.lru_cache(maxsize=None)
