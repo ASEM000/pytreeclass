@@ -348,7 +348,7 @@ def _auxiliary_transform(klass: type, *, mask: bool, index: bool) -> type:
     return klass
 
 
-def treeclass(klass: type, *, mask: bool = True, index: bool = True) -> type:
+def treeclass(klass: type, *, mask: bool = False, index: bool = False) -> type:
     """Decorator to convert a class to a `treeclass`
 
     Example:

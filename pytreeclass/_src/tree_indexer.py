@@ -193,10 +193,14 @@ def _get_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if (
-                i >= len(trace.indices)
-                or (isinstance(item, int) and trace.indices[i][0] != item)
-                or (isinstance(item, str) and trace.names[i] != item)
+            if i >= len(trace.indices):
+                msg = f"Out of bounds path={where} for leaf={leaf}."
+                msg += f" Path length={len(where)} is longer than "
+                msg += f"leaf depth={len(trace.indices)}."
+                raise IndexError(msg)
+
+            if (isinstance(item, int) and trace.indices[i][0] != item) or (
+                isinstance(item, str) and trace.names[i] != item
             ):
                 return None
         return leaf
@@ -215,10 +219,14 @@ def _set_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if (
-                i >= len(trace.indices)
-                or (isinstance(item, int) and trace.indices[i][0] != item)
-                or (isinstance(item, str) and trace.names[i] != item)
+            if i >= len(trace.indices):
+                msg = f"Out of bounds path={where} for leaf={leaf}."
+                msg += f" Path length={len(where)} is longer than "
+                msg += f"leaf depth={len(trace.indices)}."
+                raise IndexError(msg)
+
+            if (isinstance(item, int) and trace.indices[i][0] != item) or (
+                isinstance(item, str) and trace.names[i] != item
             ):
                 return leaf
         return set_value
@@ -237,10 +245,14 @@ def _apply_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if (
-                i >= len(trace.indices)
-                or (isinstance(item, int) and trace.indices[i][0] != item)
-                or (isinstance(item, str) and trace.names[i] != item)
+            if i >= len(trace.indices):
+                msg = f"Out of bounds path={where} for leaf={leaf}."
+                msg += f" Path length={len(where)} is longer than "
+                msg += f"leaf depth={len(trace.indices)}."
+                raise IndexError(msg)
+
+            if (isinstance(item, int) and trace.indices[i][0] != item) or (
+                isinstance(item, str) and trace.names[i] != item
             ):
                 return leaf
         return func(leaf)
@@ -262,10 +274,14 @@ def _reduce_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if (
-                i >= len(trace.indices)
-                or (isinstance(item, int) and trace.indices[i][0] != item)
-                or (isinstance(item, str) and trace.names[i] != item)
+            if i >= len(trace.indices):
+                msg = f"Out of bounds path={where} for leaf={leaf}."
+                msg += f" Path length={len(where)} is longer than "
+                msg += f"leaf depth={len(trace.indices)}."
+                raise IndexError(msg)
+
+            if (isinstance(item, int) and trace.indices[i][0] != item) or (
+                isinstance(item, str) and trace.names[i] != item
             ):
                 return None
         return leaf
