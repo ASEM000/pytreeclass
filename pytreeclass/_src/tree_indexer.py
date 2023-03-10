@@ -82,6 +82,8 @@ def _set_at_mask(
         # do not broadcast set_value if it is a pytree of same structure
         # for example tree.at[where].set(tree2) will set all tree leaves to tree2 leaves
         # if tree2 is a pytree of same structure as tree
+        # instead of making each leaf of tree a copy of tree2
+        # is design is similar to `numpy` design `Array.at[...].set(Array)`
         return jtu.tree_map(lhs_set, tree, where, set_value, is_leaf=is_leaf)
 
     # set_value is broadcasted to tree leaves
@@ -234,15 +236,6 @@ def _set_at_trace(
                 return leaf
         # consider the same structure PyTree case tree.at[...].set(tree)
         return set_value
-
-    if isinstance(set_value, type(tree)) and (
-        jtu.tree_structure(tree, is_leaf=is_leaf)
-        == jtu.tree_structure(set_value, is_leaf=is_leaf)
-    ):
-        # do not broadcast set_value if it is a pytree of same structure
-        # for example tree.at[where].set(tree2) will set all tree leaves to tree2 leaves
-        # if tree2 is a pytree of same structure as tree
-        return tree_map_with_trace(lhs_set, tree, set_value, is_leaf=is_leaf)
 
     # set_value is broadcasted to tree leaves
     # for example tree.at[where].set(1) will set all tree leaves to 1

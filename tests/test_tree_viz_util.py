@@ -11,7 +11,6 @@ from pytreeclass._src.tree_pprint import (
     _hbox,
     _hstack,
     _node_pprint,
-    _slice_pprint,
     _table,
     _vbox,
 )
@@ -73,11 +72,3 @@ def test_format_count():
 
     with pytest.raises(TypeError):
         _format_count("a")
-
-
-def test_slice_pprint():
-    assert _slice_pprint(slice(0, 1, 1), 0, "str", 60) == "[0]"
-    assert _slice_pprint(slice(0, 2, 1), 0, "str", 60) == "[0:2]"
-    assert _slice_pprint(slice(0, 2, 2), 0, "str", 60) == "[0:2:2]"
-    assert _slice_pprint(slice(None, 1, 2), 0, "str", 60) == "[:1:2]"
-    assert _slice_pprint(slice(1, None, 2), 0, "str", 60) == "[1::2]"

@@ -213,3 +213,30 @@ def test_misc():
         tree_repr(jnp.ones([1, 2], dtype=jnp.uint16))
         == "ui16[1,2](μ=1.00, σ=0.00, ∈[1,1])"
     )
+
+
+def test_extra_tree_diagram():
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+        b: int = 2
+
+    @pytc.treeclass
+    class L1:
+        c: L0 = L0()
+        d: int = 3
+
+    @pytc.treeclass
+    class L2:
+        e: int = 4
+        f: L1 = L1()
+        g: L0 = L0()
+        h: int = 5
+
+    tree = L2()
+
+    assert (
+        (tree_diagram(tree))
+        # trunk-ignore(flake8/E501)
+        == "L2\n    ├── e=4\n    ├── f:L1\n    │   ├── c:L0\n    │   │   ├── a=1\n    │   │   └── b=2\n    │   └── d=3\n    ├── g:L0\n    │   ├── a=1\n    │   └── b=2\n    └── h=5"
+    )

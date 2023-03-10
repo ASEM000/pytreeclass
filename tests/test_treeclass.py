@@ -8,7 +8,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_decorator import _FIELD_MAP, _dataclass_like_fields
+from pytreeclass._src.tree_decorator import _FIELD_MAP, _dataclass_like_fields, fields
 
 
 def test_field():
@@ -438,6 +438,12 @@ def test_callbacks():
         class Test:
             a: int = pytc.field(callbacks=[1])
 
+    with pytest.raises(TypeError):
+
+        @ft.partial(pytc.treeclass, math=True, index=True)
+        class Test:
+            a: int = pytc.field(callbacks=[1])
+
 
 def test_treeclass_frozen_field():
     @ft.partial(pytc.treeclass, math=True, index=True)
@@ -471,6 +477,9 @@ def test_dataclass_fields_like():
 
     with pytest.raises(TypeError):
         _dataclass_like_fields(1)
+
+    with pytest.raises(TypeError):
+        fields(1)
 
 
 def test_super():

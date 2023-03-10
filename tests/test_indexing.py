@@ -433,7 +433,7 @@ def test_attributre_apply():
     assert pytc.is_tree_equal(t.at["b"].at["a"].apply(lambda _: 100), Test(1, l0(100)))
 
 
-def test_indexget():
+def test_trace_get():
     @ft.partial(pytc.treeclass, math=True, index=True)
     class l0:
         a: int = 2
@@ -448,7 +448,7 @@ def test_indexget():
     assert pytc.is_tree_equal(t.at[1].at[0].get(), Test(None, l0(2)))
 
 
-def test_index_set():
+def test_trace_set():
     @ft.partial(pytc.treeclass, math=True, index=True)
     class l0:
         a: int = 2
@@ -466,7 +466,7 @@ def test_index_set():
     assert pytc.is_tree_equal(t.at[1].at[0].set(100), Test(1, l0(100)))
 
 
-def test_index_apply():
+def test_trace_apply():
     @ft.partial(pytc.treeclass, math=True, index=True)
     class l0:
         a: int = 2
@@ -484,6 +484,20 @@ def test_index_apply():
     assert pytc.is_tree_equal(t.at[1].at[0].apply(lambda _: 100), Test(1, l0(100)))
 
 
+def test_trace_reduce():
+    @ft.partial(pytc.treeclass, math=True, index=True)
+    class A:
+        a: int
+        b: int
+        c: jnp.ndarray
+
+    init = A(1, 2, jnp.array([1, 2, 3, 4, 5]))
+
+    lhs = 1 + 2 + 3 + 4 + 5
+    rhs = init.at[2].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
+    assert lhs == rhs
+
+
 def test_mixed_get():
     @ft.partial(pytc.treeclass, math=True, index=True)
     class l0:
@@ -498,6 +512,9 @@ def test_mixed_get():
     t = Test()
     assert pytc.is_tree_equal(t.at[1].at[t == 2].get(), Test(None, l0(2, None)))
     assert pytc.is_tree_equal(t.at[t == 2].at[1].get(), Test(None, l0(2, None)))
+
+    with pytest.raises(IndexError):
+        t.at[0].at[2].get()
 
 
 def test_mixed_set():
@@ -654,3 +671,25 @@ def test_mutable_context():
 
     with pytest.raises(AttributeError):
         t.delete("a")
+
+
+def test_unsupported_indexing_type():
+    @ft.partial(pytc.treeclass, math=True, index=True)
+    class L2:
+        a: int = 1
+
+        def delete(self, name):
+            del self.a
+
+    t = L2()
+
+    with pytest.raises(NotImplementedError):
+        t.at[None].set(1)
+
+
+def test_register_pytree_node_trace():
+    with pytest.raises(TypeError):
+        pytc.register_pytree_node_trace(None, None)
+
+    with pytest.raises(ValueError):
+        pytc.register_pytree_node_trace(list, lambda x: x)

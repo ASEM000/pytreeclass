@@ -45,10 +45,7 @@ class ImmutableWrapper:
         return getattr(self, _WRAPPED)
 
     def __setattr__(self, key, value) -> None:
-        # allow setting the wrapped value only once.
-        if _WRAPPED in getattr(self, _VARS):
-            raise AttributeError("Cannot assign to frozen instance.")
-        super().__setattr__(key, value)
+        raise AttributeError("Cannot assign to frozen instance.")
 
     def __delattr__(self, _: str) -> None:
         raise AttributeError("Cannot delete from frozen instance.")

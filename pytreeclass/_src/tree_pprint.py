@@ -50,8 +50,6 @@ def _node_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
         return _dict_pprint(node, depth, kind, width)
     if _is_dataclass_like(node):
         return _dataclass_like_pprint(node, depth, kind, width)
-    if isinstance(node, slice):
-        return _slice_pprint(node, depth, kind, width)
     if is_frozen(node):
         return f"#{_node_pprint(node.unwrap(), depth, kind, width)}"
     return _general_pprint(node, depth, kind, width)
@@ -60,8 +58,6 @@ def _node_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
 def _general_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
     if isinstance(node, object) and node.__class__.__repr__ is not object.__repr__:
         # use custom __repr__ method if available
-        fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
-    elif isinstance(node, type):
         fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
     else:
         # use `jax.tree_util.tree_map`, to get representation of the node
@@ -154,21 +150,6 @@ def _func_pprint(func: Callable, depth: int, kind: Kind, width: int) -> str:
     fmt = f"{name}("
     fmt += ", ".join(item for item in [args, varargs, kwonlyargs, varkw] if item != "")
     fmt += ")"
-    return _format_width(fmt, width)
-
-
-def _slice_pprint(node: slice, depth: int, kind: Kind, width: int) -> str:
-    del depth, kind
-    start = node.start if node.start is not None else ""
-    stop = node.stop if node.stop is not None else ""
-    step = node.step if node.step is not None else ""
-
-    if step and step > 1:
-        fmt = f"[{start}:{stop}:{step}]"
-    elif stop == start + 1:
-        fmt = f"[{start}]"
-    else:
-        fmt = f"[{start}:{stop}]"
     return _format_width(fmt, width)
 
 

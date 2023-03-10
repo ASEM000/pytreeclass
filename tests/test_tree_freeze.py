@@ -403,3 +403,10 @@ def test_wrapper():
 
     assert pytc.freeze(1) == pytc.freeze(1)
     assert f"{pytc.freeze(1)!r}" == "#1"
+
+    wrapped = pytc.freeze(1)
+
+    with pytest.raises(AttributeError):
+        delattr(wrapped, "__wrapped__")
+
+    assert wrapped != 1
