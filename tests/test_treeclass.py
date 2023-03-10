@@ -38,6 +38,14 @@ def test_field():
     assert Test(1, b=2).a == 1
     assert Test(1, 2).b == 2
 
+    @ft.partial(pytc.treeclass, math=True, index=True)
+    class Test:
+        a: int = pytc.field(default=1, pos_only=True)
+        b: int = pytc.field(default=2, pos_only=True)
+
+    assert Test(1, 2).a == 1
+    assert Test(1, 2).b == 2
+
     # keyword only
     @ft.partial(pytc.treeclass, math=True, index=True)
     class Test:
@@ -442,7 +450,7 @@ def test_callbacks():
 
         @ft.partial(pytc.treeclass, math=True, index=True)
         class Test:
-            a: int = pytc.field(callbacks=[1])
+            a: int = pytc.field(callbacks=[lambda: True])
 
 
 def test_treeclass_frozen_field():
