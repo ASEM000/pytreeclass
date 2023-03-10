@@ -24,7 +24,7 @@ from pytreeclass._src.tree_decorator import (
 from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
 from pytreeclass._src.tree_indexer import _tree_copy, bcmap, tree_indexer
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
-from pytreeclass._src.tree_trace import LeafTrace, register_pytree_node_trace
+from pytreeclass._src.tree_trace import register_pytree_node_trace
 
 PyTree = Any
 
@@ -48,7 +48,7 @@ def _tree_flatten(tree: PyTree) -> tuple[list[Any], tuple[list[str], dict[str, A
     return dynamic.values(), (dynamic.keys(), static)
 
 
-def _tree_trace(tree: PyTree) -> Sequence[LeafTrace]:
+def _tree_trace(tree: PyTree) -> Sequence[Sequence[str, type, int, int, Any]]:
     """Trace flatten rule to be used with the `tree_trace` module"""
     leaves, (keys, _) = _tree_flatten(tree)
     names = (f"{key}" for key in keys)
