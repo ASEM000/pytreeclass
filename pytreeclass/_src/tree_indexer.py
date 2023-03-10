@@ -31,11 +31,6 @@ def _check_valid_mask_leaf(where: Any):
     return where
 
 
-def _tree_copy(tree: PyTree) -> PyTree:
-    """Return a copy of the tree"""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
-
-
 # tree indexing by boolean PyTree
 
 

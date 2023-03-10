@@ -10,7 +10,7 @@ import functools as ft
 import inspect
 import sys
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, NamedTuple, Protocol, Sequence, runtime_checkable
+from typing import Any, Callable, NamedTuple, Sequence
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _FROZEN = "__frozen__"
@@ -21,10 +21,8 @@ _WRAPPED = "__wrapped__"
 _VARS = "__dict__"
 
 
-@runtime_checkable
-class TreeClass(Protocol):
-    __field_map__: dict[str, Field]
-    __frozen__: bool
+def is_treeclass(cls: type) -> bool:
+    return hasattr(cls, _FROZEN) and hasattr(cls, _FIELD_MAP)
 
 
 @ft.lru_cache
@@ -248,11 +246,11 @@ def _generate_init(klass: type) -> type:
 
 def _is_dataclass_like(node: Any) -> bool:
     # maybe include other dataclass-like objects here? (e.g. attrs)
-    return dc.is_dataclass(node) or isinstance(node, TreeClass)
+    return dc.is_dataclass(node) or is_treeclass(node)
 
 
 def fields(node: Any) -> Sequence[Field]:
-    if not isinstance(node, TreeClass):
+    if not is_treeclass(node):
         raise TypeError(f"Cannot get fields from {node!r}.")
     field_map = getattr(node, _FIELD_MAP, {})
     return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))

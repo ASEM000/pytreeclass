@@ -1,5 +1,5 @@
 from pytreeclass._src.tree_base import is_tree_equal, treeclass
-from pytreeclass._src.tree_decorator import TreeClass, field, fields
+from pytreeclass._src.tree_decorator import field, fields, is_treeclass
 from pytreeclass._src.tree_freeze import (
     FrozenWrapper,
     ImmutableWrapper,
@@ -21,7 +21,7 @@ from pytreeclass._src.tree_trace import register_pytree_node_trace
 __all__ = (
     # general utils
     "treeclass",
-    "TreeClass",
+    "is_treeclass",
     "field",
     "fields",
     "is_tree_equal",
@@ -41,8 +41,7 @@ __all__ = (
     # masking and indexing utils
     "bcmap",
     "tree_indexer",
-    # trace utils
     "register_pytree_node_trace",
 )
 
-__version__ = "0.2.0b8"
+__version__ = "0.2.0b9"

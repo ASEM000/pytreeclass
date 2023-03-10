@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 from jax._src.custom_derivatives import custom_jvp
-from jaxlib.xla_extension import CompiledFunction
+from jaxlib.xla_extension import CompiledFunction, PjitFunction
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_decorator import _dataclass_like_fields, _is_dataclass_like
@@ -22,22 +22,20 @@ from pytreeclass._src.tree_freeze import is_frozen, unfreeze
 from pytreeclass._src.tree_trace import LeafTrace, tree_leaves_with_trace
 
 PyTree = Any
-Kind = Literal["repr", "str"]
+PrintKind = Literal["repr", "str"]
 
 
-def _node_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
+def _node_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
     if isinstance(node, ft.partial):
-        # applies for partial functions including `jax.tree_util.Partial`
         return f"Partial({_func_pprint(node.func, depth,kind,width)})"
     if isinstance(node, (FunctionType, custom_jvp)):
         return _func_pprint(node, depth, kind, width)
-    if isinstance(node, CompiledFunction):
-        # special case for jitted JAX functions
-        return (f"jit({_func_pprint(node)})", depth, kind, width)
+    if isinstance(node, (PjitFunction, CompiledFunction)):
+        return f"jit({_func_pprint(node, depth, kind, width)})"
     if isinstance(node, (np.ndarray, jnp.ndarray)):
         return _numpy_pprint(node, depth, kind, width)
     if isinstance(node, jax.ShapeDtypeStruct):
-        return _shape_dtype_struct_pprint(node, depth, kind, width)
+        return _shape_dtype_pprint(node, depth, kind, width)
     if isinstance(node, tuple) and hasattr(node, "_fields"):
         return _namedtuple_pprint(node, depth, kind, width)
     if isinstance(node, list):
@@ -55,7 +53,7 @@ def _node_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
     return _general_pprint(node, depth, kind, width)
 
 
-def _general_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
+def _general_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
     if isinstance(node, object) and node.__class__.__repr__ is not object.__repr__:
         # use custom __repr__ method if available
         fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
@@ -75,19 +73,16 @@ def _general_pprint(node: Any, depth: int, kind: Kind, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _shape_dtype_struct_pprint(
-    node: jax.ShapeDtypeStruct, depth: int, kind: Kind, width: int
-) -> str:
-    """Pretty print jax.ShapeDtypeStruct"""
+def _shape_dtype_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
+    """Pretty print a node with dtype and shape"""
     del depth, kind
 
-    shape = (
-        f"{node.shape}".replace(",", "")
-        .replace("(", "[")
-        .replace(")", "]")
-        .replace(" ", ",")
-        .replace("[]", "[0]")
-    )
+    shape = f"{node.shape}".replace(",", "")
+    shape = shape.replace("(", "[")
+    shape = shape.replace(")", "]")
+    shape = shape.replace(" ", ",")
+    shape = shape.replace("[]", "[0]")
+
     if issubclass(node.dtype.type, np.integer):
         fmt = f"{node.dtype}".replace("int", "i") + shape
     elif issubclass(node.dtype.type, np.floating):
@@ -100,13 +95,13 @@ def _shape_dtype_struct_pprint(
 
 
 def _numpy_pprint(
-    node: np.ndarray | jnp.ndarray, depth: int, kind: Kind, width: int
+    node: np.ndarray | jnp.ndarray, depth: int, kind: PrintKind, width: int
 ) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape"""
     if kind == "str":
         return _general_pprint(node, depth, "str", width)
 
-    base = _shape_dtype_struct_pprint(node, depth, kind, width)
+    base = _shape_dtype_pprint(node, depth, kind, width)
 
     if not issubclass(node.dtype.type, (np.integer, np.floating)) or node.size == 0:
         return _format_width(base, width)
@@ -130,7 +125,7 @@ def _numpy_pprint(
 
 
 @ft.lru_cache
-def _func_pprint(func: Callable, depth: int, kind: Kind, width: int) -> str:
+def _func_pprint(func: Callable, depth: int, kind: PrintKind, width: int) -> str:
     """Pretty print function
 
     Example:
@@ -153,7 +148,7 @@ def _func_pprint(func: Callable, depth: int, kind: Kind, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _list_pprint(node: list, depth: int, kind: Kind, width: int) -> str:
+def _list_pprint(node: list, depth: int, kind: PrintKind, width: int) -> str:
     """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,depth+1,kind,width))}" for v in node)
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
@@ -161,7 +156,7 @@ def _list_pprint(node: list, depth: int, kind: Kind, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _tuple_pprint(node: tuple, depth: int, kind: Kind, width: int) -> str:
+def _tuple_pprint(node: tuple, depth: int, kind: PrintKind, width: int) -> str:
     """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,depth+1,kind,width))}" for v in node)
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
@@ -169,7 +164,7 @@ def _tuple_pprint(node: tuple, depth: int, kind: Kind, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _set_pprint(node: set, depth: int, kind: Kind, width: int) -> str:
+def _set_pprint(node: set, depth: int, kind: PrintKind, width: int) -> str:
     """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,depth+1,kind,width))}" for v in node)
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
@@ -177,14 +172,14 @@ def _set_pprint(node: set, depth: int, kind: Kind, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _dict_pprint(node: dict, depth: int, kind: Kind, width: int) -> str:
+def _dict_pprint(node: dict, depth: int, kind: PrintKind, width: int) -> str:
     fmt = (f"{k}:{_node_pprint(v,depth+1,kind,width)}" for k, v in node.items())
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
     fmt = "{\n" + "\t" * (depth + 1) + (fmt) + "\n" + "\t" * (depth) + "}"
     return _format_width(fmt, width)
 
 
-def _namedtuple_pprint(node, depth: int, kind: Kind, width: int) -> str:
+def _namedtuple_pprint(node, depth: int, kind: PrintKind, width: int) -> str:
     items = node._asdict().items()
     fmt = (f"{k}={_node_pprint(v,depth+1,kind,width)}" for k, v in items)
     fmt = (", \n" + "\t" * (depth + 1)).join(fmt)
@@ -192,7 +187,7 @@ def _namedtuple_pprint(node, depth: int, kind: Kind, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _dataclass_like_pprint(node, depth: int, kind: Kind, width: int) -> str:
+def _dataclass_like_pprint(node, depth: int, kind: PrintKind, width: int) -> str:
     name = node.__class__.__name__
     fields = _dataclass_like_fields(node)
     # we use vars here to avoid unfreezing it in case it is frozen
@@ -204,7 +199,7 @@ def _dataclass_like_pprint(node, depth: int, kind: Kind, width: int) -> str:
     return _format_width(fmt, width)
 
 
-def _node_type_pprint(node: type, depth: int, kind: Kind, width: int) -> str:
+def _node_type_pprint(node: type, depth: int, kind: PrintKind, width: int) -> str:
     if hasattr(node, "dtype") and hasattr(node, "shape"):
         shape_dype = node.shape, node.dtype
         fmt = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), depth, kind, width)
@@ -454,12 +449,7 @@ def _calculate_leaf_trace_stats(
 ) -> tuple[int | complex, int | complex]:
     # calcuate some stats of a single subtree defined by the `NodeInfo` objects
     # for each subtree, we will calculate the types distribution and their size
-    # stats = defaultdict(lambda: [0, 0])
-    if not isinstance(trace, LeafTrace):
-        raise TypeError(f"Expected `LeafTrace` object, but got {type(trace)}")
-
     count = size = 0
-
     traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen))
 
     for trace, leaf in zip(traces, leaves):

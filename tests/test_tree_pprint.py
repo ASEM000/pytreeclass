@@ -240,3 +240,24 @@ def test_extra_tree_diagram():
         # trunk-ignore(flake8/E501)
         == "L2\n    ├── e=4\n    ├── f:L1\n    │   ├── c:L0\n    │   │   ├── a=1\n    │   │   └── b=2\n    │   └── d=3\n    ├── g:L0\n    │   ├── a=1\n    │   └── b=2\n    └── h=5"
     )
+
+    @pytc.treeclass
+    class L0:
+        a: int = 1
+
+    @pytc.treeclass
+    class L1:
+        b: L0 = L0()
+
+    tree = L1()
+
+    assert tree_diagram(tree) == "L1\n    └── b:L0\n        └── a=1"
+
+
+def test_invalid_depth():
+    with pytest.raises(TypeError):
+        tree_diagram(1, depth="a")
+    with pytest.raises(TypeError):
+        tree_summary(1, depth="a")
+    with pytest.raises(TypeError):
+        tree_mermaid(1, depth="a")

@@ -61,6 +61,8 @@ def test_func_pprint():
         == "he_normal(in_axis, out_axis, batch_axis, dtype)"
     )
 
+    assert _node_pprint(jax.jit(lambda x: x), 0, "repr", 60) == "jit(Lambda(x))"
+
 
 def test_format_count():
     assert _format_count(complex(1000, 2)) == "1,000(2)"

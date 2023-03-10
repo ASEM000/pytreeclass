@@ -21,7 +21,7 @@ from pytreeclass._src.tree_decorator import (
     _generate_init,
 )
 from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
-from pytreeclass._src.tree_indexer import _tree_copy, bcmap, tree_indexer
+from pytreeclass._src.tree_indexer import bcmap, tree_indexer
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_trace import register_pytree_node_trace
 
@@ -96,8 +96,9 @@ def _getattr_wrapper(getattr_func):
         # >>> tree.a
         # 1  # the value is unwrapped when accessed directly
         value = getattr_func(self, key)
-        # unwrap non-`TreeClass` instance variables
+        # unwrap non-`treeclass` wrapped instance variables
         # so the getattr will always return unwrapped values.
+        # this renders the wrapped instance variables transparent to the user
         return _tree_unwrap(value) if key in getattr_func(self, _VARS) else value
 
     return getattr_method
@@ -247,7 +248,7 @@ def _validate_class(klass: type) -> type:
 
 
 def _dataclass_transform(klass: type) -> type:
-    # add custom `dataclass` field_map and frozen attributes to the class
+    # add custom `dataclass`-like field_map and frozen attributes to the class
     setattr(klass, _FIELD_MAP, _generate_field_map(klass))
     # flag for the immutable behavior
     setattr(klass, _FROZEN, True)
@@ -274,8 +275,45 @@ def _dataclass_transform(klass: type) -> type:
     return klass
 
 
+def _swop(func):
+    # swaping the arguments of a function
+    return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
+
+
+def _tree_copy(tree: PyTree) -> PyTree:
+    """Return a copy of the tree"""
+    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
+
+
+def is_tree_equal(lhs: Any, rhs: Any) -> bool:
+    """Assert if two pytrees are equal"""
+    lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
+    rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
+
+    if not (lhs_treedef == rhs_treedef):
+        # not matching treedefs
+        return False
+
+    for lhs, rhs in zip(lhs_leaves, rhs_leaves):
+        if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
+            if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
+                if not np.array_equal(lhs, rhs):
+                    # lhs array leaf is not equal to rhs array leaf
+                    return False
+            else:
+                # lhs array leaf is an array but rhs
+                # leaf is not an array
+                return False
+        else:
+            if lhs != rhs:
+                # non-array lhs leaf is not equal to the
+                # non-array rhs leaf
+                return False
+    return True
+
+
 def _auxiliary_transform(klass: type, *, math: bool, index: bool) -> type:
-    # optional attributes defines pretty printing, hashing,
+    # optional methods defines pretty printing, hashing,
     # copying, indexing and math operations
     # keep the original methods if they are defined by the user
     attrs = dict()
@@ -287,6 +325,9 @@ def _auxiliary_transform(klass: type, *, math: bool, index: bool) -> type:
     # hashing and copying
     attrs["__copy__"] = _tree_copy
     attrs["__hash__"] = _tree_hash
+
+    # defautl equality behavior if `math`=False
+    attrs["__eq__"] = is_tree_equal
 
     if index:
         # index defines `at` functionality to
@@ -320,19 +361,19 @@ def _auxiliary_transform(klass: type, *, math: bool, index: bool) -> type:
         attrs["__pow__"] = bcmap(op.pow)
         attrs["__radd__"] = bcmap(op.add)
         attrs["__rand__"] = bcmap(op.and_)
-        attrs["__rdivmod__"] = bcmap(ft.wraps(divmod)(lambda x, y: divmod(y, x)))
-        attrs["__rfloordiv__"] = bcmap(ft.wraps(op.floordiv)(lambda x, y: y // x))
-        attrs["__rlshift__"] = bcmap(ft.wraps(op.lshift)(lambda x, y: (y << x)))
-        attrs["__rmatmul__"] = bcmap(ft.wraps(op.matmul)(lambda x, y: y @ x))
-        attrs["__rmod__"] = bcmap(ft.wraps(op.mod)(lambda x, y: y % x))
+        attrs["__rdivmod__"] = bcmap(_swop(divmod))
+        attrs["__rfloordiv__"] = bcmap(_swop(op.floordiv))
+        attrs["__rlshift__"] = bcmap(_swop(op.lshift))
+        attrs["__rmatmul__"] = bcmap(_swop(op.matmul))
+        attrs["__rmod__"] = bcmap(_swop(op.mod))
         attrs["__rmul__"] = bcmap(op.mul)
         attrs["__ror__"] = bcmap(op.or_)
         attrs["__round__"] = bcmap(round)
-        attrs["__rpow__"] = bcmap(ft.wraps(op.pow)(lambda x, y: op.pow(y, x)))
-        attrs["__rrshift__"] = bcmap(ft.wraps(op.rshift)(lambda x, y: (y >> x)))
+        attrs["__rpow__"] = bcmap(_swop(op.pow))
+        attrs["__rrshift__"] = bcmap(_swop(op.rshift))
         attrs["__rshift__"] = bcmap(op.rshift)
-        attrs["__rsub__"] = bcmap(ft.wraps(op.sub)(lambda x, y: (y - x)))
-        attrs["__rtruediv__"] = bcmap(ft.wraps(op.truediv)(lambda x, y: (y / x)))
+        attrs["__rsub__"] = bcmap(_swop(op.sub))
+        attrs["__rtruediv__"] = bcmap(_swop(op.truediv))
         attrs["__rxor__"] = bcmap(op.xor)
         attrs["__sub__"] = bcmap(op.sub)
         attrs["__truediv__"] = bcmap(op.truediv)
@@ -419,30 +460,3 @@ def treeclass(klass: type, *, math: bool = False, index: bool = False) -> type:
 
     # add the class to the `JAX` registry if not registered
     return _register_treeclass(klass)
-
-
-def is_tree_equal(lhs: Any, rhs: Any) -> bool:
-    """Assert if two pytrees are equal"""
-    lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
-    rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
-
-    if not (lhs_treedef == rhs_treedef):
-        # not matching treedefs
-        return False
-
-    for lhs, rhs in zip(lhs_leaves, rhs_leaves):
-        if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
-            if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
-                if not np.array_equal(lhs, rhs):
-                    # lhs array leaf is not equal to rhs array leaf
-                    return False
-            else:
-                # lhs array leaf is an array but rhs
-                # leaf is not an array
-                return False
-        else:
-            if lhs != rhs:
-                # non-array lhs leaf is not equal to the
-                # non-array rhs leaf
-                return False
-    return True

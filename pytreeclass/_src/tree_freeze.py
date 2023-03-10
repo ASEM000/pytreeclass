@@ -52,6 +52,7 @@ class ImmutableWrapper:
 
 
 def _tree_unwrap(value: PyTree) -> PyTree:
+    # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
     is_leaf = lambda x: isinstance(x, ImmutableWrapper) or hasattr(x, _FIELD_MAP)
     return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
