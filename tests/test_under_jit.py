@@ -10,7 +10,7 @@ import pytreeclass as pytc
 
 
 def test_jit_freeze():
-    @ft.partial(pytc.treeclass, mask=True, index=True)
+    @ft.partial(pytc.treeclass, math=True, index=True)
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
@@ -26,7 +26,7 @@ def test_jit_freeze():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @ft.partial(pytc.treeclass, mask=True, index=True)
+    @ft.partial(pytc.treeclass, math=True, index=True)
     class StackedLinear:
         l1: Linear
         l2: Linear
@@ -106,13 +106,13 @@ def test_jit_freeze():
 
 
 def test_ops_with_jit():
-    @ft.partial(pytc.treeclass, mask=True, index=True)
+    @ft.partial(pytc.treeclass, math=True, index=True)
     class T0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @ft.partial(pytc.treeclass, mask=True, index=True)
+    @ft.partial(pytc.treeclass, math=True, index=True)
     class T1:
         a: int = 1
         b: int = 2

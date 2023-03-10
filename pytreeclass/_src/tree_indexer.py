@@ -71,7 +71,8 @@ def _set_at_mask(
                 return jnp.where(where, set_value, lhs)
             # set_value is not scalar
             return set_value if jnp.all(where) else lhs
-        # lhs is not an array and set_value, so we apply the set_value to the lhs if the condition is met
+        # lhs is not an array and set_value, so we apply the set_value to the
+        # lhs if the condition is met
         return set_value if (where is True) else lhs
 
     if isinstance(set_value, type(tree)) and (
@@ -100,11 +101,12 @@ def _apply_at_mask(
         # to avoid extrachecks in `tree_map`
         where, value = _check_valid_mask_leaf(where), func(lhs)
         if isinstance(lhs, (jnp.ndarray, np.ndarray)):
-            if jnp.isscalar(value):
+            try:
                 # lhs is an array with scalar output
                 return jnp.where(where, value, lhs)
-            # set_value is not scalar
-            return value if jnp.all(where) else lhs
+            except TypeError:
+                # set_value is not `scalar` type
+                return value if jnp.all(where) else lhs
         # lhs is not an array and value is not scalar
         return value if (where is True) else lhs
 
@@ -118,7 +120,8 @@ def _reduce_at_mask(
     initializer: Any = _no_initializer,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> Any:
-    # note: current `jax`` implementation of `tree_reduce` does not support `is_leaf` argument
+    # note: current `jax`` implementation of `tree_reduce`
+    # does not support `is_leaf` argument, but it is supported here
     tree = tree.at[where].get(is_leaf=is_leaf)
     if initializer is _no_initializer:
         return jtu.tree_reduce(func, tree)
@@ -183,7 +186,7 @@ def _at_mask(tree: PyTree, where: PyTree) -> PyTree:
 # tree indexing by name or index  path
 
 
-def _get_at_path(
+def _get_at_trace(
     tree: PyTree,
     where: tuple[int | str, ...],
     is_leaf: Callable[[Any], bool] | None = None,
@@ -191,7 +194,7 @@ def _get_at_path(
     # canonicalize `where` to `tuple` to conform to leaf trace type
     where = tuple(where)
 
-    def map_func(trace, leaf):
+    def lhs_get(trace, leaf):
         for i, item in enumerate(where):
             if i >= len(trace.indices):
                 msg = f"Out of bounds path={where} for leaf={leaf}."
@@ -205,10 +208,10 @@ def _get_at_path(
                 return None
         return leaf
 
-    return tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
+    return tree_map_with_trace(lhs_get, tree, is_leaf=is_leaf)
 
 
-def _set_at_path(
+def _set_at_trace(
     tree: PyTree,
     where: tuple[int | str, ...],
     set_value: Any,
@@ -217,7 +220,7 @@ def _set_at_path(
     # canonicalize `where` to `tuple` to conform to leaf trace type
     where = tuple(where)
 
-    def map_func(trace, leaf):
+    def lhs_set(trace, leaf, set_value: Any):
         for i, item in enumerate(where):
             if i >= len(trace.indices):
                 msg = f"Out of bounds path={where} for leaf={leaf}."
@@ -229,12 +232,25 @@ def _set_at_path(
                 isinstance(item, str) and trace.names[i] != item
             ):
                 return leaf
+        # consider the same structure PyTree case tree.at[...].set(tree)
         return set_value
 
-    return tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
+    if isinstance(set_value, type(tree)) and (
+        jtu.tree_structure(tree, is_leaf=is_leaf)
+        == jtu.tree_structure(set_value, is_leaf=is_leaf)
+    ):
+        # do not broadcast set_value if it is a pytree of same structure
+        # for example tree.at[where].set(tree2) will set all tree leaves to tree2 leaves
+        # if tree2 is a pytree of same structure as tree
+        return tree_map_with_trace(lhs_set, tree, set_value, is_leaf=is_leaf)
+
+    # set_value is broadcasted to tree leaves
+    # for example tree.at[where].set(1) will set all tree leaves to 1
+    partial_lhs_set = lambda trace, lhs: lhs_set(trace, lhs, set_value)
+    return tree_map_with_trace(partial_lhs_set, tree, is_leaf=is_leaf)
 
 
-def _apply_at_path(
+def _apply_at_trace(
     tree: PyTree,
     where: tuple[int | str, ...],
     func: Callable,
@@ -243,7 +259,7 @@ def _apply_at_path(
     # canonicalize `where` to `tuple` to conform to leaf trace type
     where = tuple(where)
 
-    def map_func(trace, leaf):
+    def lhs_apply(trace, leaf):
         for i, item in enumerate(where):
             if i >= len(trace.indices):
                 msg = f"Out of bounds path={where} for leaf={leaf}."
@@ -257,10 +273,10 @@ def _apply_at_path(
                 return leaf
         return func(leaf)
 
-    return tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
+    return tree_map_with_trace(lhs_apply, tree, is_leaf=is_leaf)
 
 
-def _reduce_at_path(
+def _reduce_at_trace(
     tree: PyTree,
     where: tuple[str | int, ...],
     func: Callable[[Any, Any], Any],
@@ -272,7 +288,7 @@ def _reduce_at_path(
     # canonicalize `where` to `tuple` to conform to leaf trace type
     where = tuple(where)
 
-    def map_func(trace, leaf):
+    def lhs_reduce(trace, leaf):
         for i, item in enumerate(where):
             if i >= len(trace.indices):
                 msg = f"Out of bounds path={where} for leaf={leaf}."
@@ -286,7 +302,7 @@ def _reduce_at_path(
                 return None
         return leaf
 
-    tree = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
+    tree = tree_map_with_trace(lhs_reduce, tree, is_leaf=is_leaf)
     if initializer is _no_initializer:
         return jtu.tree_reduce(func, tree)
     return jtu.tree_reduce(func, tree, initializer=initializer)
@@ -297,12 +313,12 @@ class _TreeAtPath(NamedTuple):
     where: tuple[int | str]
 
     def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
-        return _get_at_path(self.tree, self.where, is_leaf)
+        return _get_at_trace(self.tree, self.where, is_leaf)
 
     def set(
         self, set_value: Any, *, is_leaf: Callable[[Any], bool] | None = None
     ) -> PyTree:
-        return _set_at_path(self.tree, self.where, set_value, is_leaf)
+        return _set_at_trace(self.tree, self.where, set_value, is_leaf)
 
     def apply(
         self,
@@ -310,7 +326,7 @@ class _TreeAtPath(NamedTuple):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> PyTree:
-        return _apply_at_path(self.tree, self.where, func, is_leaf)
+        return _apply_at_trace(self.tree, self.where, func, is_leaf)
 
     def reduce(
         self,
@@ -319,7 +335,7 @@ class _TreeAtPath(NamedTuple):
         initializer: Any = _no_initializer,
         is_leaf: Callable[[Any], bool] = None,
     ) -> Any:
-        return _reduce_at_path(self.tree, self.where, func, initializer, is_leaf)
+        return _reduce_at_trace(self.tree, self.where, func, initializer, is_leaf)
 
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         # return the output of the method called on the attribute
@@ -333,7 +349,7 @@ class _TreeAtPath(NamedTuple):
         return value, tree
 
 
-def _at_path(tree: PyTree, where: tuple[str | int]) -> PyTree:
+def _at_trace(tree: PyTree, where: tuple[str | int]) -> PyTree:
     class TreeAtPath(_TreeAtPath):
         def __getitem__(lhs_self, rhs_where: str | int | PyTree):
             # support for nested `.at``
@@ -347,7 +363,7 @@ def _at_path(tree: PyTree, where: tuple[str | int]) -> PyTree:
 
             # case for name/index path rhs
             rhs_where = (*lhs_self.where, rhs_where)
-            return _at_path(tree=tree, where=rhs_where)
+            return _at_trace(tree=tree, where=rhs_where)
 
         def __getattr__(lhs_self, name):
             # support nested `.at``
@@ -370,7 +386,7 @@ def tree_indexer(tree: PyTree) -> PyTree:
                 # indexing by name or index
                 # name and index rules are defined using
                 # `register_pytree_node_trace_func`
-                return _at_path(tree=tree, where=(where,))
+                return _at_trace(tree=tree, where=(where,))
 
             if isinstance(where, type(tree)):
                 # indexing by boolean pytree

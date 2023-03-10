@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import copy
 import functools as ft
-import math
 import operator as op
+from math import ceil, floor, trunc
 from typing import Any, Callable, Sequence
 
-import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
@@ -275,7 +274,7 @@ def _dataclass_transform(klass: type) -> type:
     return klass
 
 
-def _auxiliary_transform(klass: type, *, mask: bool, index: bool) -> type:
+def _auxiliary_transform(klass: type, *, math: bool, index: bool) -> type:
     # optional attributes defines pretty printing, hashing,
     # copying, indexing and math operations
     # keep the original methods if they are defined by the user
@@ -295,14 +294,14 @@ def _auxiliary_transform(klass: type, *, mask: bool, index: bool) -> type:
         # mask level wise
         attrs["at"] = property(tree_indexer)
 
-    if mask:
+    if math:
         attrs["__abs__"] = bcmap(op.abs)
         attrs["__add__"] = bcmap(op.add)
         attrs["__and__"] = bcmap(op.and_)
-        attrs["__ceil__"] = bcmap(math.ceil)
+        attrs["__ceil__"] = bcmap(ceil)
         attrs["__divmod__"] = bcmap(divmod)
         attrs["__eq__"] = bcmap(op.eq)
-        attrs["__floor__"] = bcmap(math.floor)
+        attrs["__floor__"] = bcmap(floor)
         attrs["__floordiv__"] = bcmap(op.floordiv)
         attrs["__ge__"] = bcmap(op.ge)
         attrs["__gt__"] = bcmap(op.gt)
@@ -337,7 +336,7 @@ def _auxiliary_transform(klass: type, *, mask: bool, index: bool) -> type:
         attrs["__rxor__"] = bcmap(op.xor)
         attrs["__sub__"] = bcmap(op.sub)
         attrs["__truediv__"] = bcmap(op.truediv)
-        attrs["__trunc__"] = bcmap(math.trunc)
+        attrs["__trunc__"] = bcmap(trunc)
         attrs["__xor__"] = bcmap(op.xor)
 
     for key in attrs:
@@ -348,7 +347,7 @@ def _auxiliary_transform(klass: type, *, mask: bool, index: bool) -> type:
     return klass
 
 
-def treeclass(klass: type, *, mask: bool = False, index: bool = False) -> type:
+def treeclass(klass: type, *, math: bool = False, index: bool = False) -> type:
     """Decorator to convert a class to a JAX compatible tree structure.
 
     Args:
@@ -416,7 +415,7 @@ def treeclass(klass: type, *, mask: bool = False, index: bool = False) -> type:
     # add the optional methods to the class
     # optional methods are math operations, indexing and masking,
     # hashing and copying, and pretty printing
-    klass = _auxiliary_transform(klass, mask=mask, index=index)
+    klass = _auxiliary_transform(klass, math=math, index=index)
 
     # add the class to the `JAX` registry if not registered
     return _register_treeclass(klass)
@@ -428,15 +427,22 @@ def is_tree_equal(lhs: Any, rhs: Any) -> bool:
     rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
 
     if not (lhs_treedef == rhs_treedef):
+        # not matching treedefs
         return False
 
     for lhs, rhs in zip(lhs_leaves, rhs_leaves):
-        if isinstance(lhs, (jnp.ndarray, np.ndarray)):
-            if isinstance(rhs, (jnp.ndarray, np.ndarray)):
+        if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
+            if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
                 if not np.array_equal(lhs, rhs):
+                    # lhs array leaf is not equal to rhs array leaf
                     return False
             else:
+                # lhs array leaf is an array but rhs
+                # leaf is not an array
                 return False
         else:
-            return lhs == rhs
+            if lhs != rhs:
+                # non-array lhs leaf is not equal to the
+                # non-array rhs leaf
+                return False
     return True
