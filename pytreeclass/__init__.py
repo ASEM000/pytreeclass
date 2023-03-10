@@ -42,4 +42,4 @@ __all__ = (
     "tree_indexer",
 )
 
-__version__ = "0.2.0b7"
+__version__ = "0.2.0b8"
