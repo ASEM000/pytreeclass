@@ -349,24 +349,57 @@ def _auxiliary_transform(klass: type, *, mask: bool, index: bool) -> type:
 
 
 def treeclass(klass: type, *, mask: bool = False, index: bool = False) -> type:
-    """Decorator to convert a class to a `treeclass`
+    """Decorator to convert a class to a JAX compatible tree structure.
+
+    Args:
+        klass: class to be converted to a `treeclass`
+        mask: Wether to generate leaf-wise math operations methods. Defaults to `False`.
+        index: Wether to support integer,name, or boolean mask indexing. Defaults to `False`.
 
     Example:
+        >>> import functools as ft
         >>> import jax
-        >>> import jax.numpy as jnp
         >>> import pytreeclass as pytc
 
+        **Tree leaves are defined by annotated fields**
         >>> @pytc.treeclass
-        ... class Linear :
-        ...     weight : jnp.ndarray
-        ...     bias   : jnp.ndarray
+        ... class Tree:
+        ...     a:int = 1
+        ...     b:float = 2.0
 
-        >>> def __init__(self,key,in_dim,out_dim):
-        ...    self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
-        ...    self.bias = jnp.ones((1,out_dim))
+        >>> tree = Tree()
+        >>> jax.tree_util.tree_leaves(tree)
+        [1, 2.0]
 
-        >>> def __call__(self,x):
-        ...    return x @ self.weight + self.bias
+        Leaf-wise math operations are supported by setting `mask=True`
+        >>> @ft.partial(pytc.treeclass, mask=True)
+        ... class Tree:
+        ...     a:int = 1
+        ...     b:float = 2.0
+
+        >>> tree = Tree()
+        >>> tree + 1
+        Tree(a=2, b=3.0)
+
+
+        Advanced indexing is supported by setting `index=True`
+        >>> @ft.partial(pytc.treeclass, index=True)
+        ... class Tree:
+        ...     a:int = 1
+        ...     b:float = 2.0
+
+        >>> tree = Tree()
+        >>> tree.at[0].get()
+        Tree(a=1, b=None)
+
+        >>> tree.at["a"].get()
+        Tree(a=1, b=None)
+
+        Indexing is supported for {`list`, `tuple`, `dict`, `defaultdict`, `OrderedDict`, 'namedtuple'}
+        and `treeclass` wrapped classes.
+
+        Extending indexing to other types is possible by registering the type with
+        `pytreeclass.register_pytree_node_trace`
 
     Raises:
         TypeError: if the input class is not a `class`

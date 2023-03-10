@@ -52,11 +52,45 @@ EmptyTrace = ((), (), (), ())
 
 def register_pytree_node_trace(
     klass: type, trace_func: Callable[[Any], Sequence[LeafTrace]]
-):
+) -> None:
+    """
+    Args:
+        klass: The class of the object to be traced.
+        trace_func:
+            A function that instance of type `klass` and returns a tuple of
+            (name, type, index, metadata) for each leaf in the object.
+
+    Example:
+        >>> import jax
+        >>> import pytreeclass as pytc
+
+        >>> class UserList(list):
+        ...     pass
+
+        >>> def user_list_trace_func(tree:UserList):
+        ...     # (1) define name for each leaf
+        ...     names = (f"leaf{i}" for i in range(len(tree)))
+        ...     # (2) define types for each leaf
+        ...     types = (type(leaf) for leaf in tree)
+        ...     # (3) define (index,children count) for each leaf
+        ...     indices = ((i,len(tree)) for i in range(len(tree)))
+        ...     # (4) define metadatas (if any) for each leaf
+        ...     metadatas = (() for _ in range(len(tree)))
+        ...     # return a list of tuples (name, type, index, metadata)
+        ...     return [*zip(names, types, indices, metadatas)]
+
+        >>> pytc.register_pytree_node_trace(UserList, user_list_trace_func)
+
+    Raises:
+        TypeError: if `klass` is not a type
+        ValueError: if `klass` is already registered
+    """
     if not isinstance(klass, type):
-        raise TypeError(f"Expected `klass` to be a type, got {type(klass)}.")
+        msg = f"Expected `klass` to be a type, got {type(klass)}."
+        raise TypeError(msg)
     if klass in _trace_registry:
-        raise ValueError(f"Node trace flatten function for {klass} already registered.")
+        msg = f"Node trace flatten function for {klass} is already registered."
+        raise ValueError(msg)
     # register the node trace flatten function to the node trace registry
     _trace_registry[klass] = _TraceRegistryEntry(trace_func)
 
@@ -71,6 +105,7 @@ def flatten_one_trace_level(
     # addition to `is_leaf` condtion , `depth`` is also useful for `tree_viz` utils
     # However, can not be used for any function that works with `treedef` objects
     if (is_leaf is not None and is_leaf(tree)) or (depth is not None and depth < 1):
+        # wrap the trace tuple with a `LeafTrace` object
         yield LeafTrace(*tree_trace), tree
         return
 
@@ -94,6 +129,7 @@ def flatten_one_trace_level(
         traces = _namedtuple_trace_func(tree)
 
     elif tree is not None:
+        # wrap the trace tuple with a `LeafTrace` object
         yield (LeafTrace(*tree_trace), tree)
         return
 
@@ -103,7 +139,7 @@ def flatten_one_trace_level(
                 (*tree_trace[0], trace[0]),  # names
                 (*tree_trace[1], trace[1]),  # types
                 (*tree_trace[2], trace[2]),  # indices
-                (*tree_trace[3], trace[3]),  # metadata
+                (*tree_trace[3], trace[3]),  # metadatas
             ),
             tree=leaf,
             is_leaf=is_leaf,
