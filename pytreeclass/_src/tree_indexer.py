@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import functools as ft
-import re
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
@@ -194,11 +193,11 @@ def _get_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if i >= len(trace.index):
-                return None
-            if isinstance(item, int) and trace.index[i] != item:
-                return None
-            if isinstance(item, str) and trace.names[i] != item:
+            if (
+                i >= len(trace.indices)
+                or (isinstance(item, int) and trace.indices[i][0] != item)
+                or (isinstance(item, str) and trace.names[i] != item)
+            ):
                 return None
         return leaf
 
@@ -216,11 +215,11 @@ def _set_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if i >= len(trace.index):
-                return leaf
-            if isinstance(item, int) and trace.index[i] != item:
-                return leaf
-            if isinstance(item, str) and trace.names[i] != item:
+            if (
+                i >= len(trace.indices)
+                or (isinstance(item, int) and trace.indices[i][0] != item)
+                or (isinstance(item, str) and trace.names[i] != item)
+            ):
                 return leaf
         return set_value
 
@@ -238,11 +237,11 @@ def _apply_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if i >= len(trace.index):
-                return leaf
-            if isinstance(item, int) and trace.index[i] != item:
-                return leaf
-            if isinstance(item, str) and trace.names[i] != item:
+            if (
+                i >= len(trace.indices)
+                or (isinstance(item, int) and trace.indices[i][0] != item)
+                or (isinstance(item, str) and trace.names[i] != item)
+            ):
                 return leaf
         return func(leaf)
 
@@ -263,11 +262,11 @@ def _reduce_at_path(
 
     def map_func(trace, leaf):
         for i, item in enumerate(where):
-            if i >= len(trace.index):
-                return None
-            if isinstance(item, int) and trace.index[i] != item:
-                return None
-            if isinstance(item, str) and trace.names[i] != item:
+            if (
+                i >= len(trace.indices)
+                or (isinstance(item, int) and trace.indices[i][0] != item)
+                or (isinstance(item, str) and trace.names[i] != item)
+            ):
                 return None
         return leaf
 
@@ -346,11 +345,6 @@ def _at_path(tree: PyTree, where: tuple[str | int]) -> PyTree:
             raise AttributeError(msg)
 
     return TreeAtPath(tree=tree, where=where)
-
-
-def _is_valid_name(s):
-    pattern = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-    return bool(pattern.match(s))
 
 
 def tree_indexer(tree: PyTree) -> PyTree:

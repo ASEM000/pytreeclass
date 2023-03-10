@@ -53,10 +53,9 @@ def _tree_trace(tree: PyTree) -> Sequence[Sequence[str, type, int, int, Any]]:
     leaves, (keys, _) = _tree_flatten(tree)
     names = (f"{key}" for key in keys)
     types = (type(leaf) for leaf in leaves)
-    index = range(len(leaves))
-    width = (len(leaves) for _ in range(len(leaves)))
-    metas = ({"repr": getattr(tree, _FIELD_MAP)[key].repr} for key in keys)
-    return [*zip(names, types, index, width, metas)]
+    indices = ((i, len(leaves)) for i in range(len(leaves)))
+    metadatas = ({"repr": getattr(tree, _FIELD_MAP)[key].repr} for key in keys)
+    return [*zip(names, types, indices, metadatas)]
 
 
 @ft.lru_cache(maxsize=None)

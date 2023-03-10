@@ -233,9 +233,9 @@ def _node_type_pprint(node: type, depth: int, kind: Kind, width: int) -> str:
 
 
 def _should_omit_trace(trace: LeafTrace) -> bool:
-    for meta in trace.metas:
-        if isinstance(meta, dict) and "repr" in meta:
-            if meta["repr"] is False:
+    for metadata in trace.metadatas:
+        if isinstance(metadata, dict) and "repr" in metadata:
+            if metadata["repr"] is False:
                 return True
     return False
 
@@ -329,7 +329,7 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
 
             for di in range(depth):
                 # handle printing the left lines for each depth
-                if trace.index[di] == trace.width[di] - 1:
+                if trace.indices[di][0] == trace.indices[di][1] - 1:
                     # do not print the left line
                     # └── A
                     #     └── B
@@ -341,7 +341,12 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
                     # └── C
                     fmt += "│\t"
 
-            fmt += "└" if trace.index[depth] == (trace.width[depth] - 1) else "├"
+            if trace.indices[depth][0] == (trace.indices[depth][1] - 1):
+                # check if we are at the last node in the current depth
+                fmt += "└"
+            else:
+                fmt += "├"
+
             fmt += f"── {_node_pprint(name,0,'str',width )}"
 
             if depth == len(trace.names) - 1:
@@ -395,7 +400,7 @@ def tree_mermaid(tree: PyTree, depth=None, width: int = 60) -> str:
             name = _node_pprint(name, 0, "str", width)
 
             prev_id = root_id if depth == 0 else cur_id
-            cur_id = node_id((depth, tuple(trace.index), prev_id))
+            cur_id = node_id((depth, tuple(trace.indices), prev_id))
             fmt += f"\n\tid{prev_id}"
             stats = f'|"{count}<br>{size}"|' if depth == len(trace.names) - 1 else ""
             fmt += "--->" + stats

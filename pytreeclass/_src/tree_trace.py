@@ -41,14 +41,13 @@ class _TraceRegistryEntry(NamedTuple):
 
 
 class LeafTrace(NamedTuple):
-    names: Sequence[str]  # name of the node in each level
-    types: Sequence[type]  # type of the node in each level
-    index: Sequence[int]  # index of the node in the tree in each level
-    width: Sequence[int]  # number of children in each level
-    metas: Sequence[Any]  # metadata for each level for a node
+    names: Sequence[str]  # name path of the node at each level
+    types: Sequence[type]  # type path of the node at each level
+    indices: Sequence[tuple[int, int]]  # (index,width) tuple of the node at each level
+    metadatas: Sequence[Any]  # metadata for each level for a node
 
 
-EmptyTrace = ((), (), (), (), ())
+EmptyTrace = ((), (), (), ())
 
 
 def register_pytree_node_trace(
@@ -103,13 +102,11 @@ def flatten_one_trace_level(
             tree_trace=(
                 (*tree_trace[0], trace[0]),  # names
                 (*tree_trace[1], trace[1]),  # types
-                (*tree_trace[2], trace[2]),  # index
-                (*tree_trace[3], trace[3]),  # width
-                (*tree_trace[4], trace[4]),  # metas
+                (*tree_trace[2], trace[2]),  # indices
+                (*tree_trace[3], trace[3]),  # metadata
             ),
             tree=leaf,
             is_leaf=is_leaf,
-            # `None` depth is max depth
             depth=(depth - 1) if depth is not None else None,
         )
 
@@ -125,9 +122,9 @@ def tree_flatten_with_trace(
     tree: PyTree, is_leaf: Callable[[Any], bool] | None = None
 ) -> tuple[Sequence[tuple[LeafTrace, Any]], jtu.PyTreeDef]:
     """Similar to jax.tree_util.tree_flatten` but returns the `LeafTrace` objects too as well"""
-    tree_def = jtu.tree_structure(tree, is_leaf=is_leaf)
+    treedef = jtu.tree_structure(tree, is_leaf=is_leaf)
     traces_leaves = tree_leaves_with_trace(tree, is_leaf=is_leaf)
-    return traces_leaves, tree_def
+    return traces_leaves, treedef
 
 
 def _sequence_trace_func(
@@ -135,41 +132,37 @@ def _sequence_trace_func(
 ) -> Sequence[Sequence[str, type, int, int, Any]]:
     names = (f"[{i}]" for i in range(len(tree)))
     types = map(type, tree)
-    index = range(len(tree))
-    width = (len(tree) for _ in range(len(tree)))
-    metas = (() for _ in range(len(tree)))
-    return [*zip(names, types, index, width, metas)]
+    indices = ((i, len(tree)) for i in range(len(tree)))
+    metadatas = (() for _ in range(len(tree)))
+    return [*zip(names, types, indices, metadatas)]
 
 
 def _dict_trace_func(tree: dict) -> Sequence[Sequence[str, type, int, int, Any]]:
     names = (f"['{k}']" for k in tree)
     types = (type(tree[key]) for key in tree)
-    index = range(len(tree))
-    width = (len(tree) for _ in range(len(tree)))
-    metas = ({"repr": not k.startswith("_")} for k in tree)
-    return [*zip(names, types, index, width, metas)]
+    indices = ((i, len(tree)) for i in range(len(tree)))
+    metadatas = ({"repr": not k.startswith("_")} for k in tree)
+    return [*zip(names, types, indices, metadatas)]
 
 
 def _namedtuple_trace_func(tree: Any) -> Sequence[Sequence[str, type, int, int, Any]]:
     names = (f"['{field}']" for field in tree._fields)
     types = (type(getattr(tree, field)) for field in tree._fields)
-    index = range(len(tree))
-    width = (len(tree) for _ in range(len(tree)))
-    metas = (() for _ in tree._fields)
-    return [*zip(names, types, index, width, metas)]
+    indices = ((i, len(tree)) for i in range(len(tree)))
+    metadatas = (() for _ in tree._fields)
+    return [*zip(names, types, indices, metadatas)]
 
 
 def _jaxable_trace_func(tree: Any) -> Sequence[Sequence[str, type, int, int, Any]]:
     # fallback trace function in case no trace function is registered for a given
     # class in the `trace` registry
     # get leaves from the `jax` registry
-    leaves, _ = _registry.get(type(tree)).to_iter(tree)
+    leaves = _registry.get(type(tree)).to_iter(tree)[0]
     names = (f"leaf_{i}" for i in range(len(leaves)))
     types = map(type, leaves)
-    index = range(len(leaves))
-    width = (len(leaves) for _ in range(len(leaves)))
-    metas = (() for _ in range(len(leaves)))
-    return [*zip(names, types, index, width, metas)]
+    indices = ((i, len(leaves)) for i in range(len(leaves)))
+    metadatas = (() for _ in range(len(leaves)))
+    return [*zip(names, types, indices, metadatas)]
 
 
 # register trace functions for common types
