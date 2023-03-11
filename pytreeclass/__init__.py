@@ -44,4 +44,4 @@ __all__ = (
     "register_pytree_node_trace",
 )
 
-__version__ = "0.2.0b9"
+__version__ = "0.2.0b10"

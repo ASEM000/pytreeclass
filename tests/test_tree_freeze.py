@@ -11,7 +11,7 @@ from pytreeclass._src.tree_freeze import _HashableWrapper
 
 
 def test_freeze_unfreeze():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class A:
         a: int
         b: int
@@ -31,17 +31,17 @@ def test_freeze_unfreeze():
 
     assert pytc.unfreeze(pytc.freeze(1.0)) == 1.0
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class A:
         a: int
         b: int
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class B:
         c: int = 3
         d: A = A(1, 2)
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class A:
         a: int
         b: int
@@ -59,15 +59,15 @@ def test_freeze_unfreeze():
     assert jtu.tree_leaves(b) == []
     assert jtu.tree_leaves(c) == [1, 2]
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l0:
         a: int = 0
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l1:
         b: l0 = l0()
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l2:
         c: l1 = l1()
 
@@ -77,12 +77,12 @@ def test_freeze_unfreeze():
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l1:
         def __init__(self):
             self.b = l0()
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l2:
         def __init__(self):
             self.c = l1()
@@ -96,7 +96,7 @@ def test_freeze_errors():
     class T:
         pass
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Test:
         a: Any
 
@@ -112,17 +112,17 @@ def test_freeze_errors():
 
 
 def test_freeze_with_ops():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class A:
         a: int
         b: int
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class B:
         c: int = 3
         d: A = A(1, 2)
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Test:
         a: int = 1
         b: float = pytc.freeze(1.0)
@@ -143,7 +143,7 @@ def test_freeze_with_ops():
     jtu.tree_map(pytc.unfreeze, t, is_leaf=pytc.is_frozen)
     jtu.tree_map(pytc.freeze, t)
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Test:
         a: int
 
@@ -153,7 +153,7 @@ def test_freeze_with_ops():
     assert pytc.is_tree_equal(t.at[...].apply(lambda x: x + 1), t)
     assert pytc.is_tree_equal(t.at[...].reduce(jnp.sin, initializer=0), 0.0)
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Test:
         x: jnp.ndarray
 
@@ -163,11 +163,11 @@ def test_freeze_with_ops():
     t = Test(jnp.array([1, 2, 3]))
     assert pytc.is_tree_equal(t.at[...].set(None), Test(x=None))
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class t0:
         a: int = 1
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class t1:
         a: int = t0()
 
@@ -175,12 +175,12 @@ def test_freeze_with_ops():
 
 
 def test_freeze_diagram():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class A:
         a: int
         b: int
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class B:
         c: int = 3
         d: A = A(1, 2)
@@ -193,7 +193,7 @@ def test_freeze_diagram():
 
 
 def test_freeze_mask():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Test:
         a: int = 1
         b: int = 2
@@ -205,7 +205,7 @@ def test_freeze_mask():
 
 
 def test_freeze_nondiff():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Test:
         a: int = pytc.freeze(1)
         b: str = "a"
@@ -220,7 +220,7 @@ def test_freeze_nondiff():
         .apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
     ) == ["a"]
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class T0:
         a: Test = Test()
 
@@ -234,20 +234,20 @@ def test_freeze_nondiff():
 
 
 def test_freeze_nondiff_with_mask():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class L0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class L1:
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class L2:
         a: int = 10
         b: int = 20
@@ -266,12 +266,12 @@ def test_non_dataclass_input_to_freeze():
 
 
 def test_tree_freeze():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l0:
         x: int = 2
         y: int = 3
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l1:
         a: int = 1
         b: l0 = l0()
@@ -293,12 +293,12 @@ def test_tree_freeze():
 
 
 def test_tree_unfreeze():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l0:
         x: int = 2
         y: int = 3
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l1:
         a: int = 1
         b: l0 = l0()
@@ -324,12 +324,12 @@ def test_tree_unfreeze():
 
 
 def test_tree_freeze_unfreeze():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l0:
         x: int = 2
         y: int = 3
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class l1:
         a: int = 1
         b: l0 = l0()
@@ -347,7 +347,7 @@ def test_tree_freeze_unfreeze():
 
 
 def test_freeze_nondiff_func():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Test:
         a: int = 1.0
         b: int = 2

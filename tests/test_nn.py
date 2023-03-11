@@ -11,7 +11,7 @@ import pytreeclass as pytc
 
 
 def test_nn():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
@@ -24,7 +24,7 @@ def test_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class StackedLinear:
         layers: Sequence[Linear]
 
@@ -63,7 +63,7 @@ def test_nn():
 
 
 def test_nn_with_func_input():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
@@ -87,7 +87,7 @@ def test_nn_with_func_input():
 
 
 def test_compact_nn():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
@@ -101,7 +101,7 @@ def test_compact_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class StackedLinear:
         def __init__(self, key, in_dim, out_dim, hidden_dim):
             keys = jax.random.split(key, 3)
@@ -132,7 +132,7 @@ def test_compact_nn():
         value, grads = jax.value_and_grad(loss_func)(model, x, y)
 
         # no need to use `jax.tree_map` to update the model
-        #  as it model is wrapped by @ft.partial(pytc.treeclass, math=True, index=True)
+        #  as it model is wrapped by @ft.partial(pytc.treeclass, leafwise=True, index=True)
         return value, model - 1e-3 * grads
 
     for _ in range(1, 10_001):
@@ -142,7 +142,7 @@ def test_compact_nn():
 
 
 def test_freeze_nondiff():
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
@@ -158,7 +158,7 @@ def test_freeze_nondiff():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @ft.partial(pytc.treeclass, math=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, index=True)
     class StackedLinear:
         name: str
         exact_array: jnp.ndarray

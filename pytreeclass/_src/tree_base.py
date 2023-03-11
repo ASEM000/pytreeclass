@@ -312,7 +312,7 @@ def is_tree_equal(lhs: Any, rhs: Any) -> bool:
     return True
 
 
-def _auxiliary_transform(klass: type, *, math: bool, index: bool) -> type:
+def _auxiliary_transform(klass: type, *, leafwise: bool, index: bool) -> type:
     # optional methods defines pretty printing, hashing,
     # copying, indexing and math operations
     # keep the original methods if they are defined by the user
@@ -326,16 +326,15 @@ def _auxiliary_transform(klass: type, *, math: bool, index: bool) -> type:
     attrs["__copy__"] = _tree_copy
     attrs["__hash__"] = _tree_hash
 
-    # defautl equality behavior if `math`=False
+    # default equality behavior if `leafwise`=False
     attrs["__eq__"] = is_tree_equal
 
     if index:
         # index defines `at` functionality to
-        # index a PyTree by integer, name, or by a boolean
-        # mask level wise
+        # index a PyTree by integer, name, or by a boolean mask
         attrs["at"] = property(tree_indexer)
 
-    if math:
+    if leafwise:
         attrs["__abs__"] = bcmap(op.abs)
         attrs["__add__"] = bcmap(op.add)
         attrs["__and__"] = bcmap(op.and_)
@@ -388,7 +387,7 @@ def _auxiliary_transform(klass: type, *, math: bool, index: bool) -> type:
     return klass
 
 
-def treeclass(klass: type, *, math: bool = False, index: bool = False) -> type:
+def treeclass(klass: type, *, leafwise: bool = False, index: bool = False) -> type:
     """Decorator to convert a class to a JAX compatible tree structure.
 
     Args:
@@ -456,7 +455,7 @@ def treeclass(klass: type, *, math: bool = False, index: bool = False) -> type:
     # add the optional methods to the class
     # optional methods are math operations, indexing and masking,
     # hashing and copying, and pretty printing
-    klass = _auxiliary_transform(klass, math=math, index=index)
+    klass = _auxiliary_transform(klass, leafwise=leafwise, index=index)
 
     # add the class to the `JAX` registry if not registered
     return _register_treeclass(klass)
