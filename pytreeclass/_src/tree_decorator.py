@@ -207,7 +207,7 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
 
         if field.pos_only and field.init:
             # if the field is positional only, we add a "/" marker after it
-            if "/," in head:
+            if "/" in head:
                 head = head.replace("/,", "")
 
             head += "/, "

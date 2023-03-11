@@ -313,7 +313,7 @@ def is_tree_equal(lhs: Any, rhs: Any) -> bool:
     return True
 
 
-def _auxiliary_transform(klass: type, *, leafwise: bool, indexable: bool) -> type:
+def _auxiliary_transform(klass: type, *, leafwise: bool, indexing: bool) -> type:
     # optional methods defines pretty printing, hashing,
     # copying, indexing and math operations
     # keep the original methods if they are defined by the user
@@ -330,7 +330,7 @@ def _auxiliary_transform(klass: type, *, leafwise: bool, indexable: bool) -> typ
     # default equality behavior if `leafwise`=False
     attrs["__eq__"] = is_tree_equal
 
-    if indexable:
+    if indexing:
         # index defines `at` functionality to
         # index a PyTree by integer, name, or by a boolean mask
         attrs["at"] = property(tree_indexer)
@@ -388,13 +388,13 @@ def _auxiliary_transform(klass: type, *, leafwise: bool, indexable: bool) -> typ
     return klass
 
 
-def treeclass(klass: type, *, leafwise: bool = False, indexable: bool = False) -> type:
+def treeclass(klass: type, *, leafwise: bool = False, indexing: bool = False) -> type:
     """Decorator to convert a class to a JAX compatible tree structure.
 
     Args:
         klass: class to be converted to a `treeclass`
         leafwise: Wether to generate leafwise math operations methods. Defaults to `False`.
-        indexable: Wether to support integer,name, or boolean indexing. Defaults to `False`.
+        indexing: Wether to support integer,name, or boolean indexing. Defaults to `False`.
 
     Example:
         >>> import functools as ft
@@ -411,7 +411,7 @@ def treeclass(klass: type, *, leafwise: bool = False, indexable: bool = False) -
         >>> jax.tree_util.tree_leaves(tree)
         [1, 2.0]
 
-        Leaf-wise math operations are supported by setting `mask=True`
+        Leaf-wise math operations are supported by setting `leafwise=True`
         >>> @ft.partial(pytc.treeclass, leafwise=True)
         ... class Tree:
         ...     a:int = 1
@@ -422,8 +422,8 @@ def treeclass(klass: type, *, leafwise: bool = False, indexable: bool = False) -
         Tree(a=2, b=3.0)
 
 
-        Advanced indexing is supported by setting `indexable=True`
-        >>> @ft.partial(pytc.treeclass, indexable=True)
+        Advanced indexing is supported by setting `indexing=True`
+        >>> @ft.partial(pytc.treeclass, indexing=True)
         ... class Tree:
         ...     a:int = 1
         ...     b:float = 2.0
@@ -456,7 +456,7 @@ def treeclass(klass: type, *, leafwise: bool = False, indexable: bool = False) -
     # add the optional methods to the class
     # optional methods are math operations, indexing and masking,
     # hashing and copying, and pretty printing
-    klass = _auxiliary_transform(klass, leafwise=leafwise, indexable=indexable)
+    klass = _auxiliary_transform(klass, leafwise=leafwise, indexing=indexing)
 
     # add the class to the `JAX` registry if not registered
     return _register_treeclass(klass)
