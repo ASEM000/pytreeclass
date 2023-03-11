@@ -44,7 +44,7 @@ class ImmutableWrapper:
     def unwrap(self) -> Any:
         return getattr(self, _WRAPPED)
 
-    def __setattr__(self, key, value) -> None:
+    def __setattr__(self, _, __) -> None:
         raise AttributeError("Cannot assign to frozen instance.")
 
     def __delattr__(self, _: str) -> None:

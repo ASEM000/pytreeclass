@@ -13,7 +13,7 @@ from pytreeclass._src.tree_indexer import bcmap
 
 
 def test_bcmap():
-    @ft.partial(pytc.treeclass, leafwise=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, indexable=True)
     class Test:
         a: tuple[int]
         b: tuple[int]
@@ -47,7 +47,7 @@ def test_bcmap():
 
 
 def test_math_operations():
-    @ft.partial(pytc.treeclass, leafwise=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, indexable=True)
     class Test:
         a: float
         b: float
@@ -66,7 +66,7 @@ def test_math_operations():
     assert A.at[...].reduce(lambda x, y: x + jnp.sum(y)) == jnp.array(60)
     assert abs(A) == A
 
-    @ft.partial(pytc.treeclass, leafwise=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, indexable=True)
     class Test:
         a: float
         b: float
@@ -114,7 +114,7 @@ def test_math_operations():
 
 
 def test_math_operations_errors():
-    @ft.partial(pytc.treeclass, leafwise=True, index=True)
+    @ft.partial(pytc.treeclass, leafwise=True, indexable=True)
     class Test:
         a: float
         b: float
