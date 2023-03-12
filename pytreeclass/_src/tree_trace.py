@@ -20,10 +20,10 @@ class _TraceRegistryEntry(NamedTuple):
     to_iter: Callable[..., Any]
 
 
-NamesType = Any
-TypesType = Any
-IndicesType = Any
-MetadatasType = Any
+NamesType = Sequence[Any]
+TypesType = Sequence[Any]
+IndicesType = Sequence[tuple[Any, Any]]
+MetadatasType = Sequence[Any]
 TraceType = Tuple[NamesType, TypesType, IndicesType, MetadatasType]
 
 
