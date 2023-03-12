@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict, defaultdict
-from typing import Any, Callable, NamedTuple, Sequence
+from typing import Any, Callable, NamedTuple, Sequence, Tuple
 
 import jax.tree_util as jtu
 from jax._src.tree_util import _registry
@@ -24,7 +24,7 @@ NamesType = Any
 TypesType = Any
 IndicesType = Any
 MetadatasType = Any
-TraceType = tuple[NamesType, TypesType, IndicesType, MetadatasType]
+TraceType = Tuple[NamesType, TypesType, IndicesType, MetadatasType]
 
 
 def register_pytree_node_trace(
