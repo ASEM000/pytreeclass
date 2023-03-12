@@ -12,7 +12,7 @@ import sys
 from types import FunctionType
 from typing import Any, Callable, NamedTuple, Sequence
 
-_NOT_SET = object()
+_NOT_SET = type("NOT_SET", (), {"__repr__": lambda self: "?"})()
 _FROZEN = "__frozen__"
 _FIELD_MAP = "__field_map__"
 _POST_INIT = "__post_init__"

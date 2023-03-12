@@ -54,7 +54,7 @@ def _node_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
 
 
 def _general_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
-    if isinstance(node, object) and node.__class__.__repr__ is not object.__repr__:
+    if isinstance(node, object) and type(node).__repr__ is not object.__repr__:
         # use custom __repr__ method if available
         fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
     else:
@@ -187,7 +187,7 @@ def _namedtuple_pprint(node, depth: int, kind: PrintKind, width: int) -> str:
 
 
 def _dataclass_like_pprint(node, depth: int, kind: PrintKind, width: int) -> str:
-    name = node.__class__.__name__
+    name = type(node).__name__
     fields = _dataclass_like_fields(node)
     # we use vars here to avoid unfreezing it in case it is frozen
     vs = (vars(node)[f.name] for f in fields if f.repr)
@@ -205,7 +205,7 @@ def _node_type_pprint(
         shape_dype = node.shape, node.dtype
         fmt = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), depth, kind, width)
     else:
-        fmt = f"{node.__class__.__name__}"
+        fmt = f"{type(node).__name__}"
     return _format_width(fmt, width)
 
 
@@ -362,14 +362,14 @@ def tree_mermaid(tree: PyTree, depth=None, width: int = 60) -> str:
     # once for the trace and once for the summary
 
     root_id = node_id((0, 0, -1, 0))
-    fmt = f"flowchart LR\n\tid{root_id}({bold_text(tree.__class__.__name__)})"
+    fmt = f"flowchart LR\n\tid{root_id}({bold_text(type(tree).__name__)})"
     cur_id = None
 
     for trace, leaf in zip(traces, leaves):
         if _should_omit_trace(trace):
             continue
 
-        count, size = _calculate_leaf_trace_stats(trace, leaf)
+        count, size = _calculate_leaf_trace_stats(leaf)
         count = _format_count(count) + " leaf"
         size = _format_size(size)
 
@@ -445,9 +445,7 @@ def _format_count(node_count, newline=False):
     raise TypeError(f"node_count must be int or float, got {type(node_count)}")
 
 
-def _calculate_leaf_trace_stats(
-    trace: LeafTrace, tree: Any
-) -> tuple[int | complex, int | complex]:
+def _calculate_leaf_trace_stats(tree: Any) -> tuple[int | complex, int | complex]:
     # calcuate some stats of a single subtree defined by the `NodeInfo` objects
     # for each subtree, we will calculate the types distribution and their size
     count = size = 0
@@ -705,7 +703,7 @@ def tree_summary(tree: PyTree, *, depth=None, width: int = 60) -> str:
         row += [_node_type_pprint(pytc.unfreeze(leaf), 0, "str", width)]
 
         # count and size row
-        count, size = _calculate_leaf_trace_stats(trace, leaf)
+        count, size = _calculate_leaf_trace_stats(leaf)
         leaves_count = _format_count(count.real + count.imag)
         leaves_size = _format_size(size.real + size.imag)
 
@@ -720,7 +718,7 @@ def tree_summary(tree: PyTree, *, depth=None, width: int = 60) -> str:
     SIZE = [complex(0), complex(0)]
 
     for trace, leaf in tree_leaves_with_trace(tree, is_leaf=is_frozen):
-        count, size = _calculate_leaf_trace_stats(trace, leaf)
+        count, size = _calculate_leaf_trace_stats(leaf)
         COUNT[is_frozen(leaf)] += count
         SIZE[is_frozen(leaf)] += size
 
