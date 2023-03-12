@@ -41,7 +41,7 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
 
 def _tree_flatten(
     tree: PyTree,
-) -> tuple[ValuesView[Any], tuple[KeysView[str, ...], dict[str, Any]]]:
+) -> tuple[ValuesView[Any], tuple[KeysView[str], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`"""
     static, dynamic = dict(getattr(tree, _VARS)), dict()
     for key in getattr(tree, _FIELD_MAP):

@@ -192,15 +192,16 @@ def _get_at_trace(
     where = tuple(where)
 
     def lhs_get(trace, leaf):
+        names, _, indices, __ = trace
         for i, item in enumerate(where):
-            if i >= len(trace.indices):
+            if i > len(indices):
                 msg = f"Out of bounds path={where} for leaf={leaf}."
                 msg += f" Path length={len(where)} is longer than "
-                msg += f"leaf depth={len(trace.indices)}."
+                msg += f"leaf depth={len(indices)}."
                 raise IndexError(msg)
 
-            if (isinstance(item, int) and trace.indices[i][0] != item) or (
-                isinstance(item, str) and trace.names[i] != item
+            if (isinstance(item, int) and indices[i + 1][0] != item) or (
+                isinstance(item, str) and names[i + 1] != item
             ):
                 return None
         return leaf
@@ -218,15 +219,16 @@ def _set_at_trace(
     where = tuple(where)
 
     def lhs_set(trace, leaf, set_value: Any):
+        names, _, indices, __ = trace
         for i, item in enumerate(where):
-            if i >= len(trace.indices):
+            if i > len(indices):
                 msg = f"Out of bounds path={where} for leaf={leaf}."
                 msg += f" Path length={len(where)} is longer than "
-                msg += f"leaf depth={len(trace.indices)}."
+                msg += f"leaf depth={len(indices)}."
                 raise IndexError(msg)
 
-            if (isinstance(item, int) and trace.indices[i][0] != item) or (
-                isinstance(item, str) and trace.names[i] != item
+            if (isinstance(item, int) and indices[i + 1][0] != item) or (
+                isinstance(item, str) and names[i + 1] != item
             ):
                 return leaf
         # consider the same structure PyTree case tree.at[...].set(tree)
@@ -248,15 +250,17 @@ def _apply_at_trace(
     where = tuple(where)
 
     def lhs_apply(trace, leaf):
+        names, _, indices, __ = trace
+
         for i, item in enumerate(where):
-            if i >= len(trace.indices):
+            if i > len(indices):
                 msg = f"Out of bounds path={where} for leaf={leaf}."
                 msg += f" Path length={len(where)} is longer than "
-                msg += f"leaf depth={len(trace.indices)}."
+                msg += f"leaf depth={len(indices)}."
                 raise IndexError(msg)
 
-            if (isinstance(item, int) and trace.indices[i][0] != item) or (
-                isinstance(item, str) and trace.names[i] != item
+            if (isinstance(item, int) and indices[i + 1][0] != item) or (
+                isinstance(item, str) and names[i + 1] != item
             ):
                 return leaf
         return func(leaf)
@@ -278,15 +282,17 @@ def _reduce_at_trace(
     where = tuple(where)
 
     def lhs_reduce(trace, leaf):
+        names, _, indices, __ = trace
+
         for i, item in enumerate(where):
-            if i >= len(trace.indices):
+            if i > len(indices):
                 msg = f"Out of bounds path={where} for leaf={leaf}."
                 msg += f" Path length={len(where)} is longer than "
-                msg += f"leaf depth={len(trace.indices)}."
+                msg += f"leaf depth={len(indices)}."
                 raise IndexError(msg)
 
-            if (isinstance(item, int) and trace.indices[i][0] != item) or (
-                isinstance(item, str) and trace.names[i] != item
+            if (isinstance(item, int) and indices[i + 1][0] != item) or (
+                isinstance(item, str) and names[i + 1] != item
             ):
                 return None
         return leaf
@@ -379,7 +385,7 @@ def _at_trace(tree: PyTree, where: tuple[str | int] | PyTree) -> PyTree:
 
 def tree_indexer(tree: PyTree) -> PyTree:
     class AtIndexer:
-        def __getitem__(_, where):
+        def __getitem__(self, where):
             if isinstance(where, (str, int)):
                 # indexing by name or index
                 # name and index rules are defined using

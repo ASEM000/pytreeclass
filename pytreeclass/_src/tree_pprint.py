@@ -19,7 +19,7 @@ from jaxlib.xla_extension import CompiledFunction, PjitFunction
 import pytreeclass as pytc
 from pytreeclass._src.tree_decorator import _dataclass_like_fields, _is_dataclass_like
 from pytreeclass._src.tree_freeze import is_frozen, unfreeze
-from pytreeclass._src.tree_trace import LeafTrace, tree_leaves_with_trace
+from pytreeclass._src.tree_trace import tree_leaves_with_trace
 
 PyTree = Any
 PrintKind = Literal["repr", "str"]
@@ -209,8 +209,8 @@ def _node_type_pprint(
     return _format_width(fmt, width)
 
 
-def _should_omit_trace(trace: LeafTrace) -> bool:
-    for metadata in trace.metadatas:
+def _should_omit_trace(metadatas) -> bool:
+    for metadata in metadatas:
         if isinstance(metadata, dict) and "repr" in metadata:
             if metadata["repr"] is False:
                 return True
@@ -239,11 +239,11 @@ def tree_str(tree: PyTree, *, width: int = 80, indent: int = 2) -> str:
     return _node_pprint(tree, depth=0, kind="str", width=width).expandtabs(indent)
 
 
-def _resolve_names(trace: LeafTrace, width: int) -> str:
+def _resolve_names(names, width: int) -> str:
     # given a trace with a tuple of names, we resolve the names
     # to a single string
-    path = trace.names[0]
-    for name in trace.names[1:]:
+    path = names[0]
+    for name in names[1:]:
         path += "" if name.startswith("[") else "."
         path += _node_pprint(name, 0, "str", width)
     return path
@@ -289,24 +289,47 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
     if not (isinstance(depth, int) or depth is None):
         raise TypeError(f"depth must be an integer or `None`, got {type(depth)}")
 
-    traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen, depth=depth))
+    def is_trace_leaf(trace) -> bool:
+        names, _, __, ___ = trace
+        # stop tracing if depth is reached
+        if depth is None:
+            return False
+        return (depth) < len(names)
+
+    traces, leaves = zip(
+        *tree_leaves_with_trace(
+            tree=tree, is_leaf=is_frozen, is_trace_leaf=is_trace_leaf
+        )
+    )
 
     fmt = f"{type(tree).__name__}"
 
     for i, (trace, leaf) in enumerate(zip(traces, leaves)):
-        if _should_omit_trace(trace):
+        names, types, indices, metadatas = trace
+
+        if _should_omit_trace(metadatas):
             continue
 
-        for depth, (name, type_) in enumerate(zip(trace.names, trace.types)):
+        for depth, (name, type_) in enumerate(zip(names, types)):
+            if depth == 0:
+                # skip printing the root node
+                continue
+
             # skip printing the common parent node twice
-            if i > 0 and traces[i - 1].names[: depth + 1] == trace.names[: depth + 1]:
+            prev_nams, _, __, ___ = traces[i - 1]
+
+            if i > 0 and prev_nams[: depth + 1] == names[: depth + 1]:
                 continue
 
             fmt += "\n\t"
 
             for di in range(depth):
+                if di == 0:
+                    # skip printing the root node
+                    continue
+
                 # handle printing the left lines for each depth
-                if trace.indices[di][0] == trace.indices[di][1] - 1:
+                if indices[di][0] == indices[di][1] - 1:
                     # do not print the left line
                     # └── A
                     #     └── B
@@ -318,7 +341,7 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
                     # └── C
                     fmt += "│\t"
 
-            if trace.indices[depth][0] == (trace.indices[depth][1] - 1):
+            if indices[depth][0] == (indices[depth][1] - 1):
                 # check if we are at the last node in the current depth
                 fmt += "└"
             else:
@@ -326,9 +349,9 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
 
             fmt += f"── {_node_pprint(name,0,'str',width )}"
 
-            if depth == len(trace.names) - 1:
+            if depth == len(names) - 1:
                 # if we are at the leaf node, print the value as `=value`
-                fmt += f"={_node_pprint(leaf,depth+2,'repr',width)}"
+                fmt += f"={_node_pprint(leaf,depth+1,'repr',width)}"
             else:
                 # if we are not at the leaf node, print the type as `:type`
                 fmt += f":{type_.__name__}"
@@ -357,7 +380,20 @@ def tree_mermaid(tree: PyTree, depth=None, width: int = 60) -> str:
         """hash a value by its location in a tree. used to connect values in mermaid"""
         return ctypes.c_size_t(hash(input)).value
 
-    traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen, depth=depth))
+    def is_trace_leaf(trace) -> bool:
+        names, _, __, ___ = trace
+        # stop tracing if depth is reached
+        if depth is None:
+            return False
+        return (depth) < len(names)
+
+    traces, leaves = zip(
+        *tree_leaves_with_trace(
+            tree=tree,
+            is_leaf=is_frozen,
+            is_trace_leaf=is_trace_leaf,
+        )
+    )
     # in case of a single node tree or depth=0, avoid printing the node twice
     # once for the trace and once for the summary
 
@@ -366,22 +402,28 @@ def tree_mermaid(tree: PyTree, depth=None, width: int = 60) -> str:
     cur_id = None
 
     for trace, leaf in zip(traces, leaves):
-        if _should_omit_trace(trace):
+        names, types, indices, metadatas = trace
+
+        if _should_omit_trace(metadatas):
             continue
 
         count, size = _calculate_leaf_trace_stats(leaf)
         count = _format_count(count) + " leaf"
         size = _format_size(size)
 
-        for depth, (name, type_) in enumerate(zip(trace.names, trace.types)):
+        for depth, (name, type_) in enumerate(zip(names, types)):
+            if depth == 0:
+                # skip printing the root node trace
+                continue
+
             name = _node_pprint(name, 0, "str", width)
 
-            prev_id = root_id if depth == 0 else cur_id
-            cur_id = node_id((depth, tuple(trace.indices), prev_id))
+            prev_id = root_id if depth == 1 else cur_id
+            cur_id = node_id((depth - 1, tuple(indices[1:]), prev_id))
             fmt += f"\n\tid{prev_id}"
-            stats = f'|"{count}<br>{size}"|' if depth == len(trace.names) - 1 else ""
+            stats = f'|"{count}<br>{size}"|' if depth == len(names) - 1 else ""
             fmt += "--->" + stats
-            is_last = depth == len(trace.names) - 1
+            is_last = depth == len(names) - 1
             value = f"={_node_pprint(leaf,0,'repr',width)}" if is_last else ""
             fmt += f'id{cur_id}("{bold_text(name)}:{type_.__name__}{value}")'
 
@@ -683,21 +725,37 @@ def tree_summary(tree: PyTree, *, depth=None, width: int = 60) -> str:
         │Σ        │list│3    │84.00B│
         └─────────┴────┴─────┴──────┘
     """
+
+    def is_trace_leaf(trace) -> bool:
+        names, _, __, ___ = trace
+        # stop tracing if depth is reached
+        if depth is None:
+            return False
+        return (depth) < len(names)
+
     if not (isinstance(depth, int) or depth is None):
         raise TypeError(f"depth must be an integer or `None`, got {type(depth)}")
 
     ROWS = [["Name", "Type", "Count", "Size"]]
 
-    traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen, depth=depth))
+    traces, leaves = zip(
+        *tree_leaves_with_trace(
+            tree,
+            is_leaf=is_frozen,
+            is_trace_leaf=is_trace_leaf,
+        )
+    )
     # in case of a single node tree or depth=0, avoid printing the node twice
     # once for the trace and once for the summary
     traces = traces if len(traces) > 1 else ()
 
     for trace, leaf in zip(traces, leaves):
-        if _should_omit_trace(trace):
+        names, types, _, metadatas = trace
+
+        if _should_omit_trace(metadatas):
             continue
 
-        row = [_resolve_names(trace, width)]
+        row = [_resolve_names(names[1:], width)]
 
         # type name row
         row += [_node_type_pprint(pytc.unfreeze(leaf), 0, "str", width)]
