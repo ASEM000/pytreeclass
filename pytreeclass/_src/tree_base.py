@@ -4,7 +4,7 @@ import copy
 import functools as ft
 import operator as op
 from math import ceil, floor, trunc
-from typing import Any, Callable
+from typing import Any, Callable, KeysView, ValuesView
 
 import jax.tree_util as jtu
 import numpy as np
@@ -41,12 +41,12 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
 
 def _tree_flatten(
     tree: PyTree,
-) -> tuple[list[Any], tuple[tuple[str, ...], dict[str, Any]]]:
+) -> tuple[ValuesView[Any], tuple[KeysView[str, ...], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`"""
     static, dynamic = dict(getattr(tree, _VARS)), dict()
     for key in getattr(tree, _FIELD_MAP):
         dynamic[key] = static.pop(key)
-    return list(dynamic.values()), (tuple(dynamic.keys()), static)
+    return dynamic.values(), (dynamic.keys(), static)
 
 
 def _tree_trace(
@@ -58,7 +58,7 @@ def _tree_trace(
     types = (type(leaf) for leaf in leaves)
     indices = ((i, len(leaves)) for i in range(len(leaves)))
     metadatas = ({"repr": getattr(tree, _FIELD_MAP)[key].repr} for key in keys)
-    return list([*zip(names, types, indices, metadatas)])
+    return [*zip(names, types, indices, metadatas)]
 
 
 @ft.lru_cache(maxsize=None)

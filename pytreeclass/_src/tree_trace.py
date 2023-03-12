@@ -110,10 +110,9 @@ def flatten_one_trace_level(
         yield LeafTrace(*tree_trace), tree
         return
 
-    leaves_handler = _registry.get(type(tree))
-
-    if leaves_handler:
-        leaves, _ = leaves_handler.to_iter(tree)
+    if type(tree) in _registry:
+        # trace handler for the current tree
+        leaves, _ = _registry[type(tree)].to_iter(tree)
 
         # if type(tree) in _trace_registry:
         # trace handler for the current tree
@@ -132,6 +131,8 @@ def flatten_one_trace_level(
     elif tree is not None:
         # wrap the trace tuple with a `LeafTrace` object
         yield (LeafTrace(*tree_trace), tree)
+        return
+    else:
         return
 
     for trace, leaf in zip(traces, leaves):
@@ -171,7 +172,7 @@ def _sequence_trace_func(
     types = map(type, tree)
     indices = ((i, len(tree)) for i in range(len(tree)))
     metadatas = (() for _ in range(len(tree)))
-    return list([*zip(names, types, indices, metadatas)])
+    return [*zip(names, types, indices, metadatas)]
 
 
 def _dict_trace_func(tree: dict) -> list[tuple[str, Any, tuple[int, int], Any]]:
@@ -179,7 +180,7 @@ def _dict_trace_func(tree: dict) -> list[tuple[str, Any, tuple[int, int], Any]]:
     types = (type(tree[key]) for key in tree)
     indices = ((i, len(tree)) for i in range(len(tree)))
     metadatas = ({"repr": not k.startswith("_")} for k in tree)
-    return list([*zip(names, types, indices, metadatas)])
+    return [*zip(names, types, indices, metadatas)]
 
 
 def _namedtuple_trace_func(tree: Any) -> list[tuple[str, type, tuple[int, int], Any]]:
@@ -187,7 +188,7 @@ def _namedtuple_trace_func(tree: Any) -> list[tuple[str, type, tuple[int, int], 
     types = (type(getattr(tree, field)) for field in tree._fields)
     indices = ((i, len(tree)) for i in range(len(tree)))
     metadatas = (() for _ in tree._fields)
-    return list([*zip(names, types, indices, metadatas)])
+    return [*zip(names, types, indices, metadatas)]
 
 
 def _jaxable_trace_func(tree: Any) -> list[tuple[str, Any, tuple[int, int], Any]]:
