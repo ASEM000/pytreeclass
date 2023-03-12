@@ -9,10 +9,10 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import sys
-from types import FunctionType, MappingProxyType
+from types import FunctionType
 from typing import Any, Callable, NamedTuple, Sequence
 
-_NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
+_NOT_SET = object()
 _FROZEN = "__frozen__"
 _FIELD_MAP = "__field_map__"
 _POST_INIT = "__post_init__"
@@ -41,19 +41,19 @@ class Field(NamedTuple):
     repr: bool = True
     kw_only: bool = False
     pos_only: bool = False
-    metadata: MappingProxyType | None = None
+    metadata: dict[str, Any] | None = None
     callbacks: Sequence[Callable] | None = None
 
 
 def field(
     *,
-    default: Any | _NOT_SET = _NOT_SET,
+    default: Any = _NOT_SET,
     default_factory: Callable | None = None,
     init: bool = True,
     repr: bool = True,
     kw_only: bool = False,
     pos_only: bool = False,
-    metadata: dict | None = None,
+    metadata: dict[str, Any] | None = None,  # type: ignore
     callbacks: Sequence[Callable] | None = None,
 ) -> Field:
     """
@@ -73,16 +73,13 @@ def field(
     if kw_only is True and pos_only is True:
         raise ValueError("Cannot specify both `kw_only=True` and `pos_only=True`")
 
-    # check metadata is a dict
-    if isinstance(metadata, dict):
-        metadata = MappingProxyType(metadata)
-    elif metadata is not None:
+    if not isinstance(metadata, (dict, type(None))):
         raise TypeError("`metadata` must be a dict")
 
     # check if `callbacks` is a Sequence of functions
     if isinstance(callbacks, Sequence):
         for index, callback in enumerate(callbacks):
-            if not isinstance(callback, Callable):
+            if not isinstance(callback, Callable):  # type: ignore
                 msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
                 msg += f" at index={index}"
                 raise TypeError(msg)
@@ -173,7 +170,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
 
 
 @ft.lru_cache(maxsize=None)
-def _generate_init_code(fields: Sequence[NamedTuple]):
+def _generate_init_code(fields: Sequence[Field]):
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
     # for example, if we have a class with fields `x` and `y`
@@ -222,11 +219,11 @@ def _generate_init_code(fields: Sequence[NamedTuple]):
     return body
 
 
-def _generate_init(klass: type) -> type:
+def _generate_init(klass: type) -> FunctionType:
     # generate the field map for the class
     FIELD_MAP = _generate_field_map(klass)
     # generate init method
-    local_namespace = dict()
+    local_namespace = dict()  # type: ignore
     global_namespace = getattr(sys.modules[klass.__module__], _VARS)
 
     # generate the init method code string

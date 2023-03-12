@@ -4,7 +4,7 @@ import copy
 import functools as ft
 import operator as op
 from math import ceil, floor, trunc
-from typing import Any, Callable, Sequence
+from typing import Any, Callable
 
 import jax.tree_util as jtu
 import numpy as np
@@ -28,7 +28,7 @@ from pytreeclass._src.tree_trace import register_pytree_node_trace
 PyTree = Any
 
 
-def _tree_unflatten(klass: type, treedef: jtu.PyTreeDef, leaves: list[Any]):
+def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     """Unflatten rule for `treeclass` to use with `jax.tree_unflatten`"""
     # call the wrapped `__new__` method (non-field initializer)
     tree = getattr(klass.__new__, _WRAPPED)(klass)
@@ -39,22 +39,26 @@ def _tree_unflatten(klass: type, treedef: jtu.PyTreeDef, leaves: list[Any]):
     return tree
 
 
-def _tree_flatten(tree: PyTree) -> tuple[list[Any], tuple[list[str], dict[str, Any]]]:
+def _tree_flatten(
+    tree: PyTree,
+) -> tuple[list[Any], tuple[tuple[str, ...], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`"""
     static, dynamic = dict(getattr(tree, _VARS)), dict()
     for key in getattr(tree, _FIELD_MAP):
         dynamic[key] = static.pop(key)
-    return dynamic.values(), (dynamic.keys(), static)
+    return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
 
-def _tree_trace(tree: PyTree) -> Sequence[Sequence[str, type, int, int, Any]]:
+def _tree_trace(
+    tree: PyTree,
+) -> list[tuple[Any, Any, tuple[int, int], Any]]:
     """Trace flatten rule to be used with the `tree_trace` module"""
     leaves, (keys, _) = _tree_flatten(tree)
     names = (f"{key}" for key in keys)
     types = (type(leaf) for leaf in leaves)
     indices = ((i, len(leaves)) for i in range(len(leaves)))
     metadatas = ({"repr": getattr(tree, _FIELD_MAP)[key].repr} for key in keys)
-    return [*zip(names, types, indices, metadatas)]
+    return list([*zip(names, types, indices, metadatas)])
 
 
 @ft.lru_cache(maxsize=None)
@@ -66,8 +70,8 @@ def _register_treeclass(klass):
     # in that case `__init_subclass__` registers the class before the decorator registers it.
     # this can be also be done using metaclass that registers the class on initialization
     # but we are trying to stay away from deep magic.
-    jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))
-    register_pytree_node_trace(klass, _tree_trace)
+    jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
+    register_pytree_node_trace(klass, _tree_trace)  # type: ignore
     return klass
 
 
@@ -163,7 +167,7 @@ def _new_wrapper(new_func: Callable) -> Callable:
 
 
 def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
-    @classmethod
+    @classmethod  # type: ignore
     @ft.wraps(init_subclass_func)
     def _init_subclass(klass: type) -> None:
         # Non-decorated subclasses uses the base `treeclass` leaves only
@@ -283,7 +287,7 @@ def _swop(func):
 
 def _tree_copy(tree: PyTree) -> PyTree:
     """Return a copy of the tree"""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
+    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore
 
 
 def is_tree_equal(lhs: Any, rhs: Any) -> bool:
@@ -324,16 +328,16 @@ def _auxiliary_transform(klass: type, *, leafwise: bool, indexing: bool) -> type
     attrs["__str__"] = tree_str
 
     # hashing and copying
-    attrs["__copy__"] = _tree_copy
-    attrs["__hash__"] = _tree_hash
+    attrs["__copy__"] = _tree_copy  # type: ignore
+    attrs["__hash__"] = _tree_hash  # type: ignore
 
     # default equality behavior if `leafwise`=False
-    attrs["__eq__"] = is_tree_equal
+    attrs["__eq__"] = is_tree_equal  # type: ignore
 
     if indexing:
         # index defines `at` functionality to
         # index a PyTree by integer, name, or by a boolean mask
-        attrs["at"] = property(tree_indexer)
+        attrs["at"] = property(tree_indexer)  # type: ignore
 
     if leafwise:
         attrs["__abs__"] = bcmap(op.abs)

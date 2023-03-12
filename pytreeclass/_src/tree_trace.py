@@ -51,7 +51,8 @@ EmptyTrace = ((), (), (), ())
 
 
 def register_pytree_node_trace(
-    klass: type, trace_func: Callable[[Any], Sequence[LeafTrace]]
+    klass: type,
+    trace_func: Callable[[Any], list[tuple[str, Any, tuple[int, int], Any]]],
 ) -> None:
     """
     Args:
@@ -125,7 +126,7 @@ def flatten_one_trace_level(
 
     elif isinstance(tree, tuple) and hasattr(tree, "_fields"):
         # this conforms to the `jax` convention for namedtuples
-        leaves = (getattr(tree, field) for field in tree._fields)
+        leaves = (getattr(tree, field) for field in tree._fields)  # type: ignore
         traces = _namedtuple_trace_func(tree)
 
     elif tree is not None:
@@ -149,8 +150,8 @@ def flatten_one_trace_level(
 
 def tree_leaves_with_trace(
     tree: PyTree, is_leaf: Callable[[Any], bool] | None = None, depth: int | None = None
-) -> Sequence[LeafTrace]:
-    """Similar to jax.tree_util.tree_leaves` but returns the `LeafTrace` objects too as well"""
+) -> Sequence[tuple[LeafTrace, Any]]:
+    """Similar to jax.tree_util.tree_leaves` but returns `LeafTrace` object, leaf pairs"""
     return list(flatten_one_trace_level(EmptyTrace, tree, is_leaf=is_leaf, depth=depth))
 
 
@@ -165,35 +166,35 @@ def tree_flatten_with_trace(
 
 def _sequence_trace_func(
     tree: Sequence,
-) -> Sequence[Sequence[str, type, int, int, Any]]:
+) -> list[tuple[Any, Any, tuple[int, int], Any]]:
     names = (f"[{i}]" for i in range(len(tree)))
     types = map(type, tree)
     indices = ((i, len(tree)) for i in range(len(tree)))
     metadatas = (() for _ in range(len(tree)))
-    return [*zip(names, types, indices, metadatas)]
+    return list([*zip(names, types, indices, metadatas)])
 
 
-def _dict_trace_func(tree: dict) -> Sequence[Sequence[str, type, int, int, Any]]:
+def _dict_trace_func(tree: dict) -> list[tuple[str, Any, tuple[int, int], Any]]:
     names = (f"['{k}']" for k in tree)
     types = (type(tree[key]) for key in tree)
     indices = ((i, len(tree)) for i in range(len(tree)))
     metadatas = ({"repr": not k.startswith("_")} for k in tree)
-    return [*zip(names, types, indices, metadatas)]
+    return list([*zip(names, types, indices, metadatas)])
 
 
-def _namedtuple_trace_func(tree: Any) -> Sequence[Sequence[str, type, int, int, Any]]:
+def _namedtuple_trace_func(tree: Any) -> list[tuple[str, type, tuple[int, int], Any]]:
     names = (f"['{field}']" for field in tree._fields)
     types = (type(getattr(tree, field)) for field in tree._fields)
     indices = ((i, len(tree)) for i in range(len(tree)))
     metadatas = (() for _ in tree._fields)
-    return [*zip(names, types, indices, metadatas)]
+    return list([*zip(names, types, indices, metadatas)])
 
 
-def _jaxable_trace_func(tree: Any) -> Sequence[Sequence[str, type, int, int, Any]]:
+def _jaxable_trace_func(tree: Any) -> list[tuple[str, Any, tuple[int, int], Any]]:
     # fallback trace function in case no trace function is registered for a given
     # class in the `trace` registry
     # get leaves from the `jax` registry
-    leaves = _registry.get(type(tree)).to_iter(tree)[0]
+    leaves, _ = _registry.get(type(tree)).to_iter(tree)  # type: ignore
     names = (f"leaf_{i}" for i in range(len(leaves)))
     types = map(type, leaves)
     indices = ((i, len(leaves)) for i in range(len(leaves)))

@@ -17,7 +17,7 @@ PyTree = Any
 
 def _hash_node(node: Any) -> int:
     if isinstance(node, (jnp.ndarray, np.ndarray)):
-        return hashlib.sha256(np.array(node).tobytes()).hexdigest()
+        return int(hashlib.sha256(np.array(node).tobytes()).hexdigest(), 16)
     if isinstance(node, set):
         return hash(frozenset(node))
     if isinstance(node, dict):
@@ -91,8 +91,8 @@ def _flatten(tree: Any) -> tuple[tuple, Any]:
     return (None,), _HashableWrapper(tree.unwrap())
 
 
-def _unflatten(klass: type, treedef: jtu.PyTreeDef, _: Sequence[Any]) -> PyTree:
-    tree = object.__new__(klass)
+def _unflatten(klass: type, treedef: Any, _: Sequence[Any]) -> PyTree:
+    tree = object.__new__(klass)  # type: ignore
     getattr(tree, _VARS)[_WRAPPED] = treedef.unwrap()
     return tree
 

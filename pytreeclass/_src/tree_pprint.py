@@ -58,11 +58,10 @@ def _general_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
         # use custom __repr__ method if available
         fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
     else:
-        # use `jax.tree_util.tree_map`, to get representation of the node
-        leaves = enumerate(jtu.tree_leaves(node))
-        fmt = (f"leaf_{i}={_node_pprint(v,depth,kind,width)}" for i, v in (leaves))
-        fmt = ", ".join(fmt)
-        fmt = f"{node.__class__.__name__}({fmt})"
+        enum_leaves = enumerate(jtu.tree_leaves(node))
+        args = (depth, kind, width)
+        fmt = ", ".join(f"leaf_{i}={_node_pprint(v,*args)}" for i, v in enum_leaves)
+        fmt = f"{type(node).__name__}({fmt})"
 
     is_mutltiline = "\n" in fmt
 
@@ -199,8 +198,10 @@ def _dataclass_like_pprint(node, depth: int, kind: PrintKind, width: int) -> str
     return _format_width(fmt, width)
 
 
-def _node_type_pprint(node: type, depth: int, kind: PrintKind, width: int) -> str:
-    if hasattr(node, "dtype") and hasattr(node, "shape"):
+def _node_type_pprint(
+    node: jnp.ndarray | np.ndarray, depth: int, kind: PrintKind, width: int
+) -> str:
+    if isinstance(node, (jnp.ndarray, np.ndarray)):
         shape_dype = node.shape, node.dtype
         fmt = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), depth, kind, width)
     else:

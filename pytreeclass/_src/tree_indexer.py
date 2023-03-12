@@ -113,7 +113,7 @@ def _apply_at_mask(
 def _reduce_at_mask(
     tree: PyTree,
     where: PyTree,
-    func: Callable[[Any], Any],
+    func: Callable[[Any, Any], Any],
     initializer: Any = _no_initializer,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> Any:
@@ -148,7 +148,7 @@ class _TreeAtMask(NamedTuple):
     def reduce(
         self,
         func: Callable[[Any, Any], Any],
-        initializer: Callable[[Any, Any], Any] = _no_initializer,
+        initializer: Callable[[Any, Any], Any] | Any = _no_initializer,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> Any:
@@ -157,23 +157,23 @@ class _TreeAtMask(NamedTuple):
 
 def _at_mask(tree: PyTree, where: PyTree) -> PyTree:
     class TreeAtMask(_TreeAtMask):
-        def __getitem__(lhs_self, rhs_where: str | int | PyTree):
+        def __getitem__(self, rhs_where: str | int | PyTree):
             if isinstance(rhs_where, (str, int)):
                 # promote `rhs` path to boolean mask
-                mask = lhs_self.tree != lhs_self.tree
+                mask = self.tree != self.tree
                 mask = mask.at[rhs_where].set(True)
                 rhs_where = mask
 
-            rhs_where = lhs_self.where & rhs_where
+            rhs_where = self.where & rhs_where
             return TreeAtMask(tree=tree, where=rhs_where)
 
-        def __getattr__(lhs_self, name):
+        def __getattr__(self, name):
             # support for nested `.at`
             if name == "at":
                 # pass the current where condition to the next level
-                return TreeAtMask(tree=tree, where=lhs_self.where)
+                return TreeAtMask(tree=tree, where=self.where)
 
-            msg = f"{name} is not a valid attribute of {lhs_self}\n"
+            msg = f"{name} is not a valid attribute of {self}\n"
             msg += f"Did you mean to use .at[{name!r}]?"
             raise AttributeError(msg)
 
@@ -271,8 +271,9 @@ def _reduce_at_trace(
     initializer: Any = _no_initializer,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTree:
-    # note: current `jax`` implementation of tree_reduce does not support `is_leaf` argument
-    # using `tree_map_with_trace` with `is_leaf` argument achieves the same result
+    # note: current `jax`` implementation of tree_reduce does
+    # not support `is_leaf` argument using `tree_map_with_trace` with `is_leaf` argument
+    # achieves the same result
     # canonicalize `where` to `tuple` to conform to leaf trace type
     where = tuple(where)
 
@@ -321,7 +322,7 @@ class _TreeAtPath(NamedTuple):
         func: Callable[[Any, Any], Any],
         *,
         initializer: Any = _no_initializer,
-        is_leaf: Callable[[Any], bool] = None,
+        is_leaf: Callable[[Any], bool] | None = None,
     ) -> Any:
         return _reduce_at_trace(self.tree, self.where, func, initializer, is_leaf)
 
@@ -332,35 +333,44 @@ class _TreeAtPath(NamedTuple):
         # next it unfreezes the tree then calls the method on the attribute
         # and finally freezes the tree again
         with _call_context(self.tree) as tree:
-            method = getattr(tree, self.where[0])
+            # check if the attribute is a string
+            (method_name,) = self.where
+            if not isinstance(method_name, str):
+                msg = "Expected method name to be a string, "
+                msg += f"Found method_name=`{method_name}` "
+                msg += f"of type={type(method_name).__name__}."
+                raise TypeError(msg)
+
+            method = getattr(tree, method_name)
             value = method(*a, **k)
         return value, tree
 
 
-def _at_trace(tree: PyTree, where: tuple[str | int]) -> PyTree:
+def _at_trace(tree: PyTree, where: tuple[str | int] | PyTree) -> PyTree:
     class TreeAtPath(_TreeAtPath):
-        def __getitem__(lhs_self, rhs_where: str | int | PyTree):
+        def __getitem__(self, rhs_where: tuple[str | int] | PyTree):
             # support for nested `.at``
 
             if isinstance(rhs_where, type(tree)):
                 # promote `lhs` name path to boolean mask
                 # and pass to `TreeAtMask`
-                lhs_mask = lhs_self.tree != lhs_self.tree
-                lhs_mask = lhs_mask.at[lhs_self.where[0]].set(True)
+                lhs_mask = self.tree != self.tree
+                (lhs_where,) = self.where
+                lhs_mask = lhs_mask.at[lhs_where].set(True)
                 return _at_mask(tree=tree, where=lhs_mask & rhs_where)
 
             # case for name/index path rhs
-            rhs_where = (*lhs_self.where, rhs_where)
+            rhs_where = (*self.where, rhs_where)
             return _at_trace(tree=tree, where=rhs_where)
 
-        def __getattr__(lhs_self, name):
+        def __getattr__(self, name):
             # support nested `.at``
             # for example `.at[A].at[B]` represents model.A.B
             if name == "at":
                 # pass the current tree and the current path to the next `.at`
-                return TreeAtPath(tree=tree, where=lhs_self.where)
+                return TreeAtPath(tree=tree, where=self.where)
 
-            msg = f"{name} is not a valid attribute of {lhs_self}\n"
+            msg = f"{name} is not a valid attribute of {self}\n"
             msg += f"Did you mean to use .at[{name!r}]?"
             raise AttributeError(msg)
 
@@ -392,10 +402,12 @@ def tree_indexer(tree: PyTree) -> PyTree:
                 f"class {type(tree).__name__}:\n"
                 "    ...\n\n"
                 f">>> tree = {type(tree).__name__}(...)\n"
-                "# indexing by boolean pytree\n"
+                ">>> # indexing by boolean pytree\n"
                 ">>> tree.at[tree > 0].get()\n\n"
-                "# indexing by string\n"
-                ">>> tree.at[`field_name`].get()"
+                ">>> # indexing by attribute name\n"
+                ">>> tree.at[`attribute_name`].get()\n\n"
+                ">>> # indexing by attribute index\n"
+                ">>> tree.at[`attribute_index`].get()"
             )
 
     return AtIndexer()
@@ -409,7 +421,7 @@ class _Partial(ft.partial):
         # https://stackoverflow.com/a/7811270
         keywords = {**self.keywords, **keywords}
         iargs = iter(args)
-        args = (next(iargs) if arg is _non_partial else arg for arg in self.args)
+        args = (next(iargs) if arg is _non_partial else arg for arg in self.args)  # type: ignore
         return self.func(*args, *iargs, **keywords)
 
 
