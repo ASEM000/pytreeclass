@@ -279,11 +279,6 @@ def _dataclass_transform(klass: type) -> type:
     return klass
 
 
-def _swop(func):
-    # swaping the arguments of a function
-    return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
-
-
 def _tree_copy(tree: PyTree) -> PyTree:
     """Return a copy of the tree"""
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore
@@ -332,13 +327,9 @@ def _binary_leafwise(func):
     return ft.wraps(func)(wrapper)
 
 
-def _reverse_binary_leafwise(func):
-    def wrapper(lhs, rhs=None):
-        if isinstance(rhs, type(lhs)):
-            return jtu.tree_map(func, rhs, lhs)
-        return jtu.tree_map(lambda x: func(rhs, x), lhs)
-
-    return ft.wraps(func)(wrapper)
+def _swop(func):
+    # swaping the arguments of a two-arg function
+    return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
 
 
 def _auxiliary_transform(klass: type, *, leafwise: bool, indexing: bool) -> type:
@@ -386,22 +377,22 @@ def _auxiliary_transform(klass: type, *, leafwise: bool, indexing: bool) -> type
         attrs["__or__"] = _binary_leafwise(op.or_)
         attrs["__pos__"] = _unary_leafwise(op.pos)
         attrs["__pow__"] = _binary_leafwise(op.pow)
-        attrs["__radd__"] = _reverse_binary_leafwise(op.add)
-        attrs["__rand__"] = _reverse_binary_leafwise(op.and_)
-        attrs["__rdivmod__"] = _reverse_binary_leafwise(divmod)
-        attrs["__rfloordiv__"] = _reverse_binary_leafwise(op.floordiv)
-        attrs["__rlshift__"] = _reverse_binary_leafwise(op.lshift)
-        attrs["__rmatmul__"] = _reverse_binary_leafwise(op.matmul)
-        attrs["__rmod__"] = _reverse_binary_leafwise(op.mod)
-        attrs["__rmul__"] = _reverse_binary_leafwise(op.mul)
-        attrs["__ror__"] = _reverse_binary_leafwise(op.or_)
+        attrs["__radd__"] = _binary_leafwise(_swop(op.add))
+        attrs["__rand__"] = _binary_leafwise(_swop(op.and_))
+        attrs["__rdivmod__"] = _binary_leafwise(_swop(divmod))
+        attrs["__rfloordiv__"] = _binary_leafwise(_swop(op.floordiv))
+        attrs["__rlshift__"] = _binary_leafwise(_swop(op.lshift))
+        attrs["__rmatmul__"] = _binary_leafwise(_swop(op.matmul))
+        attrs["__rmod__"] = _binary_leafwise(_swop(op.mod))
+        attrs["__rmul__"] = _binary_leafwise(_swop(op.mul))
+        attrs["__ror__"] = _binary_leafwise(_swop(op.or_))
         attrs["__round__"] = _binary_leafwise(round)
-        attrs["__rpow__"] = _reverse_binary_leafwise(op.pow)
-        attrs["__rrshift__"] = _reverse_binary_leafwise(op.rshift)
+        attrs["__rpow__"] = _binary_leafwise(_swop(op.pow))
+        attrs["__rrshift__"] = _binary_leafwise(_swop(op.rshift))
         attrs["__rshift__"] = _binary_leafwise(op.rshift)
-        attrs["__rsub__"] = _reverse_binary_leafwise(op.sub)
-        attrs["__rtruediv__"] = _reverse_binary_leafwise(op.truediv)
-        attrs["__rxor__"] = _reverse_binary_leafwise(op.xor)
+        attrs["__rsub__"] = _binary_leafwise(_swop(op.sub))
+        attrs["__rtruediv__"] = _binary_leafwise(_swop(op.truediv))
+        attrs["__rxor__"] = _binary_leafwise(_swop(op.xor))
         attrs["__sub__"] = _binary_leafwise(op.sub)
         attrs["__truediv__"] = _binary_leafwise(op.truediv)
         attrs["__trunc__"] = _unary_leafwise(trunc)
