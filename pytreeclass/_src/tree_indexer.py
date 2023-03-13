@@ -7,6 +7,7 @@ import functools as ft
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
+import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
@@ -41,7 +42,7 @@ def _get_at_mask(
         # check if where is a boolean leaf inside the `tree_map`
         # to avoid extrachecks in `tree_map`
         where = _check_valid_mask_leaf(where)
-        if isinstance(lhs, (jnp.ndarray, np.ndarray)):
+        if isinstance(lhs, (jax.Array, np.ndarray)):
             # return empty array instead of None if condition is not met
             # not `jittable` as size of array changes
             return lhs[jnp.where(where)]
@@ -60,7 +61,7 @@ def _set_at_mask(
         # check if where is a boolean leaf inside the `tree_map`
         # to avoid extrachecks in `tree_map`
         where = _check_valid_mask_leaf(where)
-        if isinstance(lhs, (jnp.ndarray, np.ndarray)):
+        if isinstance(lhs, (jax.Array, np.ndarray)):
             if jnp.isscalar(set_value):
                 # apply scalar set_value to lhs array if condition is met
                 return jnp.where(where, set_value, lhs)
@@ -97,7 +98,7 @@ def _apply_at_mask(
         # check if where is a boolean leaf inside the `tree_map`
         # to avoid extrachecks in `tree_map`
         where, value = _check_valid_mask_leaf(where), func(lhs)
-        if isinstance(lhs, (jnp.ndarray, np.ndarray)):
+        if isinstance(lhs, (jax.Array, np.ndarray)):
             try:
                 # lhs is an array with scalar output
                 return jnp.where(where, value, lhs)
@@ -484,7 +485,7 @@ def bcmap(
         ... class Test:
         ...    a: tuple[int] = (1,2,3)
         ...    b: tuple[int] = (4,5,6)
-        ...    c: jnp.ndarray = jnp.array([1,2,3])
+        ...    c: jax.Array = jnp.array([1,2,3])
 
         >>> tree = Test()
         >>> # 0 is broadcasted to all leaves of the pytree

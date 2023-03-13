@@ -10,7 +10,6 @@ from types import FunctionType
 from typing import Any, Callable, Literal, Sequence
 
 import jax
-import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 from jax._src.custom_derivatives import custom_jvp
@@ -32,7 +31,7 @@ def _node_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
         return _func_pprint(node, depth, kind, width)
     if isinstance(node, (PjitFunction, CompiledFunction)):
         return f"jit({_func_pprint(node, depth, kind, width)})"
-    if isinstance(node, (np.ndarray, jnp.ndarray)):
+    if isinstance(node, (np.ndarray, jax.Array)):
         return _numpy_pprint(node, depth, kind, width)
     if isinstance(node, jax.ShapeDtypeStruct):
         return _shape_dtype_pprint(node, depth, kind, width)
@@ -94,7 +93,7 @@ def _shape_dtype_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> s
 
 
 def _numpy_pprint(
-    node: np.ndarray | jnp.ndarray, depth: int, kind: PrintKind, width: int
+    node: np.ndarray | jax.Array, depth: int, kind: PrintKind, width: int
 ) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape"""
     if kind == "str":
@@ -199,9 +198,9 @@ def _dataclass_like_pprint(node, depth: int, kind: PrintKind, width: int) -> str
 
 
 def _node_type_pprint(
-    node: jnp.ndarray | np.ndarray, depth: int, kind: PrintKind, width: int
+    node: jax.Array | np.ndarray, depth: int, kind: PrintKind, width: int
 ) -> str:
-    if isinstance(node, (jnp.ndarray, np.ndarray)):
+    if isinstance(node, (jax.Array, np.ndarray)):
         shape_dype = node.shape, node.dtype
         fmt = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), depth, kind, width)
     else:
