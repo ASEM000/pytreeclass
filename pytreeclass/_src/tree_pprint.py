@@ -249,6 +249,19 @@ def _resolve_names(names, width: int) -> str:
     return path
 
 
+def _is_trace_leaf_depth_factory(depth: int):
+    # generate `is_trace_leaf` function to stop tracing at a certain `depth`
+    # in essence, depth is the length of the trace entry
+    def is_trace_leaf(trace) -> bool:
+        # trace is a tuple of (names, leaves, tracers, aux_data)
+        # done like this to ensure 4-tuple unpacking
+        names, _, __, ___ = trace
+        # stop tracing if depth is reached
+        return False if depth is None else (depth < len(names))
+
+    return is_trace_leaf
+
+
 def tree_diagram(tree, depth: int | None = None, width: int = 60):
     """Pretty print treeclass tree with tree structure diagram
 
@@ -289,16 +302,11 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
     if not (isinstance(depth, int) or depth is None):
         raise TypeError(f"depth must be an integer or `None`, got {type(depth)}")
 
-    def is_trace_leaf(trace) -> bool:
-        names, _, __, ___ = trace
-        # stop tracing if depth is reached
-        if depth is None:
-            return False
-        return (depth) < len(names)
-
     traces, leaves = zip(
         *tree_leaves_with_trace(
-            tree=tree, is_leaf=is_frozen, is_trace_leaf=is_trace_leaf
+            tree=tree,
+            is_leaf=is_frozen,
+            is_trace_leaf=_is_trace_leaf_depth_factory(depth),
         )
     )
 
@@ -380,18 +388,11 @@ def tree_mermaid(tree: PyTree, depth=None, width: int = 60) -> str:
         """hash a value by its location in a tree. used to connect values in mermaid"""
         return ctypes.c_size_t(hash(input)).value
 
-    def is_trace_leaf(trace) -> bool:
-        names, _, __, ___ = trace
-        # stop tracing if depth is reached
-        if depth is None:
-            return False
-        return (depth) < len(names)
-
     traces, leaves = zip(
         *tree_leaves_with_trace(
             tree=tree,
             is_leaf=is_frozen,
-            is_trace_leaf=is_trace_leaf,
+            is_trace_leaf=_is_trace_leaf_depth_factory(depth),
         )
     )
     # in case of a single node tree or depth=0, avoid printing the node twice
@@ -488,26 +489,25 @@ def _format_count(node_count, newline=False):
 
 
 def _calculate_leaf_trace_stats(tree: Any) -> tuple[int | complex, int | complex]:
-    # calcuate some stats of a single subtree defined by the `NodeInfo` objects
-    # for each subtree, we will calculate the types distribution and their size
-    count = size = 0
-    traces, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen))
+    # calcuate some stats of a single subtree defined
+    counts = sizes = 0
+    _, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen))
 
-    for trace, leaf in zip(traces, leaves):
+    for leaf in leaves:
         # unfrozen leaf
         leaf_ = unfreeze(leaf)
         # array count is the product of the shape. if the node is not an array, then the count is 1
-        count_ = int(np.array(leaf_.shape).prod()) if hasattr(leaf_, "shape") else 1
-        size_ = leaf_.nbytes if hasattr(leaf_, "nbytes") else sys.getsizeof(leaf_)
+        count = int(np.array(leaf_.shape).prod()) if hasattr(leaf_, "shape") else 1
+        size = leaf_.nbytes if hasattr(leaf_, "nbytes") else sys.getsizeof(leaf_)
 
         if is_frozen(tree) or is_frozen(leaf):
-            count_ = complex(0, count_)
-            size_ = complex(0, size_)
+            count = complex(0, count)
+            size = complex(0, size)
 
-        count += count_
-        size += size_
+        counts += count
+        sizes += size
 
-    return (count, size)
+    return (counts, sizes)
 
 
 # table printing
@@ -726,13 +726,6 @@ def tree_summary(tree: PyTree, *, depth=None, width: int = 60) -> str:
         └─────────┴────┴─────┴──────┘
     """
 
-    def is_trace_leaf(trace) -> bool:
-        names, _, __, ___ = trace
-        # stop tracing if depth is reached
-        if depth is None:
-            return False
-        return (depth) < len(names)
-
     if not (isinstance(depth, int) or depth is None):
         raise TypeError(f"depth must be an integer or `None`, got {type(depth)}")
 
@@ -742,7 +735,7 @@ def tree_summary(tree: PyTree, *, depth=None, width: int = 60) -> str:
         *tree_leaves_with_trace(
             tree,
             is_leaf=is_frozen,
-            is_trace_leaf=is_trace_leaf,
+            is_trace_leaf=_is_trace_leaf_depth_factory(depth),
         )
     )
     # in case of a single node tree or depth=0, avoid printing the node twice

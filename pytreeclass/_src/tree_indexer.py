@@ -384,6 +384,44 @@ def _at_trace(tree: PyTree, where: tuple[str | int] | PyTree) -> PyTree:
 
 
 def tree_indexer(tree: PyTree) -> PyTree:
+    """Adds `.at` indexing abilities to a PyTree.
+
+    Example:
+        >>> # Add `.at` indexing abilities to a PyTree
+        >>> import jax
+
+        >>> @jax.tree_util.register_pytree_node_class
+        >>> class Test:
+        ...     def __init__(self, a, b):
+        ...         self.a = a
+        ...         self.b = b
+        ...     def tree_flatten(self):
+        ...         return (self.a, self.b), None
+        ...     @classmethod
+        ...     def tree_unflatten(cls, aux_data, children):
+        ...         return cls(*children)
+        ...    @property
+        ...    def at(self):
+        ...        return tree_indexer(self)
+        ...     def __repr__(self) -> str:
+        ...         return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
+
+
+        >>> # Register the `Test` class trace function to support indexing
+        >>> def test_trace_func(tree):
+        ...     names = ("a", "b")
+        ...     types = (type(tree.a), type(tree.b))
+        ...     indices = ((0,2), (1,2))
+        ...     metadatas = (None, None)
+        ...     return [*zip(names, types, indices, metadatas)]
+
+        >>> pytc.register_pytree_node_trace(Test, test_trace_func)
+
+        >>> test = Test(1, 2)
+        >>> test.at["a"].get()
+        # Test(a=1, b=None)
+    """
+
     class AtIndexer:
         def __getitem__(self, where):
             if isinstance(where, (str, int)):

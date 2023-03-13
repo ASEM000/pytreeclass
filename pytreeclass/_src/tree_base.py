@@ -335,7 +335,7 @@ def _auxiliary_transform(klass: type, *, leafwise: bool, indexing: bool) -> type
     attrs["__eq__"] = is_tree_equal  # type: ignore
 
     if indexing:
-        # index defines `at` functionality to
+        # indexing defines `at` functionality to
         # index a PyTree by integer, name, or by a boolean mask
         attrs["at"] = property(tree_indexer)  # type: ignore
 
