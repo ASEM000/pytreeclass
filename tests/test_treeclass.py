@@ -1,6 +1,7 @@
 import copy
 import dataclasses as dc
 import functools as ft
+from typing import Tuple
 
 import jax.tree_util as jtu
 import numpy.testing as npt
@@ -548,7 +549,7 @@ def benchmark_dataclass_class():
     @dc.dataclass
     class Test:
         a: int = 1
-        b: tuple[int] = (1, 2, 3)
+        b: Tuple[int, ...] = (1, 2, 3)
 
     return Test()
 
@@ -557,7 +558,7 @@ def benchmark_treeclass_instance():
     @pytc.treeclass
     class Test:
         a: int = 1
-        b: tuple[int] = (1, 2, 3)
+        b: Tuple[int, ...] = (1, 2, 3)
 
     return Test(1, (1, 2, 3))
 
