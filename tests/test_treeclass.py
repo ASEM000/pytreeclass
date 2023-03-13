@@ -542,3 +542,31 @@ def test_optional_param():
 
     with pytest.raises(AttributeError):
         Test().at[0]
+
+
+def benchmark_dataclass_class():
+    @dc.dataclass
+    class Test:
+        a: int = 1
+        b: tuple[int] = (1, 2, 3)
+
+    return Test()
+
+
+def benchmark_treeclass_instance():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: tuple[int] = (1, 2, 3)
+
+    return Test(1, (1, 2, 3))
+
+
+@pytest.mark.benchmark(group="treeclass")
+def test_benchmark_treeclass_instance(benchmark):
+    benchmark(benchmark_treeclass_instance)
+
+
+@pytest.mark.benchmark(group="dataclass")
+def test_benchmark_dataclass_class(benchmark):
+    benchmark(benchmark_dataclass_class)
