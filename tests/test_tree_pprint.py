@@ -153,8 +153,6 @@ def test_custom_jax_class():
 
     t = Test()
 
-    assert tree_repr(t) == "Test(leaf_0=1, leaf_1=2)"
-    assert tree_str(t) == "Test(leaf_0=1, leaf_1=2)"
     assert (
         tree_diagram(t)
         == tree_diagram(t, depth=3)

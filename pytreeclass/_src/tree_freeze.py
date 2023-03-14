@@ -71,10 +71,6 @@ class _HashableWrapper(ImmutableWrapper):
 
 
 class FrozenWrapper(ImmutableWrapper):
-    def __getattr__(self, key):
-        # delegate non magical attributes to the wrapped value
-        return getattr(self.unwrap(), key)
-
     def __repr__(self):
         return f"#{self.unwrap()!r}"
 

@@ -16,7 +16,12 @@ from pytreeclass._src.tree_pprint import (
     tree_str,
     tree_summary,
 )
-from pytreeclass._src.tree_trace import register_pytree_node_trace
+from pytreeclass._src.tree_trace import (
+    register_pytree_node_trace,
+    tree_flatten_with_trace,
+    tree_leaves_with_trace,
+    tree_map_with_trace,
+)
 
 __all__ = (
     # general utils
@@ -42,6 +47,9 @@ __all__ = (
     "bcmap",
     "tree_indexer",
     "register_pytree_node_trace",
+    "tree_map_with_trace",
+    "tree_leaves_with_trace",
+    "tree_flatten_with_trace",
 )
 
 __version__ = "0.2.0b11"

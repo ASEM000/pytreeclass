@@ -10,7 +10,6 @@ from types import FunctionType
 from typing import Any, Callable, Literal, Sequence
 
 import jax
-import jax.tree_util as jtu
 import numpy as np
 from jax._src.custom_derivatives import custom_jvp
 from jaxlib.xla_extension import CompiledFunction, PjitFunction
@@ -53,15 +52,7 @@ def _node_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
 
 
 def _general_pprint(node: Any, depth: int, kind: PrintKind, width: int) -> str:
-    if isinstance(node, object) and type(node).__repr__ is not object.__repr__:
-        # use custom __repr__ method if available
-        fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
-    else:
-        enum_leaves = enumerate(jtu.tree_leaves(node))
-        args = (depth, kind, width)
-        fmt = ", ".join(f"leaf_{i}={_node_pprint(v,*args)}" for i, v in enum_leaves)
-        fmt = f"{type(node).__name__}({fmt})"
-
+    fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
     is_mutltiline = "\n" in fmt
 
     # multiline repr/str case, increase depth and indent
@@ -323,9 +314,9 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
                 continue
 
             # skip printing the common parent node twice
-            prev_nams, _, __, ___ = traces[i - 1]
+            prev_names, _, __, ___ = traces[i - 1]
 
-            if i > 0 and prev_nams[: depth + 1] == names[: depth + 1]:
+            if i > 0 and prev_names[: depth + 1] == names[: depth + 1]:
                 continue
 
             fmt += "\n\t"
@@ -552,10 +543,7 @@ def _vbox(*text: tuple[str, ...]) -> str:
         └───┘
     """
 
-    max_width = (
-        max(chain.from_iterable([[len(t) for t in item.split("\n")] for item in text]))
-        + 0
-    )
+    max_width = (max(chain.from_iterable([[len(t) for t in item.split("\n")] for item in text])) + 0)  # fmt: skip
 
     top = f"┌{'─'*max_width}┐"
     line = f"├{'─'*max_width}┤"
