@@ -104,8 +104,6 @@ def flatten_one_trace_level(
         # wrap the trace tuple with a object
         yield tree_trace, tree
         return
-    else:
-        return
 
     for trace, leaf in zip(traces, leaves):
         leaf_trace = (

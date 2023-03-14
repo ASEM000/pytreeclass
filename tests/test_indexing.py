@@ -447,6 +447,16 @@ def test_trace_get():
     assert pytc.is_tree_equal(t.at[0].get(), Test(1, l0(None)))
     assert pytc.is_tree_equal(t.at[1].at[0].get(), Test(None, l0(2)))
 
+    with pytest.raises(IndexError):
+        t.at[0].at[1].get()
+
+    with pytest.raises(IndexError):
+        t.at[0].at[1].set(10)
+    with pytest.raises(IndexError):
+        t.at[0].at[1].apply(lambda _: 10)
+    with pytest.raises(IndexError):
+        t.at[0].at[1].reduce(lambda _, __: 10)
+
 
 def test_trace_set():
     @ft.partial(pytc.treeclass, leafwise=True)

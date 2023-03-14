@@ -643,18 +643,6 @@ def _resolve_line(cols: Sequence[str]) -> str:
             cols[index][-1] = "┼"
             cols[index + 1].pop(0)
 
-        elif cols[index][-1] == "─" and cols[index + 1][0] == "└":
-            cols[index][-1] = "┴"
-            cols[index + 1].pop(0)
-
-        elif cols[index][-1] == "─" and cols[index + 1][0] == "┌":
-            cols[index][-1] = "┬"
-            cols[index + 1].pop(0)
-
-        elif cols[index][-1] == "│" and cols[index + 1][0] == "─":
-            cols[index][-1] = "├"
-            cols[index + 1].pop(0)
-
         elif cols[index][-1] == " ":
             cols[index].pop()
 
