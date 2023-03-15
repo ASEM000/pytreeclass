@@ -100,14 +100,14 @@ NN = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 <div align="center">
 <table>
 <tr>
- <td align = "center"> summary </td> <td align = "center">tree_diagram</td>
+ <td align = "center"> `tree_summary` </td> <td align = "center">`tree_diagram`</td><td align = "center">mermaid.io (Native support in Github/Notion)</td>
 </tr>
+
 <tr>
- 
 <td>
 
 ```python
-print(NN.summary())
+print(pytc.tree_summary(NN))
 
 ┌─────────┬─────────────┬─────┬───────┐
 │Name     │Type         │Count│Size   │
@@ -124,13 +124,14 @@ print(NN.summary())
 └─────────┴─────────────┴─────┴───────┘
 ```
 
+
+
 </td>
 
 
 <td>
 
 ```python
-
 print(pytc.tree_diagram(NN))
 StackedLinear
     ├── l1:Linear
@@ -141,19 +142,11 @@ StackedLinear
         └── bias=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])
 ```
 
+
+
  </td>
 
-</tr>
- 
-<tr>
- 
- </tr>
-</table>
 
-<table>
-<tr><td align = "center" > mermaid.io (Native support in Github/Notion)</td></tr>
-<tr>
- 
 <td>
 
 ```python
@@ -174,9 +167,75 @@ flowchart LR
     id17320446376606480513--->|"1 leaf<br>4.00B"|id15467604975849568978("<b>bias</b>:Array=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])")
 ```
 
+
+
 </td>
 
 </tr>
+
+<tr>
+
+<td>
+
+**Trim the tree at a certain `depth`**
+```python
+print(pytc.tree_summary(tree, depth=1))
+┌────┬──────┬─────┬──────┐
+│Name│Type  │Count│Size  │
+├────┼──────┼─────┼──────┤
+│a   │int   │1    │28.00B│
+├────┼──────┼─────┼──────┤
+│b   │tuple │2    │56.00B│
+├────┼──────┼─────┼──────┤
+│c   │i32[3]│3    │12.00B│
+├────┼──────┼─────┼──────┤
+│Σ   │Tree  │6    │96.00B│
+└────┴──────┴─────┴──────┘
+```
+
+
+</td>
+
+
+<td>
+**Trim the tree at a certain `depth`**
+
+```python
+print(pytc.tree_diagram(NN, depth=1))
+Tree
+    ├── a=1
+    ├── b=(2, 3)
+    └── c=i32[3](μ=5.00, σ=0.82, ∈[4,6])
+
+```
+</td>
+
+
+
+<td>
+**Trim the tree at a certain `depth`**
+
+```python
+print(pytc.tree_mermaid(NN, depth=1))
+```
+
+```mermaid
+flowchart LR
+    id15696277213149321320(<b>Tree</b>)
+    id15696277213149321320--->|"1 leaf<br>28.00B"|id9701372693370630274("<b>a</b>:int=1")
+    id15696277213149321320--->|"2 leaf<br>56.00B"|id11059284263013240285("<b>b</b>:tuple=(2, 3)")
+    id15696277213149321320--->|"3 leaf<br>12.00B"|id13987536159700336510("<b>c</b>:Array=i32[3](μ=5.00, σ=0.82, ∈[4,6])")
+
+```
+</td>
+
+
+
+
+</tr>
+
+
+
  </table>
 
  </div>
