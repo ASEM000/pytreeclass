@@ -64,8 +64,8 @@ import pytreeclass as pytc
 
 @pytc.treeclass
 class Linear :
-   weight : jnp.ndarray   # <- equivalent to nn.Parameter
-   bias   : jnp.ndarray   # <- equivalent to nn.Parameter
+   weight : jax.Array   # <- equivalent to nn.Parameter
+   bias   : jax.Array   # <- equivalent to nn.Parameter
 
    def __init__(self,key,in_dim,out_dim):
        self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
@@ -268,7 +268,7 @@ flowchart LR
 class Tree:
     a:int = 1
     b:tuple[int] = (2,3)
-    c:jnp.ndarray = jnp.array([4,5,6])
+    c:jax.Array = jnp.array([4,5,6])
 
 tree= Tree()  
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
@@ -305,7 +305,7 @@ print(tree.at[mask].apply(lambda x: 10))
 class Tree:
     a:int = 1
     b:tuple[int] = (2,3)
-    c:jnp.ndarray = jnp.array([4,5,6])
+    c:jax.Array = jnp.array([4,5,6])
 
 tree= Tree()  
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
@@ -337,7 +337,7 @@ print(tree.at[mask].apply(lambda x: 10))
 class Tree:
     a:int = 1
     b:tuple[int] = (2,3)
-    c:jnp.ndarray = jnp.array([4,5,6])
+    c:jax.Array = jnp.array([4,5,6])
 
 tree= Tree()  
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
@@ -361,6 +361,74 @@ print(tree.at[0].set(10))
 print(tree.at[0].apply(lambda x: 10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```
+
+#### **_Advanced_** Registering custom user-defined classes to work with visualization and indexing tools.
+
+
+Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, index, and metadatas of certain leaf along its path.
+
+Here is an example of registering
+```python
+
+class Tree:
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+    
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
+
+
+# jax flatten rule
+def tree_flatten(tree):
+    return (tree.a, tree.b), None
+
+# jax unflatten rule
+def tree_unflatten(_, children):
+    return Tree(*children)
+
+# PyTreeClass flatten rule
+def pytc_tree_flatten(tree):
+    names = ("a", "b")
+    types = (type(tree.a), type(tree.b))
+    indices = ((0,2), (1,2))
+    metadatas = (None, None)
+    return [*zip(names, types, indices, metadatas)]
+
+
+# Register with `jax`
+jax.tree_util.register_pytree_node(Tree, tree_flatten, tree_unflatten)
+
+# Register the `Tree` class trace function to support indexing
+pytc.register_pytree_node_trace(Tree, pytc_tree_flatten)
+
+tree = Tree(1, 2)
+
+# works with jax
+jax.tree_util.tree_leaves(tree)  # [1, 2]
+
+# works with PyTreeClass viz tools
+print(pytc.tree_summary(tree))
+
+# ┌────┬────┬─────┬──────┐
+# │Name│Type│Count│Size  │
+# ├────┼────┼─────┼──────┤
+# │a   │int │1    │28.00B│
+# ├────┼────┼─────┼──────┤
+# │b   │int │1    │28.00B│
+# ├────┼────┼─────┼──────┤
+# │Σ   │Tree│2    │56.00B│
+# └────┴────┴─────┴──────┘
+
+```
+
+After registeration, you can use internal tools like
+- `pytc.tree_map_with_trace`
+- `pytc.tree_leaves_with_trace`
+- `pytc.tree_flatten_with_trace`
+
+More details on that soon.
+
 
 </details>
 
@@ -406,6 +474,5 @@ print(counter.calls) # 10
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 
 - [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
-- [Treex](https://github.com/cgarciae/treex), [Equinox](https://github.com/patrick-kidger/equinox), [tree-math](https://github.com/google/tree-math), [TensorFlow](https://www.tensorflow.org), [PyTorch](https://pytorch.org)
-- [Flax](https://github.com/google/flax)
+- [Treex](https://github.com/cgarciae/treex), [Equinox](https://github.com/patrick-kidger/equinox), [tree-math](https://github.com/google/tree-math), [Flax](https://github.com/google/flax), [TensorFlow](https://www.tensorflow.org), [PyTorch](https://pytorch.org)
 - [Lovely JAX](https://github.com/xl0/lovely-jax)
