@@ -324,7 +324,7 @@ print(tree.at["a"].set(10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```
 
-**`.at[attribute_name].aplpy(...)`**
+**`.at[attribute_name].apply(...)`**
 ```python
 print(tree.at[mask].apply(lambda x: 10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
@@ -356,14 +356,55 @@ print(tree.at[0].set(10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```
 
-**`.at[integer_index].aplpy(...)`**
+**`.at[integer_index].apply(...)`**
 ```python
 print(tree.at[0].apply(lambda x: 10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```
+</details>
 
-#### **_Advanced_** Registering custom user-defined classes to work with visualization and indexing tools.
 
+
+## 📜 Stateful computations<a id="StatefulComputation"></a>
+<details>
+
+First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
+
+Using the following pattern,Updating state **functionally** can be achieved under `jax.jit`
+
+```python
+import jax
+import pytreeclass as pytc
+
+@pytc.treeclass
+class Counter:
+    calls : int = 0
+
+    def increment(self):
+        self.calls += 1
+counter = Counter() # Counter(calls=0)
+```
+
+Here, we define the update function. Since the increment method mutate the internal state, thus we need to use the functional approach to update the state by using `.at`. To achieve this we can use `.at[method_name].__call__(*args,**kwargs)`, this functional call will return the value of this call and a _new_ model instance with the update state.
+
+```python
+@jax.jit
+def update(counter):
+    value, new_counter = counter.at["increment"]()
+    return new_counter
+
+for i in range(10):
+    counter = update(counter)
+
+print(counter.calls) # 10
+```
+
+</details>
+
+
+#### 📄 **_Advanced_** Registering custom user-defined classes to work with visualization and indexing tools.
+
+<details>
 
 Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, index, and metadatas of certain leaf along its path.
 
@@ -429,47 +470,7 @@ After registeration, you can use internal tools like
 
 More details on that soon.
 
-
 </details>
-
-
-
-## 📜 Stateful computations<a id="StatefulComputation"></a>
-<details>
-
-First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
-
-Using the following pattern,Updating state **functionally** can be achieved under `jax.jit`
-
-```python
-import jax
-import pytreeclass as pytc
-
-@pytc.treeclass
-class Counter:
-    calls : int = 0
-
-    def increment(self):
-        self.calls += 1
-counter = Counter() # Counter(calls=0)
-```
-
-Here, we define the update function. Since the increment method mutate the internal state, thus we need to use the functional approach to update the state by using `.at`. To achieve this we can use `.at[method_name].__call__(*args,**kwargs)`, this functional call will return the value of this call and a _new_ model instance with the update state.
-
-```python
-@jax.jit
-def update(counter):
-    value, new_counter = counter.at["increment"]()
-    return new_counter
-
-for i in range(10):
-    counter = update(counter)
-
-print(counter.calls) # 10
-```
-
-</details>
-
 
 ## 📙 Acknowledgements<a id="Acknowledgements"></a>
 
