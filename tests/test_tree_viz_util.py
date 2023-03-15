@@ -45,23 +45,23 @@ def test_func_pprint():
     def example(a: int, b=1, *c, d, e=2, **f) -> str:
         ...  # fmt: skip
 
-    assert _func_pprint(example, 0, "str", 60) == "example(a, b, *c, d, e, **f)"
-    assert _func_pprint(lambda x: x, 0, "str", 60) == "Lambda(x)"
-    assert _func_pprint(jax.nn.relu, 0, "str", 60) == "relu(*args, **kwargs)"
+    assert _func_pprint(example, 0, "str", 60, 0) == "example(a, b, *c, d, e, **f)"
+    assert _func_pprint(lambda x: x, 0, "str", 60, 0) == "Lambda(x)"
+    assert _func_pprint(jax.nn.relu, 0, "str", 60, 0) == "relu(*args, **kwargs)"
     assert (
-        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60)
+        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60, 0)
         == "Partial(relu(*args, **kwargs))"
     )
     assert (
-        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60)
+        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60, 0)
         == "Partial(relu(*args, **kwargs))"
     )
     assert (
-        _func_pprint(jax.nn.initializers.he_normal, 0, "str", 60)
+        _func_pprint(jax.nn.initializers.he_normal, 0, "str", 60, 0)
         == "he_normal(in_axis, out_axis, batch_axis, dtype)"
     )
 
-    assert _node_pprint(jax.jit(lambda x: x), 0, "repr", 60) == "jit(Lambda(x))"
+    assert _node_pprint(jax.jit(lambda x: x), 0, "repr", 60, 0) == "jit(Lambda(x))"
 
 
 def test_format_count():
