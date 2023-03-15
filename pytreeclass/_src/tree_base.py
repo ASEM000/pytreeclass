@@ -54,8 +54,8 @@ def _tree_trace(
     """Trace flatten rule to be used with the `tree_trace` module"""
     leaves, (keys, _) = _tree_flatten(tree)
     names = (f"{key}" for key in keys)
-    types = (type(leaf) for leaf in leaves)
-    indices = ((i, len(leaves)) for i in range(len(leaves)))
+    types = map(type, leaves)
+    indices = range(len(leaves))
     metadatas = ({"repr": getattr(tree, _FIELD_MAP)[key].repr} for key in keys)
     return [*zip(names, types, indices, metadatas)]
 

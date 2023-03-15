@@ -20,7 +20,9 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1bkYr-5HidtRSXFFBlvYqFa5pc5fQK_7-?usp=sharing)
 [![Downloads](https://pepy.tech/badge/pytreeclass)](https://pepy.tech/project/pytreeclass)
 [![codecov](https://codecov.io/gh/ASEM000/pytreeclass/branch/main/graph/badge.svg?token=TZBRMO0UQH)](https://codecov.io/gh/ASEM000/pytreeclass)
+
 <!-- [![Documentation Status](https://readthedocs.org/projects/pytreeclass/badge/?version=latest)](https://pytreeclass.readthedocs.io/en/latest/?badge=latest) -->
+
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ASEM000/pytreeclass)
 [![DOI](https://zenodo.org/badge/512717921.svg)](https://zenodo.org/badge/latestdoi/512717921)
 ![PyPI](https://img.shields.io/pypi/v/pytreeclass)
@@ -77,7 +79,7 @@ class Linear :
 @pytc.treeclass
 class StackedLinear:
     def __init__(self,key,in_dim,out_dim,hidden_dim):
-        
+
         k1,k2 = jax.random.split(key,2)
         # Declaring l1,l2,l3 as dataclass_fields is optional
         # as l1,l2,l3 are Linear class that is already wrapped with @pytc.treeclass
@@ -124,10 +126,7 @@ print(pytc.tree_summary(NN))
 └─────────┴─────────────┴─────┴───────┘
 ```
 
-
-
 </td>
-
 
 <td>
 
@@ -142,10 +141,7 @@ StackedLinear
         └── bias=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])
 ```
 
-
-
  </td>
-
 
 <td>
 
@@ -167,8 +163,6 @@ flowchart LR
     id17320446376606480513--->|"1 leaf<br>4.00B"|id15467604975849568978("<b>bias</b>:Array=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])")
 ```
 
-
-
 </td>
 
 </tr>
@@ -178,6 +172,7 @@ flowchart LR
 <td>
 
 **Trim the tree at a certain `depth`**
+
 ```python
 print(pytc.tree_summary(NN, depth=1))
 ┌────┬─────────────┬─────┬───────┐
@@ -191,9 +186,7 @@ print(pytc.tree_summary(NN, depth=1))
 └────┴─────────────┴─────┴───────┘
 ```
 
-
 </td>
-
 
 <td>
 
@@ -203,18 +196,17 @@ print(pytc.tree_summary(NN, depth=1))
 print(pytc.tree_diagram(NN, depth=1))
 StackedLinear
     ├── l1=Linear(
-            weight=f32[1,10](μ=-0.04, σ=1.55, ∈[-3.69,1.54]), 
+            weight=f32[1,10](μ=-0.04, σ=1.55, ∈[-3.69,1.54]),
             bias=f32[1,10](μ=1.00, σ=0.00, ∈[1.00,1.00])
         )
     └── l2=Linear(
-            weight=f32[10,1](μ=-0.28, σ=0.41, ∈[-0.91,0.36]), 
+            weight=f32[10,1](μ=-0.28, σ=0.41, ∈[-0.91,0.36]),
             bias=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])
         )
 
 ```
+
 </td>
-
-
 
 <td>
 
@@ -228,22 +220,18 @@ print(pytc.tree_mermaid(NN, depth=1))
 flowchart LR
     id15696277213149321320(<b>StackedLinear</b>)
     id15696277213149321320--->|"20 leaf<br>80.00B"|id10921451029673043053("<b>l1</b>:Linear=Linear(
-    weight=f32[1,10](μ=-0.04, σ=1.55, ∈[-3.69,1.54]), 
+    weight=f32[1,10](μ=-0.04, σ=1.55, ∈[-3.69,1.54]),
     bias=f32[1,10](μ=1.00, σ=0.00, ∈[1.00,1.00])
 )")
     id15696277213149321320--->|"11 leaf<br>44.00B"|id1737644014573985902("<b>l2</b>:Linear=Linear(
-    weight=f32[10,1](μ=-0.28, σ=0.41, ∈[-0.91,0.36]), 
+    weight=f32[10,1](μ=-0.28, σ=0.41, ∈[-0.91,0.36]),
     bias=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])
 )")
 ```
+
 </td>
 
-
-
-
 </tr>
-
-
 
  </table>
 
@@ -270,29 +258,32 @@ class Tree:
     b:tuple[int] = (2,3)
     c:jax.Array = jnp.array([4,5,6])
 
-tree= Tree()  
+tree= Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
 # lets create a mask for values > 4
 mask = jax.tree_util.tree_map(lambda x: x>4, tree)
 
-print(mask)  
+print(mask)
 # Tree(a=False, b=(False, False), c=[False  True  True])
 ```
 
 **`.at[mask].get()`**
+
 ```python
 print(tree.at[mask].get())
 # Tree(a=None, b=(None, None), c=[5 6])
 ```
 
 **`.at[mask].set(...)`**
+
 ```python
 print(tree.at[mask].set(10))
 # Tree(a=1, b=(2, 3), c=[ 4 10 10])
 ```
 
 **`.at[mask].apply(...)`**
+
 ```python
 print(tree.at[mask].apply(lambda x: 10))
 # Tree(a=1, b=(2, 3), c=[ 4 10 10])
@@ -307,24 +298,27 @@ class Tree:
     b:tuple[int] = (2,3)
     c:jax.Array = jnp.array([4,5,6])
 
-tree= Tree()  
+tree= Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
 ```
 
 **`.at[attribute_name].get()`**
+
 ```python
 print(tree.at["a"].get())
 # Tree(a=1, b=(None, None), c=None)
 ```
 
 **`.at[attribute_name].set(...)`**
+
 ```python
 print(tree.at["a"].set(10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```
 
 **`.at[attribute_name].apply(...)`**
+
 ```python
 print(tree.at[mask].apply(lambda x: 10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
@@ -339,33 +333,36 @@ class Tree:
     b:tuple[int] = (2,3)
     c:jax.Array = jnp.array([4,5,6])
 
-tree= Tree()  
+tree= Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
 ```
 
 **`.at[integer_index].get()`**
+
 ```python
 print(tree.at[0].get())
 # Tree(a=1, b=(None, None), c=None)
 ```
 
 **`.at[integer_index].set(...)`**
+
 ```python
 print(tree.at[0].set(10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```
 
 **`.at[integer_index].apply(...)`**
+
 ```python
 print(tree.at[0].apply(lambda x: 10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```
+
 </details>
 
-
-
 ## 📜 Stateful computations<a id="StatefulComputation"></a>
+
 <details>
 
 First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
@@ -401,7 +398,6 @@ print(counter.calls) # 10
 
 </details>
 
-
 #### 📄 **_Advanced_** Registering custom user-defined classes to work with visualization and indexing tools.
 
 <details>
@@ -409,13 +405,14 @@ print(counter.calls) # 10
 Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, index, and metadatas of certain leaf along its path.
 
 Here is an example of registering
+
 ```python
 
 class Tree:
     def __init__(self, a, b):
         self.a = a
         self.b = b
-    
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
 
@@ -432,7 +429,7 @@ def tree_unflatten(_, children):
 def pytc_tree_flatten(tree):
     names = ("a", "b")
     types = (type(tree.a), type(tree.b))
-    indices = ((0,2), (1,2))
+    indices = (0,1)
     metadatas = (None, None)
     return [*zip(names, types, indices, metadatas)]
 
@@ -464,6 +461,7 @@ print(pytc.tree_summary(tree))
 ```
 
 After registeration, you can use internal tools like
+
 - `pytc.tree_map_with_trace`
 - `pytc.tree_leaves_with_trace`
 - `pytc.tree_flatten_with_trace`

@@ -252,6 +252,35 @@ def _is_trace_leaf_depth_factory(depth: int):
     return is_trace_leaf
 
 
+def _sibling_nodes_count_at_all_depth(lhs_trace, traces: tuple[Any]) -> list[int]:
+    # given a trace and a list of traces, we count the number of nodes
+    # at each depth that are siblings of the lhs_trace
+    def sibling_nodes_count_at_depth(lhs_trace: Any, traces: tuple[Any], depth: int):
+        result = set()
+        start = False
+        for trace in traces:
+            _, __, indices, ___ = trace
+            if len(indices) > depth and indices[:depth] == lhs_trace[2][:depth]:
+                start = True
+                # mere existence of a name at a given depth means
+                # that there is a node at that depth
+                result.add(indices[: depth + 1])
+            elif start is True:
+                # we already found the first sibling, so if we are here
+                # it means that we have reached the end of the siblings
+                break
+        return len(result)
+
+    depth, result = 0, []
+    while True:
+        if (out := sibling_nodes_count_at_depth(lhs_trace, traces, depth=depth)) == 0:
+            break
+        else:
+            result += [out]
+            depth += 1
+    return result
+
+
 def tree_diagram(tree, depth: int | None = None, width: int = 60):
     """Pretty print treeclass tree with tree structure diagram
 
@@ -308,6 +337,8 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
         if _should_omit_trace(metadatas):
             continue
 
+        sibling_nodes_count = _sibling_nodes_count_at_all_depth(trace, traces)
+
         for depth, (name, type_) in enumerate(zip(names, types)):
             if depth == 0:
                 # skip printing the root node
@@ -327,7 +358,7 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
                     continue
 
                 # handle printing the left lines for each depth
-                if indices[di][0] == indices[di][1] - 1:
+                if indices[di] == sibling_nodes_count[di] - 1:
                     # do not print the left line
                     # └── A
                     #     └── B
@@ -339,7 +370,7 @@ def tree_diagram(tree, depth: int | None = None, width: int = 60):
                     # └── C
                     fmt += "│\t"
 
-            if indices[depth][0] == (indices[depth][1] - 1):
+            if indices[depth] == (sibling_nodes_count[depth] - 1):
                 # check if we are at the last node in the current depth
                 fmt += "└"
             else:
@@ -376,6 +407,7 @@ def tree_mermaid(tree: PyTree, depth=None, width: int = 60) -> str:
 
     def node_id(input):
         """hash a value by its location in a tree. used to connect values in mermaid"""
+        # specifically we use c_size_t to avoid negative values in the hash that is not supported by mermaid
         return ctypes.c_size_t(hash(input)).value
 
     traces, leaves = zip(

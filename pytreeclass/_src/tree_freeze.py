@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import functools as ft
 import hashlib
 from contextlib import contextmanager
 from typing import Any, Sequence
@@ -38,11 +37,11 @@ def _unwrap(value: Any) -> Any:
 
 class ImmutableWrapper:
     # base class for all immutable wrappers
-    # that gets a speical treatment inside `treeclass` wrapped classes
+    # that gets a special treatment inside `treeclass` wrapped classes
     # in essence, this wrapper is rendered transparent inside `treeclass` wrapped classes
     # so that the wrapped value can be accessed directly, without the need to call `unwrap`
     # this is useful for myriads of use cases, such as freezing a value to avoid updating it
-    # by `jax` transformations, or wrapping a value to make it hashable for use in `dict` or `set`
+    # by `jax` transformations, or wrapping a value to make it hashable.
     def __init__(self, x: Any) -> None:
         # disable composition of Wrappers
         getattr(self, _VARS)[_WRAPPED] = _unwrap(x)
@@ -89,17 +88,17 @@ class FrozenWrapper(ImmutableWrapper):
         return hash(self.unwrap())
 
 
-def _flatten(tree: Any) -> tuple[tuple, Any]:
+def _frozen_flatten(tree: Any) -> tuple[tuple, Any]:
     return (None,), _HashableWrapper(tree.unwrap())
 
 
-def _unflatten(klass: type, treedef: Any, _: Sequence[Any]) -> PyTree:
-    tree = object.__new__(klass)  # type: ignore
+def _frozen_unflatten(treedef: Any, _: Sequence[Any]) -> PyTree:
+    tree = object.__new__(FrozenWrapper)  # type: ignore
     getattr(tree, _VARS)[_WRAPPED] = treedef.unwrap()
     return tree
 
 
-jtu.register_pytree_node(FrozenWrapper, _flatten, ft.partial(_unflatten, FrozenWrapper))
+jtu.register_pytree_node(FrozenWrapper, _frozen_flatten, _frozen_unflatten)
 
 
 def freeze(wrapped: Any) -> FrozenWrapper:

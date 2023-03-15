@@ -196,7 +196,7 @@ def _get_at_trace(
         names, _, indices, __ = trace
         for i, item in enumerate(where):
             try:
-                if (isinstance(item, int) and indices[i + 1][0] != item) or (
+                if (isinstance(item, int) and indices[i + 1] != item) or (
                     isinstance(item, str) and names[i + 1] != item
                 ):
                     return None
@@ -223,7 +223,7 @@ def _set_at_trace(
         names, _, indices, __ = trace
         for i, item in enumerate(where):
             try:
-                if (isinstance(item, int) and indices[i + 1][0] != item) or (
+                if (isinstance(item, int) and indices[i + 1] != item) or (
                     isinstance(item, str) and names[i + 1] != item
                 ):
                     return leaf
@@ -255,7 +255,7 @@ def _apply_at_trace(
 
         for i, item in enumerate(where):
             try:
-                if (isinstance(item, int) and indices[i + 1][0] != item) or (
+                if (isinstance(item, int) and indices[i + 1] != item) or (
                     isinstance(item, str) and names[i + 1] != item
                 ):
                     return leaf
@@ -287,7 +287,7 @@ def _reduce_at_trace(
 
         for i, item in enumerate(where):
             try:
-                if (isinstance(item, int) and indices[i + 1][0] != item) or (
+                if (isinstance(item, int) and indices[i + 1] != item) or (
                     isinstance(item, str) and names[i + 1] != item
                 ):
                     return None
