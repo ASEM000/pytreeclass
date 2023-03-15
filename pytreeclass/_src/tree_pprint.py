@@ -547,10 +547,7 @@ def _vbox(*text: tuple[str, ...]) -> str:
 
     top = f"┌{'─'*max_width}┐"
     line = f"├{'─'*max_width}┤"
-    side = [
-        "\n".join([f"│{t}{' '*(max_width-len(t))}│" for t in item.split("\n")])
-        for item in text
-    ]
+    side = ["\n".join([f"│{t}{' '*(max_width-len(t))}│" for t in item.split("\n")]) for item in text]  # fmt: skip
     btm = f"└{'─'*max_width}┘"
 
     fmt = ""
