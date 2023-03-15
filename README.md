@@ -195,15 +195,8 @@ print(pytc.tree_summary(NN, depth=1))
 ```python
 print(pytc.tree_diagram(NN, depth=1))
 StackedLinear
-    ├── l1=Linear(
-            weight=f32[1,10](μ=-0.04, σ=1.55, ∈[-3.69,1.54]),
-            bias=f32[1,10](μ=1.00, σ=0.00, ∈[1.00,1.00])
-        )
-    └── l2=Linear(
-            weight=f32[10,1](μ=-0.28, σ=0.41, ∈[-0.91,0.36]),
-            bias=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])
-        )
-
+    ├── l1=Linear(weight=..., bias=...)
+    └── l2=Linear(weight=..., bias=...)
 ```
 
 </td>
@@ -219,14 +212,8 @@ print(pytc.tree_mermaid(NN, depth=1))
 ```mermaid
 flowchart LR
     id15696277213149321320(<b>StackedLinear</b>)
-    id15696277213149321320--->|"20 leaf<br>80.00B"|id10921451029673043053("<b>l1</b>:Linear=Linear(
-    weight=f32[1,10](μ=-0.04, σ=1.55, ∈[-3.69,1.54]),
-    bias=f32[1,10](μ=1.00, σ=0.00, ∈[1.00,1.00])
-)")
-    id15696277213149321320--->|"11 leaf<br>44.00B"|id1737644014573985902("<b>l2</b>:Linear=Linear(
-    weight=f32[10,1](μ=-0.28, σ=0.41, ∈[-0.91,0.36]),
-    bias=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])
-)")
+    id15696277213149321320--->|"20 leaf<br>80.00B"|id4205845433746830897("<b>l1</b>:Linear=Linear(weight=..., bias=...)")
+    id15696277213149321320--->|"11 leaf<br>44.00B"|id4682191244783855647("<b>l2</b>:Linear=Linear(weight=..., bias=...)")
 ```
 
 </td>
