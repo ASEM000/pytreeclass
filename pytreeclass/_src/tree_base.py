@@ -139,7 +139,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
 
 
 def _delattr(tree, key: str) -> None:
-    """Delete the attribute of the  if tree is not frozen"""
+    """Delete the attribute if tree is not frozen"""
     if getattr(tree, _FROZEN):
         raise AttributeError(f"Cannot delete {key}.")
     del getattr(tree, _VARS)[key]
@@ -406,7 +406,7 @@ def _auxiliary_transform(klass: type, *, leafwise: bool) -> type:
 
 
 def treeclass(klass: type, *, leafwise: bool = False) -> type:
-    """Decorator to convert a class to a JAX compatible tree structure.
+    """Convert a class to a JAX compatible tree structure.
 
     Args:
         klass: class to be converted to a `treeclass`

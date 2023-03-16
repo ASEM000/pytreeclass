@@ -58,7 +58,9 @@ class ImmutableWrapper:
 
 def _tree_unwrap(value: PyTree) -> PyTree:
     # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
-    is_leaf = lambda x: isinstance(x, ImmutableWrapper) or hasattr(x, _FIELD_MAP)
+    def is_leaf(x: Any) -> bool:
+        return isinstance(x, ImmutableWrapper) or hasattr(x, _FIELD_MAP)
+
     return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
 
@@ -102,9 +104,9 @@ jtu.register_pytree_node(FrozenWrapper, _frozen_flatten, _frozen_unflatten)
 
 
 def freeze(wrapped: Any) -> FrozenWrapper:
-    """A wrapper to freeze a value to avoid updating it by `jax` transformations.
+    r"""A wrapper to freeze a value to avoid updating it by `jax` transformations.
 
-    Example
+    Example:
         >>> import jax
         >>> import pytreeclass as pytc
         >>> import jax.tree_util as jtu

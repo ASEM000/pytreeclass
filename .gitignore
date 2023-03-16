@@ -12,7 +12,8 @@ TODO.txt
 test.ipynb
 benchmarking.ipynb
 tests/nn_tests
-.vscode/settings.json
+.vscode
 notes
 build
 experimental
+.trunk

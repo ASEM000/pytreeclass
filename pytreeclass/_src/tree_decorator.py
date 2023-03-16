@@ -9,8 +9,8 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import sys
-from types import FunctionType
-from typing import Any, Callable, NamedTuple, Sequence
+from types import FunctionType, MappingProxyType
+from typing import Any, Callable, Mapping, NamedTuple, Sequence
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda self: "?"})()
 _FROZEN = "__frozen__"
@@ -41,7 +41,7 @@ class Field(NamedTuple):
     repr: bool = True
     kw_only: bool = False
     pos_only: bool = False
-    metadata: dict[str, Any] | None = None
+    metadata: Mapping[str, Any] | None = None
     callbacks: Sequence[Callable] | None = None
 
 
@@ -73,8 +73,10 @@ def field(
     if kw_only is True and pos_only is True:
         raise ValueError("Cannot specify both `kw_only=True` and `pos_only=True`")
 
-    if not isinstance(metadata, (dict, type(None))):
-        raise TypeError("`metadata` must be a dict")
+    if isinstance(metadata, Mapping):
+        metadata = MappingProxyType(metadata)
+    elif metadata is not None:
+        raise TypeError("`metadata` must be a Mapping or None")
 
     # check if `callbacks` is a Sequence of functions
     if isinstance(callbacks, Sequence):

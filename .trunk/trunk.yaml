@@ -1,6 +1,6 @@
 version: 0.1
 cli:
-  version: 1.6.0
+  version: 1.6.1
 plugins:
   sources:
     - id: trunk
@@ -8,11 +8,14 @@ plugins:
       uri: https://github.com/trunk-io/plugins
 lint:
   enabled:
+    - taplo@0.7.0
+    - ruff@0.0.256
+    - yamllint@1.29.0
     - actionlint@1.6.23
     - black@23.1.0
     - flake8@6.0.0
     - git-diff-check@SYSTEM
-    - gitleaks@8.16.0
+    - gitleaks@8.16.1
     - isort@5.12.0
     - markdownlint@0.33.0
     - prettier@2.8.4
@@ -27,6 +30,6 @@ actions:
     - trunk-upgrade-available
 runtimes:
   enabled:
-    - go@1.18.3
-    - node@16.14.2
-    - python@3.10.3
+    - go@1.19.5
+    - node@18.12.1
+    - python@3.10.8
