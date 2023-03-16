@@ -4,11 +4,11 @@
 
 <br>
 
-[**Installation**](#Installation)
-|[**Description**](#Description)
-|[**Quick Example**](#QuickExample)
-|[**StatefulComputation**](#StatefulComputation)
-[**Acknowledgements**](#Acknowledgements)
+[**Installation**](#installation)
+|[**Description**](#description)
+|[**Quick Example**](#quickExample)
+|[**StatefulComputation**](#stateful_computation)
+[**Acknowledgements**](#acknowledgements)
 
 <!-- |[**Benchmarking**](#Benchmarking) -->
 
@@ -27,7 +27,7 @@
 
 </h5>
 
-**This is v0.2 branch, for previous `PyTreeClass` use main branch**
+**For previous `PyTreeClass` use v0.1 branch**
 
 ## 🛠️ Installation<a id="Installation"></a>
 
@@ -41,7 +41,7 @@ pip install pytreeclass
 pip install git+https://github.com/ASEM000/PyTreeClass
 ```
 
-## 📖 Description<a id="Description"></a>
+## 📖 Description<a id="description"></a>
 
 `PyTreeClass` is a JAX-compatible `dataclass`-like decorator to create and operate on stateful JAX PyTrees.
 
@@ -53,9 +53,9 @@ The package aims to achieve _two goals_:
    - ☝️ Filtering\Indexing layer values similar to `jax.numpy.at[].{get,set,apply,...}`
    - 🎨 Visualize defined layers in plethora of ways.
 
-## ⏩ Quick Example <a id="QuickExample">
+## ⏩ Quick Example <a id="quickExample">
 
-### 🏗️ Simple Tree example <a id="Example">
+### 🏗️ Simple Tree example
 
 ```python
 import jax
@@ -349,7 +349,7 @@ print(tree.at[0].apply(lambda x: 10))
 
 </details>
 
-## 📜 Stateful computations<a id="StatefulComputation"></a>
+## 📜 Stateful computations<a id="stateful_computation"></a>
 
 <details>
 
