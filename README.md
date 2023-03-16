@@ -78,9 +78,13 @@ class Tree:
 tree = Tree()
 ```
 
+<details>
+
+<summary>
+
 ### 🎨 Visualize<a id="Viz">
 
-<details>
+</summary>
 
 <div align="center">
 <table>
@@ -245,9 +249,12 @@ Tree(a=1, b=(2.0, 3.0), c=[4. 5. 6.])
 
 </details>
 
-### 🏃 Working with `jax` transformation
 
 <details>
+
+<summary>
+
+### 🏃 Working with `jax` transformation </summary>
 
 Parameters are defined in `Tree` at the top of class definition similar to defining
 `dataclasses.dataclass` field.
@@ -287,9 +294,10 @@ print(tree)
 
 </details>
 
-### ☝️ Advanced Indexing with `.at[]` <a id="Indexing">
-
 <details>
+<summary>
+
+### ☝️ Advanced Indexing with `.at[]` <a id="Indexing"> </summary>
 
 `PyTreeClass` offers 3 means of indexing through `.at[]`
 
@@ -355,9 +363,11 @@ print(tree.at[1].at[0].apply(lambda x: 10))
 
 </details>
 
-## 📜 Stateful computations<a id="stateful_computation"></a>
-
 <details>
+
+<summary>
+
+## 📜 Stateful computations<a id="stateful_computation"></a> </summary>
 
 First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
 
@@ -394,7 +404,9 @@ print(counter.calls) # 10
 
 ## ➕ More<a id="more"></a>
 
-<details><summary>[Advanced] Registering custom user-defined classes to work with visualization and indexing tools. </summary>
+<details><summary>
+
+#### [Advanced] Registering custom user-defined classes to work with visualization and indexing tools. </summary>
 
 Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, index, and metadatas of certain leaf along its path.
 
@@ -464,7 +476,9 @@ More details on that soon.
 
 </details>
 
-<details> <summary> Callbacks for validation and conversion </summary>
+<details> <summary> 
+
+#### Callbacks for validation and conversion </summary>
 
 `PyTreeClass` includes `callbacks` in the `field` to apply a sequence of functions on input at setting the attribute stage. The callback is quite useful in several cases, for instance, to ensure a certain input type within a valid range. See example:
 
@@ -499,7 +513,10 @@ tree = Tree(1.0)
 
 </details>
 
-<details> <summary> Use `leafwise` to add math operations to `PyTreeClass`</summary>
+<details> 
+<summary> 
+
+##### Use `leafwise` to add math operations to `PyTreeClass`</summary>
 
 ```python
 import functools as ft
@@ -550,7 +567,9 @@ print(tree)
 
 </details>
 
-<details> <summary> `bcmap` + `treeclass(..., leafwise=True)` -> Eliminate `tree_map` </summary>
+<details> <summary> 
+
+##### `bcmap` + `treeclass(..., leafwise=True)` to eliminate `tree_map` </summary>
 
 TDLR
 
@@ -682,7 +701,11 @@ without the need to use `tree_map`
 
 </details>
 
-<details><summary>`PyTreeClass` viz tools with arbitrary `PyTree`s </summary>
+<details><summary>
+
+##### `PyTreeClass` viz tools with arbitrary `PyTree`s 
+
+</summary>
 
 ```python
 import jax
@@ -736,7 +759,11 @@ print(pytc.tree_summary(tree,depth=2))
 
 </details>
 
-<details> <summary> Using `PyTreeClass` `viz` and `at` with `Flax` </summary>
+<details> 
+<summary> 
+
+##### Using `PyTreeClass` `viz` and `at` with `Flax` 
+</summary>
 
 ```python
 import jax 
