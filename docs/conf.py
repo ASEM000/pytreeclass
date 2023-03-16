@@ -15,6 +15,7 @@
 #
 
 from __future__ import annotations
+
 import doctest
 import inspect
 import os
@@ -48,7 +49,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.linkcode",
     "sphinx.ext.napoleon",
-    "sphinxcontrib.bibtex",
+    # "sphinxcontrib.bibtex",
     "sphinxcontrib.katex",
     "sphinx_autodoc_typehints",
     "nbsphinx",
