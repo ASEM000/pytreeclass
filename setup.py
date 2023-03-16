@@ -17,18 +17,11 @@ def _get_version():
         raise ValueError("`__version__` not defined in `pytreeclass/__init__.py`")
 
 
-def _parse_requirements(path):
-    with open(os.path.join(_CURRENT_DIR, path)) as f:
-        return [
-            line.rstrip() for line in f if not (line.isspace() or line.startswith("#"))
-        ]
-
-
 setup(
     name="pytreeclass",
     version=_get_version(),
     url="https://github.com/ASEM000/pytreeclass",
-    license="MIT",
+    license="Apache-2.0",
     author="Mahmoud Asem",
     description=("JAX compatible dataclass."),
     long_description=open(os.path.join(_CURRENT_DIR, "README.md")).read(),
@@ -36,12 +29,8 @@ setup(
     author_email="asem00@kaist.ac.kr",
     keywords="python machine-learning pytorch jax",
     packages=find_namespace_packages(exclude=['examples", "tests","experimental']),
-    install_requires=_parse_requirements(
-        os.path.join(_CURRENT_DIR, "requirements", "requirements.txt")
-    ),
-    # tests_require=_parse_requirements(
-    #     os.path.join(_CURRENT_DIR, 'requirements', 'requirements-test.txt')),
-    zip_safe=False,  # Required for full installation.
+    install_requires=["jax>=0.4.0"],
+    zip_safe=False,
     python_requires=">=3.8",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
