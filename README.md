@@ -9,14 +9,15 @@
 |[**Quick Example**](#quick_example)
 |[**StatefulComputation**](#stateful_computation)
 |[**More**](#more)
-[**Acknowledgements**](#acknowledgements)
+|[**Acknowledgements**](#acknowledgements)
 
 <!-- |[**Benchmarking**](#Benchmarking) -->
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11-blue)
-![codestyle](https://img.shields.io/badge/codestyle-black-lightgrey)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1bkYr-5HidtRSXFFBlvYqFa5pc5fQK_7-?usp=sharing)
+![pyver](https://img.shields.io/badge/jax-0.4+-blue)
+![codestyle](https://img.shields.io/badge/codestyle-black-black)
+<!-- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1bkYr-5HidtRSXFFBlvYqFa5pc5fQK_7-?usp=sharing) -->
 [![Downloads](https://pepy.tech/badge/pytreeclass)](https://pepy.tech/project/pytreeclass)
 [![codecov](https://codecov.io/gh/ASEM000/pytreeclass/branch/main/graph/badge.svg?token=TZBRMO0UQH)](https://codecov.io/gh/ASEM000/pytreeclass)
 
@@ -509,11 +510,43 @@ class Tree:
     b:tuple[float] = (2.,3.)
     c:jax.Array = jnp.array([4.,5.,6.])
 
+    def __call__(self, x):
+        return self.a + self.b[0] + self.c + x
+
 tree = Tree()
 
 tree + 100
 # Tree(a=101, b=(102.0, 103.0), c=f32[3](μ=105.00, σ=0.82, ∈[104.00,106.00]))
+
+@jax.grad
+def loss_func(tree:Tree, x:jax.Array):
+    preds = jax.vmap(tree)(x)  # <--- vectorize the tree call over the leading axis
+    return jnp.mean(preds**2)  # <--- return the mean squared error
+
+@jax.jit
+def train_step(tree:Tree, x:jax.Array):
+    grads = loss_func(tree, x)
+    return tree - grads*1e-3  # <--- eliminate `tree_map` 
+
+# lets freeze the non-differentiable parts of the tree
+# in essence any non inexact type should be frozen to
+# make the tree differentiable and work with jax transformations
+jaxable_tree = jax.tree_util.tree_map(lambda x: pytc.freeze(x) if pytc.is_nondiff(x) else x, tree)
+
+for epoch in range(1_000):
+    jaxable_tree = train_step(jaxable_tree, jnp.ones([10,1]))
+
+print(jaxable_tree)
+# **the `frozen` params have "#" prefix**
+# Tree(a=#1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ]) 
+
+
+# unfreeze the tree
+tree = jax.tree_util.tree_map(pytc.unfreeze, jaxable_tree, is_leaf=pytc.is_frozen)
+print(tree)
+# Tree(a=1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ])
 ```
+
 
 </details>
 
