@@ -57,42 +57,24 @@ The package aims to achieve _two goals_:
 
 ## ⏩ Quick Example <a id="QuickExample">
 
-### 🏗️ Create simple MLP <a id="Pytorch">
+### 🏗️ Linear layer example <a id="Pytorch">
 
 ```python
 import jax
-import jax.numpy as jnp
 import pytreeclass as pytc
 
 @pytc.treeclass
-class Linear :
-   weight : jax.Array   # <- equivalent to nn.Parameter
-   bias   : jax.Array   # <- equivalent to nn.Parameter
+class Tree:
+    a:int = 1
+    b:tuple[float] = (2.,3.)
+    c:jax.Array = jnp.array([4.,5.,6.])
 
-   def __init__(self,key,in_dim,out_dim):
-       self.weight = jax.random.normal(key,shape=(in_dim, out_dim)) * jnp.sqrt(2/in_dim)
-       self.bias = jnp.ones((1,out_dim))
+    def __call__(self, x):
+        return self.a + self.b[0] + self.c + x
 
-   def __call__(self,x):
-       return x @ self.weight + self.bias
+tree = Tree()
 
-@pytc.treeclass
-class StackedLinear:
-    def __init__(self,key,in_dim,out_dim,hidden_dim):
 
-        k1,k2 = jax.random.split(key,2)
-        # Declaring l1,l2,l3 as dataclass_fields is optional
-        # as l1,l2,l3 are Linear class that is already wrapped with @pytc.treeclass
-        self.l1 = Linear(key=k1,in_dim=in_dim,out_dim=hidden_dim)
-        self.l2 = Linear(key=k2,in_dim=hidden_dim,out_dim=out_dim)
-
-    def __call__(self,x):
-        x = self.l1(x)
-        x = jax.nn.tanh(x)
-        x = self.l2(x)
-        return x
-
-NN = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 ```
 
 ### 🎨 Visualize<a id="Viz">
@@ -102,28 +84,30 @@ NN = StackedLinear(in_dim=1,out_dim=1,hidden_dim=10,key=jax.random.PRNGKey(0))
 <div align="center">
 <table>
 <tr>
- <td align = "center"> `tree_summary` </td> <td align = "center">`tree_diagram`</td><td align = "center">mermaid.io (Native support in Github/Notion)</td>
+ <td align = "center"> tree_summary</td> 
+ <td align = "center">tree_diagram</td>
+ <td align = "center">[tree_mermaid](https://mermaid.js.org)(Native support in Github/Notion)</td>
+ <td align= "center"> tree_repr </td>
+ <td align="center" > tree_str </td>
+
 </tr>
 
 <tr>
 <td>
 
 ```python
-print(pytc.tree_summary(NN))
-
-┌─────────┬─────────────┬─────┬───────┐
-│Name     │Type         │Count│Size   │
-├─────────┼─────────────┼─────┼───────┤
-│l1.weight│f32[1,10]    │10   │40.00B │
-├─────────┼─────────────┼─────┼───────┤
-│l1.bias  │f32[1,10]    │10   │40.00B │
-├─────────┼─────────────┼─────┼───────┤
-│l2.weight│f32[10,1]    │10   │40.00B │
-├─────────┼─────────────┼─────┼───────┤
-│l2.bias  │f32[1,1]     │1    │4.00B  │
-├─────────┼─────────────┼─────┼───────┤
-│Σ        │StackedLinear│31   │124.00B│
-└─────────┴─────────────┴─────┴───────┘
+print(pytc.tree_summary(tree, depth=1))
+┌────┬──────┬─────┬──────┐
+│Name│Type  │Count│Size  │
+├────┼──────┼─────┼──────┤
+│a   │int   │1    │28.00B│
+├────┼──────┼─────┼──────┤
+│b   │tuple │2    │48.00B│
+├────┼──────┼─────┼──────┤
+│c   │f32[3]│3    │12.00B│
+├────┼──────┼─────┼──────┤
+│Σ   │Tree  │6    │88.00B│
+└────┴──────┴─────┴──────┘
 ```
 
 </td>
@@ -131,14 +115,12 @@ print(pytc.tree_summary(NN))
 <td>
 
 ```python
-print(pytc.tree_diagram(NN))
-StackedLinear
-    ├── l1:Linear
-    │   ├── weight=f32[1,10](μ=-0.04, σ=1.55, ∈[-3.69,1.54])
-    │   └── bias=f32[1,10](μ=1.00, σ=0.00, ∈[1.00,1.00])
-    └── l2:Linear
-        ├── weight=f32[10,1](μ=-0.28, σ=0.41, ∈[-0.91,0.36])
-        └── bias=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])
+
+print(pytc.tree_diagram(tree, depth=1))
+Tree
+    ├── a=1
+    ├── b=(..., ...)
+    └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
 ```
 
  </td>
@@ -152,15 +134,30 @@ print(pytc.tree_mermaid(NN))
 ```mermaid
 
 flowchart LR
-    id15696277213149321320(<b>StackedLinear</b>)
-    id15696277213149321320--->id11876010482821707549("<b>l1</b>:Linear")
-    id11876010482821707549--->|"10 leaf<br>40.00B"|id12625879399672750750("<b>weight</b>:Array=f32[1,10](μ=-0.04, σ=1.55, ∈[-3.69,1.54])")
-    id15696277213149321320--->id5339875373373139095("<b>l1</b>:Linear")
-    id5339875373373139095--->|"10 leaf<br>40.00B"|id13172945660170386820("<b>bias</b>:Array=f32[1,10](μ=1.00, σ=0.00, ∈[1.00,1.00])")
-    id15696277213149321320--->id6287638614072342474("<b>l2</b>:Linear")
-    id6287638614072342474--->|"10 leaf<br>40.00B"|id1175353021666702085("<b>weight</b>:Array=f32[10,1](μ=-0.28, σ=0.41, ∈[-0.91,0.36])")
-    id15696277213149321320--->id17320446376606480513("<b>l2</b>:Linear")
-    id17320446376606480513--->|"1 leaf<br>4.00B"|id15467604975849568978("<b>bias</b>:Array=f32[1,1](μ=1.00, σ=0.00, ∈[1.00,1.00])")
+    id15696277213149321320(<b>Tree</b>)
+    id15696277213149321320--->|"1 leaf<br>28.00B"|id4205845433746830897("<b>a</b>:int=1")
+    id15696277213149321320--->|"2 leaf<br>48.00B"|id4682191244783855647("<b>b</b>:tuple=(..., ...)")
+    id15696277213149321320--->|"3 leaf<br>12.00B"|id14652085615030570957("<b>c</b>:ArrayImpl=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])")
+```
+
+</td>
+
+<td>
+
+```python
+Tree
+    ├── a=1
+    ├── b=(..., ...)
+    └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+```
+
+</td>
+
+<td>
+
+```python
+print(pytc.tree_str(tree, depth=1))
+Tree(a=1, b=(..., ...), c=[4. 5. 6.])
 ```
 
 </td>
@@ -171,29 +168,29 @@ flowchart LR
 
 <td>
 
-**Trim the tree at a certain `depth`**
-
 ```python
-print(pytc.tree_summary(NN, depth=1))
-┌────┬─────────────┬─────┬───────┐
-│Name│Type         │Count│Size   │
-├────┼─────────────┼─────┼───────┤
-│l1  │Linear       │20   │80.00B │
-├────┼─────────────┼─────┼───────┤
-│l2  │Linear       │11   │44.00B │
-├────┼─────────────┼─────┼───────┤
-│Σ   │StackedLinear│31   │124.00B│
-└────┴─────────────┴─────┴───────┘
+print(pytc.tree_summary(tree, depth=2))
+┌────┬──────┬─────┬──────┐
+│Name│Type  │Count│Size  │
+├────┼──────┼─────┼──────┤
+│a   │int   │1    │28.00B│
+├────┼──────┼─────┼──────┤
+│b[0]│float │1    │24.00B│
+├────┼──────┼─────┼──────┤
+│b[1]│float │1    │24.00B│
+├────┼──────┼─────┼──────┤
+│c   │f32[3]│3    │12.00B│
+├────┼──────┼─────┼──────┤
+│Σ   │Tree  │6    │88.00B│
+└────┴──────┴─────┴──────┘
 ```
 
 </td>
 
 <td>
 
-**Trim the tree at a certain `depth`**
-
 ```python
-print(pytc.tree_diagram(NN, depth=1))
+print(pytc.tree_diagram(tree, depth=1))
 StackedLinear
     ├── l1=Linear(weight=..., bias=...)
     └── l2=Linear(weight=..., bias=...)
@@ -203,17 +200,41 @@ StackedLinear
 
 <td>
 
-**Trim the tree at a certain `depth`**
-
 ```python
-print(pytc.tree_mermaid(NN, depth=1))
+print(pytc.tree_mermaid(tree, depth=1))
 ```
 
 ```mermaid
 flowchart LR
-    id15696277213149321320(<b>StackedLinear</b>)
-    id15696277213149321320--->|"20 leaf<br>80.00B"|id4205845433746830897("<b>l1</b>:Linear=Linear(weight=..., bias=...)")
-    id15696277213149321320--->|"11 leaf<br>44.00B"|id4682191244783855647("<b>l2</b>:Linear=Linear(weight=..., bias=...)")
+    id15696277213149321320(<b>Tree</b>)
+    id15696277213149321320--->id4205845433746830897("<b>a</b>:int=1")
+    id15696277213149321320--->|"1 leaf<br>24.00B"|id8168961130706115346("<b>b</b>:tuple")
+    id8168961130706115346--->|"1 leaf<br>24.00B"|id2766159651176208202("<b>[0]</b>:float=2.0")
+    id15696277213149321320--->|"1 leaf<br>24.00B"|id12408280303145007954("<b>b</b>:tuple")
+    id12408280303145007954--->|"1 leaf<br>24.00B"|id7897116322308127883("<b>[1]</b>:float=3.0")
+    id15696277213149321320--->id14652085615030570957("<b>c</b>:ArrayImpl=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])")
+```
+
+</td>
+
+<td>
+
+```python
+Tree
+    ├── a=1
+    ├── b:tuple
+    │   ├── [0]=2.0
+    │   └── [1]=3.0
+    └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+```
+
+</td>
+
+<td>
+
+```python
+print(pytc.tree_str(tree, depth=2))
+Tree(a=1, b=(2.0, 3.0), c=[4. 5. 6.])
 ```
 
 </td>
@@ -239,12 +260,6 @@ flowchart LR
 #### Index update by boolean mask
 
 ```python
-@pytc.treeclass
-class Tree:
-    a:int = 1
-    b:tuple[int] = (2,3)
-    c:jax.Array = jnp.array([4,5,6])
-
 tree= Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
@@ -255,23 +270,13 @@ print(mask)
 # Tree(a=False, b=(False, False), c=[False  True  True])
 ```
 
-**`.at[mask].get()`**
-
 ```python
 print(tree.at[mask].get())
 # Tree(a=None, b=(None, None), c=[5 6])
-```
 
-**`.at[mask].set(...)`**
-
-```python
 print(tree.at[mask].set(10))
 # Tree(a=1, b=(2, 3), c=[ 4 10 10])
-```
 
-**`.at[mask].apply(...)`**
-
-```python
 print(tree.at[mask].apply(lambda x: 10))
 # Tree(a=1, b=(2, 3), c=[ 4 10 10])
 ```
@@ -279,69 +284,31 @@ print(tree.at[mask].apply(lambda x: 10))
 #### Index update by attribute name
 
 ```python
-@pytc.treeclass
-class Tree:
-    a:int = 1
-    b:tuple[int] = (2,3)
-    c:jax.Array = jnp.array([4,5,6])
-
 tree= Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
-```
-
-**`.at[attribute_name].get()`**
-
-```python
 print(tree.at["a"].get())
 # Tree(a=1, b=(None, None), c=None)
-```
 
-**`.at[attribute_name].set(...)`**
-
-```python
 print(tree.at["a"].set(10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
-```
 
-**`.at[attribute_name].apply(...)`**
-
-```python
-print(tree.at[mask].apply(lambda x: 10))
+print(tree.at["a"].apply(lambda x: 10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```
 
 #### Index update by integer index
 
 ```python
-@pytc.treeclass
-class Tree:
-    a:int = 1
-    b:tuple[int] = (2,3)
-    c:jax.Array = jnp.array([4,5,6])
-
 tree= Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
-```
-
-**`.at[integer_index].get()`**
-
-```python
 print(tree.at[0].get())
 # Tree(a=1, b=(None, None), c=None)
-```
 
-**`.at[integer_index].set(...)`**
-
-```python
 print(tree.at[0].set(10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
-```
 
-**`.at[integer_index].apply(...)`**
-
-```python
 print(tree.at[0].apply(lambda x: 10))
 # Tree(a=10, b=(2, 3), c=[4 5 6])
 ```

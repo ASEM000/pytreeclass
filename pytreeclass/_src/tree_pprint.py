@@ -174,7 +174,7 @@ def _set_pprint(node: set, indent: int, kind: PrintKind, width: int, depth: int)
 def _dict_pprint(
     node: dict, indent: int, kind: PrintKind, width: int, depth: int
 ) -> str:
-    fmt = (f"{k}:{_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in node.items())  # fmt: skip
+    fmt = (f"{k}:{_node_pprint(node[k],indent+1,kind,width,depth-1)}" for k in node)
     fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = "{\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "}"
     return _format_width(fmt, width)
@@ -195,10 +195,10 @@ def _dataclass_like_pprint(
 ) -> str:
     name = type(node).__name__
     fields = _dataclass_like_fields(node)
-    # we use vars here to avoid unfreezing it in case it is frozen
     vs = (vars(node)[f.name] for f in fields if f.repr)
     fs = (f for f in fields if f.repr)
-    fmt = (f"{f.name}={_node_pprint(v,indent+1,kind,width,depth-1)}"for f, v in zip(fs, vs))  # fmt: skip
+    fs_vs = zip(fs, vs)
+    fmt = (f"{f.name}={_node_pprint(v,indent+1,kind,width,depth-1)}" for f, v in fs_vs)
     fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
     return _format_width(fmt, width)
@@ -208,10 +208,8 @@ def _node_type_pprint(
     node: jax.Array | np.ndarray, indent: int, kind: PrintKind, width: int, depth: int
 ) -> str:
     if isinstance(node, (jax.Array, np.ndarray)):
-        shape_dype = node.shape, node.dtype
-        fmt = _node_pprint(
-            jax.ShapeDtypeStruct(*shape_dype), indent, kind, width, depth
-        )
+        shape_dype = jax.ShapeDtypeStruct(node.shape, node.dtype)
+        fmt = _node_pprint(shape_dype, indent, kind, width, depth)
     else:
         fmt = f"{type(node).__name__}"
     return _format_width(fmt, width)
@@ -232,7 +230,7 @@ def tree_repr(
     tabwidth: int = 2,
     depth: int | float = float("inf"),
 ) -> str:
-    """Prertty print dataclass tree `__repr__`
+    """Prertty print a PyTree `__repr__`
 
     Args:
         tree: PyTree
@@ -250,7 +248,7 @@ def tree_str(
     tabwidth: int = 2,
     depth: int | float = float("inf"),
 ) -> str:
-    """Prertty print dataclass tree `__str__`
+    """Prertty print a PyTree `__str__`
 
     Args:
         tree: PyTree
@@ -379,6 +377,7 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
             prev_names, _, __, ___ = traces[i - 1]
 
             if i > 0 and prev_names[: j + 1] == names[: j + 1]:
+                # check if common parent node is already printed
                 continue
 
             fmt += "\n\t"
@@ -402,7 +401,8 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
                     fmt += "│\t"
 
             if indices[j] == (sibling_nodes_count[j] - 1):
-                # check if we are at the last node in the current depth
+                # check if we are at the last
+                # sibling node in the current depth
                 fmt += "└"
             else:
                 fmt += "├"
@@ -455,7 +455,8 @@ def tree_mermaid(
     fmt = f"flowchart LR\n\tid{root_id}({bold_text(type(tree).__name__)})"
     cur_id = None
 
-    for trace, leaf in zip(traces, leaves):
+    for i, (trace, leaf) in enumerate(zip(traces, leaves)):
+        # i iterates over traces
         names, types, indices, metadatas = trace
 
         if _should_omit_trace(metadatas):
@@ -465,19 +466,20 @@ def tree_mermaid(
         count = _format_count(count) + " leaf"
         size = _format_size(size)
 
-        for depth, (name, type_) in enumerate(zip(names, types)):
-            if depth == 0:
+        for j, (name, type_) in enumerate(zip(names, types)):
+            # j iterates over the depth of each trace
+            if j == 0:
                 # skip printing the root node trace
                 continue
 
             name = _node_pprint(name, 0, "str", width, depth)
 
-            prev_id = root_id if depth == 1 else cur_id
-            cur_id = node_id((depth - 1, tuple(indices[1:]), prev_id))
+            prev_id = root_id if j == 1 else cur_id
+            cur_id = node_id((j - 1, tuple(indices[1:]), prev_id))
             fmt += f"\n\tid{prev_id}"
             stats = f'|"{count}<br>{size}"|' if depth == len(names) - 1 else ""
             fmt += "--->" + stats
-            is_last = depth == len(names) - 1
+            is_last = j == len(names) - 1
             value = f"={_node_pprint(leaf,0,'repr',width,depth-1)}" if is_last else ""
             fmt += f'id{cur_id}("{bold_text(name)}:{type_.__name__}{value}")'
 
