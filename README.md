@@ -125,7 +125,7 @@ Tree
 <td>
 
 ```python
-print(pytc.tree_mermaid(NN))
+print(pytc.tree_mermaid(tree, depth=1))
 ```
 
 ```mermaid
@@ -142,10 +142,8 @@ flowchart LR
 <td>
 
 ```python
-Tree
-    ├── a=1
-    ├── b=(..., ...)
-    └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+print(pytc.tree_repr(tree, depth=1))
+Tree(a=1, b=(..., ...), c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00]))
 ```
 
 </td>
@@ -201,7 +199,7 @@ Tree
 <td>
 
 ```python
-print(pytc.tree_mermaid(tree, depth=1))
+print(pytc.tree_mermaid(tree, depth=2))
 ```
 
 ```mermaid
@@ -220,12 +218,8 @@ flowchart LR
 <td>
 
 ```python
-Tree
-    ├── a=1
-    ├── b:tuple
-    │   ├── [0]=2.0
-    │   └── [1]=3.0
-    └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+print(pytc.tree_repr(tree, depth=2))
+Tree(a=1, b=(2.0, 3.0), c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00]))
 ```
 
 </td>
@@ -269,15 +263,15 @@ def train_step(tree:Tree, x:jax.Array):
     return jax.tree_util.tree_map(lambda x, g: x - 1e-3*g, tree, grads)
 
 # lets freeze the non-differentiable parts of the tree
-# in essence any non inexact type should be frozen to make the tree differentiable
-# and work with jax transformations
+# in essence any non inexact type should be frozen to
+# make the tree differentiable and work with jax transformations
 jaxable_tree = jax.tree_util.tree_map(lambda x: pytc.freeze(x) if pytc.is_nondiff(x) else x, tree)
 
 for epoch in range(1_000):
     jaxable_tree = train_step(jaxable_tree, jnp.ones([10,1]))
 
 print(jaxable_tree)
- # **the frozen params have "#" prefix**
+# **the `frozen` params have "#" prefix**
 # Tree(a=#1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ]) 
 
 
