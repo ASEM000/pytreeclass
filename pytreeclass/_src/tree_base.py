@@ -168,7 +168,7 @@ def _new_wrapper(new_func: Callable) -> Callable:
 def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
     @classmethod  # type: ignore
     @ft.wraps(init_subclass_func)
-    def _init_subclass(klass: type) -> None:
+    def _init_subclass(klass: type, *a, **k) -> None:
         # Non-decorated subclasses uses the base `treeclass` leaves only
         # this behavior is aligned with `dataclasses` not registering non-decorated
         # subclasses dataclass fields. for example:
@@ -189,7 +189,7 @@ def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
         # [1, 2]
         # this behavior is different from `flax.struct.dataclass`
         # as it does not register non-decorated subclasses field that inherited from decorated subclasses.
-        init_subclass_func()
+        init_subclass_func(*a, **k)
         return _register_treeclass(klass)
 
     return _init_subclass

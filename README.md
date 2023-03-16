@@ -1,6 +1,6 @@
 <!-- <h1 align="center" style="font-family:Monospace" >Py🌲Class</h1> -->
 <h5 align="center">
-<img width="200px" src="assets/pytc%20logo.svg"> <br>
+<img width="250px" src="assets/pytc%20logo.svg"> <br>
 
 <br>
 
@@ -295,10 +295,12 @@ print(tree)
 2. Indexing by attribute name.
 3. Indexing by Leaf index.
 
+**Since `treeclass` wrapped class are immutable, `.at[]` operations returns new instance of the tree**
+
 #### Index update by boolean mask
 
 ```python
-tree= Tree()
+tree = Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
 # lets create a mask for values > 4
@@ -320,7 +322,7 @@ print(tree.at[mask].apply(lambda x: 10))
 #### Index update by attribute name
 
 ```python
-tree= Tree()
+tree = Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
 print(tree.at["a"].get())
@@ -336,17 +338,17 @@ print(tree.at["a"].apply(lambda x: 10))
 #### Index update by integer index
 
 ```python
-tree= Tree()
+tree = Tree()
 # Tree(a=1, b=(2, 3), c=i32[3](μ=5.00, σ=0.82, ∈[4,6]))
 
-print(tree.at[0].get())
-# Tree(a=1, b=(None, None), c=None)
+print(tree.at[1].at[0].get())
+# Tree(a=None, b=(2.0, None), c=None)
 
-print(tree.at[0].set(10))
-# Tree(a=10, b=(2, 3), c=[4 5 6])
+print(tree.at[1].at[0].set(10))
+# Tree(a=1, b=(10, 3.0), c=[4. 5. 6.])
 
-print(tree.at[0].apply(lambda x: 10))
-# Tree(a=10, b=(2, 3), c=[4 5 6])
+print(tree.at[1].at[0].apply(lambda x: 10))
+# Tree(a=1, b=(10, 3.0), c=[4. 5. 6.])
 ```
 
 </details>
