@@ -1,3 +1,4 @@
+import functools as ft
 from typing import Callable, Sequence
 
 import jax
@@ -7,13 +8,11 @@ import numpy as np
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import filter_nondiff, unfilter_nondiff
 
 
 def test_nn():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class Linear:
-
         weight: jnp.ndarray
         bias: jnp.ndarray
 
@@ -25,7 +24,7 @@ def test_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class StackedLinear:
         layers: Sequence[Linear]
 
@@ -64,9 +63,8 @@ def test_nn():
 
 
 def test_nn_with_func_input():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class Linear:
-
         weight: jnp.ndarray
         bias: jnp.ndarray
         act_func: Callable
@@ -89,9 +87,8 @@ def test_nn_with_func_input():
 
 
 def test_compact_nn():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class Linear:
-
         weight: jnp.ndarray
         bias: jnp.ndarray
 
@@ -104,10 +101,9 @@ def test_compact_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class StackedLinear:
         def __init__(self, key, in_dim, out_dim, hidden_dim):
-
             keys = jax.random.split(key, 3)
 
             self.l1 = Linear(key=keys[0], in_dim=in_dim, out_dim=hidden_dim)
@@ -136,7 +132,7 @@ def test_compact_nn():
         value, grads = jax.value_and_grad(loss_func)(model, x, y)
 
         # no need to use `jax.tree_map` to update the model
-        #  as it model is wrapped by @pytc.treeclass
+        #  as it model is wrapped by @ft.partial(pytc.treeclass, leafwise=True)
         return value, model - 1e-3 * grads
 
     for _ in range(1, 10_001):
@@ -145,10 +141,9 @@ def test_compact_nn():
     np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
 
 
-def test_filter_nondiff():
-    @pytc.treeclass
+def test_freeze_nondiff():
+    @ft.partial(pytc.treeclass, leafwise=True)
     class Linear:
-
         weight: jnp.ndarray
         bias: jnp.ndarray
         count: int = 0
@@ -163,13 +158,16 @@ def test_filter_nondiff():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class StackedLinear:
-        name: str = "stack"
-        exact_array: jnp.ndarray = jnp.array([1, 2, 3])
-        bool_array: jnp.ndarray = jnp.array([True, True])
+        name: str
+        exact_array: jnp.ndarray
+        bool_array: jnp.ndarray
 
         def __init__(self, key, in_dim, out_dim, hidden_dim):
+            self.name = "stack"
+            self.exact_array = jnp.array([1, 2, 3])
+            self.bool_array = jnp.array([True, True])
 
             keys = jax.random.split(key, 3)
 
@@ -209,12 +207,26 @@ def test_filter_nondiff():
         value, grads = jax.value_and_grad(loss_func)(model, x, y)
         return value, model - 1e-3 * grads
 
-    filtered_model = filter_nondiff(model)
+    mask = jtu.tree_map(pytc.is_nondiff, model)
+    freezeed_model = model.at[mask].apply(pytc.freeze)
 
     for _ in range(1, 10_001):
-        value, filtered_model = update(filtered_model, x, y)
+        value, freezeed_model = update(freezeed_model, x, y)
 
     np.testing.assert_allclose(value, jnp.array(0.0031012), atol=1e-5)
 
     X = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0))
-    assert jtu.tree_leaves(X) == jtu.tree_leaves(unfilter_nondiff(filter_nondiff(X)))
+
+    frozen_ = jtu.tree_map(pytc.freeze, X)
+    unfrozen_ = jtu.tree_map(pytc.unfreeze, frozen_, is_leaf=pytc.is_frozen)
+    assert jtu.tree_leaves(X) == jtu.tree_leaves(unfrozen_)
+
+
+@pytest.mark.benchmark
+def test_nn_benchmark(benchmark):
+    benchmark(test_nn)
+
+
+@pytest.mark.benchmark
+def test_freeze_nondiff_benchmark(benchmark):
+    benchmark(test_freeze_nondiff)

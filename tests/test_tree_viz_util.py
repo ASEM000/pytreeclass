@@ -2,37 +2,66 @@ from __future__ import annotations
 
 import jax
 import jax.tree_util as jtu
+import pytest
 
-from pytreeclass.tree_viz.box_drawing import _hbox, _vbox
-from pytreeclass.tree_viz.node_pprint import (
-    _format_node_diagram,
-    _format_node_repr,
-    _format_node_str,
-    _func_repr,
+from pytreeclass._src.tree_pprint import (
+    _format_count,
+    _format_size,
+    _func_pprint,
+    _hbox,
+    _hstack,
+    _node_pprint,
+    _table,
+    _vbox,
 )
-from pytreeclass.tree_viz.tree_summary import _format_count, _format_size
+
+# import pytest
 
 
-def test__vbox():
-
+def test_vbox():
     assert _vbox("a", " a", "a ") == "┌──┐\n│a │\n├──┤\n│ a│\n├──┤\n│a │\n└──┘"
+    assert _vbox("a", "b") == "┌─┐\n│a│\n├─┤\n│b│\n└─┘"
 
 
-def test__hbox():
-    assert _hbox("a", "b", "c") == "┌─┬─┬─┐\n│a│b│c│\n└─┴─┴─┘\n"
+def test_hbox():
+    assert _hbox("a", "b", "c") == "┌─┬─┬─┐\n│a│b│c│\n└─┴─┴─┘"
+    assert _hbox("a") == "┌─┐\n│a│\n└─┘"
 
 
-def test_func_repr():
+def test_table():
+    col1 = ["1\n", "2"]
+    col2 = ["3", "4000"]
+    assert (
+        _table([col1, col2])
+        == "┌─┬────┐\n│1│3   │\n│ │    │\n├─┼────┤\n│2│4000│\n└─┴────┘"
+    )
+
+
+def test_hstack():
+    assert _hstack(_hbox("a"), _vbox("b", "c")) == "┌─┬─┐\n│a│b│\n└─┼─┤\n  │c│\n  └─┘"
+
+
+def test_func_pprint():
     def example(a: int, b=1, *c, d, e=2, **f) -> str:
         ...  # fmt: skip
 
-    assert _func_repr(example) == "example(a,b,*c,d,e,**f)"
-    assert _func_repr(lambda x: x) == "Lambda(x)"
-    assert _func_repr(jax.nn.relu) == "relu(*args,**kwargs)"
-    assert (_format_node_repr(jtu.Partial(jax.nn.relu)) == "Partial(relu(*args,**kwargs))")  # fmt: skip
-    assert _format_node_str(jtu.Partial(jax.nn.relu)) == "Partial(relu(*args,**kwargs))"
-    assert (_format_node_diagram(jtu.Partial(jax.nn.relu)) == "Partial(relu(*args,**kwargs))")  # fmt: skip
-    assert (_func_repr(jax.nn.initializers.he_normal) == "he_normal(in_axis,out_axis,batch_axis,dtype)")  # fmt: skip
+    assert _func_pprint(example, 0, "str", 60, 0) == "example(a, b, *c, d, e, **f)"
+    assert _func_pprint(lambda x: x, 0, "str", 60, 0) == "Lambda(x)"
+    assert _func_pprint(jax.nn.relu, 0, "str", 60, 0) == "relu(*args, **kwargs)"
+    assert (
+        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60, 0)
+        == "Partial(relu(*args, **kwargs))"
+    )
+    assert (
+        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60, 0)
+        == "Partial(relu(*args, **kwargs))"
+    )
+    assert (
+        _func_pprint(jax.nn.initializers.he_normal, 0, "str", 60, 0)
+        == "he_normal(in_axis, out_axis, batch_axis, dtype)"
+    )
+
+    assert _node_pprint(jax.jit(lambda x: x), 0, "repr", 60, 0) == "jit(Lambda(x))"
 
 
 def test_format_count():
@@ -42,3 +71,6 @@ def test_format_count():
 
     assert _format_size(1000) == "1000.00B"
     assert _format_size(complex(1000, 2)) == "1000.00B(2.00B)"
+
+    with pytest.raises(TypeError):
+        _format_count("a")

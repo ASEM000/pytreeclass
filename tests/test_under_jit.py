@@ -1,3 +1,5 @@
+import functools as ft
+
 import jax
 import jax.tree_util as jtu
 import numpy.testing as npt
@@ -5,26 +7,26 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import tree_freeze
 
 
 def test_jit_freeze():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
-        name: str = pytc.field(nondiff=True, default=("a"))
+        name: str
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
                 2 / in_dim
             )
             self.bias = jnp.ones((1, out_dim))
+            self.name = pytc.freeze("a")
 
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class StackedLinear:
         l1: Linear
         l2: Linear
@@ -62,7 +64,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.at["l1"].set(tree_freeze(model.l1))
+        model = model.at["l1"].apply(pytc.freeze)
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
@@ -77,7 +79,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = model.at["l2"].set(tree_freeze(model.l2))
+        model = model.at["l2"].apply(pytc.freeze)
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
@@ -92,7 +94,7 @@ def test_jit_freeze():
         model = StackedLinear(
             in_dim=1, out_dim=1, hidden_dim=10, key=jax.random.PRNGKey(0)
         )
-        model = tree_freeze(model)
+        model = jtu.tree_map(pytc.freeze, model)
         for i in range(1, epochs + 1):
             value, model = update(model, x, y)
 
@@ -104,18 +106,18 @@ def test_jit_freeze():
 
 
 def test_ops_with_jit():
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class T0:
         a: int = 1
         b: int = 2
         c: int = 3
 
-    @pytc.treeclass
+    @ft.partial(pytc.treeclass, leafwise=True)
     class T1:
         a: int = 1
         b: int = 2
         c: int = 3
-        d: jnp.ndarray = jnp.array([1, 2, 3])
+        d: jnp.ndarray = pytc.field(default_factory=lambda: jnp.array([1, 2, 3]))
 
     @jax.jit
     def getter(tree):
@@ -132,13 +134,13 @@ def test_ops_with_jit():
     with pytest.raises(jax.errors.ConcretizationTypeError):
         getter(T0())
 
-    assert pytc.is_treeclass_equal(T0(0, 0, 0), setter(T0()))
+    assert pytc.is_tree_equal(T0(0, 0, 0), setter(T0()))
 
-    assert pytc.is_treeclass_equal(T0(0, 0, 0), applier(T0()))
+    assert pytc.is_tree_equal(T0(0, 0, 0), applier(T0()))
 
     with pytest.raises(jax.errors.ConcretizationTypeError):
         getter(T1())
 
-    assert pytc.is_treeclass_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), setter(T1()))
+    assert pytc.is_tree_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), setter(T1()))
 
-    assert pytc.is_treeclass_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1()))
+    assert pytc.is_tree_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1()))

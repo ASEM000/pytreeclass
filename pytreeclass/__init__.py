@@ -1,56 +1,55 @@
-import functools as ft
-
-from pytreeclass import tree_util, tree_viz
-from pytreeclass._src.tree_util import (
-    filter_nondiff,
-    tree_freeze,
-    tree_unfreeze,
-    unfilter_nondiff,
+from pytreeclass._src.tree_base import is_tree_equal, treeclass
+from pytreeclass._src.tree_decorator import field, fields, is_treeclass
+from pytreeclass._src.tree_freeze import (
+    FrozenWrapper,
+    ImmutableWrapper,
+    freeze,
+    is_frozen,
+    is_nondiff,
+    unfreeze,
 )
-from pytreeclass.treeclass import (
-    field,
-    fields,
-    is_field_frozen,
-    is_field_nondiff,
-    is_treeclass,
-    is_treeclass_equal,
-    is_treeclass_frozen,
-    is_treeclass_immutable,
-    is_treeclass_leaf,
-    is_treeclass_leaf_bool,
-    is_treeclass_non_leaf,
-    is_treeclass_nondiff,
-    treeclass,
+from pytreeclass._src.tree_indexer import bcmap, tree_indexer
+from pytreeclass._src.tree_pprint import (
+    tree_diagram,
+    tree_mermaid,
+    tree_repr,
+    tree_str,
+    tree_summary,
 )
-
-nondiff_field = ft.partial(field, nondiff=True)
-frozen_field = ft.partial(field, frozen=True)
-static_field = nondiff_field
-
+from pytreeclass._src.tree_trace import (
+    register_pytree_node_trace,
+    tree_flatten_with_trace,
+    tree_leaves_with_trace,
+    tree_map_with_trace,
+)
 
 __all__ = (
+    # general utils
     "treeclass",
-    "tree_viz",
-    "tree_util",
-    "tree_freeze",
-    "tree_unfreeze",
-    "filter_nondiff",
-    "unfilter_nondiff",
-    "field",
-    "is_field_frozen",
-    "is_field_nondiff",
-    "fields",
     "is_treeclass",
-    "is_treeclass_equal",
-    "is_treeclass_frozen",
-    "is_treeclass_leaf_bool",
-    "is_treeclass_leaf",
-    "is_treeclass_non_leaf",
-    "is_treeclass_nondiff",
-    "is_treeclass_immutable",
-    "nondiff_field",
-    "frozen_field",
-    "static_field",
+    "field",
+    "fields",
+    "is_tree_equal",
+    # pprint utils
+    "tree_diagram",
+    "tree_mermaid",
+    "tree_repr",
+    "tree_str",
+    "tree_summary",
+    # freeze/unfreeze utils
+    "is_nondiff",
+    "is_frozen",
+    "freeze",
+    "unfreeze",
+    "FrozenWrapper",
+    "ImmutableWrapper",
+    # masking and indexing utils
+    "bcmap",
+    "tree_indexer",
+    "register_pytree_node_trace",
+    "tree_map_with_trace",
+    "tree_leaves_with_trace",
+    "tree_flatten_with_trace",
 )
 
-__version__ = "0.1.14"
+__version__ = "0.2.0b12"
