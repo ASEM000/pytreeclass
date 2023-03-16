@@ -18,6 +18,7 @@ from pytreeclass._src.tree_trace import tree_map_with_trace
 PyTree = Any
 EllipsisType = type(Ellipsis)
 _no_initializer = object()
+_non_partial = object()
 
 
 def _is_leaf_bool(node: Any) -> bool:
@@ -458,10 +459,7 @@ def tree_indexer(tree: PyTree) -> PyTree:
     return AtIndexer()
 
 
-_non_partial = object()
-
-
-class _Partial(ft.partial):
+class BroadcastablePartial(ft.partial):
     def __call__(self, *args, **keywords) -> Callable:
         # https://stackoverflow.com/a/7811270
         keywords = {**self.keywords, **keywords}
@@ -522,14 +520,13 @@ def bcmap(
             # positional arguments are passed the argument to be compare
             # the tree structure with is the first argument
             leaves0, treedef0 = jtu.tree_flatten(args[0], is_leaf=is_leaf)
-            type0 = type(args[0])
             masked_args = [_non_partial]
             masked_kwargs = {}
             leaves = [leaves0]
             leaves_keys = []
 
             for arg in args[1:]:
-                if isinstance(arg, type0):
+                if treedef0 == jtu.tree_structure(arg):
                     masked_args += [_non_partial]
                     leaves += [treedef0.flatten_up_to(arg)]
                 else:
@@ -538,7 +535,6 @@ def bcmap(
             # only kwargs are passed the argument to be compare
             # the tree structure with is the first kwarg
             key0 = next(iter(kwargs))
-            type0 = type(kwargs[key0])
             leaves0, treedef0 = jtu.tree_flatten(kwargs.pop(key0), is_leaf=is_leaf)
             masked_args = []
             masked_kwargs = {key0: _non_partial}
@@ -546,25 +542,25 @@ def bcmap(
             leaves_keys = [key0]
 
         for key in kwargs:
-            if isinstance(kwargs[key], type0):
+            if treedef0 == jtu.tree_structure(kwargs[key]):
                 masked_kwargs[key] = _non_partial
                 leaves += [treedef0.flatten_up_to(kwargs[key])]
                 leaves_keys += [key]
             else:
                 masked_kwargs[key] = kwargs[key]
 
-        func_ = _Partial(func, *masked_args, **masked_kwargs)
+        bfunc = BroadcastablePartial(func, *masked_args, **masked_kwargs)
 
         if len(leaves_keys) == 0:
             # no kwargs leaves are present, so we can immediately zip
-            return jtu.tree_unflatten(treedef0, [func_(*xs) for xs in zip(*leaves)])
+            return jtu.tree_unflatten(treedef0, [bfunc(*xs) for xs in zip(*leaves)])
 
         # kwargs leaves are present, so we need to zip them
         kwargnum = len(leaves) - len(leaves_keys)
         all_leaves = []
         for xs in zip(*leaves):
             xs_args, xs_kwargs = xs[:kwargnum], xs[kwargnum:]
-            all_leaves += [func_(*xs_args, **dict(zip(leaves_keys, xs_kwargs)))]
+            all_leaves += [bfunc(*xs_args, **dict(zip(leaves_keys, xs_kwargs)))]
         return jtu.tree_unflatten(treedef0, all_leaves)
 
     docs = f"Broadcasted version of {func.__name__}\n{func.__doc__}"
