@@ -739,7 +739,7 @@ print(pytc.tree_summary(tree,depth=2))
 <details> <summary> Using `PyTreeClass` `viz` and `at` with `Flax` </summary>
 
 ```python
-import jax
+import jax 
 import pytreeclass as pytc
 from flax import struct
 
@@ -757,6 +757,15 @@ class FlaxTree:
     def at(self):
         return pytc.tree_indexer(self)
 
+def pytc_flatten_rule(tree):
+    names =("a","b","c")
+    types = map(type, (tree.a, tree.b, tree.c))
+    indices = range(3)
+    metadatas= (None, None, None)
+    return [*zip(names, types, indices, metadatas)]
+
+pytc.register_pytree_node_trace(FlaxTree, pytc_flatten_rule)
+
 flax_tree = FlaxTree()
 
 print(f"{flax_tree!r}")
@@ -767,31 +776,31 @@ print(f"{flax_tree!s}")
 
 print(pytc.tree_diagram(flax_tree))
 # FlaxTree
-#     ├── leaf_0=1
-#     ├── leaf_1:tuple
+#     ├── a=1
+#     ├── b:tuple
 #     │   ├── [0]=2.0
 #     │   └── [1]=3.0
-#     └── leaf_2=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+#     └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
 
 print(pytc.tree_summary(flax_tree))
-# ┌─────────┬────────┬─────┬──────┐
-# │Name     │Type    │Count│Size  │
-# ├─────────┼────────┼─────┼──────┤
-# │leaf_0   │int     │1    │28.00B│
-# ├─────────┼────────┼─────┼──────┤
-# │leaf_1[0]│float   │1    │24.00B│
-# ├─────────┼────────┼─────┼──────┤
-# │leaf_1[1]│float   │1    │24.00B│
-# ├─────────┼────────┼─────┼──────┤
-# │leaf_2   │f32[3]  │3    │12.00B│
-# ├─────────┼────────┼─────┼──────┤
-# │Σ        │FlaxTree│6    │88.00B│
-# └─────────┴────────┴─────┴──────┘
+# ┌────┬────────┬─────┬──────┐
+# │Name│Type    │Count│Size  │
+# ├────┼────────┼─────┼──────┤
+# │a   │int     │1    │28.00B│
+# ├────┼────────┼─────┼──────┤
+# │b[0]│float   │1    │24.00B│
+# ├────┼────────┼─────┼──────┤
+# │b[1]│float   │1    │24.00B│
+# ├────┼────────┼─────┼──────┤
+# │c   │f32[3]  │3    │12.00B│
+# ├────┼────────┼─────┼──────┤
+# │Σ   │FlaxTree│6    │88.00B│
+# └────┴────────┴─────┴──────┘
 
 flax_tree.at[0].get()
 # FlaxTree(a=1, b=(None, None), c=None)
 
-flax_tree.at[0].set(10)
+flax_tree.at["a"].set(10)
 # FlaxTree(a=10, b=(2.0, 3.0), c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00]))
 ```
 
