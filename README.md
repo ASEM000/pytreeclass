@@ -458,6 +458,64 @@ More details on that soon.
 
 </details>
 
+<details> <summary> Callbacks for validation and conversion </summary>
+
+
+`PyTreeClass` includes `callbacks`  in the `field` to apply a sequence of functions on input at setting the attribute stage. The callback is quite useful in several cases, for instance, to ensure a certain input type within a valid range. See example:
+
+```python
+import jax 
+import pytreeclass as pytc
+
+def positive_int_callback(value):
+    if not isinstance(value, int):
+        raise TypeError("Value must be an integer")
+    if value <= 0:
+        raise ValueError("Value must be positive")
+    return value
+
+
+@pytc.treeclass
+class Tree:
+    in_features:int = pytc.field(callbacks=[positive_int_callback])
+
+
+tree = Tree(1)
+# no error
+
+tree = Tree(0)
+# ValueError: Error for field=`in_features`:
+# Value must be positive
+
+tree = Tree(1.0)
+# TypeError: Error for field=`in_features`:
+# Value must be an integer
+```
+
+</details>
+
+
+<details> <summary> Use `leafwise` to add math operations to `PyTreeClass`</summary>
+
+
+```python
+import functools as ft
+import pytreeclass as pytc
+
+@ft.partial(pytc.treeclass, leafwise=True)
+class Tree:
+    a:int = 1
+    b:tuple[float] = (2.,3.)
+    c:jax.Array = jnp.array([4.,5.,6.])
+
+tree = Tree()
+
+tree + 100
+# Tree(a=101, b=(102.0, 103.0), c=f32[3](μ=105.00, σ=0.82, ∈[104.00,106.00]))
+```
+
+</details>
+
 ## 📙 Acknowledgements<a id="acknowledgements"></a>
 
 - [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
