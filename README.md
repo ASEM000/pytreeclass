@@ -59,7 +59,13 @@ The package aims to achieve _two goals_:
 
 ## ⏩ Quick Example <a id="quick_example">
 
-#### 🏗️ Simple Tree example
+### 🏗️ Simple Tree example
+
+<div align="center">
+<table>
+<tr><td align="center">Code</td> <td align="center">PyTree representation</td></tr>
+<tr>
+<td>
 
 ```python
 import jax
@@ -77,14 +83,29 @@ class Tree:
 
 tree = Tree()
 ```
+</td>
 
-<details>
+<td>
 
-<summary>
+```python
+# leaves are parameters
 
-#### 🎨 Visualize<a id="Viz">
+Tree
+    ├── a=1
+    ├── b:tuple                                  
+    │   ├── [0]=2.0
+    │   └── [1]=3.0
+    └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+```
 
-</summary>
+</td>
+
+</tr>
+</table>
+</div>
+
+### 🎨 Visualize<a id="Viz">
+<details> <summary>Visualize PyTrees in five different ways</summary>
 
 <div align="center">
 <table>
@@ -250,11 +271,8 @@ Tree(a=1, b=(2.0, 3.0), c=[4. 5. 6.])
 </details>
 
 
-<details>
-
-<summary>
-
-#### 🏃 Working with `jax` transformation </summary>
+### 🏃 Working with `jax` transformation
+<details> <summary>Make arbitrary PyTrees work with jax transformations</summary>
 
 Parameters are defined in `Tree` at the top of class definition similar to defining
 `dataclasses.dataclass` field.
@@ -294,10 +312,10 @@ print(tree)
 
 </details>
 
-<details>
-<summary>
 
-#### ☝️ Advanced Indexing with `.at[]` <a id="Indexing"> </summary>
+#### ☝️ Advanced Indexing with `.at[]` <a id="Indexing">
+
+<details> <summary>Out-of-place updates using mask, attribute name or index</summary>
 
 `PyTreeClass` offers 3 means of indexing through `.at[]`
 
@@ -363,6 +381,7 @@ print(tree.at[1].at[0].apply(lambda x: 10))
 
 </details>
 
+
 <details>
 
 <summary>
@@ -404,9 +423,7 @@ print(counter.calls) # 10
 
 ## ➕ More<a id="more"></a>
 
-<details><summary>
-
-#### [Advanced] Registering custom user-defined classes to work with visualization and indexing tools. </summary>
+<details><summary>[Advanced] Register custom user-defined classes to work with visualization and indexing tools. </summary>
 
 Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, index, and metadatas of certain leaf along its path.
 
@@ -476,9 +493,7 @@ More details on that soon.
 
 </details>
 
-<details> <summary> 
-
-#### Callbacks for validation and conversion </summary>
+<details> <summary>Validate or convert inputs using callbacks</summary>
 
 `PyTreeClass` includes `callbacks` in the `field` to apply a sequence of functions on input at setting the attribute stage. The callback is quite useful in several cases, for instance, to ensure a certain input type within a valid range. See example:
 
@@ -513,10 +528,7 @@ tree = Tree(1.0)
 
 </details>
 
-<details> 
-<summary> 
-
-##### Use `leafwise` to add math operations to `PyTreeClass`</summary>
+<details>  <summary> Add leafwise math operations to PyTreeClass wrapped class</summary>
 
 ```python
 import functools as ft
@@ -567,9 +579,7 @@ print(tree)
 
 </details>
 
-<details> <summary> 
-
-##### `bcmap` + `treeclass(..., leafwise=True)` to eliminate `tree_map` </summary>
+<details> <summary>Eliminate tree_map using bcmap + treeclass(..., leafwise=True) </summary>
 
 TDLR
 
@@ -701,11 +711,7 @@ without the need to use `tree_map`
 
 </details>
 
-<details><summary>
-
-##### `PyTreeClass` viz tools with arbitrary `PyTree`s 
-
-</summary>
+<details><summary>Use PyTreeClass vizualization tools with arbitrary PyTrees </summary>
 
 ```python
 import jax
@@ -759,11 +765,7 @@ print(pytc.tree_summary(tree,depth=2))
 
 </details>
 
-<details> 
-<summary> 
-
-##### Using `PyTreeClass` `viz` and `at` with `Flax` 
-</summary>
+<details><summary>Use PyTreeClass components with other libraries</summary>
 
 ```python
 import jax 
