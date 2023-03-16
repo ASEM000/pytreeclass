@@ -27,7 +27,7 @@ jobs:
           sudo apt install -y pandoc
           python -m pip install --upgrade pip
           pip install .
-          python -m pip install jaxlib==0.4.6
+          pip install -r docs/requirements.txt
       - name: Test doctests
         run: |
           cd docs
