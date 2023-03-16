@@ -59,6 +59,7 @@ The package aims to achieve _two goals_:
 
 ```python
 import jax
+import jax.numpy as jnp
 import pytreeclass as pytc
 
 @pytc.treeclass
@@ -71,8 +72,6 @@ class Tree:
         return self.a + self.b[0] + self.c + x
 
 tree = Tree()
-
-
 ```
 
 ### 🎨 Visualize<a id="Viz">
@@ -188,7 +187,7 @@ print(pytc.tree_summary(tree, depth=2))
 <td>
 
 ```python
-print(pytc.tree_diagram(tree, depth=1))
+print(pytc.tree_diagram(tree, depth=2))
 Tree
     ├── a=1
     ├── b:tuple
@@ -250,6 +249,8 @@ Tree(a=1, b=(2.0, 3.0), c=[4. 5. 6.])
 
 ### 🏃 Working with `jax` transformation
 
+<details>
+
 Parameters are defined in `Tree` at the top of class definition similar to defining
 `dataclasses.dataclass` field.
 Lets optimize our parameters
@@ -285,6 +286,8 @@ tree = jax.tree_util.tree_map(pytc.unfreeze, jaxable_tree, is_leaf=pytc.is_froze
 print(tree)
 # Tree(a=1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ])
 ```
+
+</details>
 
 ### ☝️ Advanced Indexing with `.at[]` <a id="Indexing">
 
@@ -389,9 +392,9 @@ print(counter.calls) # 10
 
 </details>
 
-#### 📄 **_Advanced_** Registering custom user-defined classes to work with visualization and indexing tools.
+## ➕ More<a id="More"></a>
 
-<details>
+<details><summary>[Advanced] Registering custom user-defined classes to work with visualization and indexing tools. </summary>
 
 Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, index, and metadatas of certain leaf along its path.
 
