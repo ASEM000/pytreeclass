@@ -59,7 +59,7 @@ The package aims to achieve _two goals_:
 
 ## ⏩ Quick Example <a id="quick_example">
 
-### 🏗️ Simple Tree example
+#### 🏗️ Simple Tree example
 
 ```python
 import jax
@@ -82,7 +82,7 @@ tree = Tree()
 
 <summary>
 
-### 🎨 Visualize<a id="Viz">
+#### 🎨 Visualize<a id="Viz">
 
 </summary>
 
@@ -254,7 +254,7 @@ Tree(a=1, b=(2.0, 3.0), c=[4. 5. 6.])
 
 <summary>
 
-### 🏃 Working with `jax` transformation </summary>
+#### 🏃 Working with `jax` transformation </summary>
 
 Parameters are defined in `Tree` at the top of class definition similar to defining
 `dataclasses.dataclass` field.
@@ -297,7 +297,7 @@ print(tree)
 <details>
 <summary>
 
-### ☝️ Advanced Indexing with `.at[]` <a id="Indexing"> </summary>
+#### ☝️ Advanced Indexing with `.at[]` <a id="Indexing"> </summary>
 
 `PyTreeClass` offers 3 means of indexing through `.at[]`
 
