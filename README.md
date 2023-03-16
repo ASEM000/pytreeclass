@@ -17,7 +17,9 @@
 ![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11-blue)
 ![pyver](https://img.shields.io/badge/jax-0.4+-blue)
 ![codestyle](https://img.shields.io/badge/codestyle-black-black)
+
 <!-- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1bkYr-5HidtRSXFFBlvYqFa5pc5fQK_7-?usp=sharing) -->
+
 [![Downloads](https://pepy.tech/badge/pytreeclass)](https://pepy.tech/project/pytreeclass)
 [![codecov](https://codecov.io/gh/ASEM000/pytreeclass/branch/main/graph/badge.svg?token=TZBRMO0UQH)](https://codecov.io/gh/ASEM000/pytreeclass)
 
@@ -274,13 +276,13 @@ for epoch in range(1_000):
 
 print(jaxable_tree)
 # **the `frozen` params have "#" prefix**
-# Tree(a=#1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ]) 
+#Tree(a=#1, b=(-4.2826524, 3.0), c=[2.3924797 2.905778  3.4190805])
 
 
 # unfreeze the tree
 tree = jax.tree_util.tree_map(pytc.unfreeze, jaxable_tree, is_leaf=pytc.is_frozen)
 print(tree)
-# Tree(a=1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ])
+# Tree(a=1, b=(-4.2826524, 3.0), c=[2.3924797 2.905778  3.4190805])
 ```
 
 </details>
@@ -464,11 +466,10 @@ More details on that soon.
 
 <details> <summary> Callbacks for validation and conversion </summary>
 
-
-`PyTreeClass` includes `callbacks`  in the `field` to apply a sequence of functions on input at setting the attribute stage. The callback is quite useful in several cases, for instance, to ensure a certain input type within a valid range. See example:
+`PyTreeClass` includes `callbacks` in the `field` to apply a sequence of functions on input at setting the attribute stage. The callback is quite useful in several cases, for instance, to ensure a certain input type within a valid range. See example:
 
 ```python
-import jax 
+import jax
 import pytreeclass as pytc
 
 def positive_int_callback(value):
@@ -498,9 +499,7 @@ tree = Tree(1.0)
 
 </details>
 
-
 <details> <summary> Use `leafwise` to add math operations to `PyTreeClass`</summary>
-
 
 ```python
 import functools as ft
@@ -528,7 +527,7 @@ def loss_func(tree:Tree, x:jax.Array):
 @jax.jit
 def train_step(tree:Tree, x:jax.Array):
     grads = loss_func(tree, x)
-    return tree - grads*1e-3  # <--- eliminate `tree_map` 
+    return tree - grads*1e-3  # <--- eliminate `tree_map`
 
 # lets freeze the non-differentiable parts of the tree
 # in essence any non inexact type should be frozen to
@@ -540,7 +539,7 @@ for epoch in range(1_000):
 
 print(jaxable_tree)
 # **the `frozen` params have "#" prefix**
-# Tree(a=#1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ]) 
+# Tree(a=#1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ])
 
 
 # unfreeze the tree
@@ -549,13 +548,12 @@ print(tree)
 # Tree(a=1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ])
 ```
 
-
 </details>
-
 
 <details> <summary> `bcmap` + `treeclass(..., leafwise=True)` -> Eliminate `tree_map` </summary>
 
 TDLR
+
 ```python
 import functools as ft
 import pytreeclass as pytc
@@ -574,8 +572,7 @@ print(pytc.bcmap(jnp.where)(tree>2, tree+100, 0))
 
 ```
 
-
-`bcmap(func, is_leaf)`  maps a function over [PyTrees](https://jax.readthedocs.io/en/latest/pytrees.html) leaves with automatic broadcasting for scalar arguments.
+`bcmap(func, is_leaf)` maps a function over [PyTrees](https://jax.readthedocs.io/en/latest/pytrees.html) leaves with automatic broadcasting for scalar arguments.
 
 `bcmap` is function transformation that broadcast a scalar to match the first argument of the function this enables us to convert a function like `jnp.where` to work with arbitrary tree structures without the need to write a specific function for each broadcasting case
 
@@ -584,12 +581,13 @@ For example, lets say we want to use `jnp.where` to zeros out all values in an a
 tree = ([1], {"a":1, "b":2}, (1,), -1,)
 
 we can use `jax.tree_util.tree_map` to apply `jnp.where` to the tree but we need to write a specific function for broadcasting the scalar to the tree
+
 ```python
 def map_func(leaf):
     # here we encoded the scalar `0` inside the function
     return jnp.where(leaf>0, leaf, 0)
 
-jtu.tree_map(map_func, tree)  
+jtu.tree_map(map_func, tree)
 # ([Array(1, dtype=int32, weak_type=True)],
 #  {'a': Array(1, dtype=int32, weak_type=True),
 #   'b': Array(2, dtype=int32, weak_type=True)},
@@ -598,6 +596,7 @@ jtu.tree_map(map_func, tree)
 ```
 
 However, lets say we want to use `jnp.where` to set a value to a leaf value from another tree that looks like this
+
 ```python
 def map_func2(lhs_leaf, rhs_leaf):
     # here we encoded the scalar `0` inside the function
@@ -621,6 +620,7 @@ mask = jtu.tree_map(lambda x: x>0, tree)
 ```
 
 case 1
+
 ```python
 broadcastable_where(mask, tree, 0)
 # ([Array(1, dtype=int32, weak_type=True)],
@@ -631,6 +631,7 @@ broadcastable_where(mask, tree, 0)
 ```
 
 case 2
+
 ```python
 broadcastable_where(mask, tree, tree2)
 # ([Array(1, dtype=int32, weak_type=True)],
@@ -648,12 +649,13 @@ by using `pytreeclass` with `leafwise=True `
 class Tree:
     tree : tuple = ([1], {"a":1, "b":2}, (1,), -1,)
 
-tree = Tree()  
+tree = Tree()
 # Tree(tree=([1], {a:1, b:2}, (1), -1))
 ```
 
 case 1: broadcast scalar to tree
-```python
+
+````python
 print(broadcastable_where(tree>0, tree, 0))
 # Tree(tree=([1], {a:1, b:2}, (1), 0))
 
@@ -661,9 +663,10 @@ case 2: broadcast tree to tree
 ```python
 print(broadcastable_where(tree>0, tree, tree+100))
 # Tree(tree=([1], {a:1, b:2}, (1), 99))
-```
+````
 
 `bcmap` also works with all kind of arguments in the wrapped function
+
 ```python
 print(broadcastable_where(tree>0, x=tree, y=tree+100))
 # Tree(tree=([1], {a:1, b:2}, (1), 99))
@@ -677,9 +680,122 @@ Moreover, `bcmap` can be more powerful when used with `pytreeclass` to
 facilitate operation of arbitrary functions on `PyTree` objects
 without the need to use `tree_map`
 
+</details>
+
+<details><summary>`PyTreeClass` viz tools with arbitrary `PyTree`s </summary>
+
+```python
+import jax
+import pytreeclass as pytc
+
+tree = [1, [2,3], 4]
+
+print(pytc.tree_diagram(tree,depth=1))
+# list
+#     ├── [0]=1
+#     ├── [1]=[..., ...]
+#     └── [2]=4
+
+print(pytc.tree_diagram(tree,depth=2))
+# list
+#     ├── [0]=1
+#     ├── [1]:list
+#     │   ├── [0]=2
+#     │   └── [1]=3
+#     └── [2]=4
+
+
+print(pytc.tree_summary(tree,depth=1))
+# ┌────┬────┬─────┬───────┐
+# │Name│Type│Count│Size   │
+# ├────┼────┼─────┼───────┤
+# │[0] │int │1    │28.00B │
+# ├────┼────┼─────┼───────┤
+# │[1] │list│2    │56.00B │
+# ├────┼────┼─────┼───────┤
+# │[2] │int │1    │28.00B │
+# ├────┼────┼─────┼───────┤
+# │Σ   │list│4    │112.00B│
+# └────┴────┴─────┴───────┘
+
+print(pytc.tree_summary(tree,depth=2))
+# ┌──────┬────┬─────┬───────┐
+# │Name  │Type│Count│Size   │
+# ├──────┼────┼─────┼───────┤
+# │[0]   │int │1    │28.00B │
+# ├──────┼────┼─────┼───────┤
+# │[1][0]│int │1    │28.00B │
+# ├──────┼────┼─────┼───────┤
+# │[1][1]│int │1    │28.00B │
+# ├──────┼────┼─────┼───────┤
+# │[2]   │int │1    │28.00B │
+# ├──────┼────┼─────┼───────┤
+# │Σ     │list│4    │112.00B│
+# └──────┴────┴─────┴───────┘
+```
 
 </details>
 
+<details> <summary> Using `PyTreeClass` `viz` and `at` with `Flax` </summary>
+
+```python
+import jax
+import pytreeclass as pytc
+from flax import struct
+
+@struct.dataclass
+class FlaxTree:
+    a:int = 1
+    b:tuple[float] = (2.,3.)
+    c:jax.Array = jax.numpy.array([4.,5.,6.])
+
+    def __repr__(self) -> str:
+        return pytc.tree_repr(self)
+    def __str__(self) -> str:
+        return pytc.tree_str(self)
+    @property
+    def at(self):
+        return pytc.tree_indexer(self)
+
+flax_tree = FlaxTree()
+
+print(f"{flax_tree!r}")
+# FlaxTree(a=1, b=(2.0, 3.0), c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00]))
+
+print(f"{flax_tree!s}")
+# FlaxTree(a=1, b=(2.0, 3.0), c=[4. 5. 6.])
+
+print(pytc.tree_diagram(flax_tree))
+# FlaxTree
+#     ├── leaf_0=1
+#     ├── leaf_1:tuple
+#     │   ├── [0]=2.0
+#     │   └── [1]=3.0
+#     └── leaf_2=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+
+print(pytc.tree_summary(flax_tree))
+# ┌─────────┬────────┬─────┬──────┐
+# │Name     │Type    │Count│Size  │
+# ├─────────┼────────┼─────┼──────┤
+# │leaf_0   │int     │1    │28.00B│
+# ├─────────┼────────┼─────┼──────┤
+# │leaf_1[0]│float   │1    │24.00B│
+# ├─────────┼────────┼─────┼──────┤
+# │leaf_1[1]│float   │1    │24.00B│
+# ├─────────┼────────┼─────┼──────┤
+# │leaf_2   │f32[3]  │3    │12.00B│
+# ├─────────┼────────┼─────┼──────┤
+# │Σ        │FlaxTree│6    │88.00B│
+# └─────────┴────────┴─────┴──────┘
+
+flax_tree.at[0].get()
+# FlaxTree(a=1, b=(None, None), c=None)
+
+flax_tree.at[0].set(10)
+# FlaxTree(a=10, b=(2.0, 3.0), c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00]))
+```
+
+</details>
 
 ## 📙 Acknowledgements<a id="acknowledgements"></a>
 
