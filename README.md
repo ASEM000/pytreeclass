@@ -6,7 +6,7 @@
 
 [**Installation**](#installation)
 |[**Description**](#description)
-|[**Quick Example**](#quickExample)
+|[**Quick Example**](#quick_example)
 |[**StatefulComputation**](#stateful_computation)
 [**Acknowledgements**](#acknowledgements)
 
@@ -29,7 +29,7 @@
 
 **For previous `PyTreeClass` use v0.1 branch**
 
-## 🛠️ Installation<a id="Installation"></a>
+## 🛠️ Installation<a id="installation"></a>
 
 <!-- ```python
 pip install pytreeclass
@@ -53,7 +53,7 @@ The package aims to achieve _two goals_:
    - ☝️ Filtering\Indexing layer values similar to `jax.numpy.at[].{get,set,apply,...}`
    - 🎨 Visualize defined layers in plethora of ways.
 
-## ⏩ Quick Example <a id="quickExample">
+## ⏩ Quick Example <a id="quick_example">
 
 ### 🏗️ Simple Tree example
 
@@ -458,7 +458,7 @@ More details on that soon.
 
 </details>
 
-## 📙 Acknowledgements<a id="Acknowledgements"></a>
+## 📙 Acknowledgements<a id="acknowledgements"></a>
 
 - [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
 - [Treex](https://github.com/cgarciae/treex), [Equinox](https://github.com/patrick-kidger/equinox), [tree-math](https://github.com/google/tree-math), [Flax](https://github.com/google/flax), [TensorFlow](https://www.tensorflow.org), [PyTorch](https://pytorch.org)
