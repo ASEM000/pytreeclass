@@ -8,6 +8,7 @@
 |[**Description**](#description)
 |[**Quick Example**](#quick_example)
 |[**StatefulComputation**](#stateful_computation)
+|[**More**](#more)
 [**Acknowledgements**](#acknowledgements)
 
 <!-- |[**Benchmarking**](#Benchmarking) -->
@@ -386,7 +387,7 @@ print(counter.calls) # 10
 
 </details>
 
-## ➕ More<a id="More"></a>
+## ➕ More<a id="more"></a>
 
 <details><summary>[Advanced] Registering custom user-defined classes to work with visualization and indexing tools. </summary>
 
@@ -515,6 +516,135 @@ tree + 100
 ```
 
 </details>
+
+
+<details> <summary> `bcmap` + `treeclass(..., leafwise=True)` -> Eliminate `tree_map` </summary>
+
+TDLR
+```python
+import functools as ft
+import pytreeclass as pytc
+import jax.numpy as jnp
+
+@ft.partial(pytc.treeclass, leafwise=True)
+class Tree:
+    a:int = 1
+    b:tuple[float] = (2.,3.)
+    c:jax.Array = jnp.array([4.,5.,6.])
+
+tree = Tree()
+
+print(pytc.bcmap(jnp.where)(tree>2, tree+100, 0))
+# Tree(a=0, b=(0.0, 103.0), c=[104. 105. 106.])
+
+```
+
+
+`bcmap(func, is_leaf)`  maps a function over [PyTrees](https://jax.readthedocs.io/en/latest/pytrees.html) leaves with automatic broadcasting for scalar arguments.
+
+`bcmap` is function transformation that broadcast a scalar to match the first argument of the function this enables us to convert a function like `jnp.where` to work with arbitrary tree structures without the need to write a specific function for each broadcasting case
+
+For example, lets say we want to use `jnp.where` to zeros out all values in an arbitrary tree structure that are less than 0
+
+tree = ([1], {"a":1, "b":2}, (1,), -1,)
+
+we can use `jax.tree_util.tree_map` to apply `jnp.where` to the tree but we need to write a specific function for broadcasting the scalar to the tree
+```python
+def map_func(leaf):
+    # here we encoded the scalar `0` inside the function
+    return jnp.where(leaf>0, leaf, 0)
+
+jtu.tree_map(map_func, tree)  
+# ([Array(1, dtype=int32, weak_type=True)],
+#  {'a': Array(1, dtype=int32, weak_type=True),
+#   'b': Array(2, dtype=int32, weak_type=True)},
+#  (Array(1, dtype=int32, weak_type=True),),
+#  Array(0, dtype=int32, weak_type=True))
+```
+
+However, lets say we want to use `jnp.where` to set a value to a leaf value from another tree that looks like this
+```python
+def map_func2(lhs_leaf, rhs_leaf):
+    # here we encoded the scalar `0` inside the function
+    return jnp.where(lhs_leaf>0, lhs_leaf, rhs_leaf)
+
+tree2 = jtu.tree_map(lambda x: 1000, tree)
+
+jtu.tree_map(map_func2, tree, tree2)
+# ([Array(1, dtype=int32, weak_type=True)],
+#  {'a': Array(1, dtype=int32, weak_type=True),
+#   'b': Array(2, dtype=int32, weak_type=True)},
+#  (Array(1, dtype=int32, weak_type=True),),
+#  Array(1000, dtype=int32, weak_type=True))
+```
+
+Now, `bcmap` makes this easier by figuring out the broadcasting case.
+
+```python
+broadcastable_where = pytc.bcmap(jnp.where)
+mask = jtu.tree_map(lambda x: x>0, tree)
+```
+
+case 1
+```python
+broadcastable_where(mask, tree, 0)
+# ([Array(1, dtype=int32, weak_type=True)],
+#  {'a': Array(1, dtype=int32, weak_type=True),
+#   'b': Array(2, dtype=int32, weak_type=True)},
+#  (Array(1, dtype=int32, weak_type=True),),
+#  Array(0, dtype=int32, weak_type=True))
+```
+
+case 2
+```python
+broadcastable_where(mask, tree, tree2)
+# ([Array(1, dtype=int32, weak_type=True)],
+#  {'a': Array(1, dtype=int32, weak_type=True),
+#   'b': Array(2, dtype=int32, weak_type=True)},
+#  (Array(1, dtype=int32, weak_type=True),),
+#  Array(1000, dtype=int32, weak_type=True))
+```
+
+lets then take this a step further to eliminate `mask` from the equation
+by using `pytreeclass` with `leafwise=True `
+
+```python
+@ft.partial(pytc.treeclass, leafwise=True)
+class Tree:
+    tree : tuple = ([1], {"a":1, "b":2}, (1,), -1,)
+
+tree = Tree()  
+# Tree(tree=([1], {a:1, b:2}, (1), -1))
+```
+
+case 1: broadcast scalar to tree
+```python
+print(broadcastable_where(tree>0, tree, 0))
+# Tree(tree=([1], {a:1, b:2}, (1), 0))
+
+case 2: broadcast tree to tree
+```python
+print(broadcastable_where(tree>0, tree, tree+100))
+# Tree(tree=([1], {a:1, b:2}, (1), 99))
+```
+
+`bcmap` also works with all kind of arguments in the wrapped function
+```python
+print(broadcastable_where(tree>0, x=tree, y=tree+100))
+# Tree(tree=([1], {a:1, b:2}, (1), 99))
+```
+
+in concolusion, `bcmap` is a function transformation that can be used to
+to make functions work with arbitrary tree structures without the need to write
+a specific function for each broadcasting case
+
+Moreover, `bcmap` can be more powerful when used with `pytreeclass` to
+facilitate operation of arbitrary functions on `PyTree` objects
+without the need to use `tree_map`
+
+
+</details>
+
 
 ## 📙 Acknowledgements<a id="acknowledgements"></a>
 
