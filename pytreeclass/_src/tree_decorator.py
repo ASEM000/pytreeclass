@@ -19,6 +19,7 @@ _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
 _WRAPPED = "__wrapped__"
 _VARS = "__dict__"
+_ANNOTATIONS = "__annotations__"
 
 
 def is_treeclass(tree: Any) -> bool:
@@ -64,6 +65,7 @@ def field(
         init: Whether the field is included in the object's __init__ function.
         repr: Whether the field is included in the object's __repr__ function.
         kw_only: Whether the field is keyword-only.
+        pos_only: Whether the field is positional-only.
         metadata: A mapping of user-defined data for the field.
         callbacks: A sequence of functions to call after initialization to modify the field value.
 
@@ -122,7 +124,7 @@ def field(
 def _generate_field_map(klass: type) -> dict[str, Field]:
     # get all the fields of the class and its base classes
     # get the fields of the class and its base classes
-    FIELD_MAP = dict()
+    field_map = dict()
 
     for base in reversed(klass.__mro__):
         # get the fields of the base class in the MRO
@@ -131,14 +133,15 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         # and the fields of the derived class are added last so that
         # in case of name collision, the derived class fields are preserved
         if hasattr(base, _FIELD_MAP):
-            FIELD_MAP.update(getattr(base, _FIELD_MAP))
+            field_map.update(getattr(base, _FIELD_MAP))
 
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
-    annotations = getattr(klass, _VARS).get("__annotations__", dict())
+    if _ANNOTATIONS not in getattr(klass, _VARS):
+        return field_map
 
-    for name in annotations:
+    for name in (annotations := getattr(klass, _VARS)[_ANNOTATIONS]):
         # get the value associated with the type hint
         # in essence will skip any non type-hinted attributes
         value = getattr(klass, name, _NOT_SET)
@@ -150,13 +153,13 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
             # the annotated attribute is a `Field``
             # example case: `x: Any = field(default=1)`
             # assign the name and type to the Field from the annotation
-            FIELD_MAP[name] = value._replace(name=name, type=type)
+            field_map[name] = value._replace(name=name, type=type)
 
         elif value is _NOT_SET:
             # nothing is assigned to the annotated attribute
             # example case: `x: Any`
             # then we create a Field and assign it to the class
-            FIELD_MAP[name] = Field(name=name, type=type)
+            field_map[name] = Field(name=name, type=type)
 
         else:
             # the annotated attribute has a non-field default value
@@ -176,9 +179,9 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
 
             # example case: `x: int = 1`
             # otherwise, we create a Field and assign default value to the class
-            FIELD_MAP[name] = Field(name=name, type=type, default=value)
+            field_map[name] = Field(name=name, type=type, default=value)
 
-    return FIELD_MAP
+    return field_map
 
 
 @ft.lru_cache(maxsize=None)
