@@ -404,7 +404,7 @@ def tree_indexer(tree: PyTree) -> PyTree:
         ...         return cls(*children)
         ...     @property
         ...     def at(self):
-        ...         return tree_indexer(self)
+        ...         return pytc.tree_indexer(self)
         ...     def __repr__(self) -> str:
         ...         return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
 
@@ -496,23 +496,23 @@ def bcmap(
         Test(a=(1, 0, 0), b=(0, 0, 0), c=[1 0 0])
 
         >>> # 1 is broadcasted to all leaves of the list pytree
-        >>> bcmap(lambda x,y:x+y)([1,2,3],1)
+        >>> pytc.bcmap(lambda x,y:x+y)([1,2,3],1)
         [2, 3, 4]
 
         >>> # trees are summed leaf-wise
-        >>> bcmap(lambda x,y:x+y)([1,2,3],[1,2,3])
+        >>> pytc.bcmap(lambda x,y:x+y)([1,2,3],[1,2,3])
         [2, 4, 6]
 
         >>> # Non scalar second args case
         >>> try:
-        ...     bcmap(lambda x,y:x+y)([1,2,3],[[1,2,3],[1,2,3]])
+        ...     pytc.bcmap(lambda x,y:x+y)([1,2,3],[[1,2,3],[1,2,3]])
         ... except TypeError as e:
         ...     print(e)
         unsupported operand type(s) for +: 'int' and 'list'
 
         >>> # using **numpy** functions on pytrees
         >>> import jax.numpy as jnp
-        >>> bcmap(jnp.add)([1,2,3],[1,2,3])
+        >>> pytc.bcmap(jnp.add)([1,2,3],[1,2,3])
         [Array(2, dtype=int32, weak_type=True), Array(4, dtype=int32, weak_type=True), Array(6, dtype=int32, weak_type=True)]
     """
 
