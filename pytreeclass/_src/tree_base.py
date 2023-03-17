@@ -459,6 +459,16 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         Extending indexing to other types is possible by registering the type with
         `pytreeclass.register_pytree_node_trace`
 
+    Note:
+        `leafwise`=True adds the following methods to the class:
+            '__add__', '__and__', '__ceil__', '__divmod__', '__eq__', '__floor__', '__floordiv__',
+            '__ge__', '__gt__', '__invert__', '__le__', '__lshift__', '__lt__',
+            '__matmul__', '__mod__', '__mul__', '__ne__', '__neg__', '__or__', '__pos__',
+            '__pow__', '__radd__', '__rand__', '__rdivmod__', '__reduce__', '__rfloordiv__',
+            '__rlshift__', '__rmatmul__', '__rmod__', '__rmul__', '__ror__', '__round__', '__rpow__',
+            '__rrshift__', '__rshift__', '__rsub__', '__rtruediv__', '__rxor__', '__sub__',
+            '__truediv__', '__trunc__', '__xor__',
+
     Raises:
         TypeError: if the input is not a class.
     """
