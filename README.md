@@ -11,20 +11,14 @@
 |[**More**](#more)
 |[**Acknowledgements**](#acknowledgements)
 
-<!-- |[**Benchmarking**](#Benchmarking) -->
-
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
-![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11-blue)
-![pyver](https://img.shields.io/badge/jax-0.4+-blue)
+![pyver](https://img.shields.io/badge/python-3.8+_-red)
+![pyver](https://img.shields.io/badge/jax-0.4+-red)
 ![codestyle](https://img.shields.io/badge/codestyle-black-black)
-
-<!-- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1bkYr-5HidtRSXFFBlvYqFa5pc5fQK_7-?usp=sharing) -->
-
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/intro.ipynb)
 [![Downloads](https://pepy.tech/badge/pytreeclass)](https://pepy.tech/project/pytreeclass)
 [![codecov](https://codecov.io/gh/ASEM000/pytreeclass/branch/main/graph/badge.svg?token=TZBRMO0UQH)](https://codecov.io/gh/ASEM000/pytreeclass)
-
-<!-- [![Documentation Status](https://readthedocs.org/projects/pytreeclass/badge/?version=latest)](https://pytreeclass.readthedocs.io/en/latest/?badge=latest) -->
-
+[![Documentation Status](https://readthedocs.org/projects/pytreeclass/badge/?version=latest)](https://pytreeclass.readthedocs.io/en/latest/?badge=latest)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ASEM000/pytreeclass)
 [![DOI](https://zenodo.org/badge/512717921.svg)](https://zenodo.org/badge/latestdoi/512717921)
 ![PyPI](https://img.shields.io/pypi/v/pytreeclass)
@@ -83,6 +77,7 @@ class Tree:
 
 tree = Tree()
 ```
+
 </td>
 
 <td>
@@ -92,7 +87,7 @@ tree = Tree()
 
 Tree
     ├── a=1
-    ├── b:tuple                                  
+    ├── b:tuple
     │   ├── [0]=2.0
     │   └── [1]=3.0
     └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
@@ -105,6 +100,7 @@ Tree
 </div>
 
 ### 🎨 Visualize<a id="Viz">
+
 <details> <summary>Visualize PyTrees in five different ways</summary>
 
 <div align="center">
@@ -270,8 +266,8 @@ Tree(a=1, b=(2.0, 3.0), c=[4. 5. 6.])
 
 </details>
 
-
 ### 🏃 Working with `jax` transformation
+
 <details> <summary>Make arbitrary PyTrees work with jax transformations</summary>
 
 Parameters are defined in `Tree` at the top of class definition similar to defining
@@ -311,7 +307,6 @@ print(tree)
 ```
 
 </details>
-
 
 #### ☝️ Advanced Indexing with `.at[]` <a id="Indexing">
 
@@ -380,7 +375,6 @@ print(tree.at[1].at[0].apply(lambda x: 10))
 ```
 
 </details>
-
 
 <details>
 
@@ -768,7 +762,7 @@ print(pytc.tree_summary(tree,depth=2))
 <details><summary>Use PyTreeClass components with other libraries</summary>
 
 ```python
-import jax 
+import jax
 import pytreeclass as pytc
 from flax import struct
 

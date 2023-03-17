@@ -1,8 +1,6 @@
 
 
 
-🌲PyTreeClass🌲
-=================
 Visualize, create, and operate on JAX PyTree in the most intuitive way possible.
 
 
