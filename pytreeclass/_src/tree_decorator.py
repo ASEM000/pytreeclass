@@ -45,15 +45,6 @@ class Field(NamedTuple):
     metadata: Mapping[str, Any] | None = None
     callbacks: Sequence[Callable] | None = None
 
-    def __repr__(self):
-        fmt = (
-            f"Field(\n\tname={self.name!r},\n\ttype={self.type!r},\n\tdefault={self.default!r},\n\t"
-            f"default_factory={self.default_factory!r},\n\tinit={self.init!r},\n\t"
-            f"repr={self.repr!r},\n\tkw_only={self.kw_only!r},\n\tpos_only={self.pos_only!r},\n\t"
-            f"metadata={self.metadata!r},\n\tcallbacks={self.callbacks!r}\n)"
-        )
-        return fmt.expandtabs(4)
-
 
 def field(
     *,
@@ -268,27 +259,7 @@ def _is_dataclass_like(tree: Any) -> bool:
 
 
 def fields(tree: Any) -> Sequence[Field]:
-    """Get the fields of a `treeclass` instance.
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> @pytc.treeclass
-        ... class Foo:
-        ...    x:int = 1
-        >>> pytc.fields(Foo())
-        (Field(
-            name='x',
-            type='int',
-            default=1,
-            default_factory=None,
-            init=True,
-            repr=True,
-            kw_only=False,
-            pos_only=False,
-            metadata=None,
-            callbacks=None
-        ),)
-    """
+    """Get the fields of a `treeclass` instance."""
     if not is_treeclass(tree):
         raise TypeError(f"Cannot get fields from {tree!r}.")
     field_map = getattr(tree, _FIELD_MAP, {})
