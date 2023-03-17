@@ -21,11 +21,12 @@ import inspect
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(".."))
-
 import sphinxcontrib.katex as katex
 
 import pytreeclass
+
+sys.path.insert(0, os.path.abspath(".."))
+
 
 # -- Project information -----------------------------------------------------
 
@@ -37,6 +38,8 @@ author = "Mahmoud Asem"
 # -- General configuration ---------------------------------------------------
 master_doc = "index"
 
+html_static_path = ["_static"]
+html_logo = "_static/logo.svg"
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom

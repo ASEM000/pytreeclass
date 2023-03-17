@@ -27,7 +27,7 @@ Install from pip::
     
     API/base
 
-MIT License.
+Apache2.0 License.
 
 Indices
 =======
