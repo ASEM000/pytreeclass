@@ -21,9 +21,9 @@ _WRAPPED = "__wrapped__"
 _VARS = "__dict__"
 
 
-def is_treeclass(cls: type) -> bool:
-    """Returns `True` if a class is a `treeclass`."""
-    return hasattr(cls, _FROZEN) and hasattr(cls, _FIELD_MAP)
+def is_treeclass(tree: Any) -> bool:
+    """Returns `True` if a class or instance is a `treeclass`."""
+    return hasattr(tree, _FROZEN) and hasattr(tree, _FIELD_MAP)
 
 
 @ft.lru_cache
