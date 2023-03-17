@@ -104,53 +104,54 @@ jtu.register_pytree_node(FrozenWrapper, _frozen_flatten, _frozen_unflatten)
 
 
 def freeze(wrapped: Any) -> FrozenWrapper:
-    # r"""A wrapper to freeze a value to avoid updating it by `jax` transformations.
+    r"""Freeze a value to avoid updating it by `jax` transformations.
 
-    # Example:
-    #     >>> import jax
-    #     >>> import pytreeclass as pytc
-    #     >>> import jax.tree_util as jtu
+    Example:
+        >>> import jax
+        >>> import pytreeclass as pytc
+        >>> import jax.tree_util as jtu
+        >>> # Usage with `jax.tree_util.tree_leaves`
+        >>> # no leaves for a wrapped value
+        >>> jtu.tree_leaves(pytc.freeze(2.))
+        []
 
-    #     Usage with `jax.tree_util.tree_leaves`
-    #     >>> # no leaves for a wrapped value
-    #     >>> jtu.tree_leaves(pytc.freeze(2.))
-    #     []
-    #     >>> # retrieve the frozen wrapper value using `is_leaf=pytc.is_frozen`
-    #     >>> jtu.tree_leaves(pytc.freeze(2.), is_leaf=pytc.is_frozen)
-    #     [#2.0]
+        >>> # retrieve the frozen wrapper value using `is_leaf=pytc.is_frozen`
+        >>> jtu.tree_leaves(pytc.freeze(2.), is_leaf=pytc.is_frozen)
+        [#2.0]
 
-    #     Usage with `jax.tree_util.tree_map`
-    #     >>> a= [1,2,3]
-    #     >>> a[1] = pytc.freeze(a[1])
-    #     >>> jtu.tree_map(lambda x:x+100, a)
-    #     [101, #2, 103]
+        >>> # Usage with `jax.tree_util.tree_map`
+        >>> a= [1,2,3]
+        >>> a[1] = pytc.freeze(a[1])
+        >>> jtu.tree_map(lambda x:x+100, a)
+        [101, #2, 103]
 
-    #     >>> @pytc.treeclass
-    #     ... class Test:
-    #     ...     a: float
-    #     ...     @jax.value_and_grad
-    #     ...     def __call__(self, x):
-    #     ...         return x ** self.a
-    #     >>> # without `freeze` wrapping `a`, `a` will be updated
-    #     >>> value, grad = Test(a = 2.)(2.)
-    #     >>> print("value:\t", value, "\ngrad:\t", grad)
-    #     value:	 4.0
-    #     grad:	 Test(a=2.7725887)
+        >>> @pytc.treeclass
+        ... class Test:
+        ...     a: float
+        ...     @jax.value_and_grad
+        ...     def __call__(self, x):
+        ...         return x ** self.a
 
-    #     >>> # with `freeze` wrapping `a`, `a` will NOT be updated
-    #     >>> value, grad = Test(a=pytc.freeze(2.))(2.)
-    #     >>> print("value:\t", value, "\ngrad:\t", grad)
-    #     value:	 4.0
-    #     grad:	 Test(a=#2.0)
+        >>> # without `freeze` wrapping `a`, `a` will be updated
+        >>> value, grad = Test(a = 2.)(2.)
+        >>> print(f"value: {value}\ngrad: {grad}")
+        value: 4.0
+        grad: Test(a=2.7725887)
 
-    #     >>> # usage with `jax.tree_map` to freeze a tree
-    #     >>> tree = Test(a = 2.)
-    #     >>> frozen_tree = jax.tree_map(pytc.freeze, tree)
-    #     >>> value, grad = frozen_tree(2.)
-    #     >>> print("value:\t", value, "\ngrad:\t", grad)
-    #     value:	 4.0
-    #     grad:	 Test(a=#2.0)
-    # """
+        >>> # with `freeze` wrapping `a`, `a` will NOT be updated
+        >>> value, grad = Test(a=pytc.freeze(2.))(2.)
+        >>> print(f"value: {value}\ngrad: {grad}")
+        value: 4.0
+        grad: Test(a=#2.0)
+
+        >>> # usage with `jax.tree_map` to freeze a tree
+        >>> tree = Test(a = 2.)
+        >>> frozen_tree = jax.tree_map(pytc.freeze, tree)
+        >>> value, grad = frozen_tree(2.)
+        >>> print(f"value: {value}\ngrad: {grad}")
+        value: 4.0
+        grad: Test(a=#2.0)
+    """
     return FrozenWrapper(wrapped)
 
 
@@ -160,6 +161,8 @@ def unfreeze(x: Any) -> Any:
     - use `is_leaf=pytc.is_frozen` with `jax.tree_util.tree_map` to unfreeze a tree.**
 
     Example:
+        >>> import pytreeclass as pytc
+        >>> import jax.tree_util as jtu
         >>> frozen_value = pytc.freeze(1)
         >>> pytc.unfreeze(frozen_value)
         1

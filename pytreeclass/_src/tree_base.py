@@ -285,7 +285,13 @@ def _tree_copy(tree: PyTree) -> PyTree:
 
 
 def is_tree_equal(lhs: Any, rhs: Any) -> bool:
-    """Return `True` if two pytrees are equal"""
+    """Return `True` if two pytrees are equal
+
+    Note:
+        lhs and rhs trees are compared using their leaves and treedefs.
+        For `array` leaves `np.array_equal` is used, for other leaves
+        `==` is used.
+    """
     lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
     rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
 
@@ -435,15 +441,14 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> tree + 1
         Tree(a=2, b=3.0)
 
-        >>> # Advanced indexing is supported by setting `indexing=True`
-        >>> @ft.partial(pytc.treeclass, indexing=True)
+        >>> # Advanced indexing is supported using `at` property
+        >>> @pytc.treeclass
         ... class Tree:
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
         >>> tree.at[0].get()
         Tree(a=1, b=None)
-
         >>> tree.at["a"].get()
         Tree(a=1, b=None)
 

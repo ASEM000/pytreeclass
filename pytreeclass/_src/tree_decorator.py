@@ -52,7 +52,7 @@ class Field(NamedTuple):
             f"repr={self.repr!r},\n\tkw_only={self.kw_only!r},\n\tpos_only={self.pos_only!r},\n\t"
             f"metadata={self.metadata!r},\n\tcallbacks={self.callbacks!r}\n)"
         )
-        return fmt.expandtabs(2)
+        return fmt.expandtabs(4)
 
 
 def field(
@@ -75,8 +75,16 @@ def field(
         kw_only: Whether the field is keyword-only.
         metadata: A mapping of user-defined data for the field.
         callbacks: A sequence of functions to call after initialization to modify the field value.
-    """
 
+    Example:
+        >>> import pytreeclass as pytc
+        >>> @pytc.treeclass
+        ... class Foo:
+        ...     x: int = pytc.field(callbacks=[lambda x: x + 1])  # value is incremented by 1 after initialization
+        >>> foo = Foo(x=1)
+        >>> foo.x
+        2
+    """
     if default is not _NOT_SET and default_factory is not None:
         # this is the similar behavior to `dataclasses`
         raise ValueError("Cannot specify both `default` and `default_factory`")
@@ -263,14 +271,14 @@ def fields(tree: Any) -> Sequence[Field]:
     """Get the fields of a `treeclass` instance.
 
     Example:
-        >>> import pytreeeclass as pytc
+        >>> import pytreeclass as pytc
         >>> @pytc.treeclass
         ... class Foo:
         ...    x:int = 1
         >>> pytc.fields(Foo())
         (Field(
             name='x',
-            type=<class 'int'>,
+            type='int',
             default=1,
             default_factory=None,
             init=True,

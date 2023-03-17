@@ -121,14 +121,12 @@ def _numpy_pprint(
 def _func_pprint(
     func: Callable, indent: int, kind: PrintKind, width: int, depth: int
 ) -> str:
-    """Pretty print function
-
-    Example:
-        >>> def example(a: int, b=1, *c, d, e=2, **f) -> str:
-            ...
-        >>> _func_pprint(example)
-        "example(a, b, *c, d, e, **f)"
-    """
+    # Pretty print function
+    # Example:
+    #     >>> def example(a: int, b=1, *c, d, e=2, **f) -> str:
+    #         ...
+    #     >>> _func_pprint(example)
+    #     "example(a, b, *c, d, e, **f)"
     del indent, kind, depth
 
     args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(func)
@@ -146,7 +144,6 @@ def _func_pprint(
 def _list_pprint(
     node: list, indent: int, kind: PrintKind, width: int, depth: int
 ) -> str:
-    """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
     fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = "[\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "]"
@@ -156,7 +153,6 @@ def _list_pprint(
 def _tuple_pprint(
     node: tuple, indent: int, kind: PrintKind, width: int, depth: int
 ) -> str:
-    """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
     fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = "(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
@@ -164,7 +160,6 @@ def _tuple_pprint(
 
 
 def _set_pprint(node: set, indent: int, kind: PrintKind, width: int, depth: int) -> str:
-    """Pretty print a list"""
     fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
     fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = "{\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "}"
@@ -314,42 +309,42 @@ def _sibling_nodes_count_at_all_depth(lhs_trace, traces: tuple[Any]) -> list[int
 
 
 def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
-    # """Pretty print arbitrary PyTrees tree with tree structure diagram.
+    """Pretty print arbitrary PyTrees tree with tree structure diagram.
 
-    # Args:
-    #     tree: PyTree
-    #     depth: depth of the tree to print. default is max depth
-    #     width: max width of the str string
+    Args:
+        tree: PyTree
+        depth: depth of the tree to print. default is max depth
+        width: max width of the str string
 
-    # Example:
-    #     >>> @pytc.treeclass
-    #     ... class A:
-    #     ...        x: int = 10
-    #     ...        y: int = (20,30)
-    #     ...        z: int = 40
+    Example:
+        >>> @pytc.treeclass
+        ... class A:
+        ...        x: int = 10
+        ...        y: int = (20,30)
+        ...        z: int = 40
 
-    #     >>> @pytc.treeclass
-    #     ... class B:
-    #     ...     a: int = 10
-    #     ...     b: tuple = (20,30, A())
+        >>> @pytc.treeclass
+        ... class B:
+        ...     a: int = 10
+        ...     b: tuple = (20,30, A())
 
-    #     >>> print(tree_diagram(B()), depth=0)
-    #     B
+        >>> print(tree_diagram(B(), depth=0))
+        B
 
-    #     >>> print(pytc.tree_diagram(B(), depth=1))
-    #     B
-    #         ├── a:int=10
-    #         └── b:tuple=(20, 30, A(x=10, y=(20, 30), z=40))
+        >>> print(pytc.tree_diagram(B(), depth=1))
+        B
+            ├── a=10
+            └── b=(..., ..., ...)
 
 
-    #     >>> print(pytc.tree_diagram(B(), depth=2))
-    #     B
-    #         ├── a:int=10
-    #         └── b:tuple
-    #             ├── [0]:int=20
-    #             ├── [1]:int=30
-    #             └── [2]:A=A(x=10, y=(20, 30), z=40)
-    # """
+        >>> print(pytc.tree_diagram(B(), depth=2))
+        B
+            ├── a=10
+            └── b:tuple
+                ├── [0]=20
+                ├── [1]=30
+                └── [2]=A(x=10, y=(..., ...), z=40)
+    """
     traces, leaves = zip(
         *tree_leaves_with_trace(
             tree=tree,
@@ -499,7 +494,7 @@ def _format_size(node_size, newline=False):
     #     '1.00KB'
     #     >>> _format_size(1024**2)
     #     '1.00MB'
-    
+
     mark = "\n" if newline else ""
     order_kw = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
 
@@ -526,7 +521,7 @@ def _format_count(node_count, newline=False):
 
     #     >>> _format_count(1024**2)
     #     '1,048,576'
-    
+
     mark = "\n" if newline else ""
 
     if isinstance(node_count, complex):
@@ -570,7 +565,7 @@ def _hbox(*text) -> str:
     #     ┌─┬─┐
     #     │a│b│
     #     └─┴─┘
-    
+
     boxes = list(map(_vbox, text))
     boxes = [(box).split("\n") for box in boxes]
     max_col_height = max([len(b) for b in boxes])
@@ -596,7 +591,6 @@ def _vbox(*text: tuple[str, ...]) -> str:
     #     ├───┤
     #     │a  │
     #     └───┘
-    
 
     max_width = (max(chain.from_iterable([[len(t) for t in item.split("\n")] for item in text])) + 0)  # fmt: skip
 
@@ -629,7 +623,7 @@ def _hstack(*boxes):
     #     └─┼─┤
     #       │c│
     #       └─┘
-    
+
     boxes = [(box).split("\n") for box in boxes]
     max_col_height = max([len(b) for b in boxes])
     # expand height of each col before merging
@@ -708,7 +702,7 @@ def _table(lines: Sequence[str]) -> str:
     #     ├─┼────────┤
     #     │2│40000000│
     #     └─┴────────┘
-    
+
     for i, _cells in enumerate(zip(*lines)):
         max_cell_height = max(map(lambda x: x.count("\n"), _cells))
         for j in range(len(_cells)):

@@ -386,43 +386,41 @@ def _at_trace(tree: PyTree, where: tuple[str | int] | PyTree) -> PyTree:
 
 
 def tree_indexer(tree: PyTree) -> PyTree:
-    # """Adds `.at` indexing abilities to a PyTree.
+    """Adds `.at` indexing abilities to a PyTree.
 
-    # Example:
-    #     >>> # Add `.at` indexing abilities to a PyTree
-    #     >>> import jax
+    Example:
+        >>> import jax
+        >>> import pytreeclass as pytc
 
-    #     >>> @jax.tree_util.register_pytree_node_class
-    #     >>> class Test:
-    #     ...     def __init__(self, a, b):
-    #     ...         self.a = a
-    #     ...         self.b = b
-    #     ...     def tree_flatten(self):
-    #     ...         return (self.a, self.b), None
-    #     ...     @classmethod
-    #     ...     def tree_unflatten(cls, aux_data, children):
-    #     ...         return cls(*children)
-    #     ...    @property
-    #     ...    def at(self):
-    #     ...        return tree_indexer(self)
-    #     ...     def __repr__(self) -> str:
-    #     ...         return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
+        >>> @jax.tree_util.register_pytree_node_class
+        ... class Tree:
+        ...     def __init__(self, a, b):
+        ...         self.a = a
+        ...         self.b = b
+        ...     def tree_flatten(self):
+        ...         return (self.a, self.b), None
+        ...     @classmethod
+        ...     def tree_unflatten(cls, aux_data, children):
+        ...         return cls(*children)
+        ...     @property
+        ...     def at(self):
+        ...         return tree_indexer(self)
+        ...     def __repr__(self) -> str:
+        ...         return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
 
+        >>> # Register the `Tree` class trace function to support indexing
+        >>> def test_trace_func(tree):
+        ...     names = ("a", "b")
+        ...     types = (type(tree.a), type(tree.b))
+        ...     indices = ((0,2), (1,2))
+        ...     metadatas = (None, None)
+        ...     return [*zip(names, types, indices, metadatas)]
 
-    #     >>> # Register the `Test` class trace function to support indexing
-    #     >>> def test_trace_func(tree):
-    #     ...     names = ("a", "b")
-    #     ...     types = (type(tree.a), type(tree.b))
-    #     ...     indices = ((0,2), (1,2))
-    #     ...     metadatas = (None, None)
-    #     ...     return [*zip(names, types, indices, metadatas)]
+        >>> pytc.register_pytree_node_trace(Tree, test_trace_func)
 
-    #     >>> pytc.register_pytree_node_trace(Test, test_trace_func)
-
-    #     >>> test = Test(1, 2)
-    #     >>> test.at["a"].get()
-    #     # Test(a=1, b=None)
-    # """
+        >>> Tree(1, 2).at["a"].get()
+        Tree(a=1, b=None)
+    """
 
     class AtIndexer:
         def __getitem__(self, where):
@@ -479,20 +477,23 @@ def bcmap(
         is_leaf: a function that returns True if the argument is a leaf of the pytree
 
     Example:
-        >>> @pytc.treeclass
+        >>> import jax
+        >>> import pytreeclass as pytc
+        >>> import functools as ft
+
+        >>> @ft.partial(pytc.treeclass, leafwise=True)
         ... class Test:
         ...    a: tuple[int] = (1,2,3)
         ...    b: tuple[int] = (4,5,6)
         ...    c: jax.Array = jnp.array([1,2,3])
 
         >>> tree = Test()
+
         >>> # 0 is broadcasted to all leaves of the pytree
-
         >>> print(pytc.bcmap(jnp.where)(tree>1, tree, 0))
-        Test(a=(0,2,3), b=(4,5,6), c=[0 2 3])
-
+        Test(a=(0, 2, 3), b=(4, 5, 6), c=[0 2 3])
         >>> print(pytc.bcmap(jnp.where)(tree>1, 0, tree))
-        Test(a=(1,0,0), b=(0,0,0), c=[1 0 0])
+        Test(a=(1, 0, 0), b=(0, 0, 0), c=[1 0 0])
 
         >>> # 1 is broadcasted to all leaves of the list pytree
         >>> bcmap(lambda x,y:x+y)([1,2,3],1)
@@ -503,15 +504,16 @@ def bcmap(
         [2, 4, 6]
 
         >>> # Non scalar second args case
-        >>> bcmap(lambda x,y:x+y)([1,2,3],[[1,2,3],[1,2,3]])
-        TypeError: unsupported operand type(s) for +: 'int' and 'list'
+        >>> try:
+        ...     bcmap(lambda x,y:x+y)([1,2,3],[[1,2,3],[1,2,3]])
+        ... except TypeError as e:
+        ...     print(e)
+        unsupported operand type(s) for +: 'int' and 'list'
 
         >>> # using **numpy** functions on pytrees
         >>> import jax.numpy as jnp
         >>> bcmap(jnp.add)([1,2,3],[1,2,3])
-        [DeviceArray(2, dtype=int32, weak_type=True),
-        DeviceArray(4, dtype=int32, weak_type=True),
-        DeviceArray(6, dtype=int32, weak_type=True)]
+        [Array(2, dtype=int32, weak_type=True), Array(4, dtype=int32, weak_type=True), Array(6, dtype=int32, weak_type=True)]
     """
 
     @ft.wraps(func)
