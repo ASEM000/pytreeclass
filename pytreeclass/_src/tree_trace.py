@@ -123,7 +123,50 @@ def tree_leaves_with_trace(
     is_leaf: Callable[[Any], bool] | None = None,
     is_trace_leaf: Callable[[Any], bool] | None = None,
 ) -> Sequence[tuple[TraceType, Any]]:
-    """Similar to jax.tree_util.tree_leaves` but returns  object, leaf pairs"""
+    r"""Similar to jax.tree_util.tree_leaves` but returns  object, leaf pairs
+
+    Args:
+        tree: The tree to be flattened.
+        is_leaf: A predicate function that determines whether a value is a leaf.
+        is_trace_leaf: A predicate function that determines whether a trace is a leaf.
+
+    Returns:
+        A list of (trace, leaf) pairs.
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> tree = [1, [2, [3, [4]]]]
+
+        >>> for trace, leaf in pytc.tree_leaves_with_trace(tree):
+        ...    names, types, indices, metadas = trace
+        ...    print(
+        ...        f"leaf={leaf}\n"
+        ...        f"names={names}\n"
+        ...        f"types={types}\n"
+        ...        f"indices={indices}\n"
+        ...        f"metadas={metadas}"
+        ...    )
+        leaf=1
+        names=('list', '[0]')
+        types=(<class 'list'>, <class 'int'>)
+        indices=(0, 0)
+        metadas=((),)
+        leaf=2
+        names=('list', '[1]', '[0]')
+        types=(<class 'list'>, <class 'list'>, <class 'int'>)
+        indices=(0, 1, 0)
+        metadas=((), ())
+        leaf=3
+        names=('list', '[1]', '[1]', '[0]')
+        types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
+        indices=(0, 1, 1, 0)
+        metadas=((), (), ())
+        leaf=4
+        names=('list', '[1]', '[1]', '[1]', '[0]')
+        types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
+        indices=(0, 1, 1, 1, 0)
+        metadas=((), (), (), ())
+    """
     trace = ((type(tree).__name__,), (type(tree),), (0,), ())  # type: ignore
     return list(flatten_one_trace_level(trace, tree, is_leaf, is_trace_leaf))
 
@@ -131,7 +174,16 @@ def tree_leaves_with_trace(
 def tree_flatten_with_trace(
     tree: PyTree, *, is_leaf: Callable[[Any], bool] | None = None
 ) -> tuple[Sequence[tuple[TraceType, Any]], jtu.PyTreeDef]:
-    """Similar to jax.tree_util.tree_flatten` but returns the objects too as well"""
+    """Similar to jax.tree_util.tree_flatten` but returns the objects too as well
+
+    Args:
+        tree: The tree to be flattened.
+        is_leaf: A predicate function that determines whether a value is a leaf.
+
+    Returns:
+        A pair (leaves, treedef) where leaves is a list of (trace, leaf) pairs and
+        treedef is a PyTreeDef object that can be used to reconstruct the tree.
+    """
     treedef = jtu.tree_structure(tree, is_leaf=is_leaf)
     traces_leaves = tree_leaves_with_trace(tree, is_leaf=is_leaf)
     return traces_leaves, treedef
@@ -168,6 +220,7 @@ def _jaxable_trace_func(tree: Any) -> list[tuple[str, Any, tuple[int, int], Any]
     # class in the `trace` registry
     # get leaves from the `jax` registry
     leaves, _ = _registry.get(type(tree)).to_iter(tree)  # type: ignore
+    # TODO: fetch from `jax` key registry once min jax version>=0.4.6
     names = (f"leaf_{i}" for i in range(len(leaves)))
     types = map(type, leaves)
     indices = range(len(leaves))
@@ -189,7 +242,38 @@ def tree_map_with_trace(
     *rest: Any,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> Any:
-    """Similar to `jax.tree_util.tree_map` but func accepts `trace` as first argument"""
+    """Similar to `jax.tree_util.tree_map` but func accepts `trace` as first argument
+
+    Args:
+        func: A function that takes a trace and a leaf and returns a new leaf.
+        tree: The tree to be mapped over.
+        rest: Additional trees to be mapped over.
+        is_leaf: A predicate function that determines whether a value is a leaf.
+
+    Returns:
+        A new tree with the same structure as tree.
+
+    Example:
+        >>> import jax
+        >>> import pytreeclass as pytc
+        >>> tree = {"a": [1, 2], "b": 4, "c": [5, 6]}
+
+        >>> def map_func(trace, leaf):
+        ...    names, _, __, ___ = trace
+        ...    if "['a']" in names:
+        ...        return leaf + 100
+        ...    return leaf
+        >>> pytc.tree_map_with_trace(map_func, tree)
+        {'a': [101, 102], 'b': 4, 'c': [5, 6]}
+
+        >>> def map_func(trace, leaf):
+        ...    _, types, __, ___ = trace
+        ...    if list in types:
+        ...        return leaf + 100
+        ...    return leaf
+        >>> pytc.tree_map_with_trace(map_func, tree)
+        {'a': [101, 102], 'b': 4, 'c': [105, 106]}
+    """
     traces_leaves, treedef = tree_flatten_with_trace(tree, is_leaf=is_leaf)
     traces_leaves = list(zip(*traces_leaves))
     traces_leaves += [treedef.flatten_up_to(r) for r in rest]
