@@ -12,7 +12,7 @@
 |[**Acknowledgements**](#acknowledgements)
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
-![pyver](https://img.shields.io/badge/python-3.8+_-red)
+![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11_-red)
 ![pyver](https://img.shields.io/badge/jax-0.4+-red)
 ![codestyle](https://img.shields.io/badge/codestyle-black-black)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/intro.ipynb)
@@ -826,6 +826,26 @@ flax_tree.at[0].get()
 flax_tree.at["a"].set(10)
 # FlaxTree(a=10, b=(2.0, 3.0), c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00]))
 ```
+
+</details>
+
+<details>
+<summary>Benchmark flatten/unflatten compared to Flax and Equinox </summary>
+
+<a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/benchmark_flatten_unflatten.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+<table>
+
+<tr><td align="center">CPU</td><td align="center">GPU</td></tr>
+
+<tr>
+
+<td><img src='assets/benchmark_cpu.png'></td>
+<td><img src='assets/benchmark_gpu.png'></td>
+
+</tr>
+
+</table>
 
 </details>
 
