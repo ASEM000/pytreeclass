@@ -27,7 +27,7 @@ PyTreeClass Public API
     tree_flatten_with_trace
 
 
-`treeclass` API
+core API
 ---------------------
 
 .. currentmodule:: pytreeclass 
@@ -58,5 +58,17 @@ Wrapping and freezing API
 .. autofunction:: is_frozen
 .. autofunction:: freeze
 .. autofunction:: unfreeze
-.. autofunction:: FrozenWrapper
-.. autofunction:: ImmutableWrapper
+.. autoclass:: FrozenWrapper
+.. autoclass:: ImmutableWrapper
+
+
+Advanced API
+------------
+.. currentmodule:: pytreeclass
+
+.. autofunction:: bcmap
+.. autofunction:: tree_indexer
+.. autofunction:: register_pytree_node_trace
+.. autofunction:: tree_map_with_trace
+.. autofunction:: tree_leaves_with_trace
+.. autofunction:: tree_flatten_with_trace
