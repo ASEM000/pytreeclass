@@ -1,5 +1,5 @@
 
-PyTreeClass Public API
+Public API
 ========================
 
 .. currentmodule:: pytreeclass 

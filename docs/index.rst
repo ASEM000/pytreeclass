@@ -18,7 +18,7 @@ Install from pip::
 
    notebooks/getting_started
    notebooks/stateful_computations
-   notebooks/filtering
+   notebooks/freezing
 
 .. toctree::
     :caption: API Documentation
