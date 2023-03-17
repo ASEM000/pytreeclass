@@ -27,9 +27,9 @@ __all__ = (
     # general utils
     "treeclass",
     "is_treeclass",
+    "is_tree_equal",
     "field",
     "fields",
-    "is_tree_equal",
     # pprint utils
     "tree_diagram",
     "tree_mermaid",
@@ -52,4 +52,4 @@ __all__ = (
     "tree_flatten_with_trace",
 )
 
-__version__ = "0.2.0b12"
+__version__ = "0.2.0b13"
