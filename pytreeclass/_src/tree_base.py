@@ -418,12 +418,11 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> import jax
         >>> import pytreeclass as pytc
 
-        **Tree leaves are defined by annotated fields**
+        Tree leaves are defined by type hinted fields at the class level
         >>> @pytc.treeclass
         ... class Tree:
         ...     a:int = 1
         ...     b:float = 2.0
-
         >>> tree = Tree()
         >>> jax.tree_util.tree_leaves(tree)
         [1, 2.0]
@@ -433,22 +432,18 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         ... class Tree:
         ...     a:int = 1
         ...     b:float = 2.0
-
         >>> tree = Tree()
         >>> tree + 1
         Tree(a=2, b=3.0)
-
 
         Advanced indexing is supported by setting `indexing=True`
         >>> @ft.partial(pytc.treeclass, indexing=True)
         ... class Tree:
         ...     a:int = 1
         ...     b:float = 2.0
-
         >>> tree = Tree()
         >>> tree.at[0].get()
         Tree(a=1, b=None)
-
         >>> tree.at["a"].get()
         Tree(a=1, b=None)
 
