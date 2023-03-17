@@ -29,9 +29,9 @@
 
 ## 🛠️ Installation<a id="installation"></a>
 
-<!-- ```python
+```python
 pip install pytreeclass
-``` -->
+```
 
 **Install development version**
 
