@@ -285,7 +285,7 @@ def _tree_copy(tree: PyTree) -> PyTree:
 
 
 def is_tree_equal(lhs: Any, rhs: Any) -> bool:
-    """Assert if two pytrees are equal"""
+    """Return `True` if two pytrees are equal"""
     lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
     rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
 

@@ -232,7 +232,7 @@ def tree_repr(
     tabwidth: int = 2,
     depth: int | float = float("inf"),
 ) -> str:
-    """Prertty print dataclass tree `__repr__`
+    """Prertty print arbitrary PyTrees `__repr__`
 
     Args:
         tree: PyTree
@@ -250,7 +250,7 @@ def tree_str(
     tabwidth: int = 2,
     depth: int | float = float("inf"),
 ) -> str:
-    """Prertty print dataclass tree `__str__`
+    """Prertty print arbitrary PyTrees `__str__`
 
     Args:
         tree: PyTree
@@ -314,7 +314,7 @@ def _sibling_nodes_count_at_all_depth(lhs_trace, traces: tuple[Any]) -> list[int
 
 
 def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
-    """Pretty print treeclass tree with tree structure diagram
+    """Pretty print arbitrary PyTrees tree with tree structure diagram.
 
     Args:
         tree: PyTree
@@ -430,14 +430,14 @@ def tree_mermaid(
     #     generated_html = f"https://pytreeclass.herokuapp.com/temp/?id={generated_id}"
     #     return f"Open URL in browser: {generated_html}"
 
-    """generate a mermaid diagram syntax of a pytree"""
+    """generate a mermaid diagram syntax for arbitrary PyTrees."""
 
     def bold_text(text: str) -> str:
         # bold a text in ansci code
         return "<b>" + text + "</b>"
 
     def node_id(input):
-        """hash a value by its location in a tree. used to connect values in mermaid"""
+        # hash a value by its location in a tree. used to connect values in mermaid
         # specifically we use c_size_t to avoid negative values in the hash that is not supported by mermaid
         return ctypes.c_size_t(hash(input)).value
 
@@ -493,14 +493,13 @@ def _format_width(string, width=60):
 
 
 def _format_size(node_size, newline=False):
-    """return formatted size from inexact(exact) complex number
-
-    Examples:
-        >>> _format_size(1024)
-        '1.00KB'
-        >>> _format_size(1024**2)
-        '1.00MB'
-    """
+    # return formatted size from inexact(exact) complex number
+    # Examples:
+    #     >>> _format_size(1024)
+    #     '1.00KB'
+    #     >>> _format_size(1024**2)
+    #     '1.00MB'
+    
     mark = "\n" if newline else ""
     order_kw = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
 
@@ -520,16 +519,14 @@ def _format_size(node_size, newline=False):
 
 
 def _format_count(node_count, newline=False):
-    """return formatted count from inexact(exact) complex number
+    # return formatted count from inexact(exact) complex number
+    # Examples:
+    #     >>> _format_count(1024)
+    #     '1,024'
 
-    Examples:
-        >>> _format_count(1024)
-        '1,024'
-
-        >>> _format_count(1024**2)
-        '1,048,576'
-    """
-
+    #     >>> _format_count(1024**2)
+    #     '1,048,576'
+    
     mark = "\n" if newline else ""
 
     if isinstance(node_count, complex):
@@ -567,14 +564,13 @@ def _calculate_leaf_trace_stats(tree: Any) -> tuple[int | complex, int | complex
 
 
 def _hbox(*text) -> str:
-    """Create horizontally stacked text boxes
-
-    Examples:
-        >>> _hbox("a","b")
-        ┌─┬─┐
-        │a│b│
-        └─┴─┘
-    """
+    # Create horizontally stacked text boxes
+    # Examples:
+    #     >>> _hbox("a","b")
+    #     ┌─┬─┐
+    #     │a│b│
+    #     └─┴─┘
+    
     boxes = list(map(_vbox, text))
     boxes = [(box).split("\n") for box in boxes]
     max_col_height = max([len(b) for b in boxes])
@@ -583,28 +579,24 @@ def _hbox(*text) -> str:
 
 
 def _vbox(*text: tuple[str, ...]) -> str:
-    """Create vertically stacked text boxes
+    # Create vertically stacked text boxes
+    # Example:
+    #     >>> _vbox("a","b")
+    #     ┌───┐
+    #     │a  │
+    #     ├───┤
+    #     │b  │
+    #     └───┘
 
-    Returns:
-        str: stacked boxes string
-
-    Examples:
-        >>> _vbox("a","b")
-        ┌───┐
-        │a  │
-        ├───┤
-        │b  │
-        └───┘
-
-        >>> _vbox("a","","a")
-        ┌───┐
-        │a  │
-        ├───┤
-        │   │
-        ├───┤
-        │a  │
-        └───┘
-    """
+    #     >>> _vbox("a","","a")
+    #     ┌───┐
+    #     │a  │
+    #     ├───┤
+    #     │   │
+    #     ├───┤
+    #     │a  │
+    #     └───┘
+    
 
     max_width = (max(chain.from_iterable([[len(t) for t in item.split("\n")] for item in text])) + 0)  # fmt: skip
 
@@ -629,16 +621,15 @@ def _vbox(*text: tuple[str, ...]) -> str:
 
 
 def _hstack(*boxes):
-    """Create horizontally stacked text boxes
-
-    Examples:
-        >>> print(_hstack(_hbox("a"),_vbox("b","c")))
-        ┌─┬─┐
-        │a│b│
-        └─┼─┤
-          │c│
-          └─┘
-    """
+    # Create horizontally stacked text boxes
+    # Example:
+    #     >>> print(_hstack(_hbox("a"),_vbox("b","c")))
+    #     ┌─┬─┐
+    #     │a│b│
+    #     └─┼─┤
+    #       │c│
+    #       └─┘
+    
     boxes = [(box).split("\n") for box in boxes]
     max_col_height = max([len(b) for b in boxes])
     # expand height of each col before merging
@@ -654,22 +645,20 @@ def _hstack(*boxes):
 
 
 def _resolve_line(cols: Sequence[str]) -> str:
-    """combine columns of single line by merging their borders
+    # Combine columns of single line by merging their borders
 
-    Args:
-        cols (Sequence[str,...]): Sequence of single line column string
+    # Args:
+    #     cols (Sequence[str,...]): Sequence of single line column string
 
-    Returns:
-        str: resolved column string
+    # Returns:
+    #     str: resolved column string
 
-    Example:
-        >>> _resolve_line(['ab','b│','│c'])
-        'abb│c'
+    # Example:
+    #     >>> _resolve_line(['ab','b│','│c'])
+    #     'abb│c'
 
-        >>> _resolve_line(['ab','b┐','┌c'])
-        'abb┬c'
-
-    """
+    #     >>> _resolve_line(['ab','b┐','┌c'])
+    #     'abb┬c'
 
     cols = list(map(list, cols))  # convert each col to col of chars
     alpha = ["│", "┌", "┐", "└", "┘", "┤", "├"]
@@ -701,25 +690,25 @@ def _resolve_line(cols: Sequence[str]) -> str:
 
 
 def _table(lines: Sequence[str]) -> str:
-    """create a table with self aligning rows and cols
+    # Create a table with self aligning rows and cols
 
-    Args:
-        lines (Sequence[str,...]): list of lists of cols values
+    # Args:
+    #     lines (Sequence[str,...]): list of lists of cols values
 
-    Returns:
-        str: box string
+    # Returns:
+    #     str: box string
 
-    Example:
-        >>> col1 = ['1\n','2']
-        >>> col2 = ['3','4000']
-        >>> print(_table([col1,col2]))
-        ┌─┬────────┐
-        │1│3       │
-        │ │        │
-        ├─┼────────┤
-        │2│40000000│
-        └─┴────────┘
-    """
+    # Example:
+    #     >>> col1 = ['1\n','2']
+    #     >>> col2 = ['3','4000']
+    #     >>> print(_table([col1,col2]))
+    #     ┌─┬────────┐
+    #     │1│3       │
+    #     │ │        │
+    #     ├─┼────────┤
+    #     │2│40000000│
+    #     └─┴────────┘
+    
     for i, _cells in enumerate(zip(*lines)):
         max_cell_height = max(map(lambda x: x.count("\n"), _cells))
         for j in range(len(_cells)):
@@ -731,7 +720,7 @@ def _table(lines: Sequence[str]) -> str:
 def tree_summary(
     tree: PyTree, *, width: int = 60, depth: int | float = float("inf")
 ) -> str:
-    """Print a summary of a pytree structure
+    """Print a summary of an arbitrary PyTree.
 
     Args:
         tree: pytree to summarize (ex. list, tuple, dict, dataclass, jax.numpy.ndarray)

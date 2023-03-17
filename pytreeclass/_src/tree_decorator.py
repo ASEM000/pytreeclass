@@ -22,6 +22,7 @@ _VARS = "__dict__"
 
 
 def is_treeclass(cls: type) -> bool:
+    """Returns `True` if a class is a `treeclass`."""
     return hasattr(cls, _FROZEN) and hasattr(cls, _FIELD_MAP)
 
 
@@ -249,6 +250,7 @@ def _is_dataclass_like(node: Any) -> bool:
 
 
 def fields(node: Any) -> Sequence[Field]:
+    """Get the fields of a dataclass-like object."""
     if not is_treeclass(node):
         raise TypeError(f"Cannot get fields from {node!r}.")
     field_map = getattr(node, _FIELD_MAP, {})

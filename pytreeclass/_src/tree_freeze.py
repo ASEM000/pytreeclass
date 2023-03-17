@@ -157,7 +157,7 @@ def freeze(wrapped: Any) -> FrozenWrapper:
 
 
 def unfreeze(x: Any) -> Any:
-    """Unfreeze `frozen` value.
+    """Unfreeze `frozen` value, otherwise return the value itself.
 
     - use `is_leaf=pytc.is_frozen` with `jax.tree_util.tree_map` to unfreeze a tree.**
 
@@ -176,6 +176,7 @@ def unfreeze(x: Any) -> Any:
 
 
 def is_frozen(wrapped: Any) -> bool:
+    """Returns True if the value is a frozen wrapper."""
     return isinstance(wrapped, FrozenWrapper)
 
 
