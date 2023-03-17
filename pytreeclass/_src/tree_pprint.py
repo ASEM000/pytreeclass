@@ -314,42 +314,42 @@ def _sibling_nodes_count_at_all_depth(lhs_trace, traces: tuple[Any]) -> list[int
 
 
 def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
-    """Pretty print arbitrary PyTrees tree with tree structure diagram.
+    # """Pretty print arbitrary PyTrees tree with tree structure diagram.
 
-    Args:
-        tree: PyTree
-        depth: depth of the tree to print. default is max depth
-        width: max width of the str string
+    # Args:
+    #     tree: PyTree
+    #     depth: depth of the tree to print. default is max depth
+    #     width: max width of the str string
 
-    Example:
-        >>> @pytc.treeclass
-        ... class A:
-        ...        x: int = 10
-        ...        y: int = (20,30)
-        ...        z: int = 40
+    # Example:
+    #     >>> @pytc.treeclass
+    #     ... class A:
+    #     ...        x: int = 10
+    #     ...        y: int = (20,30)
+    #     ...        z: int = 40
 
-        >>> @pytc.treeclass
-        ... class B:
-        ...     a: int = 10
-        ...     b: tuple = (20,30, A())
+    #     >>> @pytc.treeclass
+    #     ... class B:
+    #     ...     a: int = 10
+    #     ...     b: tuple = (20,30, A())
 
-        >>> print(tree_diagram(B()), depth=0)
-        B
+    #     >>> print(tree_diagram(B()), depth=0)
+    #     B
 
-        >>> print(pytc.tree_diagram(B(), depth=1))
-        B
-            ├── a:int=10
-            └── b:tuple=(20, 30, A(x=10, y=(20, 30), z=40))
+    #     >>> print(pytc.tree_diagram(B(), depth=1))
+    #     B
+    #         ├── a:int=10
+    #         └── b:tuple=(20, 30, A(x=10, y=(20, 30), z=40))
 
 
-        >>> print(pytc.tree_diagram(B(), depth=2))
-        B
-            ├── a:int=10
-            └── b:tuple
-                ├── [0]:int=20
-                ├── [1]:int=30
-                └── [2]:A=A(x=10, y=(20, 30), z=40)
-    """
+    #     >>> print(pytc.tree_diagram(B(), depth=2))
+    #     B
+    #         ├── a:int=10
+    #         └── b:tuple
+    #             ├── [0]:int=20
+    #             ├── [1]:int=30
+    #             └── [2]:A=A(x=10, y=(20, 30), z=40)
+    # """
     traces, leaves = zip(
         *tree_leaves_with_trace(
             tree=tree,
