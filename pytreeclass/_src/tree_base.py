@@ -416,6 +416,7 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> import functools as ft
         >>> import jax
         >>> import pytreeclass as pytc
+
         >>> # Tree leaves are defined by type hinted fields at the class level
         >>> @pytc.treeclass
         ... class Tree:
@@ -424,6 +425,7 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> tree = Tree()
         >>> jax.tree_util.tree_leaves(tree)
         [1, 2.0]
+
         >>> # Leaf-wise math operations are supported by setting `leafwise=True`
         >>> @ft.partial(pytc.treeclass, leafwise=True)
         ... class Tree:
@@ -432,6 +434,7 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> tree = Tree()
         >>> tree + 1
         Tree(a=2, b=3.0)
+
         >>> # Advanced indexing is supported by setting `indexing=True`
         >>> @ft.partial(pytc.treeclass, indexing=True)
         ... class Tree:
@@ -440,14 +443,15 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> tree = Tree()
         >>> tree.at[0].get()
         Tree(a=1, b=None)
+
         >>> tree.at["a"].get()
         Tree(a=1, b=None)
 
     Note:
-        Indexing is supported for {`list`, `tuple`, `dict`, `defaultdict`, `OrderedDict`, 'namedtuple'}
+        Indexing is supported for {`list`, `tuple`, `dict`, `defaultdict`, `OrderedDict`, `namedtuple`}
         and `treeclass` wrapped classes.
 
-        Extending indexing to other types is possible by registering the type with 
+        Extending indexing to other types is possible by registering the type with
         `pytreeclass.register_pytree_node_trace`
 
     Raises:

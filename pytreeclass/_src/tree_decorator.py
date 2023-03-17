@@ -45,6 +45,15 @@ class Field(NamedTuple):
     metadata: Mapping[str, Any] | None = None
     callbacks: Sequence[Callable] | None = None
 
+    def __repr__(self):
+        fmt = (
+            f"Field(\n\tname={self.name!r},\n\ttype={self.type!r},\n\tdefault={self.default!r},\n\t"
+            f"default_factory={self.default_factory!r},\n\tinit={self.init!r},\n\t"
+            f"repr={self.repr!r},\n\tkw_only={self.kw_only!r},\n\tpos_only={self.pos_only!r},\n\t"
+            f"metadata={self.metadata!r},\n\tcallbacks={self.callbacks!r}\n)"
+        )
+        return fmt.expandtabs(2)
+
 
 def field(
     *,
@@ -58,13 +67,14 @@ def field(
     callbacks: Sequence[Callable] | None = None,
 ) -> Field:
     """
-    default: The default value of the field.
-    default_factory: A 0-argument function called to initialize a field's value.
-    init: Whether the field is included in the object's __init__ function.
-    repr: Whether the field is included in the object's __repr__ function.
-    kw_only: Whether the field is keyword-only.
-    metadata: A mapping of user-defined data for the field.
-    callbacks: A sequence of functions to call after initialization to modify the field value.
+    Args:
+        default: The default value of the field.
+        default_factory: A 0-argument function called to initialize a field's value.
+        init: Whether the field is included in the object's __init__ function.
+        repr: Whether the field is included in the object's __repr__ function.
+        kw_only: Whether the field is keyword-only.
+        metadata: A mapping of user-defined data for the field.
+        callbacks: A sequence of functions to call after initialization to modify the field value.
     """
 
     if default is not _NOT_SET and default_factory is not None:
@@ -244,24 +254,44 @@ def _generate_init(klass: type) -> FunctionType:
     )
 
 
-def _is_dataclass_like(node: Any) -> bool:
+def _is_dataclass_like(tree: Any) -> bool:
     # maybe include other dataclass-like objects here? (e.g. attrs)
-    return dc.is_dataclass(node) or is_treeclass(node)
+    return dc.is_dataclass(tree) or is_treeclass(tree)
 
 
-def fields(node: Any) -> Sequence[Field]:
-    """Get the fields of a dataclass-like object."""
-    if not is_treeclass(node):
-        raise TypeError(f"Cannot get fields from {node!r}.")
-    field_map = getattr(node, _FIELD_MAP, {})
+def fields(tree: Any) -> Sequence[Field]:
+    """Get the fields of a `treeclass` instance.
+
+    Example:
+        >>> import pytreeeclass as pytc
+        >>> @pytc.treeclass
+        ... class Foo:
+        ...    x:int = 1
+        >>> pytc.fields(Foo())
+        (Field(
+            name='x',
+            type=<class 'int'>,
+            default=1,
+            default_factory=None,
+            init=True,
+            repr=True,
+            kw_only=False,
+            pos_only=False,
+            metadata=None,
+            callbacks=None
+        ),)
+    """
+    if not is_treeclass(tree):
+        raise TypeError(f"Cannot get fields from {tree!r}.")
+    field_map = getattr(tree, _FIELD_MAP, {})
     return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))
 
 
-def _dataclass_like_fields(node):
+def _dataclass_like_fields(tree):
     """Get the fields of a dataclass-like object."""
     # maybe include other dataclass-like objects here? (e.g. attrs)
-    if not _is_dataclass_like(node):
-        raise TypeError(f"Cannot get fields from {node!r}.")
-    if dc.is_dataclass(node):
-        return dc.fields(node)
-    return fields(node)
+    if not _is_dataclass_like(tree):
+        raise TypeError(f"Cannot get fields from {tree!r}.")
+    if dc.is_dataclass(tree):
+        return dc.fields(tree)
+    return fields(tree)
