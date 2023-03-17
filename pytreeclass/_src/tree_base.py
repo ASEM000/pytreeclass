@@ -411,14 +411,12 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
     Args:
         klass: class to be converted to a `treeclass`
         leafwise: Wether to generate leafwise math operations methods. Defaults to `False`.
-        indexing: Wether to support integer,name, or boolean indexing. Defaults to `False`.
 
     Example:
         >>> import functools as ft
         >>> import jax
         >>> import pytreeclass as pytc
-
-        Tree leaves are defined by type hinted fields at the class level
+        >>> # Tree leaves are defined by type hinted fields at the class level
         >>> @pytc.treeclass
         ... class Tree:
         ...     a:int = 1
@@ -426,8 +424,7 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> tree = Tree()
         >>> jax.tree_util.tree_leaves(tree)
         [1, 2.0]
-
-        Leaf-wise math operations are supported by setting `leafwise=True`
+        >>> # Leaf-wise math operations are supported by setting `leafwise=True`
         >>> @ft.partial(pytc.treeclass, leafwise=True)
         ... class Tree:
         ...     a:int = 1
@@ -435,8 +432,7 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> tree = Tree()
         >>> tree + 1
         Tree(a=2, b=3.0)
-
-        Advanced indexing is supported by setting `indexing=True`
+        >>> # Advanced indexing is supported by setting `indexing=True`
         >>> @ft.partial(pytc.treeclass, indexing=True)
         ... class Tree:
         ...     a:int = 1
@@ -447,14 +443,15 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
         >>> tree.at["a"].get()
         Tree(a=1, b=None)
 
+    Note:
         Indexing is supported for {`list`, `tuple`, `dict`, `defaultdict`, `OrderedDict`, 'namedtuple'}
         and `treeclass` wrapped classes.
 
-        Extending indexing to other types is possible by registering the type with
+        Extending indexing to other types is possible by registering the type with 
         `pytreeclass.register_pytree_node_trace`
 
     Raises:
-        TypeError: if the input class is not a `class`
+        TypeError: if the input is not a class.
     """
     # check if the input is a valid class
     # in essence, it should be a type with immutable setters and deleters

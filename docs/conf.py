@@ -152,7 +152,7 @@ def linkcode_resolve(domain, info):
     except OSError:
         return None
 
-    return "https://github.com/ASEM000/pytreeclass/%s#L%d#L%d" % (
+    return "https://github.com/ASEM000/pytreeclass/blob/main/pytreeclass/%s#L%d#L%d" % (
         os.path.relpath(filename, start=os.path.dirname(pytreeclass.__file__)),
         lineno,
         lineno + len(source) - 1,
