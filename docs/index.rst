@@ -1,9 +1,10 @@
 
 
 
-🌲Pytreeclass🌲
+🌲PyTreeClass🌲
 =================
-Write pytorch-like layers with rich visualizations in JAX.
+Visualize, create, and operate on JAX PyTree in the most intuitive way possible.
+
 
 Installation
 ------------
