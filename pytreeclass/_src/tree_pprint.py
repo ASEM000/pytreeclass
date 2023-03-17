@@ -317,6 +317,7 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
         width: max width of the str string
 
     Example:
+        >>> import pytreeclass as pytc
         >>> @pytc.treeclass
         ... class A:
         ...        x: int = 10
@@ -328,7 +329,7 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
         ...     a: int = 10
         ...     b: tuple = (20,30, A())
 
-        >>> print(tree_diagram(B(), depth=0))
+        >>> print(pytc.tree_diagram(B(), depth=0))
         B
 
         >>> print(pytc.tree_diagram(B(), depth=1))
@@ -732,6 +733,7 @@ def tree_summary(
         Array elements are considered as leaves, for example `jnp.array([1,2,3])` has 3 leaves
 
     Example:
+        >>> import pytreeclass as pytc
         >>> print(pytc.tree_summary([1,[2,[3]]]))
         ┌─────────┬────┬─────┬──────┐
         │Name     │Type│Count│Size  │
