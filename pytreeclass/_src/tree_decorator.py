@@ -1,8 +1,3 @@
-# similar to dataclass decorator for init code generation
-# the motivation for writing this is to avoid the need to use dataclasses
-# especially after this update https://github.com/google/jax/issues/14295
-# in essence, after this upadte jax arrays are considred mutable by the field logic
-
 from __future__ import annotations
 
 import dataclasses as dc
@@ -20,6 +15,14 @@ _MUTABLE_TYPES = (list, dict, set)
 _WRAPPED = "__wrapped__"
 _VARS = "__dict__"
 _ANNOTATIONS = "__annotations__"
+
+PyTree = Any
+
+"""Scritp to define custom fozen `dataclasses.dataclass`-like"""
+# similar to dataclass decorator for init code generation
+# the motivation for writing this is to avoid the need to use dataclasses
+# especially after this update https://github.com/google/jax/issues/14295
+# in essence, after this upadte jax arrays are considred mutable by the field logic
 
 
 def is_treeclass(tree: Any) -> bool:
@@ -254,6 +257,107 @@ def _generate_init(klass: type) -> FunctionType:
         argdefs=method.__defaults__,
         closure=method.__closure__,
     )
+
+
+def _new_wrapper(new_func: Callable) -> Callable:
+    @ft.wraps(new_func)
+    def new_method(klass: type, *_, **__) -> PyTree:
+        tree = new_func(klass)
+        for field in getattr(klass, _FIELD_MAP).values():
+            if field.default is not _NOT_SET:
+                getattr(tree, _VARS)[field.name] = field.default
+            elif field.default_factory is not None:
+                getattr(tree, _VARS)[field.name] = field.default_factory()
+
+        # set the tree as not frozen to enable
+        getattr(tree, _VARS)[_FROZEN] = False
+        return tree
+
+    # wrap the original `new_func`, to use it later in `tree_unflatten`
+    # to avoid repeating iterating over fields and setting default values
+    setattr(new_method, _WRAPPED, new_func)
+    return new_method
+
+
+def _init_wrapper(init_func: Callable) -> Callable:
+    @ft.wraps(init_func)
+    def init_method(self, *a, **k) -> None:
+        getattr(self, _VARS)[_FROZEN] = False
+        output = init_func(self, *a, **k)
+
+        # in case __post_init__ is defined then call it
+        # after the tree is initialized
+        # here, we assume that __post_init__ is a method
+        if hasattr(type(self), _POST_INIT):
+            # in case we found post_init in super class
+            # then defreeze it first and call it
+            # this behavior is differet to `dataclasses` with `frozen=True`
+            # but similar if `frozen=False`
+            # vars(self)[_FROZEN] = False
+            # the following code will raise FrozenInstanceError in `dataclasses`
+            # but it will work in `treeclass`,
+            # i.e. `treeclass` defreezes the tree after `__post_init__`
+            # >>> @dc.dataclass(frozen=True)
+            # ... class Test:
+            # ...    a:int = 1
+            # ...    def __post_init__(self):
+            # ...        self.b = 1
+            getattr(self, _VARS)[_FROZEN] = False
+            output = getattr(type(self), _POST_INIT)(self)
+
+        # handle uninitialized fields
+        for field in getattr(self, _FIELD_MAP).values():
+            if field.name not in getattr(self, _VARS):
+                # at this point, all fields should be initialized
+                # in principle, this error will be caught when invoking `repr`/`str`
+                # like in `dataclasses` but we raise it here for better error message.
+                raise AttributeError(f"field=`{field.name}` is not initialized.")
+
+        # delete the shadowing `__dict__` attribute to
+        # restore the frozen behavior
+        if _FROZEN in getattr(self, _VARS):
+            del getattr(self, _VARS)[_FROZEN]
+        return output
+
+    return init_method
+
+
+def _setattr(tree: PyTree, key: str, value: Any) -> None:
+    """Set the attribute of the tree if the tree is not frozen"""
+    if getattr(tree, _FROZEN):
+        msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
+        raise AttributeError(msg)
+
+    # apply the callbacks on setting the value
+    # check if the key is a field name
+    if key in getattr(tree, _FIELD_MAP):
+        # check if there is a callback associated with the field
+        callbacks = getattr(tree, _FIELD_MAP)[key].callbacks
+
+        if callbacks is not None:
+            for callback in callbacks:
+                try:
+                    # callback is a function that takes the value of the field
+                    # and returns a modified value
+                    value = callback(value)
+                except Exception as e:
+                    msg = f"Error for field=`{key}`:\n{e}"
+                    raise type(e)(msg)
+
+    # set the value
+    getattr(tree, _VARS)[key] = value
+
+    if hasattr(value, _FIELD_MAP) and (key not in getattr(tree, _FIELD_MAP)):
+        field = Field(name=key, type=type(value))  # type: ignore
+        # register it to field map, to avoid re-registering it in field_map
+        getattr(tree, _FIELD_MAP)[key] = field
+
+
+def _delattr(tree, key: str) -> None:
+    """Delete the attribute if tree is not frozen"""
+    if getattr(tree, _FROZEN):
+        raise AttributeError(f"Cannot delete {key}.")
+    del getattr(tree, _VARS)[key]
 
 
 def _is_dataclass_like(tree: Any) -> bool:
