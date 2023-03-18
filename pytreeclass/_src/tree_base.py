@@ -3,10 +3,11 @@ from __future__ import annotations
 import functools as ft
 import operator as op
 from math import ceil, floor, trunc
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 import jax.tree_util as jtu
 import numpy as np
+from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_decorator import (
     _FIELD_MAP,
@@ -19,6 +20,7 @@ from pytreeclass._src.tree_decorator import (
     _init_wrapper,
     _new_wrapper,
     _setattr,
+    field,
 )
 from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
 from pytreeclass._src.tree_indexer import tree_indexer
@@ -26,6 +28,7 @@ from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_trace import register_pytree_node_trace
 
 PyTree = Any
+T = TypeVar("T")
 
 
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
@@ -150,7 +153,7 @@ def _validate_class(klass: type) -> type:
     return klass
 
 
-def _dataclass_transform(klass: type) -> type:
+def _treeclass_transform(klass: type) -> type:
     # add custom `dataclass`-like fields map
     setattr(klass, _FIELD_MAP, _generate_field_map(klass))
     # flag for the immutable behavior used throughout the code
@@ -311,7 +314,8 @@ def _auxiliary_transform(klass: type, *, leafwise: bool) -> type:
     return klass
 
 
-def treeclass(klass: type, *, leafwise: bool = False) -> type:
+@dataclass_transform(field_specifiers=(field,))
+def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     """Convert a class to a JAX compatible tree structure.
 
     Args:
@@ -379,7 +383,7 @@ def treeclass(klass: type, *, leafwise: bool = False) -> type:
     # add the immutable setters and deleters
     # and generate the `__init__` method if not present
     # generate fields from type annotations
-    klass = _dataclass_transform(klass)
+    klass = _treeclass_transform(klass)
 
     # add the optional methods to the class
     # optional methods are math operations, indexing and masking,
