@@ -412,7 +412,7 @@ def tree_indexer(tree: PyTree) -> PyTree:
         >>> def test_trace_func(tree):
         ...     names = ("a", "b")
         ...     types = (type(tree.a), type(tree.b))
-        ...     indices = ((0,2), (1,2))
+        ...     indices = (0, 1)
         ...     metadatas = (None, None)
         ...     return [*zip(names, types, indices, metadatas)]
 

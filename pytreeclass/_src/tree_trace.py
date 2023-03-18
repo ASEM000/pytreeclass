@@ -167,34 +167,34 @@ def tree_leaves_with_trace(
         >>> tree = [1, [2, [3, [4]]]]
 
         >>> for trace, leaf in pytc.tree_leaves_with_trace(tree):
-        ...    names, types, indices, metadas = trace
+        ...    names, types, indices, metadatas = trace
         ...    print(
         ...        f"leaf={leaf}\n"
         ...        f"names={names}\n"
         ...        f"types={types}\n"
         ...        f"indices={indices}\n"
-        ...        f"metadas={metadas}"
+        ...        f"metadatas={metadatas}"
         ...    )
         leaf=1
         names=('list', '[0]')
         types=(<class 'list'>, <class 'int'>)
         indices=(0, 0)
-        metadas=((),)
+        metadatas=((),)
         leaf=2
         names=('list', '[1]', '[0]')
         types=(<class 'list'>, <class 'list'>, <class 'int'>)
         indices=(0, 1, 0)
-        metadas=((), ())
+        metadatas=((), ())
         leaf=3
         names=('list', '[1]', '[1]', '[0]')
         types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
         indices=(0, 1, 1, 0)
-        metadas=((), (), ())
+        metadatas=((), (), ())
         leaf=4
         names=('list', '[1]', '[1]', '[1]', '[0]')
         types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
         indices=(0, 1, 1, 1, 0)
-        metadas=((), (), (), ())
+        metadatas=((), (), (), ())
     """
     trace = ((type(tree).__name__,), (type(tree),), (0,), ())  # type: ignore
     return list(flatten_one_trace_level(trace, tree, is_leaf, is_trace_leaf))
