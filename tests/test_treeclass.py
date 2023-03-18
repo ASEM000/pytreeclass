@@ -639,7 +639,7 @@ def test_incorrect_trace_func():
 
     def trace_func(tree):
         names = ("a",)
-        types = (1,)
+        types = (int,)
         indices = ("a",)
         metadatas = (None,)
         return [*zip(names, types, indices, metadatas)]
@@ -653,4 +653,22 @@ def test_incorrect_trace_func():
 
     with pytest.raises(TypeError):
         # improper index entry
+        pytc.tree_leaves_with_trace(T())
+
+    class T:
+        def __init__(self):
+            self.a = 1
+
+    def trace_func(tree):
+        return [""]
+
+    flatten_func = lambda tree: ((tree.a,), None)
+    unflatten_func = lambda _, x: T(x)
+
+    jax.tree_util.register_pytree_node(T, flatten_func, unflatten_func)
+
+    pytc.register_pytree_node_trace(T, trace_func)
+
+    with pytest.raises(TypeError):
+        # improper return type
         pytc.tree_leaves_with_trace(T())
