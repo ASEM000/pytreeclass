@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools as ft
 from collections import OrderedDict, defaultdict
 from typing import Any, Callable, Iterable, NamedTuple, Sequence
 
@@ -15,7 +16,6 @@ PyTree = Any
 TraceType = Any
 
 _trace_registry: dict[type, Callable] = dict()
-_valid_trace_registry_types: set[type] = {tuple, list, dict, OrderedDict, defaultdict}
 
 
 class _TraceRegistryEntry(NamedTuple):
@@ -62,7 +62,55 @@ def register_pytree_node_trace(
         msg = f"Node trace flatten function for {klass} is already registered."
         raise ValueError(msg)
     # register the node trace flatten function to the node trace registry
-    _trace_registry[klass] = _TraceRegistryEntry(trace_func)
+    _trace_registry[klass] = _TraceRegistryEntry(_validate_trace_func(trace_func))
+
+
+def _validate_trace_func(trace_func: Callable) -> Callable:
+    # validate the trace function to make sure it returns the correct format
+    # validation is only performed once
+    @ft.wraps(trace_func)
+    def wrapper(tree):
+        if wrapper.is_validated:
+            return trace_func(tree)
+
+        for trace in (traces := trace_func(tree)):
+            # check if the trace has the correct format
+            if not isinstance(trace, (list, tuple)):
+                msg = f"Trace return type is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += f"Expected a list or tuple, got {trace}"
+                raise TypeError(msg)
+
+            if len(trace) != 4:
+                msg = f"Trace length is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += "Expected 4 entries, in the order of"
+                msg += f"(name, type, index, metadata), got {trace}"
+                raise ValueError(msg)
+
+            if not isinstance(trace[0], str):
+                msg = f"Trace name entry is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += f" Expected a string, got {trace[0]}"
+                raise TypeError(msg)
+
+            if not isinstance(trace[1], type):
+                msg = f"Trace type entry is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += f" Expected a type, got {trace[1]}"
+                raise TypeError(msg)
+
+            if not isinstance(trace[2], int):
+                msg = f"Trace index entry is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += f" Expected an integer, got {trace[2]}"
+                raise TypeError(msg)
+
+        wrapper.is_validated = True
+        return traces
+
+    wrapper.is_validated = False
+    return wrapper
 
 
 def flatten_one_trace_level(
@@ -99,50 +147,13 @@ def flatten_one_trace_level(
         yield tree_trace, tree
         return
 
-    for trace, leaf in zip(traces, leaves):
-        if type(tree) not in _valid_trace_registry_types:
-            # check if the defined trace function is valid only once
-            if not isinstance(trace, (list, tuple)):
-                msg = f"Trace return type is not defined properly for "
-                msg += f"class=`{type(tree).__name__}`."
-                msg += f" Expected a list or tuple, got {trace}"
-                raise TypeError(msg)
-
-            if len(trace) != 4:
-                msg = f"Trace length is not defined properly for "
-                msg += f"class=`{type(tree).__name__}`."
-                msg += " Expected 4 entries, in the order of"
-                msg += f"(name, type, index, metadata), got {trace}"
-                raise ValueError(msg)
-
-            if not isinstance(trace[0], str):
-                msg = f"Trace name entry is not defined properly for "
-                msg += f"class=`{type(tree).__name__}`."
-                msg += f" Expected a string, got {trace[0]}"
-                raise TypeError(msg)
-
-            if not isinstance(trace[1], type):
-                msg = f"Trace type entry is not defined properly for "
-                msg += f"class=`{type(tree).__name__}`."
-                msg += f" Expected a type, got {trace[1]}"
-                raise TypeError(msg)
-
-            if not isinstance(trace[2], int):
-                msg = f"Trace index entry is not defined properly for "
-                msg += f"class=`{type(tree).__name__}`."
-                msg += f" Expected an integer, got {trace[2]}"
-                raise TypeError(msg)
-
-            # avoid re-checking the same type
-            _valid_trace_registry_types.add(type(tree))
-
+    for rhs_trace, leaf in zip(traces, leaves):
         leaf_trace = (
-            (*tree_trace[0], trace[0]),  # names
-            (*tree_trace[1], trace[1]),  # types
-            (*tree_trace[2], trace[2]),  # indices
-            (*tree_trace[3], trace[3]),  # metadatas
+            (*tree_trace[0], rhs_trace[0]),  # names
+            (*tree_trace[1], rhs_trace[1]),  # types
+            (*tree_trace[2], rhs_trace[2]),  # indices
+            (*tree_trace[3], rhs_trace[3]),  # metadatas
         )
-
         yield from flatten_one_trace_level(leaf_trace, leaf, is_leaf, is_trace_leaf)
 
 
@@ -179,24 +190,24 @@ def tree_leaves_with_trace(
         names=('list', '[0]')
         types=(<class 'list'>, <class 'int'>)
         indices=(0, 0)
-        metadatas=((),)
+        metadatas=((), ())
         leaf=2
         names=('list', '[1]', '[0]')
         types=(<class 'list'>, <class 'list'>, <class 'int'>)
         indices=(0, 1, 0)
-        metadatas=((), ())
+        metadatas=((), (), ())
         leaf=3
         names=('list', '[1]', '[1]', '[0]')
         types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
         indices=(0, 1, 1, 0)
-        metadatas=((), (), ())
+        metadatas=((), (), (), ())
         leaf=4
         names=('list', '[1]', '[1]', '[1]', '[0]')
         types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
         indices=(0, 1, 1, 1, 0)
-        metadatas=((), (), (), ())
+        metadatas=((), (), (), (), ())
     """
-    trace = ((type(tree).__name__,), (type(tree),), (0,), ())  # type: ignore
+    trace = ((type(tree).__name__,), (type(tree),), (0,), ((),))  # type: ignore
     return list(flatten_one_trace_level(trace, tree, is_leaf, is_trace_leaf))
 
 
@@ -258,11 +269,11 @@ def _jaxable_trace_func(tree: Any) -> list[tuple[str, Any, tuple[int, int], Any]
 
 
 # register trace functions for common types
-register_pytree_node_trace(tuple, _sequence_trace_func)
-register_pytree_node_trace(list, _sequence_trace_func)
-register_pytree_node_trace(dict, _dict_trace_func)
-register_pytree_node_trace(OrderedDict, _dict_trace_func)
-register_pytree_node_trace(defaultdict, _dict_trace_func)
+_trace_registry[tuple] = _TraceRegistryEntry(_sequence_trace_func)
+_trace_registry[list] = _TraceRegistryEntry(_sequence_trace_func)
+_trace_registry[dict] = _TraceRegistryEntry(_dict_trace_func)
+_trace_registry[OrderedDict] = _TraceRegistryEntry(_dict_trace_func)
+_trace_registry[defaultdict] = _TraceRegistryEntry(_dict_trace_func)
 
 
 def tree_map_with_trace(
