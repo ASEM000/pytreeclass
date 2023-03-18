@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict, defaultdict
-from typing import Any, Callable, NamedTuple, Sequence
+from typing import Any, Callable, Iterable, NamedTuple, Sequence
 
 import jax.tree_util as jtu
 from jax._src.tree_util import _registry
@@ -14,7 +14,8 @@ from jax._src.tree_util import _registry
 PyTree = Any
 TraceType = Any
 
-_trace_registry = {}
+_trace_registry: dict[type, Callable] = dict()
+_valid_trace_registry_types: set[type] = {tuple, list, dict, OrderedDict, defaultdict}
 
 
 class _TraceRegistryEntry(NamedTuple):
@@ -70,10 +71,9 @@ def flatten_one_trace_level(
     is_leaf: Callable[[Any], bool] | None,
     is_trace_leaf: Callable[[TraceType], bool] | None,
 ):
-    # addition to `is_leaf` condtion , `depth`` is also useful for `tree_viz` utils
-    # However, can not be used for any function that works with `treedef` objects
     if (is_leaf and is_leaf(tree)) or (is_trace_leaf and is_trace_leaf(tree_trace)):
-        # wrap the trace tuple with a object
+        # is_leaf is a predicate function that determines whether a value is a leaf
+        # is_trace_leaf is a predicate function that determines whether a trace is a leaf
         yield tree_trace, tree
         return
 
@@ -96,25 +96,54 @@ def flatten_one_trace_level(
         traces = _namedtuple_trace_func(tree)
 
     elif tree is not None:
-        # wrap the trace tuple with a object
         yield tree_trace, tree
         return
 
     for trace, leaf in zip(traces, leaves):
-        try:
-            leaf_trace = (
-                (*tree_trace[0], trace[0]),  # names
-                (*tree_trace[1], trace[1]),  # types
-                (*tree_trace[2], trace[2]),  # indices
-                (*tree_trace[3], trace[3]),  # metadatas
-            )
+        if type(tree) not in _valid_trace_registry_types:
+            # check if the defined trace function is valid only once
+            if not isinstance(trace, (list, tuple)):
+                msg = f"Trace return type is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += f" Expected a list or tuple, got {trace}"
+                raise TypeError(msg)
 
-            yield from flatten_one_trace_level(leaf_trace, leaf, is_leaf, is_trace_leaf)
-        except IndexError:
-            # this means the trace tuple is not define properly
-            msg = f"Trace tuple is not defined properly for {type(tree)}"
-            msg += "Expected 4 elements, in the order of (name, type, index, metadata)"
-            msg += f"Got {trace}"
+            if len(trace) != 4:
+                msg = f"Trace length is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += " Expected 4 entries, in the order of"
+                msg += f"(name, type, index, metadata), got {trace}"
+                raise ValueError(msg)
+
+            if not isinstance(trace[0], str):
+                msg = f"Trace name entry is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += f" Expected a string, got {trace[0]}"
+                raise TypeError(msg)
+
+            if not isinstance(trace[1], type):
+                msg = f"Trace type entry is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += f" Expected a type, got {trace[1]}"
+                raise TypeError(msg)
+
+            if not isinstance(trace[2], int):
+                msg = f"Trace index entry is not defined properly for "
+                msg += f"class=`{type(tree).__name__}`."
+                msg += f" Expected an integer, got {trace[2]}"
+                raise TypeError(msg)
+
+            # avoid re-checking the same type
+            _valid_trace_registry_types.add(type(tree))
+
+        leaf_trace = (
+            (*tree_trace[0], trace[0]),  # names
+            (*tree_trace[1], trace[1]),  # types
+            (*tree_trace[2], trace[2]),  # indices
+            (*tree_trace[3], trace[3]),  # metadatas
+        )
+
+        yield from flatten_one_trace_level(leaf_trace, leaf, is_leaf, is_trace_leaf)
 
 
 def tree_leaves_with_trace(

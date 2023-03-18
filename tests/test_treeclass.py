@@ -3,6 +3,7 @@ import dataclasses as dc
 import functools as ft
 from typing import Tuple
 
+import jax
 import jax.tree_util as jtu
 import numpy.testing as npt
 import pytest
@@ -564,3 +565,92 @@ def test_benchmark_treeclass_instance(benchmark):
 @pytest.mark.benchmark(group="dataclass")
 def test_benchmark_dataclass_class(benchmark):
     benchmark(benchmark_dataclass_class)
+
+
+def test_incorrect_trace_func():
+    class T:
+        def __init__(self):
+            self.a = 1
+
+    def trace_func(tree):
+        names = ("a",)
+        types = (type(tree.a),)
+        indices = (0,)
+        return [*zip(names, types, indices)]
+
+    flatten_func = lambda tree: ((tree.a,), None)
+    unflatten_func = lambda _, x: T(x)
+
+    jax.tree_util.register_pytree_node(T, flatten_func, unflatten_func)
+
+    pytc.register_pytree_node_trace(T, trace_func)
+
+    with pytest.raises(ValueError):
+        # improper length
+        pytc.tree_leaves_with_trace(T())
+
+    class T:
+        def __init__(self):
+            self.a = 1
+
+    def trace_func(tree):
+        names = (1,)
+        types = (type(tree.a),)
+        indices = (0,)
+        metadatas = (None,)
+        return [*zip(names, types, indices, metadatas)]
+
+    flatten_func = lambda tree: ((tree.a,), None)
+    unflatten_func = lambda _, x: T(x)
+
+    jax.tree_util.register_pytree_node(T, flatten_func, unflatten_func)
+
+    pytc.register_pytree_node_trace(T, trace_func)
+
+    with pytest.raises(TypeError):
+        # improper name entry
+        pytc.tree_leaves_with_trace(T())
+
+    class T:
+        def __init__(self):
+            self.a = 1
+
+    def trace_func(tree):
+        names = ("a",)
+        types = (1,)
+        indices = (0,)
+        metadatas = (None,)
+        return [*zip(names, types, indices, metadatas)]
+
+    flatten_func = lambda tree: ((tree.a,), None)
+    unflatten_func = lambda _, x: T(x)
+
+    jax.tree_util.register_pytree_node(T, flatten_func, unflatten_func)
+
+    pytc.register_pytree_node_trace(T, trace_func)
+
+    with pytest.raises(TypeError):
+        # improper type entry
+        pytc.tree_leaves_with_trace(T())
+
+    class T:
+        def __init__(self):
+            self.a = 1
+
+    def trace_func(tree):
+        names = ("a",)
+        types = (1,)
+        indices = ("a",)
+        metadatas = (None,)
+        return [*zip(names, types, indices, metadatas)]
+
+    flatten_func = lambda tree: ((tree.a,), None)
+    unflatten_func = lambda _, x: T(x)
+
+    jax.tree_util.register_pytree_node(T, flatten_func, unflatten_func)
+
+    pytc.register_pytree_node_trace(T, trace_func)
+
+    with pytest.raises(TypeError):
+        # improper index entry
+        pytc.tree_leaves_with_trace(T())

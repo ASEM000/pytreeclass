@@ -144,13 +144,13 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
     if _ANNOTATIONS not in getattr(klass, _VARS):
         return field_map
 
-    for name in (annotations := getattr(klass, _VARS)[_ANNOTATIONS]):
+    for name in (annotation_map := getattr(klass, _VARS)[_ANNOTATIONS]):
         # get the value associated with the type hint
         # in essence will skip any non type-hinted attributes
         value = getattr(klass, name, _NOT_SET)
         # at this point we stick to the type hint provided by the user
         # inconsistency between the type hint and the value will be handled later
-        type = annotations[name]
+        type = annotation_map[name]
 
         if isinstance(value, Field):
             # the annotated attribute is a `Field``
@@ -239,15 +239,15 @@ def _generate_init_code(fields: Sequence[Field]):
 
 def _generate_init(klass: type) -> FunctionType:
     # generate the field map for the class
-    FIELD_MAP = _generate_field_map(klass)
+    field_map = _generate_field_map(klass)
     # generate init method
     local_namespace = dict()  # type: ignore
     global_namespace = getattr(sys.modules[klass.__module__], _VARS)
 
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
-    exec(_generate_init_code(FIELD_MAP.values()), global_namespace, local_namespace)
-    method = local_namespace["closure"](FIELD_MAP)
+    exec(_generate_init_code(field_map.values()), global_namespace, local_namespace)
+    method = local_namespace["closure"](field_map)
 
     # inject the method into the class namespace
     return FunctionType(
@@ -323,7 +323,7 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
 
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
-    """Set the attribute of the tree if the tree is not frozen"""
+    # Set the attribute of the tree if the tree is not frozen
     if getattr(tree, _FROZEN):
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise AttributeError(msg)
@@ -354,7 +354,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
 
 
 def _delattr(tree, key: str) -> None:
-    """Delete the attribute if tree is not frozen"""
+    # Delete the attribute if tree is not frozen
     if getattr(tree, _FROZEN):
         raise AttributeError(f"Cannot delete {key}.")
     del getattr(tree, _VARS)[key]
