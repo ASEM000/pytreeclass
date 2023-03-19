@@ -43,20 +43,31 @@ class ImmutableWrapper:
     by `jax` transformations, or wrapping a value to make it hashable.
 
     Example:
-        >>> import jax
+        >>> import jax.tree_util as jut
         >>> import pytreeclass as pytc
-        >>> class TransparentWrapper(pytc.ImmutableWrapper):
+        >>> @jtu.register_pytree_node_class
+        ... class TransparentWrapper(pytc.ImmutableWrapper):
         ...    def __repr__(self):
         ...        return f"TransparentWrapper({self.__wrapped__!r})"
+        ...    def tree_flatten(self):
+        ...        # return the unwrapped value as a tuple
+        ...        return (self.unwrap(),), None
+        ...    @classmethod
+        ...    def tree_unflatten(cls, _, xs):
+        ...        return TransparentWrapper(xs[0])
 
         >>> @pytc.treeclass
         ... class Tree:
         ...    a:int = TransparentWrapper(1)
-
         >>> tree = Tree()
+        >>> # no need to unwrap the value when accessing it
         >>> assert type(tree.a)  is int
         >>> print(tree)
         Tree(a=TransparentWrapper(1))
+        >>> jtu.tree_leaves(tree)
+        [1]
+        >>> jtu.tree_leaves(tree, is_leaf=lambda x: isinstance(x, TransparentWrapper))
+        [TransparentWrapper(1)]
     """
 
     def __init__(self, x: Any) -> None:
