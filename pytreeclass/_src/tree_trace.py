@@ -15,54 +15,11 @@ from jax._src.tree_util import _registry
 PyTree = Any
 TraceType = Any
 
-_trace_registry: dict[type, Callable] = dict()
+_trace_registry: dict[type, _TraceRegistryEntry] = dict()
 
 
 class _TraceRegistryEntry(NamedTuple):
     to_iter: Callable[..., Any]
-
-
-def register_pytree_node_trace(
-    klass: type,
-    trace_func: Callable[[Any], list[tuple[str, Any, tuple[int, int], Any]]],
-) -> None:
-    """
-    Args:
-        klass: The class of the object to be traced.
-        trace_func:
-            A function that instance of type `klass` and returns a tuple of
-            (name, type, index, metadata) for each leaf in the object.
-
-    Example:
-        >>> import jax
-        >>> import pytreeclass as pytc
-        >>> class UserList(list):
-        ...     pass
-        >>> def user_list_trace_func(tree:UserList):
-        ...     # (1) define name for each leaf
-        ...     names = (f"leaf{i}" for i in range(len(tree)))
-        ...     # (2) define types for each leaf
-        ...     types = (type(leaf) for leaf in tree)
-        ...     # (3) define (index,children count) for each leaf
-        ...     indices = ((i,len(tree)) for i in range(len(tree)))
-        ...     # (4) define metadatas (if any) for each leaf
-        ...     metadatas = (() for _ in range(len(tree)))
-        ...     # return a list of tuples (name, type, index, metadata)
-        ...     return [*zip(names, types, indices, metadatas)]
-        >>> pytc.register_pytree_node_trace(UserList, user_list_trace_func)
-
-    Raises:
-        TypeError: if input is not a type
-        ValueError: if `klass` is already registered
-    """
-    if not isinstance(klass, type):
-        msg = f"Expected `klass` to be a type, got {type(klass)}."
-        raise TypeError(msg)
-    if klass in _trace_registry:
-        msg = f"Node trace flatten function for {klass} is already registered."
-        raise ValueError(msg)
-    # register the node trace flatten function to the node trace registry
-    _trace_registry[klass] = _TraceRegistryEntry(_validate_trace_func(trace_func))
 
 
 def _validate_trace_func(trace_func: Callable) -> Callable:
@@ -111,6 +68,49 @@ def _validate_trace_func(trace_func: Callable) -> Callable:
 
     wrapper.is_validated = False
     return wrapper
+
+
+def register_pytree_node_trace(
+    klass: type,
+    trace_func: Callable[[Any], list[tuple[str, Any, tuple[int, int], Any]]],
+) -> None:
+    """
+    Args:
+        klass: The class of the object to be traced.
+        trace_func:
+            A function that instance of type `klass` and returns a tuple of
+            (name, type, index, metadata) for each leaf in the object.
+
+    Example:
+        >>> import jax
+        >>> import pytreeclass as pytc
+        >>> class UserList(list):
+        ...     pass
+        >>> def user_list_trace_func(tree:UserList):
+        ...     # (1) define name for each leaf
+        ...     names = (f"leaf{i}" for i in range(len(tree)))
+        ...     # (2) define types for each leaf
+        ...     types = (type(leaf) for leaf in tree)
+        ...     # (3) define (index,children count) for each leaf
+        ...     indices = ((i,len(tree)) for i in range(len(tree)))
+        ...     # (4) define metadatas (if any) for each leaf
+        ...     metadatas = (() for _ in range(len(tree)))
+        ...     # return a list of tuples (name, type, index, metadata)
+        ...     return [*zip(names, types, indices, metadatas)]
+        >>> pytc.register_pytree_node_trace(UserList, user_list_trace_func)
+
+    Raises:
+        TypeError: if input is not a type
+        ValueError: if `klass` is already registered
+    """
+    if not isinstance(klass, type):
+        msg = f"Expected `klass` to be a type, got {type(klass)}."
+        raise TypeError(msg)
+    if klass in _trace_registry:
+        msg = f"Node trace flatten function for {klass} is already registered."
+        raise ValueError(msg)
+    # register the node trace flatten function to the node trace registry
+    _trace_registry[klass] = _TraceRegistryEntry(_validate_trace_func(trace_func))
 
 
 def flatten_one_trace_level(
