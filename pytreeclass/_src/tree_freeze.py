@@ -236,8 +236,8 @@ def _call_context(tree: PyTree):
         # after the context manager exits, the instance variable will be deleted
         # and the class attribute will be used again.
         getattr(tree, _VARS)[_FROZEN] = False
-        for key in fields(tree):
-            mutate_step(getattr(tree, key))
+        for field in fields(tree):
+            mutate_step(getattr(tree, field.name))
         return tree
 
     def immutate_step(tree):
@@ -247,8 +247,8 @@ def _call_context(tree: PyTree):
             return tree
 
         del getattr(tree, _VARS)[_FROZEN]
-        for key in fields(tree):
-            immutate_step(getattr(tree, key))
+        for field in fields(tree):
+            immutate_step(getattr(tree, field.name))
         return tree
 
     tree = copy.copy(tree)
