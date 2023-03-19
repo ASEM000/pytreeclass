@@ -36,12 +36,29 @@ def _unwrap(value: Any) -> Any:
 
 
 class ImmutableWrapper:
-    # base class for all immutable wrappers
-    # that gets a special treatment inside `treeclass` wrapped classes
-    # in essence, this wrapper is rendered transparent inside `treeclass` wrapped classes
-    # so that the wrapped value can be accessed directly, without the need to call `unwrap`
-    # this is useful for myriads of use cases, such as freezing a value to avoid updating it
-    # by `jax` transformations, or wrapping a value to make it hashable.
+    """Base class for all immutable wrappers that gets a special treatment inside `treeclass` wrapped classes
+    in essence, this wrapper is rendered transparent inside `treeclass` wrapped classes
+    so that the wrapped value can be accessed directly, without the need to call `unwrap`
+    this is useful for myriads of use cases, such as freezing a value to avoid updating it
+    by `jax` transformations, or wrapping a value to make it hashable.
+
+    Example:
+        >>> import jax
+        >>> import pytreeclass as pytc
+        >>> class TransparentWrapper(pytc.ImmutableWrapper):
+        ...    def __repr__(self):
+        ...        return f"TransparentWrapper({self.__wrapped__!r})"
+
+        >>> @pytc.treeclass
+        ... class Tree:
+        ...    a:int = TransparentWrapper(1)
+
+        >>> tree = Tree()
+        >>> assert type(tree.a)  is int
+        >>> print(tree)
+        Tree(a=TransparentWrapper(1))
+    """
+
     def __init__(self, x: Any) -> None:
         # disable composition of Wrappers
         getattr(self, _VARS)[_WRAPPED] = _unwrap(x)
