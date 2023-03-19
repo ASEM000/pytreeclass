@@ -22,7 +22,9 @@ class _TraceRegistryEntry(NamedTuple):
     to_iter: Callable[..., Any]
 
 
-def _validate_trace_func(trace_func: Callable) -> Callable:
+def _validate_trace_func(
+    trace_func: Callable[[Any], TraceType]
+) -> Callable[[Any], TraceType]:
     # validate the trace function to make sure it returns the correct format
     # validation is only performed once
     @ft.wraps(trace_func)

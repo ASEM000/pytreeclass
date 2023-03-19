@@ -9,7 +9,13 @@ import jax
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _FIELD_MAP, _FROZEN, _VARS, _WRAPPED
+from pytreeclass._src.tree_decorator import (
+    _FROZEN,
+    _VARS,
+    _WRAPPED,
+    fields,
+    is_treeclass,
+)
 
 PyTree = Any
 
@@ -87,7 +93,7 @@ class ImmutableWrapper:
 def _tree_unwrap(value: PyTree) -> PyTree:
     # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
     def is_leaf(x: Any) -> bool:
-        return isinstance(x, ImmutableWrapper) or hasattr(x, _FIELD_MAP)
+        return isinstance(x, ImmutableWrapper) or is_treeclass(x)
 
     return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
@@ -223,25 +229,25 @@ def is_nondiff(node: Any) -> bool:
 @contextmanager
 def _call_context(tree: PyTree):
     def mutate_step(tree: PyTree):
-        if not hasattr(tree, _FIELD_MAP):
+        if not is_treeclass(tree):
             return tree
         # shadow the class _FROZEN attribute with an
         # instance variable to temporarily disable the frozen behavior
         # after the context manager exits, the instance variable will be deleted
         # and the class attribute will be used again.
         getattr(tree, _VARS)[_FROZEN] = False
-        for key in getattr(tree, _FIELD_MAP):
+        for key in fields(tree):
             mutate_step(getattr(tree, key))
         return tree
 
     def immutate_step(tree):
-        if not hasattr(tree, _FIELD_MAP):
+        if not is_treeclass(tree):
             return tree
         if _FROZEN not in getattr(tree, _VARS):
             return tree
 
         del getattr(tree, _VARS)[_FROZEN]
-        for key in getattr(tree, _FIELD_MAP):
+        for key in fields(tree):
             immutate_step(getattr(tree, key))
         return tree
 

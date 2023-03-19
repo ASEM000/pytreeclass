@@ -849,6 +849,74 @@ flax_tree.at["a"].set(10)
 
 </details>
 
+<details> 
+<summary>Use tree_map_with_trace</summary>
+
+V0.2 of `PyTreeClass` register common python datatypes and `treeclass` wrapped class to `trace` registry.
+While `jax` uses `jax.tree_util.register_pytree_node` to define `flatten_rule` for leaves, `PyTreeClass` extends on this
+By registering the `flatten_rule` of (1) names, (2) types, (3) indexing, (4) metadata -if exists-
+
+For demonstration , the following figure contains the 4 variants of the same `Tree` instance define
+
+```python
+import jax
+import jax.numpy as jnp
+import pytreeclass as pytc
+
+@pytc.treeclass
+class Tree:
+    a:int = 1
+    b:tuple[float] = (2.,3.)
+    c:jax.Array = jnp.array([4.,5.,6.])
+```
+
+![image](assets/tree_figures.png)
+
+1. Value leaves variant.
+2. Name leaves variant.
+3. Type leaves variant.
+4. Indexing leaves variant.
+
+The four variants can be accessed using `pytc.tree_map_with_trace` .
+Similar to `jax.tree_util.tree_map`, `pytc.tree_map_with_trace` accepts the map function, however the first argument must be the `trace` argument.
+Trace is a four item tuple consists of names,types,indices,metadatas path for each leaf.
+For example for the previous tree, the reuslting trace path for each leaf is :
+
+### Named tree variant
+
+```python
+>>> name_tree = pytc.tree_map_with_trace(lambda trace,x : trace[0], tree)
+>>> print(name_tree)
+Tree(a=(Tree, a), b=((Tree, b, [0]), (Tree, b, [1])), c=(Tree, c))
+```
+
+### Typed tree variant
+
+```python
+>>> type_tree = pytc.tree_map_with_trace(lambda trace,x : f"{trace[1]!s}", tree)
+>>> print(type_tree)
+Tree(
+  a=(<class '__main__.Tree'>, <class 'int'>),
+  b=(
+    (<class '__main__.Tree'>, <class 'tuple'>, <class 'float'>),
+    (<class '__main__.Tree'>, <class 'tuple'>, <class 'float'>)
+  ),
+  c=(<class '__main__.Tree'>, <class 'jaxlib.xla_extension.ArrayImpl'>)
+)
+```
+
+### Index tree variant
+
+```python
+>>> index_tree = pytc.tree_map_with_trace(lambda trace,x : trace[2], tree)
+>>> print(index_tree)
+Tree(a=(0, 0), b=((0, 1, 0), (0, 1, 1)), c=(0, 2))
+```
+
+In essence, each leaf contains information about the name path, type path, and indices path. The rules for custom types can be registered using `pytc.register_pytree_node_trace`
+
+</details>
+
 ## 📙 Acknowledgements<a id="acknowledgements"></a>
 
 - [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
