@@ -1,7 +1,6 @@
 from pytreeclass._src.tree_base import is_tree_equal, treeclass
 from pytreeclass._src.tree_decorator import field, fields, is_treeclass
 from pytreeclass._src.tree_freeze import (
-    FrozenWrapper,
     ImmutableWrapper,
     freeze,
     is_frozen,
@@ -41,7 +40,6 @@ __all__ = (
     "is_frozen",
     "freeze",
     "unfreeze",
-    "FrozenWrapper",
     "ImmutableWrapper",
     # masking and indexing utils
     "bcmap",

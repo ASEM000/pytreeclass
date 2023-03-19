@@ -36,10 +36,10 @@ def _unwrap(value: Any) -> Any:
 
 
 class ImmutableWrapper:
-    """Base class for all immutable wrappers that gets a special treatment inside `treeclass` wrapped classes
-    in essence, this wrapper is rendered transparent inside `treeclass` wrapped classes
-    so that the wrapped value can be accessed directly, without the need to call `unwrap`
-    this is useful for myriads of use cases, such as freezing a value to avoid updating it
+    """Base class for all immutable wrappers that gets a special treatment inside `treeclass` wrapped classes.
+    In essence, this wrapper is rendered transparent inside `treeclass` wrapped classes
+    so that the wrapped value can be accessed directly, without the need to call `unwrap`.
+    This behavior is useful for myriads of use cases, such as freezing a value to avoid updating it
     by `jax` transformations, or wrapping a value to make it hashable.
 
     Example:
