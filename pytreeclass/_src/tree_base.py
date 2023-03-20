@@ -33,10 +33,13 @@ T = TypeVar("T")
 
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     """Unflatten rule for `treeclass` to use with `jax.tree_unflatten`"""
-    # call the wrapped `__new__` method (non-field initializer)
-    tree = getattr(klass.__new__, _WRAPPED)(klass)
+    tree = object.__new__(klass)
     # update through vars, to avoid calling the `setattr` method
-    # that will iterate over the fields
+    # that will check for callbacks.
+    # calling `setattr` will trigger any defined callbacks by the user
+    # on each unflattening which is not efficient.
+    # however it might be useful to constantly check if the updated value is
+    # satisfying the constraints defined by the user.
     getattr(tree, _VARS).update(treedef[1])
     getattr(tree, _VARS).update(zip(treedef[0], leaves))
     return tree
