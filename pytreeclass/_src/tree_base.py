@@ -82,7 +82,7 @@ def _register_treeclass(klass):
 
 def _getattr_wrapper(getattr_func):
     @ft.wraps(getattr_func)
-    def getattr_method(self, key: str) -> Any:
+    def wrapper(self, key: str) -> Any:
         # this current approach replaces the older metdata based approach
         # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`.
         # the metadata approach is defined at class variable and can not be changed at runtime while the current
@@ -110,13 +110,13 @@ def _getattr_wrapper(getattr_func):
         # this renders the wrapped instance variables transparent to the user
         return _tree_unwrap(value) if key in getattr_func(self, _VARS) else value
 
-    return getattr_method
+    return wrapper
 
 
 def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
     @classmethod  # type: ignore
     @ft.wraps(init_subclass_func)
-    def _init_subclass(klass: type, *a, **k) -> None:
+    def wrapper(klass: type, *a, **k) -> None:
         # Non-decorated subclasses uses the base `treeclass` leaves only
         # this behavior is aligned with `dataclasses` not registering non-decorated
         # subclasses dataclass fields. for example:
@@ -140,7 +140,7 @@ def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
         init_subclass_func(*a, **k)
         return _register_treeclass(klass)
 
-    return _init_subclass
+    return wrapper
 
 
 def _validate_class(klass: type) -> type:
@@ -367,6 +367,7 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
 
     Note:
         `leafwise`=True adds the following methods to the class:
+        .. code-block:: python
             '__add__', '__and__', '__ceil__', '__divmod__', '__eq__', '__floor__', '__floordiv__',
             '__ge__', '__gt__', '__invert__', '__le__', '__lshift__', '__lt__',
             '__matmul__', '__mod__', '__mul__', '__ne__', '__neg__', '__or__', '__pos__',

@@ -261,7 +261,7 @@ def _generate_init(klass: type) -> FunctionType:
 
 def _new_wrapper(new_func: Callable) -> Callable:
     @ft.wraps(new_func)
-    def new_method(klass: type, *_, **__) -> PyTree:
+    def wrapper(klass: type, *_, **__) -> PyTree:
         tree = new_func(klass)
         for field in getattr(klass, _FIELD_MAP).values():
             if field.default is not _NOT_SET:
@@ -275,13 +275,13 @@ def _new_wrapper(new_func: Callable) -> Callable:
 
     # wrap the original `new_func`, to use it later in `tree_unflatten`
     # to avoid repeating iterating over fields and setting default values
-    setattr(new_method, _WRAPPED, new_func)
-    return new_method
+    setattr(wrapper, _WRAPPED, new_func)
+    return wrapper
 
 
 def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
-    def init_method(self, *a, **k) -> None:
+    def wrapper(self, *a, **k) -> None:
         getattr(self, _VARS)[_FROZEN] = False
         output = init_func(self, *a, **k)
 
@@ -319,7 +319,7 @@ def _init_wrapper(init_func: Callable) -> Callable:
             del getattr(self, _VARS)[_FROZEN]
         return output
 
-    return init_method
+    return wrapper
 
 
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
