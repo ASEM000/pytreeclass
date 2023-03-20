@@ -27,8 +27,6 @@ import sphinxcontrib.katex as katex
 
 import pytreeclass
 
-
-
 # -- Project information -----------------------------------------------------
 
 project = "pytreeclass"
@@ -91,6 +89,13 @@ html_theme = "sphinx_book_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ["_static"]
+
+
+html_theme_options = {
+    "show_toc_level": 2,
+    "repository_url": "https://github.com/ASEM000/PyTreeClass",
+    "use_repository_button": True,
+}
 
 
 # -- Options for doctest -----------------------------------------------------
