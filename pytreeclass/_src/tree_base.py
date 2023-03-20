@@ -9,7 +9,7 @@ import jax.tree_util as jtu
 import numpy as np
 from typing_extensions import dataclass_transform
 
-from pytreeclass._src.tree_decorator import (
+from pytreeclass._src.tree_decorator import (  # _new_wrapper,
     _FIELD_MAP,
     _FROZEN,
     _VARS,
@@ -18,7 +18,6 @@ from pytreeclass._src.tree_decorator import (
     _generate_field_map,
     _generate_init,
     _init_wrapper,
-    _new_wrapper,
     _setattr,
     field,
 )
@@ -169,8 +168,8 @@ def _treeclass_transform(klass: type) -> type:
         setattr(klass, "__init__", _generate_init(klass))
 
     for name, wrapper in zip(
-        ("__new__", "__init__", "__init_subclass__", "__getattribute__"),
-        (_new_wrapper, _init_wrapper, _init_sub_wrapper, _getattr_wrapper),
+        ("__init__", "__init_subclass__", "__getattribute__"),
+        (_init_wrapper, _init_sub_wrapper, _getattr_wrapper),
     ):
         # wrap the original methods to enable the field initialization,
         # callback functionality and immutable behavior

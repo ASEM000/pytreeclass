@@ -698,14 +698,3 @@ def test_incorrect_trace_func():
     pytc.tree_leaves_with_trace(T())
 
     assert True
-
-
-def test_custom_new():
-    class T:
-        a: int = 1
-
-        def __new__(cls, *args, **kwargs):
-            return super().__new__(cls)
-
-    tree = T()
-    assert tree.a == 1

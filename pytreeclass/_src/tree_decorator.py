@@ -259,34 +259,17 @@ def _generate_init(klass: type) -> FunctionType:
     )
 
 
-def _new_wrapper(new_func: Callable) -> Callable:
-    @ft.wraps(new_func)
-    def wrapper(klass: type, *a, **k) -> PyTree:
-        try:
-            # in case the class does not define custom __new__ method
-            # `object` new method does not take any arguments
-            tree = new_func(klass)
-        except TypeError:
-            # in case the class defines custom __new__ method
-            tree = new_func(klass, *a, **k)
-
-        for field in getattr(klass, _FIELD_MAP).values():
-            if field.default is not _NOT_SET:
-                getattr(tree, _VARS)[field.name] = field.default
-            elif field.default_factory is not None:
-                getattr(tree, _VARS)[field.name] = field.default_factory()
-
-        # set the tree as not frozen to enable
-        getattr(tree, _VARS)[_FROZEN] = False
-        return tree
-
-    return wrapper
-
-
 def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
     def wrapper(self, *a, **k) -> None:
         getattr(self, _VARS)[_FROZEN] = False
+
+        for field in getattr(self, _FIELD_MAP).values():
+            if field.default is not _NOT_SET:
+                getattr(self, _VARS)[field.name] = field.default
+            elif field.default_factory is not None:
+                getattr(self, _VARS)[field.name] = field.default_factory()
+
         output = init_func(self, *a, **k)
 
         # in case __post_init__ is defined then call it
