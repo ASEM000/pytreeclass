@@ -191,36 +191,44 @@ def _tree_copy(tree: PyTree) -> PyTree:
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore
 
 
-def is_tree_equal(lhs: Any, rhs: Any) -> bool:
-    """Return `True` if two pytrees are equal
+def is_tree_equal(*trees: Any) -> bool:
+    """Return `True` if all pytrees are equal
 
     Note:
-        lhs and rhs trees are compared using their leaves and treedefs.
+        trees are compared using their leaves and treedefs.
         For `array` leaves `np.array_equal` is used, for other leaves
-        `==` is used.
+        method `__eq__` is used.
     """
-    lhs_leaves, lhs_treedef = jtu.tree_flatten(lhs)
-    rhs_leaves, rhs_treedef = jtu.tree_flatten(rhs)
+    tree, *rest = trees
+    leaves0, treedef0 = jtu.tree_flatten(tree)
 
-    if not (lhs_treedef == rhs_treedef):
-        # not matching treedefs
-        return False
+    for tree in rest:
+        leaves, treedef = jtu.tree_flatten(tree)
+        if len(leaves) != len(leaves0):
+            # not matching number of leaves
+            return False
 
-    for lhs, rhs in zip(lhs_leaves, rhs_leaves):
-        if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
-            if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
-                if not np.array_equal(lhs, rhs):
-                    # lhs array leaf is not equal to rhs array leaf
+        if not (treedef == treedef0):
+            # not matching treedefs
+            return False
+
+        for lhs, rhs in zip(leaves0, leaves):
+            if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
+                # lhs leaf is an array
+                if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
+                    # rhs leaf is an array
+                    if not np.array_equal(lhs, rhs):
+                        # lhs array leaf is not equal to rhs array leaf
+                        return False
+                else:
+                    # lhs array leaf is an array but rhs
+                    # leaf is not an array
                     return False
             else:
-                # lhs array leaf is an array but rhs
-                # leaf is not an array
-                return False
-        else:
-            if lhs != rhs:
-                # non-array lhs leaf is not equal to the
-                # non-array rhs leaf
-                return False
+                if lhs != rhs:
+                    # non-array lhs leaf is not equal to the
+                    # non-array rhs leaf
+                    return False
     return True
 
 
