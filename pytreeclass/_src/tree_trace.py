@@ -277,7 +277,7 @@ def tree_map_with_trace(
     *rest: Any,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> Any:
-    """Similar to `jax.tree_util.tree_map` but func accepts `trace` as first argument
+    r"""Similar to `jax.tree_util.tree_map` but func accepts `trace` as first argument
 
     Args:
         func: A function that takes a trace and a leaf and returns a new leaf.
@@ -292,6 +292,50 @@ def tree_map_with_trace(
         >>> import jax
         >>> import pytreeclass as pytc
         >>> tree = {"a": [1, 2], "b": 4, "c": [5, 6]}
+
+        >>> # value tree:
+        >>> #        tree
+        >>> #          |
+        >>> #    ---------------
+        >>> #    |      |      |
+        >>> #    |      |      |
+        >>> #  ------   4   -------
+        >>> #  |    |       |     |
+        >>> #  1    2       5     6
+
+        >>> # named tree:
+        >>> #        `dict`
+        >>> #          |
+        >>> #    ---------------
+        >>> #    |      |      |
+        >>> #   'a'    'b'    'c'
+        >>> #    |             |
+        >>> #  ------       -------
+        >>> #  |    |       |     |
+        >>> #`[0]``[1]`   `[0]` `[1]`
+
+        >>> # type tree:
+        >>> #        dict
+        >>> #          |
+        >>> #    ---------------
+        >>> #    |      |      |
+        >>> #   list   int    list
+        >>> #    |             |
+        >>> #  ------       -------
+        >>> #  |    |       |     |
+        >>> # int  int     int   int
+
+        >>> # index tree:
+        >>> #          0
+        >>> #          |
+        >>> #    ---------------
+        >>> #    |      |      |
+        >>> #    0      1      2
+        >>> #    |             |
+        >>> #  ------       -------
+        >>> #  |    |       |     |
+        >>> #  0    1       0     1
+
 
         >>> def map_func(trace, leaf):
         ...    names, _, __, ___ = trace
