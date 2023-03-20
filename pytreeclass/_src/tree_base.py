@@ -52,7 +52,7 @@ def _tree_flatten(
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
 
-def _tree_trace_func(
+def _tree_trace(
     tree: PyTree,
 ) -> list[tuple[Any, Any, tuple[int, int], Any]]:
     """Trace flatten rule to be used with the `tree_trace` module"""
@@ -76,7 +76,7 @@ def _register_treeclass(klass):
     jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
     # register the trace flatten rule without the validation to avoid
     # the unnecessary overhead of the first call validation.
-    _trace_registry[klass] = _TraceRegistryEntry(_tree_trace_func)
+    _trace_registry[klass] = _TraceRegistryEntry(_tree_trace)
     return klass
 
 
