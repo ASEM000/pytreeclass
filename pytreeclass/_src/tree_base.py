@@ -25,7 +25,7 @@ from pytreeclass._src.tree_decorator import (
 from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
 from pytreeclass._src.tree_indexer import tree_indexer
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
-from pytreeclass._src.tree_trace import register_pytree_node_trace
+from pytreeclass._src.tree_trace import _trace_registry, _TraceRegistryEntry
 
 PyTree = Any
 T = TypeVar("T")
@@ -52,7 +52,7 @@ def _tree_flatten(
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
 
-def _tree_trace(
+def _tree_trace_func(
     tree: PyTree,
 ) -> list[tuple[Any, Any, tuple[int, int], Any]]:
     """Trace flatten rule to be used with the `tree_trace` module"""
@@ -74,7 +74,9 @@ def _register_treeclass(klass):
     # this can be also be done using metaclass that registers the class on initialization
     # but we are trying to stay away from deep magic.
     jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
-    register_pytree_node_trace(klass, _tree_trace)  # type: ignore
+    # register the trace flatten rule without the validation to avoid
+    # the unnecessary overhead of the first call validation.
+    _trace_registry[klass] = _TraceRegistryEntry(_tree_trace_func)
     return klass
 
 

@@ -204,9 +204,7 @@ def _node_type_pprint(
 ) -> str:
     if isinstance(node, (jax.Array, np.ndarray)):
         shape_dype = node.shape, node.dtype
-        fmt = _node_pprint(
-            jax.ShapeDtypeStruct(*shape_dype), indent, kind, width, depth
-        )
+        fmt = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), indent, kind, width, depth)  # fmt: skip
     else:
         fmt = f"{type(node).__name__}"
     return _format_width(fmt, width)
@@ -234,6 +232,28 @@ def tree_repr(
         width: max width of the repr string
         tabwidth: tab width of the repr string
         depth: max depth of the repr string
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> import jax.numpy as jnp
+        >>> tree = {'a' : 1, 'b' : [2, 3], 'c' : {'d' : 4, 'e' : 5} , 'f' : jnp.array([6, 7])}
+
+        >>> print(pytc.tree_repr(tree, depth=0))
+        {a:..., b:..., c:..., f:...}
+
+        >>> print(pytc.tree_repr(tree, depth=1))
+        {a:1, b:[..., ...], c:{d:..., e:...}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
+
+        >>> print(pytc.tree_repr(tree, depth=2))
+        {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
+
+        >>> print(pytc.tree_repr(tree, tabwidth=8, width=20))
+        {
+                a:1,
+                b:[2, 3],
+                c:{d:4, e:5},
+                f:i32[2](μ=6.50, σ=0.50, ∈[6,7])
+        }
     """
     return _node_pprint(tree, 0, "repr", width, depth).expandtabs(tabwidth)
 
@@ -252,6 +272,27 @@ def tree_str(
         width: max width of the str string
         tabwidth: tab width of the repr string
         depth: max depth of the repr string
+    Example:
+        >>> import pytreeclass as pytc
+        >>> import jax.numpy as jnp
+        >>> tree = {'a' : 1, 'b' : [2, 3], 'c' : {'d' : 4, 'e' : 5} , 'f' : jnp.array([6, 7])}
+
+        >>> print(pytc.tree_str(tree, depth=0))
+        {a:..., b:..., c:..., f:...}
+
+        >>> print(pytc.tree_str(tree, depth=1))
+        {a:1, b:[..., ...], c:{d:..., e:...}, f:[6 7]}
+
+        >>> print(pytc.tree_str(tree, depth=2))
+        {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
+
+        >> print(pytc.tree_str(tree, tabwidth=8, width=20))
+        {
+                a:1,
+                b:[2, 3],
+                c:{d:4, e:5},
+                f:[6 7]
+        }
     """
     return _node_pprint(tree, 0, "str", width, depth).expandtabs(tabwidth)
 

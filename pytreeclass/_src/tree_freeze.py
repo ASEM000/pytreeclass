@@ -215,13 +215,29 @@ def is_frozen(wrapped: Any) -> bool:
     return isinstance(wrapped, FrozenWrapper)
 
 
-def is_nondiff(node: Any) -> bool:
-    """Returns False if the node is a float, complex number, or a numpy array of floats or complex numbers."""
-    # this is meant to be used with `jtu.tree_map`.
+def is_nondiff(x: Any) -> bool:
+    """Returns False if the node is a float, complex number, or a numpy array of floats or complex numbers.
 
-    if hasattr(node, "dtype") and np.issubdtype(node.dtype, np.inexact):
+    Example:
+        >>> import pytreeclass as pytc
+        >>> import jax.numpy as jnp
+        >>> pytc.is_nondiff(jnp.array(1))  # int array is non-diff type
+        True
+        >>> pytc.is_nondiff(jnp.array(1.))  # float array is diff type
+        False
+        >>> pytc.is_nondiff(1)  # int is non-diff type
+        True
+        >>> pytc.is_nondiff(1.)  # float is diff type
+        False
+
+    Note:
+        This function is meant to be used with `jax.tree_util.tree_map` to create a mask
+        for non-differentiable nodes in a tree, that can be used to freeze the non-differentiable nodes
+        in a tree.
+    """
+    if hasattr(x, "dtype") and np.issubdtype(x.dtype, np.inexact):
         return False
-    if isinstance(node, (float, complex)):
+    if isinstance(x, (float, complex)):
         return False
     return True
 

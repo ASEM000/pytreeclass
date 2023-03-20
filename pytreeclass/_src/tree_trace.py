@@ -80,8 +80,8 @@ def register_pytree_node_trace(
     Args:
         klass: The class of the object to be traced.
         trace_func:
-            A function that instance of type `klass` and returns a tuple of
-            (name, type, index, metadata) for each leaf in the object.
+            A function that takes an instance of type `klass` and defines the flatten rule
+            for the object (name, type, index, metadata) for each leaf in the object.
 
     Example:
         >>> import jax
@@ -231,9 +231,7 @@ def tree_flatten_with_trace(
     return traces_leaves, treedef
 
 
-def _sequence_trace_func(
-    tree: Sequence,
-) -> list[tuple[Any, Any, tuple[int, int], Any]]:
+def _sequence_trace_func(tree: Sequence) -> list[TraceType]:
     names = (f"[{i}]" for i in range(len(tree)))
     types = map(type, tree)
     indices = range(len(tree))
@@ -241,7 +239,7 @@ def _sequence_trace_func(
     return [*zip(names, types, indices, metadatas)]
 
 
-def _dict_trace_func(tree: dict) -> list[tuple[str, Any, tuple[int, int], Any]]:
+def _dict_trace_func(tree: dict) -> list[TraceType]:
     names = (f"['{k}']" for k in tree)
     types = (type(tree[key]) for key in tree)
     indices = range(len(tree))
@@ -249,7 +247,7 @@ def _dict_trace_func(tree: dict) -> list[tuple[str, Any, tuple[int, int], Any]]:
     return [*zip(names, types, indices, metadatas)]
 
 
-def _namedtuple_trace_func(tree: Any) -> list[tuple[str, type, tuple[int, int], Any]]:
+def _namedtuple_trace_func(tree: Any) -> list[TraceType]:
     names = (f"['{field}']" for field in tree._fields)
     types = (type(getattr(tree, field)) for field in tree._fields)
     indices = range(len(tree))
@@ -257,7 +255,7 @@ def _namedtuple_trace_func(tree: Any) -> list[tuple[str, type, tuple[int, int], 
     return [*zip(names, types, indices, metadatas)]
 
 
-def _jaxable_trace_func(tree: Any) -> list[tuple[str, Any, tuple[int, int], Any]]:
+def _jaxable_trace_func(tree: Any) -> list[TraceType]:
     # fallback trace function in case no trace function is registered for a given
     # class in the `trace` registry
     # get leaves from the `jax` registry
