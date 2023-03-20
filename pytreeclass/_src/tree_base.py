@@ -62,7 +62,8 @@ def _tree_trace(
     names = (f"{key}" for key in keys)
     types = map(type, leaves)
     indices = range(len(leaves))
-    metadatas = ({"repr": getattr(tree, _FIELD_MAP)[key].repr} for key in keys)
+    fields = (getattr(tree, _FIELD_MAP)[key] for key in keys)
+    metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields)
     return [*zip(names, types, indices, metadatas)]
 
 

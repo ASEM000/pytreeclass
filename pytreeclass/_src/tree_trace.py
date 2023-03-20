@@ -235,7 +235,7 @@ def _sequence_trace_func(tree: Sequence) -> list[TraceType]:
     names = (f"[{i}]" for i in range(len(tree)))
     types = map(type, tree)
     indices = range(len(tree))
-    metadatas = (() for _ in range(len(tree)))
+    metadatas = (dict(id=id(leaf)) for leaf in tree)
     return [*zip(names, types, indices, metadatas)]
 
 
@@ -243,7 +243,7 @@ def _dict_trace_func(tree: dict) -> list[TraceType]:
     names = (f"['{k}']" for k in tree)
     types = (type(tree[key]) for key in tree)
     indices = range(len(tree))
-    metadatas = ({"repr": not k.startswith("_")} for k in tree)
+    metadatas = (dict(repr=not k.startswith("_"), id=id(tree[k])) for k in tree)
     return [*zip(names, types, indices, metadatas)]
 
 
@@ -251,7 +251,7 @@ def _namedtuple_trace_func(tree: Any) -> list[TraceType]:
     names = (f"['{field}']" for field in tree._fields)
     types = (type(getattr(tree, field)) for field in tree._fields)
     indices = range(len(tree))
-    metadatas = (() for _ in tree._fields)
+    metadatas = (dict(id=id(getattr(tree, field))) for field in tree._fields)
     return [*zip(names, types, indices, metadatas)]
 
 
@@ -264,7 +264,7 @@ def _jaxable_trace_func(tree: Any) -> list[TraceType]:
     names = (f"leaf_{i}" for i in range(len(leaves)))
     types = map(type, leaves)
     indices = range(len(leaves))
-    metadatas = (() for _ in range(len(leaves)))
+    metadatas = (dict(id=id(leaf)) for leaf in leaves)
     return [*zip(names, types, indices, metadatas)]
 
 
