@@ -93,8 +93,8 @@ def register_pytree_node_trace(
         ...     names = (f"leaf{i}" for i in range(len(tree)))
         ...     # (2) define types for each leaf
         ...     types = (type(leaf) for leaf in tree)
-        ...     # (3) define (index,children count) for each leaf
-        ...     indices = ((i,len(tree)) for i in range(len(tree)))
+        ...     # (3) index for each leaf in the level
+        ...     indices = range(len(tree))
         ...     # (4) define metadatas (if any) for each leaf
         ...     metadatas = (() for _ in range(len(tree)))
         ...     # return a list of tuples (name, type, index, metadata)
@@ -182,32 +182,34 @@ def tree_leaves_with_trace(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> tree = [1, [2, [3, [4]]]]
+        >>> tree = [1, [2, [3]]]
+        >>> traces, _ = zip(*pytc.tree_leaves_with_trace(tree))
+        >>> # print(pytc.tree_repr(traces))
+        >>> # (
+        >>> #   (
+        >>> #     ('list', '[0]'),                                                      # -> name path of leaf = 1
+        >>> #     (<class 'list'>, <class 'int'>),                                      # -> type path of leaf = 1
+        >>> #     (0, 0),                                                               # -> index path of leaf = 1
+        >>> #     ({id:4951960512}, {id:4380344560})                                    # -> metadata path of leaf = 1
+        >>> #   ),
+        >>> #   (
+        >>> #     ('list', '[1]', '[0]'),                                               # -> name path of leaf = 2
+        >>> #     (<class 'list'>, <class 'list'>, <class 'int'>),                      # -> type path of leaf = 2
+        >>> #     (0, 1, 0),                                                            # -> index path of leaf = 2
+        >>> #     ({id:4951960512}, {id:4951876032}, {id:4380344592})                   # -> metadata path of leaf = 2
+        >>> #   ),
+        >>> #   (
+        >>> #     ('list', '[1]', '[1]', '[0]'),                                        # -> name path of leaf = 3
+        >>> #     (<class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>),      # -> type path of leaf = 3
+        >>> #     (0, 1, 1, 0),                                                         # -> index path of leaf = 3
+        >>> #     ({id:4951960512}, {id:4951876032}, {id:4950290624}, {id:4380344624})  # -> metadata path of leaf = 3
+        >>> #   )
+        >>> # )
 
-        >>> for trace, leaf in pytc.tree_leaves_with_trace(tree):
-        ...    names, types, indices, metadatas = trace
-        ...    print(
-        ...        f"leaf={leaf}\n"
-        ...        f"names={names}\n"
-        ...        f"types={types}\n"
-        ...        f"indices={indices}"
-        ...    )
-        leaf=1
-        names=('list', '[0]')
-        types=(<class 'list'>, <class 'int'>)
-        indices=(0, 0)
-        leaf=2
-        names=('list', '[1]', '[0]')
-        types=(<class 'list'>, <class 'list'>, <class 'int'>)
-        indices=(0, 1, 0)
-        leaf=3
-        names=('list', '[1]', '[1]', '[0]')
-        types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
-        indices=(0, 1, 1, 0)
-        leaf=4
-        names=('list', '[1]', '[1]', '[1]', '[0]')
-        types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
-        indices=(0, 1, 1, 1, 0)
+    Note:
+        `metadata` path can hold any information about the object. PyTreeClass stores the object id
+        for the common data structures like `list`, `tuple`, `dict`, `set`, `namedtuple`, and `treeclass` wrapped
+        classes.
     """
     trace = ((type(tree).__name__,), (type(tree),), (0,), (dict(id=id(tree)),))  # type: ignore
     return list(flatten_one_trace_level(trace, tree, is_leaf, is_trace_leaf))
