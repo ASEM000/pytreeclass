@@ -38,7 +38,7 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     # calling `setattr` will trigger any defined callbacks by the user
     # on each unflattening which is not efficient.
     # however it might be useful to constantly check if the updated value is
-    # satisfying the constraints defined by the user.
+    # satisfying the constraints defined by the user in the callbacks.
     getattr(tree, _VARS).update(treedef[1])
     getattr(tree, _VARS).update(zip(treedef[0], leaves))
     return tree

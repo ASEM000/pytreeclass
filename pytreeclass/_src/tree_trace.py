@@ -101,6 +101,12 @@ def register_pytree_node_trace(
         ...     return [*zip(names, types, indices, metadatas)]
         >>> pytc.register_pytree_node_trace(UserList, user_list_trace_func)
 
+    Note:
+        The `trace_func` should return a list of tuples in the order of
+        (name, type, index, metadata) for each leaf in the object.
+        The format of the trace is validated on the first call and will raise
+        `TypeError` or `ValueError` if the format is not correct.
+
     Raises:
         TypeError: if input is not a type
         ValueError: if `klass` is already registered
@@ -131,7 +137,6 @@ def flatten_one_trace_level(
         # trace handler for the current tree
         leaves, _ = _registry[type(tree)].to_iter(tree)
 
-        # if type(tree) in _trace_registry:
         # trace handler for the current tree
         # defaults to `_jaxable_trace_func`
         traces = (
@@ -204,7 +209,7 @@ def tree_leaves_with_trace(
         types=(<class 'list'>, <class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>)
         indices=(0, 1, 1, 1, 0)
     """
-    trace = ((type(tree).__name__,), (type(tree),), (0,), ((),))  # type: ignore
+    trace = ((type(tree).__name__,), (type(tree),), (0,), (dict(id=id(tree)),))  # type: ignore
     return list(flatten_one_trace_level(trace, tree, is_leaf, is_trace_leaf))
 
 
