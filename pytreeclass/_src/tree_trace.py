@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 from collections import OrderedDict, defaultdict
-from typing import Any, Callable, Iterable, NamedTuple, Sequence
+from typing import Any, Callable, NamedTuple, Sequence
 
 import jax.tree_util as jtu
 from jax._src.tree_util import _registry
@@ -35,32 +35,32 @@ def _validate_trace_func(
         for trace in (traces := trace_func(tree)):
             # check if the trace has the correct format
             if not isinstance(trace, (list, tuple)):
-                msg = f"Trace return type is not defined properly for "
+                msg = "Trace return type is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
                 msg += f"Expected a list or tuple, got {trace}"
                 raise TypeError(msg)
 
             if len(trace) != 4:
-                msg = f"Trace length is not defined properly for "
+                msg = "Trace length is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
                 msg += "Expected 4 entries, in the order of"
                 msg += f"(name, type, index, metadata), got {trace}"
                 raise ValueError(msg)
 
             if not isinstance(trace[0], str):
-                msg = f"Trace name entry is not defined properly for "
+                msg = "Trace name entry is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
                 msg += f" Expected a string, got {trace[0]}"
                 raise TypeError(msg)
 
             if not isinstance(trace[1], type):
-                msg = f"Trace type entry is not defined properly for "
+                msg = "Trace type entry is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
                 msg += f" Expected a type, got {trace[1]}"
                 raise TypeError(msg)
 
             if not isinstance(trace[2], int):
-                msg = f"Trace index entry is not defined properly for "
+                msg = "Trace index entry is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
                 msg += f" Expected an integer, got {trace[2]}"
                 raise TypeError(msg)
@@ -150,7 +150,7 @@ def flatten_one_trace_level(
         leaves = (getattr(tree, field) for field in tree._fields)  # type: ignore
         traces = _namedtuple_trace_func(tree)
 
-    elif tree is not None:
+    else:
         yield tree_trace, tree
         return
 
@@ -170,7 +170,7 @@ def tree_leaves_with_trace(
     is_leaf: Callable[[Any], bool] | None = None,
     is_trace_leaf: Callable[[Any], bool] | None = None,
 ) -> Sequence[tuple[TraceType, Any]]:
-    r"""Similar to jax.tree_util.tree_leaves` but returns  object, leaf pairs
+    r"""Similar to jax.tree_util.tree_leaves` but returns  object, leaf pairs.
 
     Args:
         tree: The tree to be flattened.
@@ -315,22 +315,22 @@ def tree_map_with_trace(
         >>> #          |
         >>> #    ---------------
         >>> #    |      |      |
-        >>> #   'a'    'b'    'c'
+        >>> # `['a']` `['b']``['c']`
         >>> #    |             |
         >>> #  ------       -------
         >>> #  |    |       |     |
         >>> #`[0]``[1]`   `[0]` `[1]`
 
         >>> # type tree:
-        >>> #        dict
+        >>> #        <dict>
         >>> #          |
         >>> #    ---------------
         >>> #    |      |      |
-        >>> #   list   int    list
+        >>> #  <list> <int> <list>
         >>> #    |             |
         >>> #  ------       -------
         >>> #  |    |       |     |
-        >>> # int  int     int   int
+        >>> # <int><int>   <int><int>
 
         >>> # index tree:
         >>> #          0

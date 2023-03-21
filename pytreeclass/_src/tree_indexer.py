@@ -16,7 +16,6 @@ from pytreeclass._src.tree_freeze import _call_context
 from pytreeclass._src.tree_trace import tree_map_with_trace
 
 PyTree = Any
-EllipsisType = type(Ellipsis)
 _no_initializer = object()
 _non_partial = object()
 
@@ -434,7 +433,7 @@ def tree_indexer(tree: PyTree) -> PyTree:
                 # indexing by boolean pytree
                 return _at_mask(tree=tree, where=where)
 
-            if isinstance(where, EllipsisType):
+            if isinstance(where, type(...)):
                 # Ellipsis as an alias for all elements
                 # model.at[model == model ] <--> model.at[...]
                 return tree.at[tree == tree]

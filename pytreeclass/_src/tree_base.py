@@ -13,7 +13,6 @@ from pytreeclass._src.tree_decorator import (  # _new_wrapper,
     _FIELD_MAP,
     _FROZEN,
     _VARS,
-    _WRAPPED,
     _delattr,
     _generate_field_map,
     _generate_init,
@@ -31,7 +30,7 @@ T = TypeVar("T")
 
 
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
-    """Unflatten rule for `treeclass` to use with `jax.tree_unflatten`"""
+    """Unflatten rule for `treeclass` to use with `jax.tree_unflatten`."""
     tree = object.__new__(klass)
     # update through vars, to avoid calling the `setattr` method
     # that will check for callbacks.
@@ -47,7 +46,7 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
 def _tree_flatten(
     tree: PyTree,
 ) -> tuple[list[Any], tuple[tuple[str], dict[str, Any]]]:
-    """Flatten rule for `treeclass` to use with `jax.tree_flatten`"""
+    """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
     static, dynamic = dict(getattr(tree, _VARS)), dict()
     for key in getattr(tree, _FIELD_MAP):
         dynamic[key] = static.pop(key)
@@ -57,7 +56,7 @@ def _tree_flatten(
 def _tree_trace(
     tree: PyTree,
 ) -> list[tuple[Any, Any, tuple[int, int], Any]]:
-    """Trace flatten rule to be used with the `tree_trace` module"""
+    """Trace flatten rule to be used with the `tree_trace` module."""
     leaves, (keys, _) = _tree_flatten(tree)
     names = (f"{key}" for key in keys)
     types = map(type, leaves)
@@ -67,7 +66,7 @@ def _tree_trace(
     return [*zip(names, types, indices, metadatas)]
 
 
-@ft.lru_cache(maxsize=None)
+@ft.lru_cache(maxsize=1)
 def _register_treeclass(klass):
     # register a treeclass only once by using `lru_cache`
     # there are two cases where a class is registered more than once:
@@ -188,12 +187,12 @@ def _treeclass_transform(klass: type) -> type:
 
 
 def _tree_copy(tree: PyTree) -> PyTree:
-    """Return a copy of the tree"""
+    """Return a copy of the tree."""
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore
 
 
 def is_tree_equal(*trees: Any) -> bool:
-    """Return `True` if all pytrees are equal
+    """Return `True` if all pytrees are equal.
 
     Note:
         trees are compared using their leaves and treedefs.
@@ -206,11 +205,11 @@ def is_tree_equal(*trees: Any) -> bool:
     for tree in rest:
         leaves, treedef = jtu.tree_flatten(tree)
         if len(leaves) != len(leaves0):
-            # not matching number of leaves
+            # non matching number of leaves
             return False
 
-        if not (treedef == treedef0):
-            # not matching treedefs
+        if treedef != treedef0:
+            # non matching treedefs
             return False
 
         for lhs, rhs in zip(leaves0, leaves):
@@ -233,14 +232,14 @@ def is_tree_equal(*trees: Any) -> bool:
     return True
 
 
-def _unary_leafwise(func):
+def _unary_op(func):
     def wrapper(self):
         return jtu.tree_map(func, self)
 
     return ft.wraps(func)(wrapper)
 
 
-def _binary_leafwise(func):
+def _binary_op(func):
     def wrapper(lhs, rhs=None):
         if isinstance(rhs, type(lhs)):
             return jtu.tree_map(func, lhs, rhs)
@@ -276,48 +275,48 @@ def _auxiliary_transform(klass: type, *, leafwise: bool) -> type:
     attrs["at"] = property(tree_indexer)  # type: ignore
 
     if leafwise:
-        attrs["__abs__"] = _unary_leafwise(op.abs)
-        attrs["__add__"] = _binary_leafwise(op.add)
-        attrs["__and__"] = _binary_leafwise(op.and_)
-        attrs["__ceil__"] = _unary_leafwise(ceil)
-        attrs["__divmod__"] = _binary_leafwise(divmod)
-        attrs["__eq__"] = _binary_leafwise(op.eq)
-        attrs["__floor__"] = _unary_leafwise(floor)
-        attrs["__floordiv__"] = _binary_leafwise(op.floordiv)
-        attrs["__ge__"] = _binary_leafwise(op.ge)
-        attrs["__gt__"] = _binary_leafwise(op.gt)
-        attrs["__invert__"] = _unary_leafwise(op.invert)
-        attrs["__le__"] = _binary_leafwise(op.le)
-        attrs["__lshift__"] = _binary_leafwise(op.lshift)
-        attrs["__lt__"] = _binary_leafwise(op.lt)
-        attrs["__matmul__"] = _binary_leafwise(op.matmul)
-        attrs["__mod__"] = _binary_leafwise(op.mod)
-        attrs["__mul__"] = _binary_leafwise(op.mul)
-        attrs["__ne__"] = _binary_leafwise(op.ne)
-        attrs["__neg__"] = _unary_leafwise(op.neg)
-        attrs["__or__"] = _binary_leafwise(op.or_)
-        attrs["__pos__"] = _unary_leafwise(op.pos)
-        attrs["__pow__"] = _binary_leafwise(op.pow)
-        attrs["__radd__"] = _binary_leafwise(_swop(op.add))
-        attrs["__rand__"] = _binary_leafwise(_swop(op.and_))
-        attrs["__rdivmod__"] = _binary_leafwise(_swop(divmod))
-        attrs["__rfloordiv__"] = _binary_leafwise(_swop(op.floordiv))
-        attrs["__rlshift__"] = _binary_leafwise(_swop(op.lshift))
-        attrs["__rmatmul__"] = _binary_leafwise(_swop(op.matmul))
-        attrs["__rmod__"] = _binary_leafwise(_swop(op.mod))
-        attrs["__rmul__"] = _binary_leafwise(_swop(op.mul))
-        attrs["__ror__"] = _binary_leafwise(_swop(op.or_))
-        attrs["__round__"] = _binary_leafwise(round)
-        attrs["__rpow__"] = _binary_leafwise(_swop(op.pow))
-        attrs["__rrshift__"] = _binary_leafwise(_swop(op.rshift))
-        attrs["__rshift__"] = _binary_leafwise(op.rshift)
-        attrs["__rsub__"] = _binary_leafwise(_swop(op.sub))
-        attrs["__rtruediv__"] = _binary_leafwise(_swop(op.truediv))
-        attrs["__rxor__"] = _binary_leafwise(_swop(op.xor))
-        attrs["__sub__"] = _binary_leafwise(op.sub)
-        attrs["__truediv__"] = _binary_leafwise(op.truediv)
-        attrs["__trunc__"] = _unary_leafwise(trunc)
-        attrs["__xor__"] = _binary_leafwise(op.xor)
+        attrs["__abs__"] = _unary_op(op.abs)
+        attrs["__add__"] = _binary_op(op.add)
+        attrs["__and__"] = _binary_op(op.and_)
+        attrs["__ceil__"] = _unary_op(ceil)
+        attrs["__divmod__"] = _binary_op(divmod)
+        attrs["__eq__"] = _binary_op(op.eq)
+        attrs["__floor__"] = _unary_op(floor)
+        attrs["__floordiv__"] = _binary_op(op.floordiv)
+        attrs["__ge__"] = _binary_op(op.ge)
+        attrs["__gt__"] = _binary_op(op.gt)
+        attrs["__invert__"] = _unary_op(op.invert)
+        attrs["__le__"] = _binary_op(op.le)
+        attrs["__lshift__"] = _binary_op(op.lshift)
+        attrs["__lt__"] = _binary_op(op.lt)
+        attrs["__matmul__"] = _binary_op(op.matmul)
+        attrs["__mod__"] = _binary_op(op.mod)
+        attrs["__mul__"] = _binary_op(op.mul)
+        attrs["__ne__"] = _binary_op(op.ne)
+        attrs["__neg__"] = _unary_op(op.neg)
+        attrs["__or__"] = _binary_op(op.or_)
+        attrs["__pos__"] = _unary_op(op.pos)
+        attrs["__pow__"] = _binary_op(op.pow)
+        attrs["__radd__"] = _binary_op(_swop(op.add))
+        attrs["__rand__"] = _binary_op(_swop(op.and_))
+        attrs["__rdivmod__"] = _binary_op(_swop(divmod))
+        attrs["__rfloordiv__"] = _binary_op(_swop(op.floordiv))
+        attrs["__rlshift__"] = _binary_op(_swop(op.lshift))
+        attrs["__rmatmul__"] = _binary_op(_swop(op.matmul))
+        attrs["__rmod__"] = _binary_op(_swop(op.mod))
+        attrs["__rmul__"] = _binary_op(_swop(op.mul))
+        attrs["__ror__"] = _binary_op(_swop(op.or_))
+        attrs["__round__"] = _binary_op(round)
+        attrs["__rpow__"] = _binary_op(_swop(op.pow))
+        attrs["__rrshift__"] = _binary_op(_swop(op.rshift))
+        attrs["__rshift__"] = _binary_op(op.rshift)
+        attrs["__rsub__"] = _binary_op(_swop(op.sub))
+        attrs["__rtruediv__"] = _binary_op(_swop(op.truediv))
+        attrs["__rxor__"] = _binary_op(_swop(op.xor))
+        attrs["__sub__"] = _binary_op(op.sub)
+        attrs["__truediv__"] = _binary_op(op.truediv)
+        attrs["__trunc__"] = _unary_op(trunc)
+        attrs["__xor__"] = _binary_op(op.xor)
 
     for key in attrs:
         if key not in getattr(klass, _VARS):
@@ -396,12 +395,13 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
 
     # add the immutable setters and deleters
     # and generate the `__init__` method if not present
-    # generate fields from type annotations
+    # using type hints.
     klass = _treeclass_transform(klass)
 
-    # add the optional methods to the class
-    # optional methods are math operations, indexing and masking,
-    # hashing and copying, and pretty printing
+    # add `repr`,'str', 'at', 'copy', 'hash', 'copy'
+    # add math operations in case `leafwise=True`
+    # if user defined methods are not present, otherwise
+    # donot override them
     klass = _auxiliary_transform(klass, leafwise=leafwise)
 
     # add the class to the `JAX` registry if not registered

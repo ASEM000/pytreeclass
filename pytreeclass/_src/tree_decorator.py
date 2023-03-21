@@ -18,7 +18,7 @@ _ANNOTATIONS = "__annotations__"
 
 PyTree = Any
 
-"""Scritp to define custom fozen `dataclasses.dataclass`-like"""
+"""Define custom fozen `dataclasses.dataclass`-like decorator"""
 # similar to dataclass decorator for init code generation
 # the motivation for writing this is to avoid the need to use dataclasses
 # especially after this update https://github.com/google/jax/issues/14295
@@ -310,8 +310,8 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
 
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
-    # Set the attribute of the tree if the tree is not frozen
     if getattr(tree, _FROZEN):
+        # Set the attribute of the tree if the tree is not frozen
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise AttributeError(msg)
 

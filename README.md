@@ -101,7 +101,7 @@ Tree
 
 ### 🎨 Visualize<a id="Viz">
 
-<details> <summary>Visualize PyTrees in five different ways</summary>
+<details> <summary> Visualize PyTrees in five different ways</summary>
 
 <div align="center">
 <table>
@@ -914,6 +914,37 @@ Tree(a=(0, 0), b=((0, 1, 0), (0, 1, 1)), c=(0, 2))
 ```
 
 In essence, each leaf contains information about the name path, type path, and indices path. The rules for custom types can be registered using `pytc.register_pytree_node_trace`
+
+</details>
+
+<details>
+
+<summary> Comparison with dataclass </summary>
+
+<div align="center">
+<table>
+
+<tr><td></td>  <td>PyTreeClass</td>  <td>dataclass</td></tr>
+
+<tr><td align="center">Generated init method</td> <td align="center">✅</td>  <td align="center">✅</td></tr>
+<tr><td align="center">Generated repr method</td> <td align="center">✅</td>  <td align="center">✅</td></tr>
+<tr><td align="center">Generated str method</td> <td align="center">✅</td>  <td align="center"></td></tr>
+<tr><td align="center">Generated hash method</td> <td align="center">✅</td>  <td align="center">✅</td></tr>
+<tr><td align="center">Generated eq method</td> <td align="center">✅✅*</td>  <td align="center">✅</td></tr>
+<tr><td align="center">Support slots</td> <td align="center"></td>  <td align="center">✅</td></tr>
+<tr><td align="center">Keyword-only args</td> <td align="center">✅</td>  <td align="center">✅ 3.10+</td></tr>
+<tr><td align="center">Positional-only args</td> <td align="center">✅</td>  <td align="center"></td></tr>
+<tr><td align="center">Frozen instance</td> <td align="center">✅**</td>  <td align="center">✅</td></tr>
+<tr><td align="center">Match args support</td> <td align="center">✅</td>  <td align="center">✅</td></tr>
+<tr><td align="center">Support callbacks</td> <td align="center">✅</td>  <td align="center"></td></tr>
+</table>
+
+</div>
+
+`*` Either compare the whole instance and return `True/False` or treating it leafwise using `treeclass(..., leafwise=True)` and retrurn `Tree(a=True, ....)`
+`**` Always frozen. non-frozen is not supported.
+
+`***` `treeclass` decorator code generation is also a bit faster than `dataclasses.dataclass` check [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/pytc_dc_benchmark.ipynb)
 
 </details>
 
