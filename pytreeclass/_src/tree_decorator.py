@@ -177,7 +177,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
                 # which are immutable but do not have a `__hash__` method
                 msg = f"mutable value= {(value)} is not allowed as a value"
                 msg += f" for field `{name}` in class `{klass.__name__}`.\n"
-                msg += f" use `field(default_factory=lambda:{value})` instead"
+                msg += f" use `field(... ,default_factory=lambda:{value})` instead"
                 raise TypeError(msg)
 
             # example case: `x: int = 1`

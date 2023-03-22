@@ -540,21 +540,21 @@ def test_optional_param():
 
 
 def benchmark_dataclass_class():
-    @dc.dataclass
-    class Test:
-        a: int = 1
-        b: Tuple[int, ...] = (1, 2, 3)
-
-    return Test()
+    count = 10
+    annot = {f"leaf_{i}": int for i in range(count)}
+    leaves = {f"leaf_{i}": i for i in range(count)}
+    Tree = type("Tree", (), {"__annotations__": annot, **leaves})
+    Tree = dc.dataclass(Tree)
+    return Tree()
 
 
 def benchmark_treeclass_instance():
-    @pytc.treeclass
-    class Test:
-        a: int = 1
-        b: Tuple[int, ...] = (1, 2, 3)
-
-    return Test(1, (1, 2, 3))
+    count = 10
+    annot = {f"leaf_{i}": int for i in range(count)}
+    leaves = {f"leaf_{i}": i for i in range(count)}
+    Tree = type("Tree", (), {"__annotations__": annot, **leaves})
+    Tree = pytc.treeclass(Tree)
+    return Tree()
 
 
 @pytest.mark.benchmark(group="treeclass")

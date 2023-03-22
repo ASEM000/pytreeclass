@@ -5,11 +5,12 @@ import operator as op
 from math import ceil, floor, trunc
 from typing import Any, Callable, TypeVar
 
+import jax
+import jax.numpy as jnp
 import jax.tree_util as jtu
-import numpy as np
 from typing_extensions import dataclass_transform
 
-from pytreeclass._src.tree_decorator import (  # _new_wrapper,
+from pytreeclass._src.tree_decorator import (
     _FIELD_MAP,
     _FROZEN,
     _VARS,
@@ -31,7 +32,7 @@ T = TypeVar("T")
 
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     """Unflatten rule for `treeclass` to use with `jax.tree_unflatten`."""
-    tree = object.__new__(klass)
+    tree = getattr(object, "__new__")(klass)
     # update through vars, to avoid calling the `setattr` method
     # that will check for callbacks.
     # calling `setattr` will trigger any defined callbacks by the user
@@ -157,42 +158,8 @@ def _validate_class(klass: type) -> type:
     return klass
 
 
-def _treeclass_transform(klass: type) -> type:
-    # add custom `dataclass`-like fields map
-    setattr(klass, _FIELD_MAP, _generate_field_map(klass))
-    # flag for the immutable behavior used throughout the code
-    setattr(klass, _FROZEN, True)
-
-    if "__init__" not in getattr(klass, _VARS):
-        # generate the init method in case it is not defined by the user
-        setattr(klass, "__init__", _generate_init(klass))
-
-    for name, wrapper in zip(
-        ("__init__", "__init_subclass__", "__getattribute__"),
-        (_init_wrapper, _init_sub_wrapper, _getattr_wrapper),
-    ):
-        # wrap the original methods to enable the field initialization,
-        # callback functionality and immutable behavior
-        setattr(klass, name, wrapper(getattr(klass, name)))
-
-    # immutable attributes similar to `dataclasses`
-    setattr(klass, "__setattr__", _setattr)
-    setattr(klass, "__delattr__", _delattr)
-
-    # used with `match` functionality in python 3.10
-    keys = tuple(key for key in getattr(klass, _FIELD_MAP))
-    setattr(klass, "__match_args__", keys)
-
-    return klass
-
-
-def _tree_copy(tree: PyTree) -> PyTree:
-    """Return a copy of the tree."""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore
-
-
-def is_tree_equal(*trees: Any) -> bool:
-    """Return `True` if all pytrees are equal.
+def is_tree_equal(*trees: Any) -> bool | jax.Array:
+    """Return `True` or Array(True) if all pytrees are equal.
 
     Note:
         trees are compared using their leaves and treedefs.
@@ -204,10 +171,6 @@ def is_tree_equal(*trees: Any) -> bool:
 
     for tree in rest:
         leaves, treedef = jtu.tree_flatten(tree)
-        if len(leaves) != len(leaves0):
-            # non matching number of leaves
-            return False
-
         if treedef != treedef0:
             # non matching treedefs
             return False
@@ -217,7 +180,7 @@ def is_tree_equal(*trees: Any) -> bool:
                 # lhs leaf is an array
                 if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
                     # rhs leaf is an array
-                    if not np.array_equal(lhs, rhs):
+                    if jnp.array_equal(lhs, rhs) == False:
                         # lhs array leaf is not equal to rhs array leaf
                         return False
                 else:
@@ -230,6 +193,55 @@ def is_tree_equal(*trees: Any) -> bool:
                     # non-array rhs leaf
                     return False
     return True
+
+
+def _treeclass_transform(klass: type[T]) -> type[T]:
+    # add custom `dataclass`-like fields map
+    setattr(klass, _FIELD_MAP, _generate_field_map(klass))
+    # flag for the immutable behavior used throughout the code
+    setattr(klass, _FROZEN, True)
+
+    if "__init__" not in getattr(klass, _VARS):
+        # generate the init method in case it is not defined by the user
+        setattr(klass, "__init__", _generate_init(klass))
+
+    for key, wrapper in (
+        ("__init__", _init_wrapper),
+        ("__init_subclass__", _init_sub_wrapper),
+        ("__getattribute__", _getattr_wrapper),
+    ):
+        # wrappers to enable the field initialization,
+        # callback functionality and transparent wrapper behavior
+        setattr(klass, key, wrapper(getattr(klass, key)))
+
+    # basic required methods
+    for key, method in (
+        ("__setattr__", _setattr),
+        ("__delattr__", _delattr),
+        ("__match_args__", tuple(getattr(klass, _FIELD_MAP).keys())),
+    ):
+        setattr(klass, key, method)
+
+    # basic optional methods
+    for key, method in (
+        ("__repr__", tree_repr),
+        ("__str__", tree_str),
+        ("__copy__", _tree_copy),
+        ("__hash__", _tree_hash),
+        ("__eq__", is_tree_equal),
+        ("at", property(tree_indexer)),
+    ):
+        if key not in getattr(klass, _VARS):
+            # keep the original method if it is defined by the user
+            # this behavior similar is to `dataclasses.dataclass`
+            setattr(klass, key, method)
+
+    return klass
+
+
+def _tree_copy(tree: PyTree) -> PyTree:
+    """Return a copy of the tree."""
+    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore
 
 
 def _unary_op(func):
@@ -253,76 +265,58 @@ def _swop(func):
     return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
 
 
-def _auxiliary_transform(klass: type, *, leafwise: bool) -> type:
-    # optional methods defines pretty printing, hashing,
-    # copying, indexing and math operations
-    # keep the original methods if they are defined by the user
-    attrs = dict()
-
-    # pretty printing
-    attrs["__repr__"] = tree_repr
-    attrs["__str__"] = tree_str
-
-    # hashing and copying
-    attrs["__copy__"] = _tree_copy  # type: ignore
-    attrs["__hash__"] = _tree_hash  # type: ignore
-
-    # default equality behavior if `leafwise`=False
-    attrs["__eq__"] = is_tree_equal  # type: ignore
-
-    # indexing defines `at` functionality to
-    # index a PyTree by integer, name, or by a boolean mask
-    attrs["at"] = property(tree_indexer)  # type: ignore
-
-    if leafwise:
-        attrs["__abs__"] = _unary_op(op.abs)
-        attrs["__add__"] = _binary_op(op.add)
-        attrs["__and__"] = _binary_op(op.and_)
-        attrs["__ceil__"] = _unary_op(ceil)
-        attrs["__divmod__"] = _binary_op(divmod)
-        attrs["__eq__"] = _binary_op(op.eq)
-        attrs["__floor__"] = _unary_op(floor)
-        attrs["__floordiv__"] = _binary_op(op.floordiv)
-        attrs["__ge__"] = _binary_op(op.ge)
-        attrs["__gt__"] = _binary_op(op.gt)
-        attrs["__invert__"] = _unary_op(op.invert)
-        attrs["__le__"] = _binary_op(op.le)
-        attrs["__lshift__"] = _binary_op(op.lshift)
-        attrs["__lt__"] = _binary_op(op.lt)
-        attrs["__matmul__"] = _binary_op(op.matmul)
-        attrs["__mod__"] = _binary_op(op.mod)
-        attrs["__mul__"] = _binary_op(op.mul)
-        attrs["__ne__"] = _binary_op(op.ne)
-        attrs["__neg__"] = _unary_op(op.neg)
-        attrs["__or__"] = _binary_op(op.or_)
-        attrs["__pos__"] = _unary_op(op.pos)
-        attrs["__pow__"] = _binary_op(op.pow)
-        attrs["__radd__"] = _binary_op(_swop(op.add))
-        attrs["__rand__"] = _binary_op(_swop(op.and_))
-        attrs["__rdivmod__"] = _binary_op(_swop(divmod))
-        attrs["__rfloordiv__"] = _binary_op(_swop(op.floordiv))
-        attrs["__rlshift__"] = _binary_op(_swop(op.lshift))
-        attrs["__rmatmul__"] = _binary_op(_swop(op.matmul))
-        attrs["__rmod__"] = _binary_op(_swop(op.mod))
-        attrs["__rmul__"] = _binary_op(_swop(op.mul))
-        attrs["__ror__"] = _binary_op(_swop(op.or_))
-        attrs["__round__"] = _binary_op(round)
-        attrs["__rpow__"] = _binary_op(_swop(op.pow))
-        attrs["__rrshift__"] = _binary_op(_swop(op.rshift))
-        attrs["__rshift__"] = _binary_op(op.rshift)
-        attrs["__rsub__"] = _binary_op(_swop(op.sub))
-        attrs["__rtruediv__"] = _binary_op(_swop(op.truediv))
-        attrs["__rxor__"] = _binary_op(_swop(op.xor))
-        attrs["__sub__"] = _binary_op(op.sub)
-        attrs["__truediv__"] = _binary_op(op.truediv)
-        attrs["__trunc__"] = _unary_op(trunc)
-        attrs["__xor__"] = _binary_op(op.xor)
-
-    for key in attrs:
+def _leafwise_transform(klass: type[T]) -> type[T]:
+    # add leafwise transform methods to the class
+    # that enable the user to apply a function to
+    # all the leaves of the tree
+    for key, method in (
+        ("__abs__", _unary_op(abs)),
+        ("__add__", _binary_op(op.add)),
+        ("__and__", _binary_op(op.and_)),
+        ("__ceil__", _unary_op(ceil)),
+        ("__divmod__", _binary_op(divmod)),
+        ("__eq__", _binary_op(op.eq)),
+        ("__floor__", _unary_op(floor)),
+        ("__floordiv__", _binary_op(op.floordiv)),
+        ("__ge__", _binary_op(op.ge)),
+        ("__gt__", _binary_op(op.gt)),
+        ("__invert__", _unary_op(op.invert)),
+        ("__le__", _binary_op(op.le)),
+        ("__lshift__", _binary_op(op.lshift)),
+        ("__lt__", _binary_op(op.lt)),
+        ("__matmul__", _binary_op(op.matmul)),
+        ("__mod__", _binary_op(op.mod)),
+        ("__mul__", _binary_op(op.mul)),
+        ("__ne__", _binary_op(op.ne)),
+        ("__neg__", _unary_op(op.neg)),
+        ("__or__", _binary_op(op.or_)),
+        ("__pos__", _unary_op(op.pos)),
+        ("__pow__", _binary_op(op.pow)),
+        ("__radd__", _binary_op(_swop(op.add))),
+        ("__rand__", _binary_op(_swop(op.and_))),
+        ("__rdivmod__", _binary_op(_swop(divmod))),
+        ("__rfloordiv__", _binary_op(_swop(op.floordiv))),
+        ("__rlshift__", _binary_op(_swop(op.lshift))),
+        ("__rmatmul__", _binary_op(_swop(op.matmul))),
+        ("__rmod__", _binary_op(_swop(op.mod))),
+        ("__rmul__", _binary_op(_swop(op.mul))),
+        ("__ror__", _binary_op(_swop(op.or_))),
+        ("__round__", _binary_op(round)),
+        ("__rpow__", _binary_op(_swop(op.pow))),
+        ("__rrshift__", _binary_op(_swop(op.rshift))),
+        ("__rshift__", _binary_op(op.rshift)),
+        ("__rsub__", _binary_op(_swop(op.sub))),
+        ("__rtruediv__", _binary_op(_swop(op.truediv))),
+        ("__rxor__", _binary_op(_swop(op.xor))),
+        ("__sub__", _binary_op(op.sub)),
+        ("__truediv__", _binary_op(op.truediv)),
+        ("__trunc__", _unary_op(trunc)),
+        ("__xor__", _binary_op(op.xor)),
+    ):
         if key not in getattr(klass, _VARS):
             # do not override any user defined methods
             # this behavior similar is to `dataclasses.dataclass`
-            setattr(klass, key, attrs[key])
+            setattr(klass, key, method)
     return klass
 
 
@@ -393,16 +387,14 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     # in essence, it should be a type with immutable setters and deleters
     klass = _validate_class(klass)
 
-    # add the immutable setters and deleters
-    # and generate the `__init__` method if not present
-    # using type hints.
-    klass = _treeclass_transform(klass)
+    # add math operations methods if leafwise
+    # do not override any user defined methods
+    klass = _leafwise_transform(klass) if leafwise else klass
 
     # add `repr`,'str', 'at', 'copy', 'hash', 'copy'
-    # add math operations in case `leafwise=True`
-    # if user defined methods are not present, otherwise
-    # donot override them
-    klass = _auxiliary_transform(klass, leafwise=leafwise)
+    # add the immutable setters and deleters
+    # generate the `__init__` method if not present using type hints.
+    klass = _treeclass_transform(klass)
 
     # add the class to the `JAX` registry if not registered
     return _register_treeclass(klass)

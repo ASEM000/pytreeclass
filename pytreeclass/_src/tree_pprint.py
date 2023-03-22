@@ -12,7 +12,7 @@ from typing import Any, Callable, Literal, Sequence
 import jax
 import numpy as np
 from jax._src.custom_derivatives import custom_jvp
-from jaxlib.xla_extension import CompiledFunction, PjitFunction
+from jaxlib.xla_extension import PjitFunction
 
 import pytreeclass as pytc
 from pytreeclass._src.tree_decorator import _dataclass_like_fields, _is_dataclass_like
@@ -32,7 +32,7 @@ def _node_pprint(
         return f"Partial({_func_pprint(node.func, indent,kind,width,depth)})"
     if isinstance(node, (FunctionType, custom_jvp)):
         return _func_pprint(node, indent, kind, width, depth)
-    if isinstance(node, (PjitFunction, CompiledFunction)):
+    if isinstance(node, PjitFunction):
         return f"jit({_func_pprint(node, indent, kind, width,depth)})"
     if isinstance(node, (np.ndarray, jax.Array)):
         return _numpy_pprint(node, indent, kind, width, depth)

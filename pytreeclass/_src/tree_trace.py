@@ -187,16 +187,16 @@ def tree_leaves_with_trace(
         >>> # print(pytc.tree_repr(traces))
         >>> # (
         >>> #   (
-        >>> #     ('list', '[0]'),                                                      # -> name path of leaf = 1
-        >>> #     (<class 'list'>, <class 'int'>),                                      # -> type path of leaf = 1
-        >>> #     (0, 0),                                                               # -> index path of leaf = 1
-        >>> #     ({id:4951960512}, {id:4380344560})                                    # -> metadata path of leaf = 1
+        >>> #     ('list', '[0]'),                      # -> name path of leaf = 1
+        >>> #     (<class 'list'>, <class 'int'>),      # -> type path of leaf = 1
+        >>> #     (0, 0),                               # -> index path of leaf = 1
+        >>> #     ({id:4951960512}, {id:4380344560})    # -> metadata path of leaf = 1
         >>> #   ),
         >>> #   (
-        >>> #     ('list', '[1]', '[0]'),                                               # -> name path of leaf = 2
-        >>> #     (<class 'list'>, <class 'list'>, <class 'int'>),                      # -> type path of leaf = 2
-        >>> #     (0, 1, 0),                                                            # -> index path of leaf = 2
-        >>> #     ({id:4951960512}, {id:4951876032}, {id:4380344592})                   # -> metadata path of leaf = 2
+        >>> #     ('list', '[1]', '[0]'),                               # -> name path of leaf = 2
+        >>> #     (<class 'list'>, <class 'list'>, <class 'int'>),      # -> type path of leaf = 2
+        >>> #     (0, 1, 0),                                            # -> index path of leaf = 2
+        >>> #     ({id:4951960512}, {id:4951876032}, {id:4380344592})   # -> metadata path of leaf = 2
         >>> #   ),
         >>> #   (
         >>> #     ('list', '[1]', '[1]', '[0]'),                                        # -> name path of leaf = 3
@@ -299,7 +299,7 @@ def tree_map_with_trace(
         >>> import jax
         >>> import pytreeclass as pytc
         >>> tree = {"a": [1, 2], "b": 4, "c": [5, 6]}
-
+        >>> # the tree above is visualized as:
         >>> # value tree:
         >>> #        tree
         >>> #          |

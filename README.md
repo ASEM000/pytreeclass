@@ -942,9 +942,10 @@ In essence, each leaf contains information about the name path, type path, and i
 </div>
 
 `*` Either compare the whole instance and return `True/False` or treating it leafwise using `treeclass(..., leafwise=True)` and retrurn `Tree(a=True, ....)`
+
 `**` Always frozen. non-frozen is not supported.
 
-`***` `treeclass` decorator code generation is also a bit faster than `dataclasses.dataclass` check [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/pytc_dc_benchmark.ipynb)
+`***` `treeclass` decorator is also a bit faster than `dataclasses.dataclass` [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/pytc_dc_benchmark.ipynb)
 
 </details>
 
