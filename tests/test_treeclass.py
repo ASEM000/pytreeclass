@@ -495,6 +495,12 @@ def test_dataclass_fields_like():
     with pytest.raises(TypeError):
         fields(1)
 
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+
+    assert len(_dataclass_like_fields(Test)) == 1
+
 
 def test_super():
     @ft.partial(pytc.treeclass, leafwise=True)
