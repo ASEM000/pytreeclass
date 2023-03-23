@@ -10,11 +10,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_decorator import (
-    _dataclass_like_fields,
-    _field_map_registry,
-    fields,
-)
+from pytreeclass._src.tree_decorator import _field_registry
 
 
 def test_field():
@@ -30,7 +26,7 @@ def test_field():
     class Test:
         a: int = pytc.field(default=1, metadata={"a": 1})
 
-    assert _field_map_registry[Test]["a"].metadata["a"] == 1
+    assert _field_registry[Test]["a"].metadata["a"] == 1
 
     @ft.partial(pytc.treeclass, leafwise=True)
     class Test:
@@ -480,26 +476,6 @@ def test_key_error():
 
     with pytest.raises(AttributeError):
         Test()
-
-
-def test_dataclass_fields_like():
-    @dc.dataclass
-    class Test:
-        a: int = 1
-
-    assert _dataclass_like_fields(Test) == dc.fields(Test)
-
-    with pytest.raises(TypeError):
-        _dataclass_like_fields(1)
-
-    with pytest.raises(TypeError):
-        fields(1)
-
-    @pytc.treeclass
-    class Test:
-        a: int = 1
-
-    assert len(_dataclass_like_fields(Test)) == 1
 
 
 def test_super():

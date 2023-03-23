@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import dataclasses as dc
 import functools as ft
 import inspect
 import math
@@ -15,9 +16,6 @@ from jax._src.custom_derivatives import custom_jvp
 from jaxlib.xla_extension import PjitFunction
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_decorator import _dataclass_like_fields, _is_dataclass_like
-from pytreeclass._src.tree_freeze import is_frozen, unfreeze
-from pytreeclass._src.tree_trace import tree_leaves_with_trace
 
 PyTree = Any
 PrintKind = Literal["repr", "str"]
@@ -48,9 +46,11 @@ def _node_pprint(
         return _set_pprint(node, indent, kind, width, depth)
     if isinstance(node, dict):
         return _dict_pprint(node, indent, kind, width, depth)
-    if _is_dataclass_like(node):
-        return _dataclass_like_pprint(node, indent, kind, width, depth)
-    if is_frozen(node):
+    if dc.is_dataclass(node):
+        return _dataclass_pprint(node, indent, kind, width, depth)
+    if pytc.is_treeclass(node):
+        return _treeclass_pprint(node, indent, kind, width, depth)
+    if pytc.is_frozen(node):
         return f"#{_node_pprint(node.unwrap(), indent, kind, width,depth)}"
     return _general_pprint(node, indent, kind, width, depth)
 
@@ -185,14 +185,26 @@ def _namedtuple_pprint(
     return _format_width(fmt, width)
 
 
-def _dataclass_like_pprint(
+def _dataclass_pprint(
     node: Any, indent: int, kind: PrintKind, width: int, depth: int
 ) -> str:
     name = type(node).__name__
-    fields = _dataclass_like_fields(node)
-    # we use vars here to avoid unfreezing it in case it is frozen
-    vs = (vars(node)[f.name] for f in fields if f.repr)
-    fs = (f for f in fields if f.repr)
+    fields = dc.fields(node)
+    vs = (vars(node)[F.name] for F in fields if F.repr)
+    fs = (F for F in fields if F.repr)
+    fmt = (f"{f.name}={_node_pprint(v,indent+1,kind,width,depth-1)}"for f, v in zip(fs, vs))  # fmt: skip
+    fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+    fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
+    return _format_width(fmt, width)
+
+
+def _treeclass_pprint(
+    node: Any, indent: int, kind: PrintKind, width: int, depth: int
+) -> str:
+    name = type(node).__name__
+    fields = pytc.fields(node)
+    vs = (vars(node)[F.name] for F in fields if F.repr)
+    fs = (F for F in fields if F.repr)
     fmt = (f"{f.name}={_node_pprint(v,indent+1,kind,width,depth-1)}"for f, v in zip(fs, vs))  # fmt: skip
     fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
@@ -388,9 +400,9 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
                 └── [2]=A(x=10, y=(..., ...), z=40)
     """
     traces, leaves = zip(
-        *tree_leaves_with_trace(
+        *pytc.tree_leaves_with_trace(
             tree=tree,
-            is_leaf=is_frozen,
+            is_leaf=pytc.is_frozen,
             is_trace_leaf=_is_trace_leaf_depth_factory(depth),
         )
     )
@@ -479,9 +491,9 @@ def tree_mermaid(
         return ctypes.c_size_t(hash(input)).value
 
     traces, leaves = zip(
-        *tree_leaves_with_trace(
+        *pytc.tree_leaves_with_trace(
             tree=tree,
-            is_leaf=is_frozen,
+            is_leaf=pytc.is_frozen,
             is_trace_leaf=_is_trace_leaf_depth_factory(depth),
         )
     )
@@ -578,16 +590,16 @@ def _format_count(node_count, newline=False):
 def _calculate_leaf_trace_stats(tree: Any) -> tuple[int | complex, int | complex]:
     # calcuate some stats of a single subtree defined
     counts = sizes = 0
-    _, leaves = zip(*tree_leaves_with_trace(tree, is_leaf=is_frozen))
+    _, leaves = zip(*pytc.tree_leaves_with_trace(tree, is_leaf=pytc.is_frozen))
 
     for leaf in leaves:
         # unfrozen leaf
-        leaf_ = unfreeze(leaf)
+        leaf_ = pytc.unfreeze(leaf)
         # array count is the product of the shape. if the node is not an array, then the count is 1
         count = int(np.array(leaf_.shape).prod()) if hasattr(leaf_, "shape") else 1
         size = leaf_.nbytes if hasattr(leaf_, "nbytes") else sys.getsizeof(leaf_)
 
-        if is_frozen(tree) or is_frozen(leaf):
+        if pytc.is_frozen(tree) or pytc.is_frozen(leaf):
             count = complex(0, count)
             size = complex(0, size)
 
@@ -791,9 +803,9 @@ def tree_summary(
     ROWS = [["Name", "Type", "Count", "Size"]]
 
     traces, leaves = zip(
-        *tree_leaves_with_trace(
+        *pytc.tree_leaves_with_trace(
             tree,
-            is_leaf=is_frozen,
+            is_leaf=pytc.is_frozen,
             is_trace_leaf=_is_trace_leaf_depth_factory(depth),
         )
     )
@@ -827,10 +839,10 @@ def tree_summary(
     COUNT = [complex(0), complex(0)]  # non-frozen, frozen
     SIZE = [complex(0), complex(0)]
 
-    for trace, leaf in tree_leaves_with_trace(tree, is_leaf=is_frozen):
+    for trace, leaf in pytc.tree_leaves_with_trace(tree, is_leaf=pytc.is_frozen):
         count, size = _calculate_leaf_trace_stats(leaf)
-        COUNT[is_frozen(leaf)] += count
-        SIZE[is_frozen(leaf)] += size
+        COUNT[pytc.is_frozen(leaf)] += count
+        SIZE[pytc.is_frozen(leaf)] += size
 
     unfrozen_count = COUNT[0].real + COUNT[0].imag
     frozen_count = COUNT[1].real + COUNT[1].imag

@@ -20,7 +20,7 @@ T = TypeVar("T")
 
 PyTree = Any
 
-_field_map_registry: Mapping[type, Mapping[str, Field]] = WeakKeyDictionary()  # type: ignore
+_field_registry: Mapping[type, Mapping[str, Field]] = WeakKeyDictionary()  # type: ignore
 
 """Define custom fozen `dataclasses.dataclass`-like decorator"""
 # similar to dataclass decorator for init code generation
@@ -32,8 +32,8 @@ _field_map_registry: Mapping[type, Mapping[str, Field]] = WeakKeyDictionary()  #
 def is_treeclass(klass_or_instance: Any) -> bool:
     """Returns `True` if a class or instance is a `treeclass`."""
     if isinstance(klass_or_instance, type):
-        return klass_or_instance in _field_map_registry
-    return type(klass_or_instance) in _field_map_registry
+        return klass_or_instance in _field_registry
+    return type(klass_or_instance) in _field_registry
 
 
 @ft.lru_cache
@@ -140,8 +140,8 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         # are preserved, i.e. the fields of the base class are added first
         # and the fields of the derived class are added last so that
         # in case of name collision, the derived class fields are preserved
-        if base in _field_map_registry:
-            field_map.update(_field_map_registry[base])
+        if base in _field_registry:
+            field_map.update(_field_registry[base])
 
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
@@ -190,7 +190,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
             field_map[name] = Field(name=name, type=type, default=value)
 
     # add the field map to the global registry
-    _field_map_registry[klass] = field_map
+    _field_registry[klass] = field_map
     return field_map
 
 
@@ -246,7 +246,7 @@ def _generate_init_code(fields: Sequence[Field]):
 
 def _generate_init(klass: type) -> FunctionType:
     # generate the field map for the class
-    field_map = _field_map_registry[klass]
+    field_map = _field_registry[klass]
     # generate init method
     local_namespace = dict()  # type: ignore
     global_namespace = getattr(sys.modules[klass.__module__], _VARS)
@@ -271,7 +271,7 @@ def _init_wrapper(init_func: Callable) -> Callable:
     def wrapper(self, *a, **k) -> None:
         getattr(self, _VARS)[_FROZEN] = False
 
-        for field in _field_map_registry[type(self)].values():
+        for field in _field_registry[type(self)].values():
             if field.default is not _NOT_SET:
                 getattr(self, _VARS)[field.name] = field.default
             elif field.default_factory is not None:
@@ -300,7 +300,7 @@ def _init_wrapper(init_func: Callable) -> Callable:
             output = getattr(type(self), _POST_INIT)(self)
 
         # handle uninitialized fields
-        for field in _field_map_registry[type(self)].values():
+        for field in _field_registry[type(self)].values():
             if field.name not in getattr(self, _VARS):
                 # at this point, all fields should be initialized
                 # in principle, this error will be caught when invoking `repr`/`str`
@@ -323,7 +323,7 @@ def _register_field(klass: type[T], key: str, type: type) -> type[T]:
     # While the whole process can be designed to be an instance variable like `nn.Module`
     # treeclass tries to shield the access to the field map from the user as much as possible
     # to avoid manipulating the field map directly by the user.
-    _field_map_registry[klass][key] = Field(name=key, type=type)
+    _field_registry[klass][key] = Field(name=key, type=type)
     return klass
 
 
@@ -335,9 +335,9 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
 
     # apply the callbacks on setting the value
     # check if the key is a field name
-    if key in _field_map_registry[type(self)]:
+    if key in _field_registry[type(self)]:
         # check if there is a callback associated with the field
-        callbacks = _field_map_registry[type(self)][key].callbacks
+        callbacks = _field_registry[type(self)][key].callbacks
 
         if callbacks is not None:
             for callback in callbacks:
@@ -352,7 +352,7 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
     # set the value
     getattr(self, _VARS)[key] = value
 
-    if klass := type(value) in _field_map_registry:
+    if klass := type(value) in _field_registry:
         # auto registers the value if it is a registered `treeclass`
         # this behavior is similar to PyTorch behavior in `nn.Module`
         # with `Parameter` class
@@ -366,11 +366,6 @@ def _delattr(self, key: str) -> None:
     del getattr(self, _VARS)[key]
 
 
-def _is_dataclass_like(tree: Any) -> bool:
-    # maybe include other dataclass-like objects here? (e.g. attrs)
-    return dc.is_dataclass(tree) or is_treeclass(tree)
-
-
 def fields(klass_or_instance: Any) -> Sequence[Field]:
     """Get the fields of a `treeclass` instance."""
     if not is_treeclass(klass_or_instance):
@@ -378,19 +373,9 @@ def fields(klass_or_instance: Any) -> Sequence[Field]:
 
     if isinstance(klass_or_instance, type):
         # if the tree is a class, then return the fields of the class
-        field_map = _field_map_registry[klass_or_instance]
+        field_map = _field_registry[klass_or_instance]
     else:
         # if the tree is an instance, then return the fields of the instance
-        field_map = _field_map_registry[type(klass_or_instance)]
+        field_map = _field_registry[type(klass_or_instance)]
 
     return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))
-
-
-def _dataclass_like_fields(tree):
-    """Get the fields of a dataclass-like object."""
-    # maybe include other dataclass-like objects here? (e.g. attrs)
-    if not _is_dataclass_like(tree):
-        raise TypeError(f"Cannot get fields from {tree!r}.")
-    if dc.is_dataclass(tree):
-        return dc.fields(tree)
-    return fields(tree)

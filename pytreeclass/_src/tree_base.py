@@ -14,7 +14,7 @@ from pytreeclass._src.tree_decorator import (
     _FROZEN,
     _VARS,
     _delattr,
-    _field_map_registry,
+    _field_registry,
     _generate_field_map,
     _generate_init,
     _init_wrapper,
@@ -49,7 +49,7 @@ def _tree_flatten(
 ) -> tuple[list[Any], tuple[tuple[str], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
     static, dynamic = dict(getattr(tree, _VARS)), dict()
-    for key in _field_map_registry[type(tree)]:
+    for key in _field_registry[type(tree)]:
         dynamic[key] = static.pop(key)
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
@@ -62,7 +62,7 @@ def _tree_trace(
     names = (f"{key}" for key in keys)
     types = map(type, leaves)
     indices = range(len(leaves))
-    fields = (_field_map_registry[type(tree)][key] for key in keys)
+    fields = (_field_registry[type(tree)][key] for key in keys)
     metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields)
     return [*zip(names, types, indices, metadatas)]
 
@@ -81,7 +81,7 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     # the unnecessary overhead of the first call validation.
     _trace_registry[klass] = _TraceRegistryEntry(_tree_trace)
     # generate field map for the class and register it in a weakref registry
-    _field_map_registry[klass] = _generate_field_map(klass)
+    _field_registry[klass] = _generate_field_map(klass)
     return klass
 
 
@@ -219,7 +219,7 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     for key, method in (
         ("__setattr__", _setattr),
         ("__delattr__", _delattr),
-        ("__match_args__", tuple(_field_map_registry[klass].keys())),
+        ("__match_args__", tuple(_field_registry[klass].keys())),
     ):
         setattr(klass, key, method)
 

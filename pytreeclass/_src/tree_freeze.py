@@ -13,9 +13,8 @@ from pytreeclass._src.tree_decorator import (
     _FROZEN,
     _VARS,
     _WRAPPED,
-    _field_map_registry,
+    _field_registry,
     fields,
-    is_treeclass,
 )
 
 PyTree = Any
@@ -94,7 +93,7 @@ class ImmutableWrapper:
 def _tree_unwrap(value: PyTree) -> PyTree:
     # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
     def is_leaf(x: Any) -> bool:
-        return isinstance(x, ImmutableWrapper) or type(x) in _field_map_registry
+        return isinstance(x, ImmutableWrapper) or type(x) in _field_registry
 
     return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
@@ -246,7 +245,7 @@ def is_nondiff(x: Any) -> bool:
 @contextmanager
 def _call_context(tree: PyTree):
     def mutate_step(tree: PyTree):
-        if not is_treeclass(tree):
+        if type(tree) not in _field_registry:
             return tree
         # shadow the class _FROZEN attribute with an
         # instance variable to temporarily disable the frozen behavior
@@ -258,7 +257,7 @@ def _call_context(tree: PyTree):
         return tree
 
     def immutate_step(tree):
-        if not is_treeclass(tree):
+        if type(tree) not in _field_registry:
             return tree
         if _FROZEN not in getattr(tree, _VARS):
             return tree
