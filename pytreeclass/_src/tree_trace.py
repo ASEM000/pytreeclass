@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 from collections import OrderedDict, defaultdict
-from typing import Any, Callable, NamedTuple, Sequence
+from typing import Any, Callable, Mapping, NamedTuple, Sequence
 
 import jax.tree_util as jtu
 from jax._src.tree_util import _registry
@@ -15,7 +15,7 @@ from jax._src.tree_util import _registry
 PyTree = Any
 TraceType = Any
 
-_trace_registry: dict[type, _TraceRegistryEntry] = dict()
+_trace_registry: Mapping[type, _TraceRegistryEntry] = dict()
 
 
 class _TraceRegistryEntry(NamedTuple):
