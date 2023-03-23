@@ -206,13 +206,13 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
         # generate the init method in case it is not defined by the user
         setattr(klass, "__init__", _generate_init(klass))
 
+    # wrappers to enable the field initialization,
+    # callback functionality and transparent wrapper behavior
     for key, wrapper in (
         ("__init__", _init_wrapper),
         ("__init_subclass__", _init_sub_wrapper),
         ("__getattribute__", _getattr_wrapper),
     ):
-        # wrappers to enable the field initialization,
-        # callback functionality and transparent wrapper behavior
         setattr(klass, key, wrapper(getattr(klass, key)))
 
     # basic required methods

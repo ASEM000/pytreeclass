@@ -121,6 +121,51 @@ def register_pytree_node_trace(
     _trace_registry[klass] = _TraceRegistryEntry(_validate_trace_func(trace_func))
 
 
+def _sequence_trace_func(tree: Sequence) -> list[TraceType]:
+    names = (f"[{i}]" for i in range(len(tree)))
+    types = map(type, tree)
+    indices = range(len(tree))
+    metadatas = (dict(id=id(leaf)) for leaf in tree)
+    return [*zip(names, types, indices, metadatas)]
+
+
+def _dict_trace_func(tree: dict) -> list[TraceType]:
+    names = (f"['{k}']" for k in tree)
+    types = (type(tree[key]) for key in tree)
+    indices = range(len(tree))
+    metadatas = (dict(repr=not k.startswith("_"), id=id(tree[k])) for k in tree)
+    return [*zip(names, types, indices, metadatas)]
+
+
+def _namedtuple_trace_func(tree: Any) -> list[TraceType]:
+    names = (f"['{field}']" for field in tree._fields)
+    types = (type(getattr(tree, field)) for field in tree._fields)
+    indices = range(len(tree))
+    metadatas = (dict(id=id(getattr(tree, field))) for field in tree._fields)
+    return [*zip(names, types, indices, metadatas)]
+
+
+def _jaxable_trace_func(tree: Any) -> list[TraceType]:
+    # fallback trace function in case no trace function is registered for a given
+    # class in the `trace` registry
+    # get leaves from the `jax` registry
+    leaves, _ = _registry.get(type(tree)).to_iter(tree)  # type: ignore
+    # TODO: fetch from `jax` key registry once min jax version>=0.4.6
+    names = (f"leaf_{i}" for i in range(len(leaves)))
+    types = map(type, leaves)
+    indices = range(len(leaves))
+    metadatas = (dict(id=id(leaf)) for leaf in leaves)
+    return [*zip(names, types, indices, metadatas)]
+
+
+# register trace functions for common types
+_trace_registry[tuple] = _TraceRegistryEntry(_sequence_trace_func)
+_trace_registry[list] = _TraceRegistryEntry(_sequence_trace_func)
+_trace_registry[dict] = _TraceRegistryEntry(_dict_trace_func)
+_trace_registry[OrderedDict] = _TraceRegistryEntry(_dict_trace_func)
+_trace_registry[defaultdict] = _TraceRegistryEntry(_dict_trace_func)
+
+
 def flatten_one_trace_level(
     tree_trace: TraceType,
     tree: PyTree,
@@ -231,51 +276,6 @@ def tree_flatten_with_trace(
     treedef = jtu.tree_structure(tree, is_leaf=is_leaf)
     traces_leaves = tree_leaves_with_trace(tree, is_leaf=is_leaf)
     return traces_leaves, treedef
-
-
-def _sequence_trace_func(tree: Sequence) -> list[TraceType]:
-    names = (f"[{i}]" for i in range(len(tree)))
-    types = map(type, tree)
-    indices = range(len(tree))
-    metadatas = (dict(id=id(leaf)) for leaf in tree)
-    return [*zip(names, types, indices, metadatas)]
-
-
-def _dict_trace_func(tree: dict) -> list[TraceType]:
-    names = (f"['{k}']" for k in tree)
-    types = (type(tree[key]) for key in tree)
-    indices = range(len(tree))
-    metadatas = (dict(repr=not k.startswith("_"), id=id(tree[k])) for k in tree)
-    return [*zip(names, types, indices, metadatas)]
-
-
-def _namedtuple_trace_func(tree: Any) -> list[TraceType]:
-    names = (f"['{field}']" for field in tree._fields)
-    types = (type(getattr(tree, field)) for field in tree._fields)
-    indices = range(len(tree))
-    metadatas = (dict(id=id(getattr(tree, field))) for field in tree._fields)
-    return [*zip(names, types, indices, metadatas)]
-
-
-def _jaxable_trace_func(tree: Any) -> list[TraceType]:
-    # fallback trace function in case no trace function is registered for a given
-    # class in the `trace` registry
-    # get leaves from the `jax` registry
-    leaves, _ = _registry.get(type(tree)).to_iter(tree)  # type: ignore
-    # TODO: fetch from `jax` key registry once min jax version>=0.4.6
-    names = (f"leaf_{i}" for i in range(len(leaves)))
-    types = map(type, leaves)
-    indices = range(len(leaves))
-    metadatas = (dict(id=id(leaf)) for leaf in leaves)
-    return [*zip(names, types, indices, metadatas)]
-
-
-# register trace functions for common types
-_trace_registry[tuple] = _TraceRegistryEntry(_sequence_trace_func)
-_trace_registry[list] = _TraceRegistryEntry(_sequence_trace_func)
-_trace_registry[dict] = _TraceRegistryEntry(_dict_trace_func)
-_trace_registry[OrderedDict] = _TraceRegistryEntry(_dict_trace_func)
-_trace_registry[defaultdict] = _TraceRegistryEntry(_dict_trace_func)
 
 
 def tree_map_with_trace(

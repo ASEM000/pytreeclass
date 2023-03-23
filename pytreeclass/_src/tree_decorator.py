@@ -20,13 +20,19 @@ T = TypeVar("T")
 
 PyTree = Any
 
-_field_registry: Mapping[type, Mapping[str, Field]] = WeakKeyDictionary()  # type: ignore
-
 """Define custom fozen `dataclasses.dataclass`-like decorator"""
 # similar to dataclass decorator for init code generation
 # the motivation for writing this is to avoid the need to use dataclasses
 # especially after this update https://github.com/google/jax/issues/14295
 # in essence, after this upadte jax arrays are considred mutable by the field logic
+
+
+# A registry to store the fields of the `treeclass` wrapped classes. fields are a similar concept to
+# `dataclasses.Field` but with the addition of `callbacks` attribute
+# While `dataclasses` fields are added as a class attribute to the class under `__dataclass_fields__`
+# in this implementation, the fields are stored in a `WeakKeyDictionary` as an extra precaution
+# to avoid user-side modification of the fields while maintaining a cleaner namespace
+_field_registry: Mapping[type, Mapping[str, Field]] = WeakKeyDictionary()  # type: ignore
 
 
 def is_treeclass(klass_or_instance: Any) -> bool:
