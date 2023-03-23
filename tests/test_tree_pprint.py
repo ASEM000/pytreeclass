@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses as dc
 import functools as ft
 import sys
 from collections import namedtuple
@@ -223,6 +224,12 @@ def test_misc():
         tree_repr(jnp.ones([1, 2], dtype=jnp.uint16))
         == "ui16[1,2](μ=1.00, σ=0.00, ∈[1,1])"
     )
+
+    @dc.dataclass
+    class Test:
+        a: int = 1
+
+    assert pytc.tree_repr(Test()) == pytc.tree_str(Test()) == "Test(a=1)"
 
 
 def test_extra_tree_diagram():

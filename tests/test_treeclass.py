@@ -93,6 +93,11 @@ def test_field():
 
     assert Test(b=2).a == 1
 
+    with pytest.raises(TypeError):
+        pytc.fields(1)
+
+    assert len(pytc.fields(Test)) == 2
+
 
 def test_field_nondiff():
     @ft.partial(pytc.treeclass, leafwise=True)
