@@ -5,7 +5,7 @@ import functools as ft
 import inspect
 import sys
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, Mapping, NamedTuple, Sequence
+from typing import Any, Callable, Mapping, NamedTuple, Sequence, TypeVar
 from weakref import WeakKeyDictionary
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda self: "?"})()
@@ -15,6 +15,8 @@ _MUTABLE_TYPES = (list, dict, set)
 _WRAPPED = "__wrapped__"
 _VARS = "__dict__"
 _ANNOTATIONS = "__annotations__"
+
+T = TypeVar("T")
 
 PyTree = Any
 
@@ -315,14 +317,14 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
 
 @ft.lru_cache(maxsize=1)
-def _register_field(klass: type, key: str, type: type) -> None:
+def _register_field(klass: type[T], key: str, type: type) -> type[T]:
     # append the key and field pair to the `klass` field map
     # this is done once per class/key pair to avoid continuous appending of the same field.
     # While the whole process can be designed to be an instance variable like `nn.Module`
     # treeclass tries to shield the access to the field map from the user as much as possible
     # to avoid manipulating the field map directly by the user.
     _field_map_registry[klass][key] = Field(name=key, type=type)
-    return None
+    return klass
 
 
 def _setattr(self: PyTree, key: str, value: Any) -> None:

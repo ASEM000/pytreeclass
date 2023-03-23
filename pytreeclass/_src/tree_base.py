@@ -68,7 +68,7 @@ def _tree_trace(
 
 
 @ft.lru_cache(maxsize=1)
-def _register_treeclass(klass):
+def _register_treeclass(klass: type[T]) -> type[T]:
     # register a treeclass only once by using `lru_cache`
     # there are two cases where a class is registered more than once:
     # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
