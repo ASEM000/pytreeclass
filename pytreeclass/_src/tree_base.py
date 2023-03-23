@@ -11,10 +11,10 @@ import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_decorator import (
-    _FIELD_MAP,
     _FROZEN,
     _VARS,
     _delattr,
+    _field_map_registry,
     _generate_field_map,
     _generate_init,
     _init_wrapper,
@@ -49,7 +49,7 @@ def _tree_flatten(
 ) -> tuple[list[Any], tuple[tuple[str], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
     static, dynamic = dict(getattr(tree, _VARS)), dict()
-    for key in getattr(tree, _FIELD_MAP):
+    for key in _field_map_registry[type(tree)]:
         dynamic[key] = static.pop(key)
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
@@ -62,13 +62,13 @@ def _tree_trace(
     names = (f"{key}" for key in keys)
     types = map(type, leaves)
     indices = range(len(leaves))
-    fields = (getattr(tree, _FIELD_MAP)[key] for key in keys)
+    fields = (_field_map_registry[type(tree)][key] for key in keys)
     metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields)
     return [*zip(names, types, indices, metadatas)]
 
 
 @ft.lru_cache(maxsize=1)
-def _register_treeclass(klass):
+def _register_treeclass(klass: type[T]) -> type[T]:
     # register a treeclass only once by using `lru_cache`
     # there are two cases where a class is registered more than once:
     # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
@@ -80,6 +80,8 @@ def _register_treeclass(klass):
     # register the trace flatten rule without the validation to avoid
     # the unnecessary overhead of the first call validation.
     _trace_registry[klass] = _TraceRegistryEntry(_tree_trace)
+    # generate field map for the class and register it in a weakref registry
+    _field_map_registry[klass] = _generate_field_map(klass)
     return klass
 
 
@@ -197,7 +199,6 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
 
 def _treeclass_transform(klass: type[T]) -> type[T]:
     # add custom `dataclass`-like fields map
-    setattr(klass, _FIELD_MAP, _generate_field_map(klass))
     # flag for the immutable behavior used throughout the code
     setattr(klass, _FROZEN, True)
 
@@ -218,7 +219,7 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     for key, method in (
         ("__setattr__", _setattr),
         ("__delattr__", _delattr),
-        ("__match_args__", tuple(getattr(klass, _FIELD_MAP).keys())),
+        ("__match_args__", tuple(_field_map_registry[klass].keys())),
     ):
         setattr(klass, key, method)
 
@@ -387,6 +388,9 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     # in essence, it should be a type with immutable setters and deleters
     klass = _validate_class(klass)
 
+    # add the class to the `JAX`, `trace`, and `field_map` registries
+    klass = _register_treeclass(klass)
+
     # add math operations methods if leafwise
     # do not override any user defined methods
     klass = _leafwise_transform(klass) if leafwise else klass
@@ -396,5 +400,4 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     # generate the `__init__` method if not present using type hints.
     klass = _treeclass_transform(klass)
 
-    # add the class to the `JAX` registry if not registered
-    return _register_treeclass(klass)
+    return klass

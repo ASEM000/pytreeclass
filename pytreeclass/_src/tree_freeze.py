@@ -13,6 +13,7 @@ from pytreeclass._src.tree_decorator import (
     _FROZEN,
     _VARS,
     _WRAPPED,
+    _field_map_registry,
     fields,
     is_treeclass,
 )
@@ -93,7 +94,7 @@ class ImmutableWrapper:
 def _tree_unwrap(value: PyTree) -> PyTree:
     # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
     def is_leaf(x: Any) -> bool:
-        return isinstance(x, ImmutableWrapper) or is_treeclass(x)
+        return isinstance(x, ImmutableWrapper) or type(x) in _field_map_registry
 
     return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
