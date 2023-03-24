@@ -46,7 +46,7 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
 
 def _tree_flatten(
     tree: PyTree,
-) -> tuple[list[Any], tuple[tuple[str], dict[str, Any]]]:
+) -> tuple[list[Any], tuple[tuple[str, ...], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
     static, dynamic = dict(getattr(tree, _VARS)), dict()
     for key in _field_registry[type(tree)]:
@@ -56,14 +56,14 @@ def _tree_flatten(
 
 def _tree_trace(
     tree: PyTree,
-) -> list[tuple[Any, Any, tuple[int, int], Any]]:
+) -> list[tuple[Any, Any, int, Any]]:
     """Trace flatten rule to be used with the `tree_trace` module."""
     leaves, (keys, _) = _tree_flatten(tree)
     names = (f"{key}" for key in keys)
     types = map(type, leaves)
     indices = range(len(leaves))
     fields = (_field_registry[type(tree)][key] for key in keys)
-    metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields)
+    metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields)  # type: ignore
     return [*zip(names, types, indices, metadatas)]
 
 
@@ -143,16 +143,16 @@ def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
         # this behavior is different from `flax.struct.dataclass`
         # as it does not register non-decorated subclasses field that inherited from decorated subclasses.
         init_subclass_func(*a, **k)
-        return _register_treeclass(klass)
+        _register_treeclass(klass)
 
     return wrapper
 
 
-def _validate_class(klass: type) -> type:
+def _validate_class(klass: type[T]) -> type[T]:
     if not isinstance(klass, type):
         raise TypeError(f"Expected `class` but got `{type(klass)}`.")
 
-    for key, method in zip(("__delattr__", "__setattr__"), (_delattr, _setattr)):
+    for key, method in (("__delattr__", _delattr), ("__setattr__", _setattr)):
         if key in getattr(klass, _VARS) and getattr(klass, _VARS)[key] is not method:
             # raise error if the current setattr/delattr is not immutable
             raise AttributeError(f"Cannot define `{key}` in {klass.__name__}.")

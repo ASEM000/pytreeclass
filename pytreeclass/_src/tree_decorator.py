@@ -5,7 +5,7 @@ import functools as ft
 import inspect
 import sys
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, Mapping, NamedTuple, Sequence, TypeVar
+from typing import Any, Callable, NamedTuple, Sequence, TypeVar
 from weakref import WeakKeyDictionary
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda self: "?"})()
@@ -32,7 +32,7 @@ PyTree = Any
 # While `dataclasses` fields are added as a class attribute to the class under `__dataclass_fields__`
 # in this implementation, the fields are stored in a `WeakKeyDictionary` as an extra precaution
 # to avoid user-side modification of the fields while maintaining a cleaner namespace
-_field_registry: Mapping[type, Mapping[str, Field]] = WeakKeyDictionary()  # type: ignore
+_field_registry: dict[type, Mapping[str, Field]] = WeakKeyDictionary()  # type: ignore
 
 
 def is_treeclass(klass_or_instance: Any) -> bool:
@@ -58,7 +58,7 @@ class Field(NamedTuple):
     repr: bool = True
     kw_only: bool = False
     pos_only: bool = False
-    metadata: Mapping[str, Any] | None = None
+    metadata: MappingProxyType[str, Any] | None = None
     callbacks: Sequence[Callable] | None = None
 
 
@@ -100,8 +100,8 @@ def field(
     if kw_only is True and pos_only is True:
         raise ValueError("Cannot specify both `kw_only=True` and `pos_only=True`")
 
-    if isinstance(metadata, Mapping):
-        metadata = MappingProxyType(metadata)
+    if isinstance(metadata, dict):
+        metadata = MappingProxyType(metadata)  # type: ignore
     elif metadata is not None:
         raise TypeError("`metadata` must be a Mapping or None")
 
@@ -130,7 +130,7 @@ def field(
         repr=repr,
         kw_only=kw_only,
         pos_only=pos_only,
-        metadata=metadata,
+        metadata=metadata,  # type: ignore
         callbacks=callbacks,
     )
 
@@ -322,17 +322,6 @@ def _init_wrapper(init_func: Callable) -> Callable:
     return wrapper
 
 
-@ft.lru_cache(maxsize=1)
-def _register_field(klass: type[T], key: str, type: type) -> type[T]:
-    # append the key and field pair to the `klass` field map
-    # this is done once per class/key pair to avoid continuous appending of the same field.
-    # While the whole process can be designed to be an instance variable like `nn.Module`
-    # treeclass tries to shield the access to the field map from the user as much as possible
-    # to avoid manipulating the field map directly by the user.
-    _field_registry[klass][key] = Field(name=key, type=type)
-    return klass
-
-
 def _setattr(self: PyTree, key: str, value: Any) -> None:
     if getattr(self, _FROZEN):
         # Set the attribute of the tree if the tree is not frozen
@@ -358,11 +347,11 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
     # set the value
     getattr(self, _VARS)[key] = value
 
-    if klass := type(value) in _field_registry:
-        # auto registers the value if it is a registered `treeclass`
+    if type(value) in _field_registry and key not in _field_registry[type(self)]:
+        # auto registers the instance value if it is a registered `treeclass`
         # this behavior is similar to PyTorch behavior in `nn.Module`
-        # with `Parameter` class
-        _register_field(type(self), key, klass)
+        # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
+        _field_registry[type(self)][key] = Field(name=key, type=type(value))
 
 
 def _delattr(self, key: str) -> None:

@@ -15,7 +15,7 @@ from jax._src.tree_util import _registry
 PyTree = Any
 TraceType = Any
 
-_trace_registry: Mapping[type, _TraceRegistryEntry] = dict()
+_trace_registry: dict[type, _TraceRegistryEntry] = dict()
 
 
 class _TraceRegistryEntry(NamedTuple):
@@ -29,7 +29,7 @@ def _validate_trace_func(
     # validation is only performed once
     @ft.wraps(trace_func)
     def wrapper(tree):
-        if wrapper.is_validated:
+        if getattr(wrapper, "is_validated", False):
             return trace_func(tree)
 
         for trace in (traces := trace_func(tree)):
@@ -65,10 +65,9 @@ def _validate_trace_func(
                 msg += f" Expected an integer, got {trace[2]}"
                 raise TypeError(msg)
 
-        wrapper.is_validated = True
+        setattr(wrapper, "is_validated", True)
         return traces
 
-    wrapper.is_validated = False
     return wrapper
 
 
