@@ -13,7 +13,6 @@ _FROZEN = "__frozen__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
 _WRAPPED = "__wrapped__"
-_VARS = "__dict__"
 _ANNOTATIONS = "__annotations__"
 
 T = TypeVar("T")
@@ -152,10 +151,10 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
-    if _ANNOTATIONS not in getattr(klass, _VARS):
+    if _ANNOTATIONS not in vars(klass):
         return field_map
 
-    for name in (annotation_map := getattr(klass, _VARS)[_ANNOTATIONS]):
+    for name in (annotation_map := vars(klass)[_ANNOTATIONS]):
         # get the value associated with the type hint
         # in essence will skip any non type-hinted attributes
         value = getattr(klass, name, _NOT_SET)
@@ -255,7 +254,7 @@ def _generate_init(klass: type) -> FunctionType:
     field_map = _field_registry[klass]
     # generate init method
     local_namespace = dict()  # type: ignore
-    global_namespace = getattr(sys.modules[klass.__module__], _VARS)
+    global_namespace = vars(sys.modules[klass.__module__])
 
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`default_factory`
@@ -275,13 +274,13 @@ def _generate_init(klass: type) -> FunctionType:
 def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
     def wrapper(self, *a, **k) -> None:
-        getattr(self, _VARS)[_FROZEN] = False
+        vars(self)[_FROZEN] = False
 
         for field in _field_registry[type(self)].values():
             if field.default is not _NOT_SET:
-                getattr(self, _VARS)[field.name] = field.default
+                vars(self)[field.name] = field.default
             elif field.default_factory is not None:
-                getattr(self, _VARS)[field.name] = field.default_factory()
+                vars(self)[field.name] = field.default_factory()
 
         output = init_func(self, *a, **k)
 
@@ -302,12 +301,12 @@ def _init_wrapper(init_func: Callable) -> Callable:
             # ...    a:int = 1
             # ...    def __post_init__(self):
             # ...        self.b = 1
-            getattr(self, _VARS)[_FROZEN] = False
+            vars(self)[_FROZEN] = False
             output = getattr(type(self), _POST_INIT)(self)
 
         # handle uninitialized fields
         for field in _field_registry[type(self)].values():
-            if field.name not in getattr(self, _VARS):
+            if field.name not in vars(self):
                 # at this point, all fields should be initialized
                 # in principle, this error will be caught when invoking `repr`/`str`
                 # like in `dataclasses` but we raise it here for better error message.
@@ -315,8 +314,8 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
         # delete the shadowing `__dict__` attribute to
         # restore the frozen behavior
-        if _FROZEN in getattr(self, _VARS):
-            del getattr(self, _VARS)[_FROZEN]
+        if _FROZEN in vars(self):
+            del vars(self)[_FROZEN]
         return output
 
     return wrapper
@@ -345,7 +344,7 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
                     raise type(e)(msg)
 
     # set the value
-    getattr(self, _VARS)[key] = value
+    vars(self)[key] = value  # type: ignore
 
     if type(value) in _field_registry and key not in _field_registry[type(self)]:
         # auto registers the instance value if it is a registered `treeclass`
@@ -358,7 +357,7 @@ def _delattr(self, key: str) -> None:
     # Delete the attribute if tree is not frozen
     if getattr(self, _FROZEN):
         raise AttributeError(f"Cannot delete {key}.")
-    del getattr(self, _VARS)[key]
+    del vars(self)[key]
 
 
 def fields(klass_or_instance: Any) -> Sequence[Field]:

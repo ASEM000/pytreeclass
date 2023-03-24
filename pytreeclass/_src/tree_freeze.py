@@ -9,13 +9,7 @@ import jax
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import (
-    _FROZEN,
-    _VARS,
-    _WRAPPED,
-    _field_registry,
-    fields,
-)
+from pytreeclass._src.tree_decorator import _FROZEN, _WRAPPED, _field_registry, fields
 
 PyTree = Any
 
@@ -78,7 +72,7 @@ class ImmutableWrapper:
 
     def __init__(self, x: Any) -> None:
         # disable composition of Wrappers
-        getattr(self, _VARS)[_WRAPPED] = _unwrap(x)
+        vars(self)[_WRAPPED] = _unwrap(x)
 
     def unwrap(self) -> Any:
         return getattr(self, _WRAPPED)
@@ -130,7 +124,7 @@ def _frozen_flatten(tree: Any) -> tuple[tuple, Any]:
 
 def _frozen_unflatten(treedef: Any, _: Sequence[Any]) -> PyTree:
     tree = object.__new__(FrozenWrapper)  # type: ignore
-    getattr(tree, _VARS)[_WRAPPED] = treedef.unwrap()
+    vars(tree)[_WRAPPED] = treedef.unwrap()
     return tree
 
 
@@ -251,18 +245,18 @@ def _call_context(tree: PyTree):
         # instance variable to temporarily disable the frozen behavior
         # after the context manager exits, the instance variable will be deleted
         # and the class attribute will be used again.
-        getattr(tree, _VARS)[_FROZEN] = False
+        vars(tree)[_FROZEN] = False  # type: ignore
         for field in fields(tree):
-            mutate_step(getattr(tree, field.name))
+            mutate_step(getattr(tree, field.name))  # type: ignore
         return tree
 
     def immutate_step(tree):
         if type(tree) not in _field_registry:
             return tree
-        if _FROZEN not in getattr(tree, _VARS):
+        if _FROZEN not in vars(tree):
             return tree
 
-        del getattr(tree, _VARS)[_FROZEN]
+        del vars(tree)[_FROZEN]
         for field in fields(tree):
             immutate_step(getattr(tree, field.name))
         return tree

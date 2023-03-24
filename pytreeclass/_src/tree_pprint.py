@@ -22,7 +22,7 @@ PrintKind = Literal["repr", "str"]
 
 
 def _node_pprint(
-    node: Any, indent: int, kind: PrintKind, width: int, depth: int
+    node: Any, indent: int, kind: PrintKind, width: int, depth: int | float
 ) -> str:
     if depth < 0:
         return "..."

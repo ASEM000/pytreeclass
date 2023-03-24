@@ -12,7 +12,6 @@ from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_decorator import (
     _FROZEN,
-    _VARS,
     _delattr,
     _field_registry,
     _generate_field_map,
@@ -39,8 +38,8 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     # on each unflattening which is not efficient.
     # however it might be useful to constantly check if the updated value is
     # satisfying the constraints defined by the user in the callbacks.
-    getattr(tree, _VARS).update(treedef[1])
-    getattr(tree, _VARS).update(zip(treedef[0], leaves))
+    vars(tree).update(treedef[1])
+    vars(tree).update(zip(treedef[0], leaves))
     return tree
 
 
@@ -48,7 +47,7 @@ def _tree_flatten(
     tree: PyTree,
 ) -> tuple[list[Any], tuple[tuple[str, ...], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
-    static, dynamic = dict(getattr(tree, _VARS)), dict()
+    static, dynamic = dict(vars(tree)), dict()
     for key in _field_registry[type(tree)]:
         dynamic[key] = static.pop(key)
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
@@ -85,8 +84,8 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     return klass
 
 
-def _getattr_wrapper(getattr_func):
-    @ft.wraps(getattr_func)
+def _getattr_method(getattr_method):
+    @ft.wraps(getattr_method)
     def wrapper(self, key: str) -> Any:
         # this current approach replaces the older metdata based approach
         # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`.
@@ -109,18 +108,18 @@ def _getattr_wrapper(getattr_func):
         # Tree(a=#1)  # frozen value is displayed in the repr with a prefix `#`
         # >>> tree.a
         # 1  # the value is unwrapped when accessed directly
-        value = getattr_func(self, key)
+        value = getattr_method(self, key)
         # unwrap non-`treeclass` wrapped instance variables
         # so the getattr will always return unwrapped values.
         # this renders the wrapped instance variables transparent to the user
-        return _tree_unwrap(value) if key in getattr_func(self, _VARS) else value
+        return _tree_unwrap(value) if key in getattr_method(self, "__dict__") else value
 
     return wrapper
 
 
-def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
+def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
     @classmethod  # type: ignore
-    @ft.wraps(init_subclass_func)
+    @ft.wraps(init_subclass_method)
     def wrapper(klass: type, *a, **k) -> None:
         # Non-decorated subclasses uses the base `treeclass` leaves only
         # this behavior is aligned with `dataclasses` not registering non-decorated
@@ -142,7 +141,7 @@ def _init_sub_wrapper(init_subclass_func: Callable) -> Callable:
         # [1, 2]
         # this behavior is different from `flax.struct.dataclass`
         # as it does not register non-decorated subclasses field that inherited from decorated subclasses.
-        init_subclass_func(*a, **k)
+        init_subclass_method(*a, **k)
         _register_treeclass(klass)
 
     return wrapper
@@ -153,7 +152,7 @@ def _validate_class(klass: type[T]) -> type[T]:
         raise TypeError(f"Expected `class` but got `{type(klass)}`.")
 
     for key, method in (("__delattr__", _delattr), ("__setattr__", _setattr)):
-        if key in getattr(klass, _VARS) and getattr(klass, _VARS)[key] is not method:
+        if key in vars(klass) and vars(klass)[key] is not method:
             # raise error if the current setattr/delattr is not immutable
             raise AttributeError(f"Cannot define `{key}` in {klass.__name__}.")
 
@@ -202,7 +201,7 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     # flag for the immutable behavior used throughout the code
     setattr(klass, _FROZEN, True)
 
-    if "__init__" not in getattr(klass, _VARS):
+    if "__init__" not in vars(klass):
         # generate the init method in case it is not defined by the user
         setattr(klass, "__init__", _generate_init(klass))
 
@@ -210,8 +209,8 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     # callback functionality and transparent wrapper behavior
     for key, wrapper in (
         ("__init__", _init_wrapper),
-        ("__init_subclass__", _init_sub_wrapper),
-        ("__getattribute__", _getattr_wrapper),
+        ("__init_subclass__", _init_subclass_wrapper),
+        ("__getattribute__", _getattr_method),
     ):
         setattr(klass, key, wrapper(getattr(klass, key)))
 
@@ -232,7 +231,7 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
         ("__eq__", is_tree_equal),
         ("at", property(tree_indexer)),
     ):
-        if key not in getattr(klass, _VARS):
+        if key not in vars(klass):
             # keep the original method if it is defined by the user
             # this behavior similar is to `dataclasses.dataclass`
             setattr(klass, key, method)
@@ -314,7 +313,7 @@ def _leafwise_transform(klass: type[T]) -> type[T]:
         ("__trunc__", _unary_op(trunc)),
         ("__xor__", _binary_op(op.xor)),
     ):
-        if key not in getattr(klass, _VARS):
+        if key not in vars(klass):
             # do not override any user defined methods
             # this behavior similar is to `dataclasses.dataclass`
             setattr(klass, key, method)
