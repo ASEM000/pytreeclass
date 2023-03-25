@@ -93,11 +93,17 @@ def field(
         2
     """
     if default is not _NOT_SET and default_factory is not None:
+        # mutually exclusive arguments
         # this is the similar behavior to `dataclasses`
-        raise ValueError("Cannot specify both `default` and `default_factory`")
+        msg = "`default` and `default_factory` are mutually exclusive arguments."
+        msg += f"got default={default} and default_factory={default_factory}"
+        raise ValueError(msg)
 
     if kw_only is True and pos_only is True:
-        raise ValueError("Cannot specify both `kw_only=True` and `pos_only=True`")
+        # mutually exclusive arguments
+        msg = "`kw_only` and `pos_only` are mutually exclusive arguments."
+        msg += f"got kw_only={kw_only} and pos_only={pos_only}"
+        raise ValueError(msg)
 
     if isinstance(metadata, dict):
         metadata = MappingProxyType(metadata)  # type: ignore
@@ -166,6 +172,13 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
             # the annotated attribute is a `Field``
             # example case: `x: Any = field(default=1)`
             # assign the name and type to the Field from the annotation
+            if isinstance(value.default, _MUTABLE_TYPES):
+                # example case: `x: Any = field(default=[1, 2, 3])`
+                # https://github.com/ericvsmith/dataclasses/issues/3
+                msg = f"Mutable default value of field `{name}` is not allowed, use "
+                msg += f"`default_factory=lambda: {value.default}` instead."
+                raise TypeError(msg)
+
             field_map[name] = value._replace(name=name, type=type)
 
         elif value is _NOT_SET:
@@ -178,6 +191,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
             # the annotated attribute has a non-field default value
             # check for mutable types and raise an error if found
             if isinstance(value, _MUTABLE_TYPES):
+                # https://github.com/ericvsmith/dataclasses/issues/3
                 # example case: `x: Any = [1, 2, 3]`
                 # this is the prime motivation for writing this decorator
                 # as from python 3.11, jax arrays `dataclasses` will raise an error if
@@ -185,7 +199,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
                 # the `dataclasses` logic is flawed by using `__hash__` existence
                 # as a proxy for immutability, which is not the case for `JAX` arrays
                 # which are immutable but do not have a `__hash__` method
-                msg = f"mutable value= {(value)} is not allowed as a value"
+                msg = f"Mutable value= {(value)} is not allowed"
                 msg += f" for field `{name}` in class `{klass.__name__}`.\n"
                 msg += f" use `field(... ,default_factory=lambda:{value})` instead"
                 raise TypeError(msg)

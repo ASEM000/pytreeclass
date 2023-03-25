@@ -358,6 +358,12 @@ def test_mutable_field():
         class Test:
             a: list = [1, 2, 3]
 
+    with pytest.raises(TypeError):
+
+        @ft.partial(pytc.treeclass, leafwise=True)
+        class Test:
+            a: list = pytc.field(default=[1, 2, 3])
+
 
 def test_non_class_input():
     with pytest.raises(TypeError):
