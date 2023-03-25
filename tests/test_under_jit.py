@@ -117,7 +117,7 @@ def test_ops_with_jit():
         a: int = 1
         b: int = 2
         c: int = 3
-        d: jnp.ndarray = pytc.field(default_factory=lambda: jnp.array([1, 2, 3]))
+        d: jnp.ndarray = pytc.field(factory=lambda: jnp.array([1, 2, 3]))
 
     @jax.jit
     def getter(tree):

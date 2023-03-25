@@ -52,7 +52,7 @@ class Field(NamedTuple):
     name: str | None = None
     type: type | None = None
     default: Any = _NOT_SET
-    default_factory: Any = None
+    factory: Any = None
     init: bool = True
     repr: bool = True
     kw_only: bool = False
@@ -64,7 +64,7 @@ class Field(NamedTuple):
 def field(
     *,
     default: Any = _NOT_SET,
-    default_factory: Callable | None = None,
+    factory: Callable | None = None,
     init: bool = True,
     repr: bool = True,
     kw_only: bool = False,
@@ -74,14 +74,14 @@ def field(
 ) -> Field:
     """
     Args:
-        default: The default value of the field.
-        default_factory: A 0-argument function called to initialize a field's value.
+        default: The default value of the field. Mutually exclusive with `factory`.
+        factory: A 0-argument function called to initialize field value. Mutually exclusive with `default`.
         init: Whether the field is included in the object's __init__ function.
         repr: Whether the field is included in the object's __repr__ function.
-        kw_only: Whether the field is keyword-only.
-        pos_only: Whether the field is positional-only.
+        kw_only: Whether the field is keyword-only. Mutually exclusive with `pos_only`.
+        pos_only: Whether the field is positional-only. Mutually exclusive with `kw_only`.
         metadata: A mapping of user-defined data for the field.
-        callbacks: A sequence of functions to call after initialization to modify the field value.
+        callbacks: A sequence of functions to called on `setattr` during initialization to modify the field value.
 
     Example:
         >>> import pytreeclass as pytc
@@ -92,11 +92,11 @@ def field(
         >>> foo.x
         2
     """
-    if default is not _NOT_SET and default_factory is not None:
+    if default is not _NOT_SET and factory is not None:
         # mutually exclusive arguments
         # this is the similar behavior to `dataclasses`
-        msg = "`default` and `default_factory` are mutually exclusive arguments."
-        msg += f"got default={default} and default_factory={default_factory}"
+        msg = "`default` and `factory` are mutually exclusive arguments."
+        msg += f"got default={default} and factory={factory}"
         raise ValueError(msg)
 
     if kw_only is True and pos_only is True:
@@ -130,7 +130,7 @@ def field(
         name=None,
         type=None,
         default=default,
-        default_factory=default_factory,
+        factory=factory,
         init=init,
         repr=repr,
         kw_only=kw_only,
@@ -176,7 +176,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
                 # example case: `x: Any = field(default=[1, 2, 3])`
                 # https://github.com/ericvsmith/dataclasses/issues/3
                 msg = f"Mutable default value of field `{name}` is not allowed, use "
-                msg += f"`default_factory=lambda: {value.default}` instead."
+                msg += f"`factory=lambda: {value.default}` instead."
                 raise TypeError(msg)
 
             field_map[name] = value._replace(name=name, type=type)
@@ -201,7 +201,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
                 # which are immutable but do not have a `__hash__` method
                 msg = f"Mutable value= {(value)} is not allowed"
                 msg += f" for field `{name}` in class `{klass.__name__}`.\n"
-                msg += f" use `field(... ,default_factory=lambda:{value})` instead"
+                msg += f" use `field(... ,factory=lambda:{value})` instead"
                 raise TypeError(msg)
 
             # example case: `x: int = 1`
@@ -216,7 +216,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
 @ft.lru_cache(maxsize=None)
 def _generate_init_code(fields: Sequence[Field]):
     # generate the init method code string
-    # in here, we generate the function head and body and add `default`/`default_factory`
+    # in here, we generate the function head and body and add `default`/`factory`
     # for example, if we have a class with fields `x` and `y`
     # then generated code will something like  `def __init__(self, x, y): self.x = x; self.y = y`
     head = body = ""
@@ -224,7 +224,8 @@ def _generate_init_code(fields: Sequence[Field]):
     for field in fields:
         key = field.name
         mark0 = f"FIELD_MAP['{key}'].default"
-        mark1 = f"self.{key}"
+        mark1 = f"FIELD_MAP['{key}'].factory()"
+        mark2 = f"self.{key}"
 
         if field.kw_only and "*" not in head and field.init:
             # if the field is keyword only, and we have not added the `*` yet
@@ -236,15 +237,15 @@ def _generate_init_code(fields: Sequence[Field]):
             head += f"{key}={mark0}, " if field.init else ""
             # we then add self.x = x for the body function if field is initialized
             # otherwise, define the default value inside the body ( self.x = default_value)
-            body += f"{mark1}=" + (f"{key}; " if field.init else f"{mark0};")
-        elif field.default_factory is not None:
+            body += f"{mark2}=" + (f"{key}; " if field.init else f"{mark0};")
+        elif field.factory is not None:
             # same story for functions as above
-            head += f"{key}={mark0}_factory(), " if field.init else ""
-            body += f"{mark1}=" + (f"{key};" if field.init else f"{mark0}_factory();")
+            head += f"{key}={mark1}, " if field.init else ""
+            body += f"{mark2}=" + (f"{key};" if field.init else f"{mark1};")
         else:
             # no defaults are added
             head += f"{key}, " if field.init else ""
-            body += f"{mark1}={key}; " if field.init else ""
+            body += f"{mark2}={key}; " if field.init else ""
 
         if field.pos_only and field.init:
             # if the field is positional only, we add a "/" marker after it
@@ -271,7 +272,7 @@ def _generate_init(klass: type) -> FunctionType:
     global_namespace = vars(sys.modules[klass.__module__])
 
     # generate the init method code string
-    # in here, we generate the function head and body and add `default`/`default_factory`
+    # in here, we generate the function head and body and add `default`/`factory`
     exec(_generate_init_code(field_map.values()), global_namespace, local_namespace)
     method = local_namespace["closure"](field_map)
 
@@ -293,8 +294,8 @@ def _init_wrapper(init_func: Callable) -> Callable:
         for field in _field_registry[type(self)].values():
             if field.default is not _NOT_SET:
                 vars(self)[field.name] = field.default
-            elif field.default_factory is not None:
-                vars(self)[field.name] = field.default_factory()
+            elif field.factory is not None:
+                vars(self)[field.name] = field.factory()
 
         output = init_func(self, *a, **k)
 

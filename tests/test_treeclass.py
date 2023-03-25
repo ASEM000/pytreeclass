@@ -15,7 +15,7 @@ from pytreeclass._src.tree_decorator import _field_registry
 
 def test_field():
     with pytest.raises(ValueError):
-        pytc.field(default=1, default_factory=lambda: 1)
+        pytc.field(default=1, factory=lambda: 1)
 
     assert pytc.field(default=1).default == 1
 
