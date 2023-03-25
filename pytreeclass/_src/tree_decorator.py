@@ -332,10 +332,10 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
             if field.default is not _NOT_SET:
                 # uninitialized fields with default values
-                vars(self)[field.name] = field.default
+                ovars(self)[field.name] = field.default
             elif field.factory is not None:
                 # uninitialized fields with factory functions
-                vars(self)[field.name] = field.factory()
+                ovars(self)[field.name] = field.factory()
             else:
                 # uninitialized fields without default values/factory functions
                 raise AttributeError(f"field=`{field.name}` is not initialized.")

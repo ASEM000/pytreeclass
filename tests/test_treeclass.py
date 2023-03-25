@@ -98,6 +98,10 @@ def test_field():
 
     assert len(pytc.fields(Test)) == 2
 
+    @pytc.treeclass
+    class Test:
+        a: int = pytc.field(factory=lambda: 1)
+
 
 def test_field_nondiff():
     @ft.partial(pytc.treeclass, leafwise=True)
