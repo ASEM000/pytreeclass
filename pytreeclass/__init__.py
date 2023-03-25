@@ -12,6 +12,7 @@ from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_mermaid,
     tree_repr,
+    tree_repr_with_trace,
     tree_str,
     tree_summary,
 )
@@ -35,6 +36,7 @@ __all__ = (
     "tree_repr",
     "tree_str",
     "tree_summary",
+    "tree_trace_summary",
     # freeze/unfreeze utils
     "is_nondiff",
     "is_frozen",

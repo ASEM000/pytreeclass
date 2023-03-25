@@ -278,3 +278,17 @@ def test_invalid_depth():
         tree_summary(1, depth="a")
     with pytest.raises(TypeError):
         tree_mermaid(1, depth="a")
+
+
+def test_tree_repr_with_trace():
+    @pytc.treeclass
+    class Test:
+        a: int = 1
+        b: float = 2.0
+
+    tree = Test()
+    assert (
+        str(pytc.tree_repr_with_trace(Test()))
+        # trunk-ignore(flake8/E501)
+        == "Test(\n  a=\n    ┌──────────┬─────────┐\n    │value     │1        │\n    ├──────────┼─────────┤\n    │name path │Test->a  │\n    ├──────────┼─────────┤\n    │type path │Test->int│\n    ├──────────┼─────────┤\n    │index path│0->0     │\n    └──────────┴─────────┘, \n  b=\n    ┌──────────┬───────────┐\n    │value     │2.0        │\n    ├──────────┼───────────┤\n    │name path │Test->b    │\n    ├──────────┼───────────┤\n    │type path │Test->float│\n    ├──────────┼───────────┤\n    │index path│0->1       │\n    └──────────┴───────────┘\n)"
+    )

@@ -8,7 +8,7 @@ import math
 import sys
 from itertools import chain
 from types import FunctionType
-from typing import Any, Callable, Literal, Sequence
+from typing import Any, Callable, Literal
 
 import jax
 import numpy as np
@@ -627,7 +627,7 @@ def _hbox(*text) -> str:
     return "\n".join([_resolve_line(line) for line in zip(*boxes)])
 
 
-def _vbox(*text: tuple[str, ...]) -> str:
+def _vbox(*text) -> str:
     # Create vertically stacked text boxes
     # Example:
     #     >>> _vbox("a","b")
@@ -692,7 +692,7 @@ def _hstack(*boxes):
     return FMT
 
 
-def _resolve_line(cols: Sequence[str]) -> str:
+def _resolve_line(cols: list[str]) -> str:
     # Combine columns of single line by merging their borders
 
     # Args:
@@ -737,7 +737,7 @@ def _resolve_line(cols: Sequence[str]) -> str:
     return "".join(map(lambda x: "".join(x), cols))
 
 
-def _table(lines: Sequence[str]) -> str:
+def _table(lines: list[list[str]]) -> str:
     # Create a table with self aligning rows and cols
 
     # Args:
@@ -872,3 +872,62 @@ def tree_summary(
     COLS = [list(c) for c in zip(*ROWS)]
     layer_table = _table(COLS)
     return layer_table.expandtabs(8)
+
+
+def tree_repr_with_trace(tree: PyTree) -> PyTree:
+    """Return a PyTree with the same structure, but with the leaves replaced by a summary of the trace.
+
+    Example:
+        >>> @pytc.treeclass
+        ... class Test:
+        ...    a:int = 1
+        ...    b:float = 2.0
+
+        >>> tree = Test()
+        >>> print(tree_repr_with_trace(Test()))
+        Test(
+        a=
+            ┌──────────┬─────────┐
+            │value     │1        │
+            ├──────────┼─────────┤
+            │name path │Test->a  │
+            ├──────────┼─────────┤
+            │type path │Test->int│
+            ├──────────┼─────────┤
+            │index path│0->0     │
+            └──────────┴─────────┘,
+        b=
+            ┌──────────┬───────────┐
+            │value     │2.0        │
+            ├──────────┼───────────┤
+            │name path │Test->b    │
+            ├──────────┼───────────┤
+            │type path │Test->float│
+            ├──────────┼───────────┤
+            │index path│0->1       │
+            └──────────┴───────────┘
+        )
+
+    Note:
+        This function can be useful for debugging and raising descriptive errors.
+    """
+
+    def leaf_trace_summary(trace, leaf) -> str:
+        # this can be useful in debugging and raising descriptive errors
+        ROWS = [["value", f"{leaf}"]]
+
+        names = "->".join(trace[0])
+        ROWS += [["name path", names]]
+
+        types = "->".join(i.__name__ for i in trace[1])
+        ROWS += [["type path", types]]
+
+        indices = "->".join(str(i) for i in trace[2])
+        ROWS += [["index path", indices]]
+
+        # make a pretty table for each leaf
+        COLS = [list(c) for c in zip(*ROWS)]
+
+        return _table(COLS)
+
+    return pytc.tree_map_with_trace(leaf_trace_summary, tree)
