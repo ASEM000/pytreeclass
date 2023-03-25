@@ -878,13 +878,14 @@ def tree_repr_with_trace(tree: PyTree) -> PyTree:
     """Return a PyTree with the same structure, but with the leaves replaced by a summary of the trace.
 
     Example:
+        >>> import pytreeclass as pytc
         >>> @pytc.treeclass
         ... class Test:
         ...    a:int = 1
         ...    b:float = 2.0
 
         >>> tree = Test()
-        >>> print(tree_repr_with_trace(Test()))
+        >>> print(pytc.tree_repr_with_trace(Test()))
         Test(
         a=
             ┌──────────┬─────────┐
