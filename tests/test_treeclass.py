@@ -100,7 +100,14 @@ def test_field():
 
     @pytc.treeclass
     class Test:
-        a: int = pytc.field(factory=lambda: 1)
+        a: int = pytc.field(default=1)
+        b: int = pytc.field(factory=lambda: 1)
+
+        def __init__(self) -> None:
+            pass
+
+    assert Test().__dict__["a"] == 1
+    assert Test().__dict__["b"] == 1
 
 
 def test_field_nondiff():
