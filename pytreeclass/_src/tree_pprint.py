@@ -889,23 +889,23 @@ def tree_repr_with_trace(tree: PyTree) -> PyTree:
         Test(
         a=
             ┌──────────┬─────────┐
-            │value     │1        │
+            │Value     │1        │
             ├──────────┼─────────┤
-            │name path │Test->a  │
+            │Name path │Test->a  │
             ├──────────┼─────────┤
-            │type path │Test->int│
+            │Type path │Test->int│
             ├──────────┼─────────┤
-            │index path│0->0     │
+            │Index path│0->0     │
             └──────────┴─────────┘,
         b=
             ┌──────────┬───────────┐
-            │value     │2.0        │
+            │Value     │2.0        │
             ├──────────┼───────────┤
-            │name path │Test->b    │
+            │Name path │Test->b    │
             ├──────────┼───────────┤
-            │type path │Test->float│
+            │Type path │Test->float│
             ├──────────┼───────────┤
-            │index path│0->1       │
+            │Index path│0->1       │
             └──────────┴───────────┘
         )
 
@@ -915,16 +915,16 @@ def tree_repr_with_trace(tree: PyTree) -> PyTree:
 
     def leaf_trace_summary(trace, leaf) -> str:
         # this can be useful in debugging and raising descriptive errors
-        ROWS = [["value", f"{leaf}"]]
+        ROWS = [["Value", tree_repr(leaf)]]
 
         names = "->".join(trace[0])
-        ROWS += [["name path", names]]
+        ROWS += [["Name path", names]]
 
         types = "->".join(i.__name__ for i in trace[1])
-        ROWS += [["type path", types]]
+        ROWS += [["Type path", types]]
 
         indices = "->".join(str(i) for i in trace[2])
-        ROWS += [["index path", indices]]
+        ROWS += [["Index path", indices]]
 
         # make a pretty table for each leaf
         COLS = [list(c) for c in zip(*ROWS)]

@@ -290,5 +290,5 @@ def test_tree_repr_with_trace():
     assert (
         str(pytc.tree_repr_with_trace(Test()))
         # trunk-ignore(flake8/E501)
-        == "Test(\n  a=\n    ┌──────────┬─────────┐\n    │value     │1        │\n    ├──────────┼─────────┤\n    │name path │Test->a  │\n    ├──────────┼─────────┤\n    │type path │Test->int│\n    ├──────────┼─────────┤\n    │index path│0->0     │\n    └──────────┴─────────┘, \n  b=\n    ┌──────────┬───────────┐\n    │value     │2.0        │\n    ├──────────┼───────────┤\n    │name path │Test->b    │\n    ├──────────┼───────────┤\n    │type path │Test->float│\n    ├──────────┼───────────┤\n    │index path│0->1       │\n    └──────────┴───────────┘\n)"
+        == "Test(\n  a=\n    ┌──────────┬─────────┐\n    │Value     │1        │\n    ├──────────┼─────────┤\n    │Name path │Test->a  │\n    ├──────────┼─────────┤\n    │Type path │Test->int│\n    ├──────────┼─────────┤\n    │Index path│0->0     │\n    └──────────┴─────────┘, \n  b=\n    ┌──────────┬───────────┐\n    │Value     │2.0        │\n    ├──────────┼───────────┤\n    │Name path │Test->b    │\n    ├──────────┼───────────┤\n    │Type path │Test->float│\n    ├──────────┼───────────┤\n    │Index path│0->1       │\n    └──────────┴───────────┘\n)"
     )
