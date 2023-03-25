@@ -144,3 +144,5 @@ def test_ops_with_jit():
     assert pytc.is_tree_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), setter(T1()))
 
     assert pytc.is_tree_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1()))
+
+    assert jax.jit(pytc.is_tree_equal)(T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1()))
