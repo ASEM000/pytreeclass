@@ -160,40 +160,44 @@ def _validate_class(klass: type[T]) -> type[T]:
 
 
 def is_tree_equal(*trees: Any) -> bool | jax.Array:
-    """Return `True` or Array(True) if all pytrees are equal.
+    """Return `True` if all pytrees are equal.
 
     Note:
         trees are compared using their leaves and treedefs.
-        For `array` leaves `np.array_equal` is used, for other leaves
+        For `array` leaves `jnp.array_equal` is used, for other leaves
         method `__eq__` is used.
+
+    Note:
+        Under `jit` the return type is `jax.Array` instead of python `bool`.
     """
-    tree, *rest = trees
-    leaves0, treedef0 = jtu.tree_flatten(tree)
+
+    def compare(lhs, rhs) -> bool | jax.Array:
+        if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
+            if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
+                # Array lhs leaf and array rhs leaf
+                # try to convert to bool to avoid having `Array(True)` without jit
+                # this can occur if any leaf is an array
+                # howver the conversion will fail under `jit`
+                verdict = jnp.array_equal(lhs, rhs)
+                try:
+                    return bool(verdict)
+                except:
+                    return verdict
+            # Non-array rhs leaf and lhs leaf array
+            return False
+        # Non-array lhs leaf and non-array rhs leaf
+        return lhs == rhs
+
+    tree0, *rest = trees
+    leaves0, treedef0 = jtu.tree_flatten(tree0)
+    verdict = True
 
     for tree in rest:
         leaves, treedef = jtu.tree_flatten(tree)
-        if treedef != treedef0:
-            # non matching treedefs
+        if (treedef != treedef0) or verdict is False:
             return False
-
-        for lhs, rhs in zip(leaves0, leaves):
-            if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
-                # lhs leaf is an array
-                if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
-                    # rhs leaf is an array
-                    if jnp.array_equal(lhs, rhs) == False:
-                        # lhs array leaf is not equal to rhs array leaf
-                        return False
-                else:
-                    # lhs array leaf is an array but rhs
-                    # leaf is not an array
-                    return False
-            else:
-                if lhs != rhs:
-                    # non-array lhs leaf is not equal to the
-                    # non-array rhs leaf
-                    return False
-    return True
+        verdict = ft.reduce(op.and_, map(compare, leaves0, leaves), verdict)
+    return verdict
 
 
 def _treeclass_transform(klass: type[T]) -> type[T]:
