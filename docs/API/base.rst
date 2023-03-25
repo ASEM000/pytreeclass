@@ -15,6 +15,7 @@ Public API
     tree_repr
     tree_str
     tree_summary
+    tree_repr_with_trace
     is_nondiff
     is_frozen
     unfreeze
@@ -48,6 +49,7 @@ Pretty Printing API
 .. autofunction:: tree_repr 
 .. autofunction:: tree_str
 .. autofunction:: tree_summary
+.. autofunction:: tree_repr_with_trace
 
 Wrapping and freezing API
 -------------------
