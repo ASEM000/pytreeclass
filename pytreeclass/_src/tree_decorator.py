@@ -177,7 +177,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
                 # https://github.com/ericvsmith/dataclasses/issues/3
                 msg = f"Mutable default value of field `{name}` is not allowed, use "
                 msg += f"`default_factory=lambda: {value.default}` instead."
-                raise ValueError(msg)
+                raise TypeError(msg)
 
             field_map[name] = value._replace(name=name, type=type)
 
