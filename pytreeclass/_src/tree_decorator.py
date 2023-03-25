@@ -8,16 +8,18 @@ from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence, TypeVar
 from weakref import WeakKeyDictionary
 
-_NOT_SET = type("NOT_SET", (), {"__repr__": lambda self: "?"})()
-_FROZEN = "__frozen__"
+_NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
+_MUTABLE = "__mutable__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
-_WRAPPED = "__wrapped__"
 _ANNOTATIONS = "__annotations__"
+_MAX_CACHE_SIZE = 128
+_WRAPPED = "__wrapped__"
 
 T = TypeVar("T")
 
 PyTree = Any
+
 
 """Define custom fozen `dataclasses.dataclass`-like decorator"""
 # similar to dataclass decorator for init code generation
@@ -34,14 +36,18 @@ PyTree = Any
 _field_registry: dict[type, Mapping[str, Field]] = WeakKeyDictionary()  # type: ignore
 
 
-def is_treeclass(klass_or_instance: Any) -> bool:
+def ovars(obj: Any) -> dict[str, Any]:
+    """Returns a dictionary of the object's attributes."""
+    return object.__getattribute__(obj, "__dict__")
+
+
+def is_treeclass(item: Any) -> bool:
     """Returns `True` if a class or instance is a `treeclass`."""
-    if isinstance(klass_or_instance, type):
-        return klass_or_instance in _field_registry
-    return type(klass_or_instance) in _field_registry
+    klass = item if isinstance(item, type) else type(item)
+    return klass in _field_registry
 
 
-@ft.lru_cache
+@ft.lru_cache(maxsize=_MAX_CACHE_SIZE)
 def _is_one_arg_func(func: Callable) -> bool:
     return len(inspect.signature(func).parameters) == 1
 
@@ -140,6 +146,7 @@ def field(
     )
 
 
+@ft.lru_cache(maxsize=_MAX_CACHE_SIZE)
 def _generate_field_map(klass: type) -> dict[str, Field]:
     # get all the fields of the class and its base classes
     # get the fields of the class and its base classes
@@ -167,6 +174,12 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         # at this point we stick to the type hint provided by the user
         # inconsistency between the type hint and the value will be handled later
         type = annotation_map[name]
+
+        if name == "self":
+            # while `dataclasses` allows `self` as a field name, its confusing
+            # and not recommended. so raise an error
+            msg = f"Field name cannot be `self`"
+            raise ValueError(msg)
 
         if isinstance(value, Field):
             # the annotated attribute is a `Field``
@@ -213,7 +226,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
     return field_map
 
 
-@ft.lru_cache(maxsize=None)
+@ft.lru_cache(maxsize=_MAX_CACHE_SIZE)
 def _generate_init_code(fields: Sequence[Field]):
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`factory`
@@ -223,8 +236,9 @@ def _generate_init_code(fields: Sequence[Field]):
 
     for field in fields:
         key = field.name
-        mark0 = f"FIELD_MAP['{key}'].default"
-        mark1 = f"FIELD_MAP['{key}'].factory()"
+
+        mark0 = f"field_map['{key}'].default"
+        mark1 = f"field_map['{key}'].factory()"
         mark2 = f"self.{key}"
 
         if field.kw_only and "*" not in head and field.init:
@@ -237,15 +251,15 @@ def _generate_init_code(fields: Sequence[Field]):
             head += f"{key}={mark0}, " if field.init else ""
             # we then add self.x = x for the body function if field is initialized
             # otherwise, define the default value inside the body ( self.x = default_value)
-            body += f"{mark2}=" + (f"{key}; " if field.init else f"{mark0};")
+            body += f"\t\t{mark2}=" + (f"{key}\n " if field.init else f"{mark0}\n")
         elif field.factory is not None:
             # same story for functions as above
             head += f"{key}={mark1}, " if field.init else ""
-            body += f"{mark2}=" + (f"{key};" if field.init else f"{mark1};")
+            body += f"\t\t{mark2}=" + (f"{key}\n" if field.init else f"{mark1}\n")
         else:
             # no defaults are added
             head += f"{key}, " if field.init else ""
-            body += f"{mark2}={key}; " if field.init else ""
+            body += f"\t\t{mark2}={key}\n " if field.init else ""
 
         if field.pos_only and field.init:
             # if the field is positional only, we add a "/" marker after it
@@ -256,12 +270,12 @@ def _generate_init_code(fields: Sequence[Field]):
 
     # in case no field is initialized, we add a pass statement to the body
     # to avoid syntax error in the generated code
-    body += "pass"
+    body += "\t\tpass"
     # add the body to the head
-    body = " def __init__(self, " + head[:-2] + "):" + body
+    body = "\tdef __init__(self, " + head[:-2] + "):\n" + body
     # use closure to be able to reference default values of all types
-    body = f"def closure(FIELD_MAP):\n{body}\n return __init__"
-    return body
+    body = f"def closure(field_map):\n{body}\n\treturn __init__"
+    return body.expandtabs(4)
 
 
 def _generate_init(klass: type) -> FunctionType:
@@ -289,56 +303,55 @@ def _generate_init(klass: type) -> FunctionType:
 def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
     def wrapper(self, *a, **k) -> None:
-        vars(self)[_FROZEN] = False
-
-        for field in _field_registry[type(self)].values():
-            if field.default is not _NOT_SET:
-                vars(self)[field.name] = field.default
-            elif field.factory is not None:
-                vars(self)[field.name] = field.factory()
+        ovars(self)[_MUTABLE] = True
 
         output = init_func(self, *a, **k)
 
-        # in case __post_init__ is defined then call it
-        # after the tree is initialized
-        # here, we assume that __post_init__ is a method
+        # To simplify logic; if defined, `__post_init__` will
+        # be called after initialization Even if `__init__` is user-defind
         if hasattr(type(self), _POST_INIT):
-            # in case we found post_init in super class
-            # then defreeze it first and call it
-            # this behavior is differet to `dataclasses` with `frozen=True`
-            # but similar if `frozen=False`
-            # vars(self)[_FROZEN] = False
-            # the following code will raise FrozenInstanceError in `dataclasses`
-            # but it will work in `treeclass`,
+            # defreeze then call the method. this behavior is differet to
+            # `dataclasses` with `frozen=True` but similar if `frozen=False`
+            # the following code will raise FrozenInstanceError in
+            # `dataclasses` but it will work in `treeclass`,
             # i.e. `treeclass` defreezes the tree after `__post_init__`
             # >>> @dc.dataclass(frozen=True)
             # ... class Test:
             # ...    a:int = 1
             # ...    def __post_init__(self):
             # ...        self.b = 1
-            vars(self)[_FROZEN] = False
+            vars(self)[_MUTABLE] = True
             output = getattr(type(self), _POST_INIT)(self)
 
         # handle uninitialized fields
-        for field in _field_registry[type(self)].values():
-            if field.name not in vars(self):
-                # at this point, all fields should be initialized
-                # in principle, this error will be caught when invoking `repr`/`str`
-                # like in `dataclasses` but we raise it here for better error message.
+        for key in set(_field_registry[type(self)]) - set(ovars(self)):
+            # To avoid confusion, all type hinted class variables must be
+            # translated to instnace variables. this is different from `dataclasses` behavior
+            # that will assume non-initialized fields as class variables.
+            field = _field_registry[type(self)][key]
+
+            if field.default is not _NOT_SET:
+                # uninitialized fields with default values
+                vars(self)[field.name] = field.default
+            elif field.factory is not None:
+                # uninitialized fields with factory functions
+                vars(self)[field.name] = field.factory()
+            else:
+                # uninitialized fields without default values/factory functions
                 raise AttributeError(f"field=`{field.name}` is not initialized.")
 
         # delete the shadowing `__dict__` attribute to
         # restore the frozen behavior
-        if _FROZEN in vars(self):
-            del vars(self)[_FROZEN]
+        if _MUTABLE in ovars(self):
+            del ovars(self)[_MUTABLE]
         return output
 
     return wrapper
 
 
 def _setattr(self: PyTree, key: str, value: Any) -> None:
-    if getattr(self, _FROZEN):
-        # Set the attribute of the tree if the tree is not frozen
+    if _MUTABLE not in ovars(self):
+        # default behavior for frozen instances
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise AttributeError(msg)
 
@@ -359,7 +372,7 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
                     raise type(e)(msg)
 
     # set the value
-    vars(self)[key] = value  # type: ignore
+    ovars(self)[key] = value  # type: ignore
 
     if type(value) in _field_registry and key not in _field_registry[type(self)]:
         # auto registers the instance value if it is a registered `treeclass`
@@ -370,21 +383,16 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
 
 def _delattr(self, key: str) -> None:
     # Delete the attribute if tree is not frozen
-    if getattr(self, _FROZEN):
+    if _MUTABLE not in ovars(self):
         raise AttributeError(f"Cannot delete {key}.")
-    del vars(self)[key]
+    del ovars(self)[key]
 
 
-def fields(klass_or_instance: Any) -> Sequence[Field]:
+def fields(item: Any) -> Sequence[Field]:
     """Get the fields of a `treeclass` instance."""
-    if not is_treeclass(klass_or_instance):
-        raise TypeError(f"Cannot get fields from {klass_or_instance!r}.")
+    if not is_treeclass(item):
+        raise TypeError(f"Cannot get fields from {_field_registry!r}.")
 
-    if isinstance(klass_or_instance, type):
-        # if the tree is a class, then return the fields of the class
-        field_map = _field_registry[klass_or_instance]
-    else:
-        # if the tree is an instance, then return the fields of the instance
-        field_map = _field_registry[type(klass_or_instance)]
-
+    klass = item if isinstance(item, type) else type(item)
+    field_map = _field_registry[klass]
     return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))

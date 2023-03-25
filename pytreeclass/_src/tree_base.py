@@ -11,7 +11,6 @@ import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_decorator import (
-    _FROZEN,
     _delattr,
     _field_registry,
     _generate_field_map,
@@ -19,8 +18,9 @@ from pytreeclass._src.tree_decorator import (
     _init_wrapper,
     _setattr,
     field,
+    ovars,
 )
-from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
+from pytreeclass._src.tree_freeze import _WRAPPED, _tree_hash, _tree_unwrap
 from pytreeclass._src.tree_indexer import tree_indexer
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_trace import _trace_registry, _TraceRegistryEntry
@@ -38,8 +38,8 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     # on each unflattening which is not efficient.
     # however it might be useful to constantly check if the updated value is
     # satisfying the constraints defined by the user in the callbacks.
-    vars(tree).update(treedef[1])
-    vars(tree).update(zip(treedef[0], leaves))
+    ovars(tree).update(treedef[1])
+    ovars(tree).update(zip(treedef[0], leaves))
     return tree
 
 
@@ -47,7 +47,7 @@ def _tree_flatten(
     tree: PyTree,
 ) -> tuple[list[Any], tuple[tuple[str, ...], dict[str, Any]]]:
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
-    static, dynamic = dict(vars(tree)), dict()
+    static, dynamic = dict(ovars(tree)), dict()
     for key in _field_registry[type(tree)]:
         dynamic[key] = static.pop(key)
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
@@ -66,7 +66,7 @@ def _tree_trace(
     return [*zip(names, types, indices, metadatas)]
 
 
-@ft.lru_cache(maxsize=1)
+@ft.lru_cache(maxsize=None)
 def _register_treeclass(klass: type[T]) -> type[T]:
     # register a treeclass only once by using `lru_cache`
     # there are two cases where a class is registered more than once:
@@ -84,7 +84,7 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     return klass
 
 
-def _getattr_method(getattr_method):
+def _getattr_wrapper(getattr_method):
     @ft.wraps(getattr_method)
     def wrapper(self, key: str) -> Any:
         # this current approach replaces the older metdata based approach
@@ -112,7 +112,7 @@ def _getattr_method(getattr_method):
         # unwrap non-`treeclass` wrapped instance variables
         # so the getattr will always return unwrapped values.
         # this renders the wrapped instance variables transparent to the user
-        return _tree_unwrap(value) if key in getattr_method(self, "__dict__") else value
+        return _tree_unwrap(value) if key in ovars(self) else value
 
     return wrapper
 
@@ -200,11 +200,8 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
     return verdict
 
 
+@ft.lru_cache(maxsize=None)
 def _treeclass_transform(klass: type[T]) -> type[T]:
-    # add custom `dataclass`-like fields map
-    # flag for the immutable behavior used throughout the code
-    setattr(klass, _FROZEN, True)
-
     if "__init__" not in vars(klass):
         # generate the init method in case it is not defined by the user
         setattr(klass, "__init__", _generate_init(klass))
@@ -214,8 +211,10 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     for key, wrapper in (
         ("__init__", _init_wrapper),
         ("__init_subclass__", _init_subclass_wrapper),
-        ("__getattribute__", _getattr_method),
+        ("__getattribute__", _getattr_wrapper),
     ):
+        # use cache to prevent transforming the same class multiple times
+        # this can lead to recursion errors from wrapping the same method multiple times
         setattr(klass, key, wrapper(getattr(klass, key)))
 
     # basic required methods

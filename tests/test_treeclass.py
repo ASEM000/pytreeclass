@@ -695,3 +695,11 @@ def test_incorrect_trace_func():
     pytc.tree_leaves_with_trace(T())
 
     assert True
+
+
+def test_self_field_name():
+    with pytest.raises(ValueError):
+
+        @pytc.treeclass
+        class Tree:
+            self: int = pytc.field()

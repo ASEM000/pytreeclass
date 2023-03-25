@@ -9,7 +9,13 @@ import jax
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _FROZEN, _WRAPPED, _field_registry, fields
+from pytreeclass._src.tree_decorator import (
+    _MUTABLE,
+    _WRAPPED,
+    _field_registry,
+    fields,
+    ovars,
+)
 
 PyTree = Any
 
@@ -33,6 +39,14 @@ def _tree_hash(tree: PyTree) -> int:
 
 def _unwrap(value: Any) -> Any:
     return value.unwrap() if isinstance(value, ImmutableWrapper) else value
+
+
+def _tree_unwrap(value: PyTree) -> PyTree:
+    # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
+    def is_leaf(x: Any) -> bool:
+        return isinstance(x, ImmutableWrapper) or type(x) in _field_registry
+
+    return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
 
 class ImmutableWrapper:
@@ -72,7 +86,7 @@ class ImmutableWrapper:
 
     def __init__(self, x: Any) -> None:
         # disable composition of Wrappers
-        vars(self)[_WRAPPED] = _unwrap(x)
+        ovars(self)[_WRAPPED] = _unwrap(x)
 
     def unwrap(self) -> Any:
         return getattr(self, _WRAPPED)
@@ -82,14 +96,6 @@ class ImmutableWrapper:
 
     def __delattr__(self, _: str) -> None:
         raise AttributeError("Cannot delete from frozen instance.")
-
-
-def _tree_unwrap(value: PyTree) -> PyTree:
-    # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
-    def is_leaf(x: Any) -> bool:
-        return isinstance(x, ImmutableWrapper) or type(x) in _field_registry
-
-    return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
 
 class _HashableWrapper(ImmutableWrapper):
@@ -124,7 +130,7 @@ def _frozen_flatten(tree: Any) -> tuple[tuple, Any]:
 
 def _frozen_unflatten(treedef: Any, _: Sequence[Any]) -> PyTree:
     tree = object.__new__(FrozenWrapper)  # type: ignore
-    vars(tree)[_WRAPPED] = treedef.unwrap()
+    ovars(tree)[_WRAPPED] = treedef.unwrap()
     return tree
 
 
@@ -241,11 +247,10 @@ def _call_context(tree: PyTree):
     def mutate_step(tree: PyTree):
         if type(tree) not in _field_registry:
             return tree
-        # shadow the class _FROZEN attribute with an
-        # instance variable to temporarily disable the frozen behavior
+        # temporarily disable the frozen behavior by inject _MUTABLE flag
         # after the context manager exits, the instance variable will be deleted
         # and the class attribute will be used again.
-        vars(tree)[_FROZEN] = False  # type: ignore
+        ovars(tree)[_MUTABLE] = True  # type: ignore
         for field in fields(tree):
             mutate_step(getattr(tree, field.name))  # type: ignore
         return tree
@@ -253,10 +258,10 @@ def _call_context(tree: PyTree):
     def immutate_step(tree):
         if type(tree) not in _field_registry:
             return tree
-        if _FROZEN not in vars(tree):
+        if _MUTABLE not in ovars(tree):
             return tree
 
-        del vars(tree)[_FROZEN]
+        del ovars(tree)[_MUTABLE]
         for field in fields(tree):
             immutate_step(getattr(tree, field.name))
         return tree
