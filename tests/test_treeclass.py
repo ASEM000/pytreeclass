@@ -106,8 +106,8 @@ def test_field():
         def __init__(self) -> None:
             pass
 
-    assert Test().__dict__["a"] == 1
-    assert Test().__dict__["b"] == 1
+    with pytest.raises(AttributeError):
+        Test()
 
 
 def test_field_nondiff():

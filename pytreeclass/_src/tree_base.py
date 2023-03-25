@@ -20,7 +20,7 @@ from pytreeclass._src.tree_decorator import (
     field,
     ovars,
 )
-from pytreeclass._src.tree_freeze import _WRAPPED, _tree_hash, _tree_unwrap
+from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
 from pytreeclass._src.tree_indexer import tree_indexer
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_trace import _trace_registry, _TraceRegistryEntry

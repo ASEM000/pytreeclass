@@ -146,14 +146,16 @@ def test_freeze_nondiff():
     class Linear:
         weight: jnp.ndarray
         bias: jnp.ndarray
-        count: int = 0
-        use_bias: bool = True
+        count: int
+        use_bias: bool
 
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
                 2 / in_dim
             )
             self.bias = jnp.ones((1, out_dim))
+            self.use_bias = True
+            self.count = 0
 
         def __call__(self, x):
             return x @ self.weight + self.bias

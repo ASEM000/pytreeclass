@@ -307,8 +307,8 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
         output = init_func(self, *a, **k)
 
-        # To simplify logic; if defined, `__post_init__` will
-        # be called after initialization Even if `__init__` is user-defind
+        # To simplify logic; defined, `__post_init__` will
+        # be called after initialization Even if `__init__` is user-defined
         if hasattr(type(self), _POST_INIT):
             # defreeze then call the method. this behavior is differet to
             # `dataclasses` with `frozen=True` but similar if `frozen=False`
@@ -320,25 +320,15 @@ def _init_wrapper(init_func: Callable) -> Callable:
             # ...    a:int = 1
             # ...    def __post_init__(self):
             # ...        self.b = 1
-            vars(self)[_MUTABLE] = True
+            ovars(self)[_MUTABLE] = True
             output = getattr(type(self), _POST_INIT)(self)
 
         # handle uninitialized fields
-        for key in set(_field_registry[type(self)]) - set(ovars(self)):
-            # To avoid confusion, all type hinted class variables must be
-            # translated to instnace variables. this is different from `dataclasses` behavior
-            # that will assume non-initialized fields as class variables.
-            field = _field_registry[type(self)][key]
-
-            if field.default is not _NOT_SET:
-                # uninitialized fields with default values
-                ovars(self)[field.name] = field.default
-            elif field.factory is not None:
-                # uninitialized fields with factory functions
-                ovars(self)[field.name] = field.factory()
-            else:
-                # uninitialized fields without default values/factory functions
-                raise AttributeError(f"field=`{field.name}` is not initialized.")
+        uninit_keys = set(_field_registry[type(self)]) - set(ovars(self))
+        if len(uninit_keys) > 0:
+            msg = f"Uninitialized fields: ({', '.join(uninit_keys)}) "
+            msg += f"in class `{type(self).__name__}`"
+            raise AttributeError(msg)
 
         # delete the shadowing `__dict__` attribute to
         # restore the frozen behavior
