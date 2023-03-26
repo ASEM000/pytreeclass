@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_freeze import _call_context
+from pytreeclass._src.tree_decorator import _call_context
 from pytreeclass._src.tree_trace import tree_map_with_trace
 
 PyTree = Any

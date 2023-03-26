@@ -1,21 +1,13 @@
 from __future__ import annotations
 
-import copy
 import hashlib
-from contextlib import contextmanager
 from typing import Any, Sequence
 
 import jax
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import (
-    _MUTABLE,
-    _WRAPPED,
-    _field_registry,
-    fields,
-    ovars,
-)
+from pytreeclass._src.tree_decorator import _WRAPPED, _field_registry, ovars
 
 PyTree = Any
 
@@ -240,33 +232,3 @@ def is_nondiff(x: Any) -> bool:
     if isinstance(x, (float, complex)):
         return False
     return True
-
-
-@contextmanager
-def _call_context(tree: PyTree):
-    def mutate_step(tree: PyTree):
-        if type(tree) not in _field_registry:
-            return tree
-        # temporarily disable the frozen behavior by inject _MUTABLE flag
-        # after the context manager exits, the instance variable will be deleted
-        # and the class attribute will be used again.
-        ovars(tree)[_MUTABLE] = True  # type: ignore
-        for field in fields(tree):
-            mutate_step(getattr(tree, field.name))  # type: ignore
-        return tree
-
-    def immutate_step(tree):
-        if type(tree) not in _field_registry:
-            return tree
-        if _MUTABLE not in ovars(tree):
-            return tree
-
-        del ovars(tree)[_MUTABLE]
-        for field in fields(tree):
-            immutate_step(getattr(tree, field.name))
-        return tree
-
-    tree = copy.copy(tree)
-    mutate_step(tree)
-    yield tree
-    immutate_step(tree)

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import copy
 import dataclasses as dc
 import functools as ft
 import inspect
 import sys
+from contextlib import contextmanager
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence, TypeVar
 from weakref import WeakKeyDictionary
@@ -146,7 +148,6 @@ def field(
     )
 
 
-@ft.lru_cache(maxsize=_MAX_CACHE_SIZE)
 def _generate_field_map(klass: type) -> dict[str, Field]:
     # get all the fields of the class and its base classes
     # get the fields of the class and its base classes
@@ -386,3 +387,33 @@ def fields(item: Any) -> Sequence[Field]:
     klass = item if isinstance(item, type) else type(item)
     field_map = _field_registry[klass]
     return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))
+
+
+@contextmanager
+def _call_context(tree: PyTree):
+    def mutate_step(tree: PyTree):
+        if type(tree) not in _field_registry:
+            return tree
+        # temporarily disable the frozen behavior by inject _MUTABLE flag
+        # after the context manager exits, the instance variable will be deleted
+        # and the class attribute will be used again.
+        ovars(tree)[_MUTABLE] = True  # type: ignore
+        for field in fields(tree):
+            mutate_step(getattr(tree, field.name))  # type: ignore
+        return tree
+
+    def immutate_step(tree):
+        if type(tree) not in _field_registry:
+            return tree
+        if _MUTABLE not in ovars(tree):
+            return tree
+
+        del ovars(tree)[_MUTABLE]
+        for field in fields(tree):
+            immutate_step(getattr(tree, field.name))
+        return tree
+
+    tree = copy.copy(tree)
+    mutate_step(tree)
+    yield tree
+    immutate_step(tree)

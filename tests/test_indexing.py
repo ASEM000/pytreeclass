@@ -669,7 +669,7 @@ def test_iterable_node():
 # t = Tree()
 
 
-def test_mutable_context():
+def test_call_context():
     @ft.partial(pytc.treeclass, leafwise=True)
     class L2:
         a: int = 1

@@ -159,6 +159,18 @@ def _validate_class(klass: type[T]) -> type[T]:
     return klass
 
 
+def _is_lhs_rhs_equal(lhs, rhs) -> bool | jax.Array:
+    if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
+        if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
+            verdict = jnp.array_equal(lhs, rhs)
+            try:
+                return bool(verdict)
+            except Exception:
+                return verdict  #  fail under `jit`
+        return False
+    return lhs == rhs
+
+
 def is_tree_equal(*trees: Any) -> bool | jax.Array:
     """Return `True` if all pytrees are equal.
 
@@ -168,25 +180,8 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
         method `__eq__` is used.
 
     Note:
-        Under `jit` the return type is `jax.Array` instead of python `bool`.
+        Under `jit` the return type is boolean `jax.Array` instead of python `bool`.
     """
-
-    def compare(lhs, rhs) -> bool | jax.Array:
-        if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
-            if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
-                # Array lhs leaf and array rhs leaf
-                # try to convert to bool to avoid having `Array(True)` without jit
-                # this can occur if any leaf is an array
-                # howver the conversion will fail under `jit`
-                verdict = jnp.array_equal(lhs, rhs)
-                try:
-                    return bool(verdict)
-                except:
-                    return verdict
-            # Non-array rhs leaf and lhs leaf array
-            return False
-        # Non-array lhs leaf and non-array rhs leaf
-        return lhs == rhs
 
     tree0, *rest = trees
     leaves0, treedef0 = jtu.tree_flatten(tree0)
@@ -196,7 +191,7 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
         leaves, treedef = jtu.tree_flatten(tree)
         if (treedef != treedef0) or verdict is False:
             return False
-        verdict = ft.reduce(op.and_, map(compare, leaves0, leaves), verdict)
+        verdict = ft.reduce(op.and_, map(_is_lhs_rhs_equal, leaves0, leaves), verdict)
     return verdict
 
 
