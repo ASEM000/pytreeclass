@@ -405,10 +405,10 @@ def _call_context(tree: PyTree):
     def immutate_step(tree):
         if type(tree) not in _field_registry:
             return tree
-        if _MUTABLE not in ovars(tree):
-            return tree
 
-        del ovars(tree)[_MUTABLE]
+        if _MUTABLE in ovars(tree):
+            del ovars(tree)[_MUTABLE]
+
         for field in fields(tree):
             immutate_step(getattr(tree, field.name))
         return tree
