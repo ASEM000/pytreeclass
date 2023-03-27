@@ -38,10 +38,6 @@ _field_registry: dict[type, Mapping[str, Field]] = defaultdict(dict)
 
 
 def register_pytree_field_map(klass: type[T], field_map: Mapping[str, Field]) -> None:
-    if klass in _field_registry and any(k in _field_registry[klass] for k in field_map):
-        msg = f"Class {klass} is already registered as a `treeclass`"
-        msg += f"with field_map={_field_registry[klass]}"
-        raise ValueError(msg)
     _field_registry[klass].update(field_map)
 
 

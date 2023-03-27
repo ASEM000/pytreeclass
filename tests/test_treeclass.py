@@ -714,3 +714,12 @@ def test_self_field_name():
         @pytc.treeclass
         class Tree:
             self: int = pytc.field()
+
+
+def test_repeated_treeclass():
+    @pytc.treeclass
+    @pytc.treeclass
+    class Tree:
+        a: int = pytc.field()
+
+    assert True
