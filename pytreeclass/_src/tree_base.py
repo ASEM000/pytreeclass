@@ -19,11 +19,12 @@ from pytreeclass._src.tree_decorator import (
     _setattr,
     field,
     ovars,
+    register_pytree_field_map,
 )
 from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
 from pytreeclass._src.tree_indexer import tree_indexer
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
-from pytreeclass._src.tree_trace import _trace_registry, _TraceRegistryEntry
+from pytreeclass._src.tree_trace import register_pytree_node_trace
 
 PyTree = Any
 T = TypeVar("T")
@@ -66,21 +67,13 @@ def _tree_trace(
     return [*zip(names, types, indices, metadatas)]
 
 
-@ft.lru_cache(maxsize=None)
 def _register_treeclass(klass: type[T]) -> type[T]:
-    # register a treeclass only once by using `lru_cache`
-    # there are two cases where a class is registered more than once:
-    # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
-    # second when a class is decorated with `treeclass` and has a parent class that is also decorated with `treeclass`
-    # in that case `__init_subclass__` registers the class before the decorator registers it.
-    # this can be also be done using metaclass that registers the class on initialization
-    # but we are trying to stay away from deep magic.
+    # register the trace flatten rule
+    register_pytree_node_trace(klass, _tree_trace)
+    # register the generated field map
+    register_pytree_field_map(klass, _generate_field_map(klass))
+    # register the flatten/unflatten rules with jax
     jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
-    # register the trace flatten rule without the validation to avoid
-    # the unnecessary overhead of the first call validation.
-    _trace_registry[klass] = _TraceRegistryEntry(_tree_trace)
-    # generate field map for the class and register it in a weakref registry
-    _field_registry[klass] = _generate_field_map(klass)
     return klass
 
 
@@ -147,18 +140,6 @@ def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
     return wrapper
 
 
-def _validate_class(klass: type[T]) -> type[T]:
-    if not isinstance(klass, type):
-        raise TypeError(f"Expected `class` but got `{type(klass)}`.")
-
-    for key, method in (("__delattr__", _delattr), ("__setattr__", _setattr)):
-        if key in vars(klass) and vars(klass)[key] is not method:
-            # raise error if the current setattr/delattr is not immutable
-            raise AttributeError(f"Cannot define `{key}` in {klass.__name__}.")
-
-    return klass
-
-
 def _is_lhs_rhs_equal(lhs, rhs) -> bool | jax.Array:
     if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
         if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
@@ -195,48 +176,6 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
     return verdict
 
 
-@ft.lru_cache(maxsize=None)
-def _treeclass_transform(klass: type[T]) -> type[T]:
-    if "__init__" not in vars(klass):
-        # generate the init method in case it is not defined by the user
-        setattr(klass, "__init__", _generate_init(klass))
-
-    # wrappers to enable the field initialization,
-    # callback functionality and transparent wrapper behavior
-    for key, wrapper in (
-        ("__init__", _init_wrapper),
-        ("__init_subclass__", _init_subclass_wrapper),
-        ("__getattribute__", _getattr_wrapper),
-    ):
-        # use cache to prevent transforming the same class multiple times
-        # this can lead to recursion errors from wrapping the same method multiple times
-        setattr(klass, key, wrapper(getattr(klass, key)))
-
-    # basic required methods
-    for key, method in (
-        ("__setattr__", _setattr),
-        ("__delattr__", _delattr),
-        ("__match_args__", tuple(_field_registry[klass].keys())),
-    ):
-        setattr(klass, key, method)
-
-    # basic optional methods
-    for key, method in (
-        ("__repr__", tree_repr),
-        ("__str__", tree_str),
-        ("__copy__", _tree_copy),
-        ("__hash__", _tree_hash),
-        ("__eq__", is_tree_equal),
-        ("at", property(tree_indexer)),
-    ):
-        if key not in vars(klass):
-            # keep the original method if it is defined by the user
-            # this behavior similar is to `dataclasses.dataclass`
-            setattr(klass, key, method)
-
-    return klass
-
-
 def _tree_copy(tree: PyTree) -> PyTree:
     """Return a copy of the tree."""
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore
@@ -263,58 +202,101 @@ def _swop(func):
     return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
 
 
-def _leafwise_transform(klass: type[T]) -> type[T]:
-    # add leafwise transform methods to the class
-    # that enable the user to apply a function to
-    # all the leaves of the tree
+def _treeclass_transform(klass: type[T], leafwise: bool) -> type[T]:
+    # the method is called after registering the class with `_register_treeclass`
+
+    for key, method in (("__setattr__", _setattr), ("__delattr__", _delattr)):
+        # basic required methods
+        if key in vars(klass):
+            if vars(klass)[key] is method:
+                return klass  # the class is already transformed
+            msg = f"Unable to transform the class {klass.__name__} with {key} method defined."
+            raise TypeError(msg)
+        setattr(klass, key, method)
+
+    if "__init__" not in vars(klass):
+        # generate the init method in case it is not defined by the user
+        setattr(klass, "__init__", _generate_init(klass))
+
+    # wrappers to enable the field initialization,
+    # callback functionality and transparent wrapper behavior
+    for key, wrapper in (
+        ("__init__", _init_wrapper),
+        ("__init_subclass__", _init_subclass_wrapper),
+        ("__getattribute__", _getattr_wrapper),
+    ):
+        # use cache to prevent transforming the same class multiple times
+        # this can lead to recursion errors from wrapping the same method multiple times
+        setattr(klass, key, wrapper(getattr(klass, key)))
+
+    if leafwise:
+        # add leafwise transform methods to the class
+        # that enable the user to apply a function to
+        # all the leaves of the tree
+        for key, method in (
+            ("__abs__", _unary_op(abs)),
+            ("__add__", _binary_op(op.add)),
+            ("__and__", _binary_op(op.and_)),
+            ("__ceil__", _unary_op(ceil)),
+            ("__divmod__", _binary_op(divmod)),
+            ("__eq__", _binary_op(op.eq)),
+            ("__floor__", _unary_op(floor)),
+            ("__floordiv__", _binary_op(op.floordiv)),
+            ("__ge__", _binary_op(op.ge)),
+            ("__gt__", _binary_op(op.gt)),
+            ("__invert__", _unary_op(op.invert)),
+            ("__le__", _binary_op(op.le)),
+            ("__lshift__", _binary_op(op.lshift)),
+            ("__lt__", _binary_op(op.lt)),
+            ("__matmul__", _binary_op(op.matmul)),
+            ("__mod__", _binary_op(op.mod)),
+            ("__mul__", _binary_op(op.mul)),
+            ("__ne__", _binary_op(op.ne)),
+            ("__neg__", _unary_op(op.neg)),
+            ("__or__", _binary_op(op.or_)),
+            ("__pos__", _unary_op(op.pos)),
+            ("__pow__", _binary_op(op.pow)),
+            ("__radd__", _binary_op(_swop(op.add))),
+            ("__rand__", _binary_op(_swop(op.and_))),
+            ("__rdivmod__", _binary_op(_swop(divmod))),
+            ("__rfloordiv__", _binary_op(_swop(op.floordiv))),
+            ("__rlshift__", _binary_op(_swop(op.lshift))),
+            ("__rmatmul__", _binary_op(_swop(op.matmul))),
+            ("__rmod__", _binary_op(_swop(op.mod))),
+            ("__rmul__", _binary_op(_swop(op.mul))),
+            ("__ror__", _binary_op(_swop(op.or_))),
+            ("__round__", _binary_op(round)),
+            ("__rpow__", _binary_op(_swop(op.pow))),
+            ("__rrshift__", _binary_op(_swop(op.rshift))),
+            ("__rshift__", _binary_op(op.rshift)),
+            ("__rsub__", _binary_op(_swop(op.sub))),
+            ("__rtruediv__", _binary_op(_swop(op.truediv))),
+            ("__rxor__", _binary_op(_swop(op.xor))),
+            ("__sub__", _binary_op(op.sub)),
+            ("__truediv__", _binary_op(op.truediv)),
+            ("__trunc__", _unary_op(trunc)),
+            ("__xor__", _binary_op(op.xor)),
+        ):
+            if key not in vars(klass):
+                # do not override any user defined methods
+                # this behavior similar is to `dataclasses.dataclass`
+                setattr(klass, key, method)
+
+    # basic optional methods
     for key, method in (
-        ("__abs__", _unary_op(abs)),
-        ("__add__", _binary_op(op.add)),
-        ("__and__", _binary_op(op.and_)),
-        ("__ceil__", _unary_op(ceil)),
-        ("__divmod__", _binary_op(divmod)),
-        ("__eq__", _binary_op(op.eq)),
-        ("__floor__", _unary_op(floor)),
-        ("__floordiv__", _binary_op(op.floordiv)),
-        ("__ge__", _binary_op(op.ge)),
-        ("__gt__", _binary_op(op.gt)),
-        ("__invert__", _unary_op(op.invert)),
-        ("__le__", _binary_op(op.le)),
-        ("__lshift__", _binary_op(op.lshift)),
-        ("__lt__", _binary_op(op.lt)),
-        ("__matmul__", _binary_op(op.matmul)),
-        ("__mod__", _binary_op(op.mod)),
-        ("__mul__", _binary_op(op.mul)),
-        ("__ne__", _binary_op(op.ne)),
-        ("__neg__", _unary_op(op.neg)),
-        ("__or__", _binary_op(op.or_)),
-        ("__pos__", _unary_op(op.pos)),
-        ("__pow__", _binary_op(op.pow)),
-        ("__radd__", _binary_op(_swop(op.add))),
-        ("__rand__", _binary_op(_swop(op.and_))),
-        ("__rdivmod__", _binary_op(_swop(divmod))),
-        ("__rfloordiv__", _binary_op(_swop(op.floordiv))),
-        ("__rlshift__", _binary_op(_swop(op.lshift))),
-        ("__rmatmul__", _binary_op(_swop(op.matmul))),
-        ("__rmod__", _binary_op(_swop(op.mod))),
-        ("__rmul__", _binary_op(_swop(op.mul))),
-        ("__ror__", _binary_op(_swop(op.or_))),
-        ("__round__", _binary_op(round)),
-        ("__rpow__", _binary_op(_swop(op.pow))),
-        ("__rrshift__", _binary_op(_swop(op.rshift))),
-        ("__rshift__", _binary_op(op.rshift)),
-        ("__rsub__", _binary_op(_swop(op.sub))),
-        ("__rtruediv__", _binary_op(_swop(op.truediv))),
-        ("__rxor__", _binary_op(_swop(op.xor))),
-        ("__sub__", _binary_op(op.sub)),
-        ("__truediv__", _binary_op(op.truediv)),
-        ("__trunc__", _unary_op(trunc)),
-        ("__xor__", _binary_op(op.xor)),
+        ("__repr__", tree_repr),
+        ("__str__", tree_str),
+        ("__copy__", _tree_copy),
+        ("__hash__", _tree_hash),
+        ("__eq__", is_tree_equal),
+        ("__match_args__", tuple(_field_registry[klass].keys())),
+        ("at", property(tree_indexer)),
     ):
         if key not in vars(klass):
-            # do not override any user defined methods
+            # keep the original method if it is defined by the user
             # this behavior similar is to `dataclasses.dataclass`
             setattr(klass, key, method)
+
     return klass
 
 
@@ -381,20 +363,24 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     Raises:
         TypeError: if the input is not a class.
     """
-    # check if the input is a valid class
-    # in essence, it should be a type with immutable setters and deleters
-    klass = _validate_class(klass)
-
-    # add the class to the `JAX`, `trace`, and `field_map` registries
-    klass = _register_treeclass(klass)
+    try:
+        # will raise `ValueError` if the class is already registered
+        # there are two cases where a class is registered more than once:
+        # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
+        # second when a class is decorated with `treeclass` and has a parent class that is decorated with `treeclass`
+        # in that case `__init_subclass__` registers the class before the decorator registers it.
+        # this can be also be done using metaclass that registers the class on initialization
+        # but we are trying to stay away from deep magic.
+        klass = _register_treeclass(klass)
+    except ValueError:
+        # the class is already registered
+        pass
 
     # add math operations methods if leafwise
     # do not override any user defined methods
-    klass = _leafwise_transform(klass) if leafwise else klass
-
     # add `repr`,'str', 'at', 'copy', 'hash', 'copy'
     # add the immutable setters and deleters
     # generate the `__init__` method if not present using type hints.
-    klass = _treeclass_transform(klass)
+    klass = _treeclass_transform(klass, leafwise)
 
     return klass

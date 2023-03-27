@@ -5,17 +5,16 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import sys
+from collections import defaultdict
 from contextlib import contextmanager
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, NamedTuple, Sequence, TypeVar
-from weakref import WeakKeyDictionary
+from typing import Any, Callable, Mapping, NamedTuple, Sequence, TypeVar
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _MUTABLE = "__mutable__"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
 _ANNOTATIONS = "__annotations__"
-_MAX_CACHE_SIZE = 128
 _WRAPPED = "__wrapped__"
 
 T = TypeVar("T")
@@ -23,7 +22,7 @@ T = TypeVar("T")
 PyTree = Any
 
 
-"""Define custom fozen `dataclasses.dataclass`-like decorator"""
+"""Define custom frozen `dataclasses.dataclass`-like decorator"""
 # similar to dataclass decorator for init code generation
 # the motivation for writing this is to avoid the need to use dataclasses
 # especially after this update https://github.com/google/jax/issues/14295
@@ -33,9 +32,17 @@ PyTree = Any
 # A registry to store the fields of the `treeclass` wrapped classes. fields are a similar concept to
 # `dataclasses.Field` but with the addition of `callbacks` attribute
 # While `dataclasses` fields are added as a class attribute to the class under `__dataclass_fields__`
-# in this implementation, the fields are stored in a `WeakKeyDictionary` as an extra precaution
+# in this implementation, the fields are stored in a `defaultdict` as an extra precaution
 # to avoid user-side modification of the fields while maintaining a cleaner namespace
-_field_registry: dict[type, Mapping[str, Field]] = WeakKeyDictionary()  # type: ignore
+_field_registry: dict[type, Mapping[str, Field]] = defaultdict(dict)
+
+
+def register_pytree_field_map(klass: type[T], field_map: Mapping[str, Field]) -> None:
+    if klass in _field_registry and any(k in _field_registry[klass] for k in field_map):
+        msg = f"Class {klass} is already registered as a `treeclass`"
+        msg += f"with field_map={_field_registry[klass]}"
+        raise ValueError(msg)
+    _field_registry[klass].update(field_map)
 
 
 def ovars(obj: Any) -> dict[str, Any]:
@@ -49,7 +56,7 @@ def is_treeclass(item: Any) -> bool:
     return klass in _field_registry
 
 
-@ft.lru_cache(maxsize=_MAX_CACHE_SIZE)
+@ft.lru_cache
 def _is_one_arg_func(func: Callable) -> bool:
     return len(inspect.signature(func).parameters) == 1
 
@@ -222,12 +229,10 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
             # otherwise, we create a Field and assign default value to the class
             field_map[name] = Field(name=name, type=type, default=value)
 
-    # add the field map to the global registry
-    _field_registry[klass] = field_map
     return field_map
 
 
-@ft.lru_cache(maxsize=_MAX_CACHE_SIZE)
+@ft.lru_cache
 def _generate_init_code(fields: Sequence[Field]):
     # generate the init method code string
     # in here, we generate the function head and body and add `default`/`factory`
@@ -281,7 +286,7 @@ def _generate_init_code(fields: Sequence[Field]):
 
 def _generate_init(klass: type) -> FunctionType:
     # generate the field map for the class
-    field_map = _field_registry[klass]
+    field_map = _generate_field_map(klass)
     # generate init method
     local_namespace = dict()  # type: ignore
     global_namespace = vars(sys.modules[klass.__module__])
@@ -369,7 +374,7 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
         # auto registers the instance value if it is a registered `treeclass`
         # this behavior is similar to PyTorch behavior in `nn.Module`
         # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
-        _field_registry[type(self)][key] = Field(name=key, type=type(value))
+        register_pytree_field_map(type(self), {key: Field(name=key, type=type(value))})
 
 
 def _delattr(self, key: str) -> None:

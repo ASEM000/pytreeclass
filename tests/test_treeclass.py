@@ -385,14 +385,14 @@ def test_non_class_input():
 
 
 def test_setattr_delattr():
-    with pytest.raises(AttributeError):
+    with pytest.raises(TypeError):
 
         @ft.partial(pytc.treeclass, leafwise=True)
         class Test:
             def __setattr__(self, k, v):
                 pass
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(TypeError):
 
         @ft.partial(pytc.treeclass, leafwise=True)
         class _:
