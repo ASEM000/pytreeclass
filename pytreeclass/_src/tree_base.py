@@ -68,13 +68,24 @@ def _tree_trace(
 
 
 def _register_treeclass(klass: type[T]) -> type[T]:
-    # register the trace flatten rule
-    register_pytree_node_trace(klass, _tree_trace)
-    # register the generated field map
-    register_pytree_field_map(klass, _generate_field_map(klass))
-    # register the flatten/unflatten rules with jax
-    jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
-    return klass
+    try:
+        # will raise `ValueError` if the class is already registered
+        # there are two cases where a class is registered more than once:
+        # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
+        # second when a class is decorated with `treeclass` and has a parent class that is decorated with `treeclass`
+        # in that case `__init_subclass__` registers the class before the decorator registers it.
+        # this can be also be done using metaclass that registers the class on initialization
+        # but we are trying to stay away from deep magic.
+        # register the trace flatten rule
+        register_pytree_node_trace(klass, _tree_trace)
+        # register the generated field map
+        register_pytree_field_map(klass, _generate_field_map(klass))
+        # register the flatten/unflatten rules with jax
+        jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
+        return klass
+    except ValueError:
+        # the class is already registered
+        return klass
 
 
 def _getattr_wrapper(getattr_method):
@@ -363,19 +374,7 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     Raises:
         TypeError: if the input is not a class.
     """
-    try:
-        # will raise `ValueError` if the class is already registered
-        # there are two cases where a class is registered more than once:
-        # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
-        # second when a class is decorated with `treeclass` and has a parent class that is decorated with `treeclass`
-        # in that case `__init_subclass__` registers the class before the decorator registers it.
-        # this can be also be done using metaclass that registers the class on initialization
-        # but we are trying to stay away from deep magic.
-        klass = _register_treeclass(klass)
-    except ValueError:
-        # the class is already registered
-        pass
-
+    klass = _register_treeclass(klass)
     # add math operations methods if leafwise
     # do not override any user defined methods
     # add `repr`,'str', 'at', 'copy', 'hash', 'copy'
