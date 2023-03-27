@@ -436,7 +436,7 @@ def tree_indexer(tree: PyTree) -> PyTree:
             if isinstance(where, type(...)):
                 # Ellipsis as an alias for all elements
                 # model.at[model == model ] <--> model.at[...]
-                return tree.at[tree == tree]
+                return tree.at[jtu.tree_map(lambda _: True, tree)]
 
             raise NotImplementedError(
                 f"Indexing with {type(where).__name__} is not implemented.\n"
