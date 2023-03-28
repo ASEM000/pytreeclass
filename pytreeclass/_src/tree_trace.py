@@ -158,11 +158,11 @@ def _jaxable_trace_func(tree: Any) -> list[TraceType]:
 
 
 # register trace functions for common types
-_trace_registry[tuple] = _TraceRegistryEntry(_sequence_trace_func)
-_trace_registry[list] = _TraceRegistryEntry(_sequence_trace_func)
-_trace_registry[dict] = _TraceRegistryEntry(_dict_trace_func)
-_trace_registry[OrderedDict] = _TraceRegistryEntry(_dict_trace_func)
-_trace_registry[defaultdict] = _TraceRegistryEntry(_dict_trace_func)
+register_pytree_node_trace(tuple, _sequence_trace_func)
+register_pytree_node_trace(list, _sequence_trace_func)
+register_pytree_node_trace(dict, _dict_trace_func)
+register_pytree_node_trace(OrderedDict, _dict_trace_func)
+register_pytree_node_trace(defaultdict, _dict_trace_func)
 
 
 def flatten_one_trace_level(
@@ -231,16 +231,16 @@ def tree_leaves_with_trace(
         >>> # print(pytc.tree_repr(traces))
         >>> # (
         >>> #   (
-        >>> #     ('list', '[0]'),                      # -> name path of leaf = 1
-        >>> #     (<class 'list'>, <class 'int'>),      # -> type path of leaf = 1
-        >>> #     (0, 0),                               # -> index path of leaf = 1
-        >>> #     ({id:4951960512}, {id:4380344560})    # -> metadata path of leaf = 1
+        >>> #     ('list', '[0]'),                                                      # -> name path of leaf = 1
+        >>> #     (<class 'list'>, <class 'int'>),                                      # -> type path of leaf = 1
+        >>> #     (0, 0),                                                               # -> index path of leaf = 1
+        >>> #     ({id:4951960512}, {id:4380344560})                                    # -> metadata path of leaf = 1
         >>> #   ),
         >>> #   (
-        >>> #     ('list', '[1]', '[0]'),                               # -> name path of leaf = 2
-        >>> #     (<class 'list'>, <class 'list'>, <class 'int'>),      # -> type path of leaf = 2
-        >>> #     (0, 1, 0),                                            # -> index path of leaf = 2
-        >>> #     ({id:4951960512}, {id:4951876032}, {id:4380344592})   # -> metadata path of leaf = 2
+        >>> #     ('list', '[1]', '[0]'),                                               # -> name path of leaf = 2
+        >>> #     (<class 'list'>, <class 'list'>, <class 'int'>),                      # -> type path of leaf = 2
+        >>> #     (0, 1, 0),                                                            # -> index path of leaf = 2
+        >>> #     ({id:4951960512}, {id:4951876032}, {id:4380344592})                   # -> metadata path of leaf = 2
         >>> #   ),
         >>> #   (
         >>> #     ('list', '[1]', '[1]', '[0]'),                                        # -> name path of leaf = 3

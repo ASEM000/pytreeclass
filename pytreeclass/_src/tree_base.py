@@ -68,7 +68,7 @@ def _tree_trace(
 
 
 def _register_treeclass(klass: type[T]) -> type[T]:
-    try:
+    if klass not in _field_registry:
         # will raise `ValueError` if the class is already registered
         # there are two cases where a class is registered more than once:
         # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
@@ -82,10 +82,7 @@ def _register_treeclass(klass: type[T]) -> type[T]:
         register_pytree_field_map(klass, _generate_field_map(klass))
         # register the flatten/unflatten rules with jax
         jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
-        return klass
-    except ValueError:
-        # the class is already registered
-        return klass
+    return klass
 
 
 def _getattr_wrapper(getattr_method):
@@ -213,15 +210,72 @@ def _swop(func):
     return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
 
 
-def _treeclass_transform(klass: type[T], leafwise: bool) -> type[T]:
+def _leafwise_transform(klass: type[T]) -> type[T]:
+    # add leafwise transform methods to the class
+    # that enable the user to apply a function to
+    # all the leaves of the tree
+    for key, method in (
+        ("__abs__", _unary_op(abs)),
+        ("__add__", _binary_op(op.add)),
+        ("__and__", _binary_op(op.and_)),
+        ("__ceil__", _unary_op(ceil)),
+        ("__divmod__", _binary_op(divmod)),
+        ("__eq__", _binary_op(op.eq)),
+        ("__floor__", _unary_op(floor)),
+        ("__floordiv__", _binary_op(op.floordiv)),
+        ("__ge__", _binary_op(op.ge)),
+        ("__gt__", _binary_op(op.gt)),
+        ("__invert__", _unary_op(op.invert)),
+        ("__le__", _binary_op(op.le)),
+        ("__lshift__", _binary_op(op.lshift)),
+        ("__lt__", _binary_op(op.lt)),
+        ("__matmul__", _binary_op(op.matmul)),
+        ("__mod__", _binary_op(op.mod)),
+        ("__mul__", _binary_op(op.mul)),
+        ("__ne__", _binary_op(op.ne)),
+        ("__neg__", _unary_op(op.neg)),
+        ("__or__", _binary_op(op.or_)),
+        ("__pos__", _unary_op(op.pos)),
+        ("__pow__", _binary_op(op.pow)),
+        ("__radd__", _binary_op(_swop(op.add))),
+        ("__rand__", _binary_op(_swop(op.and_))),
+        ("__rdivmod__", _binary_op(_swop(divmod))),
+        ("__rfloordiv__", _binary_op(_swop(op.floordiv))),
+        ("__rlshift__", _binary_op(_swop(op.lshift))),
+        ("__rmatmul__", _binary_op(_swop(op.matmul))),
+        ("__rmod__", _binary_op(_swop(op.mod))),
+        ("__rmul__", _binary_op(_swop(op.mul))),
+        ("__ror__", _binary_op(_swop(op.or_))),
+        ("__round__", _binary_op(round)),
+        ("__rpow__", _binary_op(_swop(op.pow))),
+        ("__rrshift__", _binary_op(_swop(op.rshift))),
+        ("__rshift__", _binary_op(op.rshift)),
+        ("__rsub__", _binary_op(_swop(op.sub))),
+        ("__rtruediv__", _binary_op(_swop(op.truediv))),
+        ("__rxor__", _binary_op(_swop(op.xor))),
+        ("__sub__", _binary_op(op.sub)),
+        ("__truediv__", _binary_op(op.truediv)),
+        ("__trunc__", _unary_op(trunc)),
+        ("__xor__", _binary_op(op.xor)),
+    ):
+        if key not in vars(klass):
+            # do not override any user defined methods
+            # this behavior similar is to `dataclasses.dataclass`
+            setattr(klass, key, method)
+    return klass
+
+
+def _treeclass_transform(klass: type[T]) -> type[T]:
     # the method is called after registering the class with `_register_treeclass`
+    # cached to prevent wrapping the same class multiple times
 
     for key, method in (("__setattr__", _setattr), ("__delattr__", _delattr)):
         # basic required methods
         if key in vars(klass):
             if vars(klass)[key] is method:
-                return klass  # the class is already transformed
-            msg = f"Unable to transform the class {klass.__name__} with {key} method defined."
+                return klass  # already transformed
+            # the user defined a method that conflicts with the required method
+            msg = f"Unable to transform the class `{klass.__name__}` with {key} method defined."
             raise TypeError(msg)
         setattr(klass, key, method)
 
@@ -239,59 +293,6 @@ def _treeclass_transform(klass: type[T], leafwise: bool) -> type[T]:
         # use cache to prevent transforming the same class multiple times
         # this can lead to recursion errors from wrapping the same method multiple times
         setattr(klass, key, wrapper(getattr(klass, key)))
-
-    if leafwise:
-        # add leafwise transform methods to the class
-        # that enable the user to apply a function to
-        # all the leaves of the tree
-        for key, method in (
-            ("__abs__", _unary_op(abs)),
-            ("__add__", _binary_op(op.add)),
-            ("__and__", _binary_op(op.and_)),
-            ("__ceil__", _unary_op(ceil)),
-            ("__divmod__", _binary_op(divmod)),
-            ("__eq__", _binary_op(op.eq)),
-            ("__floor__", _unary_op(floor)),
-            ("__floordiv__", _binary_op(op.floordiv)),
-            ("__ge__", _binary_op(op.ge)),
-            ("__gt__", _binary_op(op.gt)),
-            ("__invert__", _unary_op(op.invert)),
-            ("__le__", _binary_op(op.le)),
-            ("__lshift__", _binary_op(op.lshift)),
-            ("__lt__", _binary_op(op.lt)),
-            ("__matmul__", _binary_op(op.matmul)),
-            ("__mod__", _binary_op(op.mod)),
-            ("__mul__", _binary_op(op.mul)),
-            ("__ne__", _binary_op(op.ne)),
-            ("__neg__", _unary_op(op.neg)),
-            ("__or__", _binary_op(op.or_)),
-            ("__pos__", _unary_op(op.pos)),
-            ("__pow__", _binary_op(op.pow)),
-            ("__radd__", _binary_op(_swop(op.add))),
-            ("__rand__", _binary_op(_swop(op.and_))),
-            ("__rdivmod__", _binary_op(_swop(divmod))),
-            ("__rfloordiv__", _binary_op(_swop(op.floordiv))),
-            ("__rlshift__", _binary_op(_swop(op.lshift))),
-            ("__rmatmul__", _binary_op(_swop(op.matmul))),
-            ("__rmod__", _binary_op(_swop(op.mod))),
-            ("__rmul__", _binary_op(_swop(op.mul))),
-            ("__ror__", _binary_op(_swop(op.or_))),
-            ("__round__", _binary_op(round)),
-            ("__rpow__", _binary_op(_swop(op.pow))),
-            ("__rrshift__", _binary_op(_swop(op.rshift))),
-            ("__rshift__", _binary_op(op.rshift)),
-            ("__rsub__", _binary_op(_swop(op.sub))),
-            ("__rtruediv__", _binary_op(_swop(op.truediv))),
-            ("__rxor__", _binary_op(_swop(op.xor))),
-            ("__sub__", _binary_op(op.sub)),
-            ("__truediv__", _binary_op(op.truediv)),
-            ("__trunc__", _unary_op(trunc)),
-            ("__xor__", _binary_op(op.xor)),
-        ):
-            if key not in vars(klass):
-                # do not override any user defined methods
-                # this behavior similar is to `dataclasses.dataclass`
-                setattr(klass, key, method)
 
     # basic optional methods
     for key, method in (
@@ -377,9 +378,10 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     klass = _register_treeclass(klass)
     # add math operations methods if leafwise
     # do not override any user defined methods
+    klass = _leafwise_transform(klass) if leafwise else klass
     # add `repr`,'str', 'at', 'copy', 'hash', 'copy'
     # add the immutable setters and deleters
     # generate the `__init__` method if not present using type hints.
-    klass = _treeclass_transform(klass, leafwise)
+    klass = _treeclass_transform(klass)
 
     return klass
