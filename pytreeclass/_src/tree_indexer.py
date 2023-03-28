@@ -32,6 +32,10 @@ def _check_valid_mask_leaf(where: Any):
     return where
 
 
+def _true_tree(tree: PyTree, is_leaf) -> PyTree:
+    return jtu.tree_map(lambda _: True, tree, is_leaf=is_leaf)
+
+
 # tree indexing by boolean PyTree
 
 
@@ -131,12 +135,14 @@ class _TreeAtMask(NamedTuple):
     where: PyTree
 
     def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
-        return _get_at_mask(self.tree, self.where, is_leaf)
+        where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
+        return _get_at_mask(self.tree, where, is_leaf)
 
     def set(
         self, set_value: Any, *, is_leaf: Callable[[Any], bool] | None = None
     ) -> PyTree:
-        return _set_at_mask(self.tree, self.where, set_value, is_leaf)
+        where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
+        return _set_at_mask(self.tree, where, set_value, is_leaf)
 
     def apply(
         self,
@@ -144,7 +150,8 @@ class _TreeAtMask(NamedTuple):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ):
-        return _apply_at_mask(self.tree, self.where, func, is_leaf)
+        where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
+        return _apply_at_mask(self.tree, where, func, is_leaf)
 
     def reduce(
         self,
@@ -153,7 +160,8 @@ class _TreeAtMask(NamedTuple):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> Any:
-        return _reduce_at_mask(self.tree, self.where, func, initializer, is_leaf)
+        where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
+        return _reduce_at_mask(self.tree, where, func, initializer, is_leaf)
 
 
 def _at_mask(tree: PyTree, where: PyTree) -> PyTree:
@@ -429,14 +437,11 @@ def tree_indexer(tree: PyTree) -> PyTree:
                 # `register_pytree_node_trace_func`
                 return _at_trace(tree=tree, where=(where,))
 
-            if isinstance(where, type(tree)):
+            if isinstance(where, (type(tree), type(...))):
                 # indexing by boolean pytree
-                return _at_mask(tree=tree, where=where)
-
-            if isinstance(where, type(...)):
                 # Ellipsis as an alias for all elements
                 # model.at[model == model ] <--> model.at[...]
-                return tree.at[jtu.tree_map(lambda _: True, tree)]
+                return _at_mask(tree=tree, where=where)
 
             raise NotImplementedError(
                 f"Indexing with {type(where).__name__} is not implemented.\n"

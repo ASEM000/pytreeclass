@@ -635,9 +635,7 @@ def test_repr_str():
 
     assert repr(t.at["a"]) == "TreeAtPath(tree=Tree(a=1, b=2), where=('a',))"
     assert str(t.at["a"]) == "TreeAtPath(tree=Tree(a=1, b=2), where=('a',))"
-    assert (
-        repr(t.at[...]) == "TreeAtMask(tree=Tree(a=1, b=2), where=Tree(a=True, b=True))"
-    )
+    assert repr(t.at[...]) == "TreeAtMask(tree=Tree(a=1, b=2), where=Ellipsis)"
 
 
 def test_not_equal():
