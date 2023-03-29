@@ -8,7 +8,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_indexer import _call_context
+from pytreeclass._src.tree_indexer import _mutable_context
 
 
 @ft.partial(pytc.treeclass, leafwise=True)
@@ -677,7 +677,7 @@ def test_call_context():
 
     t = L2()
 
-    with _call_context(t) as tx:
+    with _mutable_context(t) as tx:
         tx.delete("a")
 
     with pytest.raises(AttributeError):

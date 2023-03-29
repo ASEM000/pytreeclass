@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _call_context
+from pytreeclass._src.tree_decorator import _mutable_context
 from pytreeclass._src.tree_trace import tree_map_with_trace
 
 PyTree = Any
@@ -347,7 +347,7 @@ class _TreeAtPath(NamedTuple):
         # this method first creates a copy of the tree,
         # next it unfreezes the tree then calls the method on the attribute
         # and finally freezes the tree again
-        with _call_context(self.tree) as tree:
+        with _mutable_context(self.tree, kopy=True) as tree:
             # check if the attribute is a string
             (method_name,) = self.where
             if not isinstance(method_name, str):

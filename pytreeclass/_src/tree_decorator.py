@@ -305,40 +305,39 @@ def _generate_init(klass: type) -> FunctionType:
     )
 
 
+@contextmanager
+def _mutable_context(tree: PyTree, *, kopy: bool = False):
+    def mutate_step(tree: PyTree):
+        ovars(tree)[_MUTABLE] = True
+        return tree
+
+    def immutate_step(tree):
+        del ovars(tree)[_MUTABLE]
+        return tree
+
+    tree = copy.copy(tree) if kopy else tree
+    mutate_step(tree)
+    yield tree
+    immutate_step(tree)
+
+
 def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
     def wrapper(self, *a, **k) -> None:
-        ovars(self)[_MUTABLE] = True
+        with _mutable_context(self):
+            output = init_func(self, *a, **k)
 
-        output = init_func(self, *a, **k)
+            if post_init_func := getattr(type(self), _POST_INIT, None):
+                # to simplify the logic, we call the post init method
+                # even if the init method is not code-generated.
+                post_init_func(self)
 
-        # To simplify logic; defined, `__post_init__` will
-        # be called after initialization Even if `__init__` is user-defined
-        if hasattr(type(self), _POST_INIT):
-            # defreeze then call the method. this behavior is differet to
-            # `dataclasses` with `frozen=True` but similar if `frozen=False`
-            # the following code will raise FrozenInstanceError in
-            # `dataclasses` but it will work in `treeclass`,
-            # i.e. `treeclass` defreezes the tree after `__post_init__`
-            # >>> @dc.dataclass(frozen=True)
-            # ... class Test:
-            # ...    a:int = 1
-            # ...    def __post_init__(self):
-            # ...        self.b = 1
-            ovars(self)[_MUTABLE] = True
-            output = getattr(type(self), _POST_INIT)(self)
-
-        # handle uninitialized fields
-        uninit_keys = set(_field_registry[type(self)]) - set(ovars(self))
-        if len(uninit_keys) > 0:
-            msg = f"Uninitialized fields: ({', '.join(uninit_keys)}) "
+        # non-initialized fields
+        if len(keys := set(_field_registry[type(self)]) - set(ovars(self))) > 0:
+            msg = f"Uninitialized fields: ({', '.join(keys)}) "
             msg += f"in class `{type(self).__name__}`"
             raise AttributeError(msg)
 
-        # delete the shadowing `__dict__` attribute to
-        # restore the frozen behavior
-        if _MUTABLE in ovars(self):
-            del ovars(self)[_MUTABLE]
         return output
 
     return wrapper
@@ -387,33 +386,3 @@ def fields(item: Any) -> Sequence[Field]:
     klass = item if isinstance(item, type) else type(item)
     field_map = _field_registry[klass]
     return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))
-
-
-@contextmanager
-def _call_context(tree: PyTree):
-    def mutate_step(tree: PyTree):
-        if type(tree) not in _field_registry:
-            return tree
-        # temporarily disable the frozen behavior by inject _MUTABLE flag
-        # after the context manager exits, the instance variable will be deleted
-        # and the class attribute will be used again.
-        ovars(tree)[_MUTABLE] = True  # type: ignore
-        for field in fields(tree):
-            mutate_step(getattr(tree, field.name))  # type: ignore
-        return tree
-
-    def immutate_step(tree):
-        if type(tree) not in _field_registry:
-            return tree
-
-        if _MUTABLE in ovars(tree):
-            del ovars(tree)[_MUTABLE]
-
-        for field in fields(tree):
-            immutate_step(getattr(tree, field.name))
-        return tree
-
-    tree = copy.copy(tree)
-    mutate_step(tree)
-    yield tree
-    immutate_step(tree)
