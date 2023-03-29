@@ -470,7 +470,7 @@ def test_callbacks():
         class Test:
             a: int = pytc.field(callbacks=[1])
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError):
 
         @ft.partial(pytc.treeclass, leafwise=True)
         class Test:

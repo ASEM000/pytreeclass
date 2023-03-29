@@ -38,6 +38,10 @@ _field_registry: dict[type, Mapping[str, Field]] = defaultdict(dict)
 
 
 def register_pytree_field_map(klass: type[T], field_map: Mapping[str, Field]) -> None:
+    # register the field map of a class to the registry
+    # field map is a mapping of field name to `Field` object
+    # the fields are used to generate the `__init__`, `__str__`, `__repr__` functions
+    # and to define the leaves in `tree_flatten` and `tree_unflatten` functions
     _field_registry[klass].update(field_map)
 
 
@@ -69,7 +73,7 @@ class Field(NamedTuple):
     kw_only: bool = False
     pos_only: bool = False
     metadata: MappingProxyType[str, Any] | None = None
-    callbacks: Sequence[Callable] | None = None
+    callbacks: Sequence[Any] = ()
 
 
 def field(
@@ -81,7 +85,7 @@ def field(
     kw_only: bool = False,
     pos_only: bool = False,
     metadata: dict[str, Any] | None = None,  # type: ignore
-    callbacks: Sequence[Callable] | None = None,
+    callbacks: Sequence[Any] = (),
 ) -> Field:
     """
     Args:
@@ -122,19 +126,20 @@ def field(
         raise TypeError("`metadata` must be a Mapping or None")
 
     # check if `callbacks` is a Sequence of functions
-    if isinstance(callbacks, Sequence):
-        for index, callback in enumerate(callbacks):
-            if not isinstance(callback, Callable):  # type: ignore
-                msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
-                msg += f" at index={index}"
-                raise TypeError(msg)
-            if not _is_one_arg_func(callback):
-                msg = "`callbacks` must be a Sequence of functions with 1 argument, that takes the value as argument"
-                msg += f"got {type(callbacks)} at index={index}"
-                raise TypeError(msg)
-    elif callbacks is not None:
+    if not isinstance(callbacks, Sequence):
         msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
         raise TypeError(msg)
+
+    # sanity check for callbacks
+    for index, callback in enumerate(callbacks):
+        if not isinstance(callback, Callable):  # type: ignore
+            msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
+            msg += f" at index={index}"
+            raise TypeError(msg)
+        if not _is_one_arg_func(callback):
+            msg = "`callbacks` must be a Sequence of functions with 1 argument, that takes the value as argument"
+            msg += f"got {type(callbacks)} at index={index}"
+            raise ValueError(msg)
 
     # set name and type post initialization
     return Field(
@@ -198,31 +203,29 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
 
             field_map[name] = value._replace(name=name, type=type)
 
+        elif isinstance(value, _MUTABLE_TYPES):
+            # https://github.com/ericvsmith/dataclasses/issues/3
+            # example case: `x: Any = [1, 2, 3]`
+            # this is the prime motivation for writing this decorator
+            # as from python 3.11, jax arrays `dataclasses` will raise an error if
+            # `JAX` arrays are used as default values.
+            # the `dataclasses` logic is flawed by using `__hash__` existence
+            # as a proxy for immutability, which is not the case for `JAX` arrays
+            # which are immutable but do not have a `__hash__` method
+            msg = f"Mutable value= {(value)} is not allowed"
+            msg += f" for field `{name}` in class `{klass.__name__}`.\n"
+            msg += f" use `field(... ,factory=lambda:{value})` instead"
+            raise TypeError(msg)
+
         elif value is _NOT_SET:
             # nothing is assigned to the annotated attribute
             # example case: `x: Any`
-            # then we create a Field and assign it to the class
+            # create a Field and assign it to the class
             field_map[name] = Field(name=name, type=type)
 
         else:
-            # the annotated attribute has a non-field default value
-            # check for mutable types and raise an error if found
-            if isinstance(value, _MUTABLE_TYPES):
-                # https://github.com/ericvsmith/dataclasses/issues/3
-                # example case: `x: Any = [1, 2, 3]`
-                # this is the prime motivation for writing this decorator
-                # as from python 3.11, jax arrays `dataclasses` will raise an error if
-                # `JAX` arrays are used as default values.
-                # the `dataclasses` logic is flawed by using `__hash__` existence
-                # as a proxy for immutability, which is not the case for `JAX` arrays
-                # which are immutable but do not have a `__hash__` method
-                msg = f"Mutable value= {(value)} is not allowed"
-                msg += f" for field `{name}` in class `{klass.__name__}`.\n"
-                msg += f" use `field(... ,factory=lambda:{value})` instead"
-                raise TypeError(msg)
-
             # example case: `x: int = 1`
-            # otherwise, we create a Field and assign default value to the class
+            # create a Field and assign default value to the class
             field_map[name] = Field(name=name, type=type, default=value)
 
     return field_map
@@ -350,27 +353,23 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
     # apply the callbacks on setting the value
     # check if the key is a field name
     if key in _field_registry[type(self)]:
-        # check if there is a callback associated with the field
-        callbacks = _field_registry[type(self)][key].callbacks
+        for callback in _field_registry[type(self)][key].callbacks:
+            try:
+                # callback is a function that takes the value of the field
+                # and returns a modified value
+                value = callback(value)
+            except Exception as e:
+                msg = f"Error for field=`{key}`:\n{e}"
+                raise type(e)(msg)
 
-        if callbacks is not None:
-            for callback in callbacks:
-                try:
-                    # callback is a function that takes the value of the field
-                    # and returns a modified value
-                    value = callback(value)
-                except Exception as e:
-                    msg = f"Error for field=`{key}`:\n{e}"
-                    raise type(e)(msg)
-
-    # set the value
-    ovars(self)[key] = value  # type: ignore
-
-    if type(value) in _field_registry and key not in _field_registry[type(self)]:
+    elif type(value) in _field_registry:
         # auto registers the instance value if it is a registered `treeclass`
         # this behavior is similar to PyTorch behavior in `nn.Module`
         # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
         register_pytree_field_map(type(self), {key: Field(name=key, type=type(value))})
+
+    # set the value
+    ovars(self)[key] = value  # type: ignore
 
 
 def _delattr(self, key: str) -> None:

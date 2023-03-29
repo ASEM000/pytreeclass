@@ -69,7 +69,6 @@ def _tree_trace(
 
 def _register_treeclass(klass: type[T]) -> type[T]:
     if klass not in _field_registry:
-        # will raise `ValueError` if the class is already registered
         # there are two cases where a class is registered more than once:
         # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
         # second when a class is decorated with `treeclass` and has a parent class that is decorated with `treeclass`
