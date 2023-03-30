@@ -513,7 +513,7 @@ def _format_width(string, width=60):
     return string.replace("\n", "").replace("\t", "")
 
 
-def _format_size(node_size, newline=False):
+def _format_size(node_size: float | int | complex, newline=False):
     # return formatted size from inexact(exact) complex number
     # Examples:
     #     >>> _format_size(1024)
@@ -532,11 +532,8 @@ def _format_size(node_size, newline=False):
         fmt += f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
         return fmt
 
-    if isinstance(node_size, (float, int)):
-        size_order = int(math.log(node_size, 1024)) if node_size > 0 else 0
-        return f"{(node_size)/(1024**size_order):.2f}{order_kw[size_order]}"
-
-    raise TypeError(f"node_size must be int or float, got {type(node_size)}")
+    size_order = int(math.log(node_size, 1024)) if node_size > 0 else 0
+    return f"{(node_size)/(1024**size_order):.2f}{order_kw[size_order]}"
 
 
 def _format_count(node_count, newline=False):
@@ -567,15 +564,8 @@ def _calculate_leaf_trace_stats(tree: Any) -> tuple[int | complex, int | complex
     for leaf in leaves:
         # unfrozen leaf
         # array count is the product of the shape. if the node is not an array, then the count is 1
-        count = int(np.array(leaf.shape).prod()) if hasattr(leaf, "shape") else 1
-        size = leaf.nbytes if hasattr(leaf, "nbytes") else sys.getsizeof(leaf)
-
-        if pytc.is_frozen(tree) or pytc.is_frozen(leaf):
-            count = complex(0, count)
-            size = complex(0, size)
-
-        counts += count
-        sizes += size
+        counts += int(np.array(leaf.shape).prod()) if hasattr(leaf, "shape") else 1
+        sizes += leaf.nbytes if hasattr(leaf, "nbytes") else sys.getsizeof(leaf)
 
     return (counts, sizes)
 
