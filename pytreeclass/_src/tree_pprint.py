@@ -566,10 +566,9 @@ def _calculate_leaf_trace_stats(tree: Any) -> tuple[int | complex, int | complex
 
     for leaf in leaves:
         # unfrozen leaf
-        leaf_ = pytc.unfreeze(leaf)
         # array count is the product of the shape. if the node is not an array, then the count is 1
-        count = int(np.array(leaf_.shape).prod()) if hasattr(leaf_, "shape") else 1
-        size = leaf_.nbytes if hasattr(leaf_, "nbytes") else sys.getsizeof(leaf_)
+        count = int(np.array(leaf.shape).prod()) if hasattr(leaf, "shape") else 1
+        size = leaf.nbytes if hasattr(leaf, "nbytes") else sys.getsizeof(leaf)
 
         if pytc.is_frozen(tree) or pytc.is_frozen(leaf):
             count = complex(0, count)
@@ -794,7 +793,7 @@ def tree_summary(
         row = [_resolve_names(names, width)]
 
         # type name row
-        row += [_node_type_pprint(pytc.unfreeze(leaf), 0, "str", width, depth)]
+        row += [_node_type_pprint(leaf, 0, "str", width, depth)]
 
         # count and size row
         count, size = _calculate_leaf_trace_stats(leaf)
@@ -808,36 +807,22 @@ def tree_summary(
 
         ROWS += [row]
 
-    COUNT = [complex(0), complex(0)]  # non-frozen, frozen
-    SIZE = [complex(0), complex(0)]
+    COUNT = complex(0)
+    SIZE = complex(0)
 
     for trace, leaf in pytc.tree_leaves_with_trace(tree, is_leaf=pytc.is_frozen):
         count, size = _calculate_leaf_trace_stats(leaf)
-        COUNT[pytc.is_frozen(leaf)] += count
-        SIZE[pytc.is_frozen(leaf)] += size
+        COUNT += count
+        SIZE += size
 
-    unfrozen_count = COUNT[0].real + COUNT[0].imag
-    frozen_count = COUNT[1].real + COUNT[1].imag
-    total_count = unfrozen_count + frozen_count
-
-    unfrozen_size = SIZE[0].real + SIZE[0].imag
-    frozen_size = SIZE[1].real + SIZE[1].imag
-    total_size = unfrozen_size + frozen_size
+    total_count = COUNT.real + COUNT.imag
+    total_size = SIZE.real + SIZE.imag
 
     row = ["Σ"]
     row += [_node_type_pprint(tree, 0, "repr", width, depth)]
     total_count = _format_count(total_count)
 
     total_size = _format_size(total_size)
-
-    if frozen_count > 0:
-        total_count += f"({_format_count(frozen_count)})"
-        total_size += f"({_format_size(frozen_size)})"
-        # add frozen to the header row if there are frozen leaves
-        # otherwise donot bloat the header row
-        ROWS[0][2] = ROWS[0][2] + "(Frozen)"
-        ROWS[0][3] = ROWS[0][3] + "(Frozen)"
-
     row += [total_count, total_size]
     ROWS += [row]
 
