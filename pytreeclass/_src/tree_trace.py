@@ -227,24 +227,19 @@ def tree_leaves_with_trace(
         >>> traces, _ = zip(*pytc.tree_leaves_with_trace(tree))
         >>> # print(pytc.tree_repr(traces))
         >>> # (
-        >>> #   (
-        >>> #     ('list', '[0]'),                                                      # -> name path of leaf = 1
-        >>> #     (<class 'list'>, <class 'int'>),                                      # -> type path of leaf = 1
-        >>> #     (0, 0),                                                               # -> index path of leaf = 1
-        >>> #     ({id:4951960512}, {id:4380344560})                                    # -> metadata path of leaf = 1
-        >>> #   ),
-        >>> #   (
-        >>> #     ('list', '[1]', '[0]'),                                               # -> name path of leaf = 2
-        >>> #     (<class 'list'>, <class 'list'>, <class 'int'>),                      # -> type path of leaf = 2
-        >>> #     (0, 1, 0),                                                            # -> index path of leaf = 2
-        >>> #     ({id:4951960512}, {id:4951876032}, {id:4380344592})                   # -> metadata path of leaf = 2
-        >>> #   ),
-        >>> #   (
-        >>> #     ('list', '[1]', '[1]', '[0]'),                                        # -> name path of leaf = 3
-        >>> #     (<class 'list'>, <class 'list'>, <class 'list'>, <class 'int'>),      # -> type path of leaf = 3
-        >>> #     (0, 1, 1, 0),                                                         # -> index path of leaf = 3
-        >>> #     ({id:4951960512}, {id:4951876032}, {id:4950290624}, {id:4380344624})  # -> metadata path of leaf = 3
-        >>> #   )
+        >>> # (('[0]'), (<class 'int'>), (0), ({id:4383785200})),
+        >>> # (
+        >>> #     ('[1]', '[0]'),
+        >>> #     (<class 'list'>, <class 'int'>),
+        >>> #     (1, 0),
+        >>> #     ({id:4558856448}, {id:4383785232})
+        >>> # ),
+        >>> # (
+        >>> #     ('[1]', '[1]', '[0]'),
+        >>> #     (<class 'list'>, <class 'list'>, <class 'int'>),
+        >>> #     (1, 1, 0),
+        >>> #     ({id:4558856448}, {id:4558857472}, {id:4383785264})
+        >>> # )
         >>> # )
 
     Note:
@@ -252,7 +247,7 @@ def tree_leaves_with_trace(
         for the common data structures like `list`, `tuple`, `dict`, `set`, `namedtuple`, and `treeclass` wrapped
         classes.
     """
-    trace = ((type(tree).__name__,), (type(tree),), (0,), (dict(id=id(tree)),))  # type: ignore
+    trace = ((), (), (), ())
     return list(flatten_one_trace_level(trace, tree, is_leaf, is_trace_leaf))
 
 

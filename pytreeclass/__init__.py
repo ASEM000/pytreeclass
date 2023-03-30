@@ -50,6 +50,7 @@ __all__ = (
     "tree_map_with_trace",
     "tree_leaves_with_trace",
     "tree_flatten_with_trace",
+    "tree_repr_with_trace",
 )
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"

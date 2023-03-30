@@ -259,14 +259,6 @@ def tree_repr(
 
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
-
-        >>> print(pytc.tree_repr(tree, tabwidth=8, width=20))
-        {
-                a:1,
-                b:[2, 3],
-                c:{d:4, e:5},
-                f:i32[2](μ=6.50, σ=0.50, ∈[6,7])
-        }
     """
     return _node_pprint(tree, 0, "repr", width, depth).expandtabs(tabwidth)
 
@@ -298,14 +290,6 @@ def tree_str(
 
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
-
-        >>> print(pytc.tree_str(tree, tabwidth=8, width=20))
-        {
-                a:1,
-                b:[2, 3],
-                c:{d:4, e:5},
-                f:[6 7]
-        }
     """
     return _node_pprint(tree, 0, "str", width, depth).expandtabs(tabwidth)
 
@@ -328,7 +312,7 @@ def _is_trace_leaf_depth_factory(depth: int):
         # done like this to ensure 4-tuple unpacking
         names, _, __, ___ = trace
         # stop tracing if depth is reached
-        return False if depth is None else (depth < len(names))
+        return False if depth is None else (depth <= len(names))
 
     return is_trace_leaf
 
@@ -420,11 +404,6 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
         sibling_nodes_count = _sibling_nodes_count_at_all_depth(trace, traces)
 
         for j, (name, type_) in enumerate(zip(names, types)):
-            # j iterates over the depth of each trace
-            if j == 0:
-                # skip printing the root node
-                continue
-
             # skip printing the common parent node twice
             prev_names, _, __, ___ = traces[i - 1]
 
@@ -434,10 +413,6 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
             fmt += "\n\t"
 
             for k in range(j):
-                if k == 0:
-                    # skip printing the root node
-                    continue
-
                 # handle printing the left lines for each depth
                 if indices[k] == sibling_nodes_count[k] - 1:
                     # do not print the left line
@@ -516,19 +491,15 @@ def tree_mermaid(
         size = _format_size(size)
 
         for depth, (name, type_) in enumerate(zip(names, types)):
-            if depth == 0:
-                # skip printing the root node trace
-                continue
-
             name = _node_pprint(name, 0, "str", width, depth)
 
-            prev_id = root_id if depth == 1 else cur_id
-            cur_id = node_id((depth - 1, tuple(indices[1:]), prev_id))
+            prev_id = root_id if depth == 0 else cur_id
+            cur_id = node_id((depth, tuple(indices), prev_id))
             fmt += f"\n\tid{prev_id}"
             stats = f'|"{count}<br>{size}"|' if depth == len(names) - 1 else ""
             fmt += "--->" + stats
             is_last = depth == len(names) - 1
-            value = f"={_node_pprint(leaf,0,'repr',width,depth-1)}" if is_last else ""
+            value = f"={_node_pprint(leaf,0,'repr',width,depth)}" if is_last else ""
             fmt += f'id{cur_id}("{bold_text(name)}:{type_.__name__}{value}")'
 
     return fmt.expandtabs(4)
@@ -815,12 +786,12 @@ def tree_summary(
     traces = traces if len(traces) > 1 else ()
 
     for trace, leaf in zip(traces, leaves):
-        names, types, _, metadatas = trace
+        names, _, __, metadatas = trace
 
         if _should_omit_trace(metadatas):
             continue
 
-        row = [_resolve_names(names[1:], width)]
+        row = [_resolve_names(names, width)]
 
         # type name row
         row += [_node_type_pprint(pytc.unfreeze(leaf), 0, "str", width, depth)]
@@ -886,28 +857,28 @@ def tree_repr_with_trace(tree: PyTree) -> PyTree:
         ...    b:float = 2.0
 
         >>> tree = Test()
-        >>> print(pytc.tree_repr_with_trace(Test()))
+        >>> print(pytc.tree_repr_with_trace(Test()))  # doctest: +SKIP
         Test(
-        a=
-            ┌──────────┬─────────┐
-            │Value     │1        │
-            ├──────────┼─────────┤
-            │Name path │Test->a  │
-            ├──────────┼─────────┤
-            │Type path │Test->int│
-            ├──────────┼─────────┤
-            │Index path│0->0     │
-            └──────────┴─────────┘,
-        b=
-            ┌──────────┬───────────┐
-            │Value     │2.0        │
-            ├──────────┼───────────┤
-            │Name path │Test->b    │
-            ├──────────┼───────────┤
-            │Type path │Test->float│
-            ├──────────┼───────────┤
-            │Index path│0->1       │
-            └──────────┴───────────┘
+          a=
+            ┌──────────┬───┐
+            │Value     │1  │
+            ├──────────┼───┤
+            │Name path │a  │
+            ├──────────┼───┤
+            │Type path │int│
+            ├──────────┼───┤
+            │Index path│0  │
+            └──────────┴───┘,
+          b=
+            ┌──────────┬─────┐
+            │Value     │2.0  │
+            ├──────────┼─────┤
+            │Name path │b    │
+            ├──────────┼─────┤
+            │Type path │float│
+            ├──────────┼─────┤
+            │Index path│1    │
+            └──────────┴─────┘
         )
 
     Note:

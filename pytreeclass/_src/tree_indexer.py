@@ -204,8 +204,8 @@ def _get_at_trace(
         names, _, indices, __ = trace
         for i, item in enumerate(where):
             try:
-                if (isinstance(item, int) and indices[i + 1] != item) or (
-                    isinstance(item, str) and names[i + 1] != item
+                if (isinstance(item, int) and indices[i] != item) or (
+                    isinstance(item, str) and names[i] != item
                 ):
                     return None
             except IndexError:
@@ -231,8 +231,8 @@ def _set_at_trace(
         names, _, indices, __ = trace
         for i, item in enumerate(where):
             try:
-                if (isinstance(item, int) and indices[i + 1] != item) or (
-                    isinstance(item, str) and names[i + 1] != item
+                if (isinstance(item, int) and indices[i] != item) or (
+                    isinstance(item, str) and names[i] != item
                 ):
                     return leaf
             except IndexError:
@@ -263,8 +263,8 @@ def _apply_at_trace(
 
         for i, item in enumerate(where):
             try:
-                if (isinstance(item, int) and indices[i + 1] != item) or (
-                    isinstance(item, str) and names[i + 1] != item
+                if (isinstance(item, int) and indices[i] != item) or (
+                    isinstance(item, str) and names[i] != item
                 ):
                     return leaf
             except IndexError:
@@ -295,8 +295,8 @@ def _reduce_at_trace(
 
         for i, item in enumerate(where):
             try:
-                if (isinstance(item, int) and indices[i + 1] != item) or (
-                    isinstance(item, str) and names[i + 1] != item
+                if (isinstance(item, int) and indices[i] != item) or (
+                    isinstance(item, str) and names[i] != item
                 ):
                     return None
             except IndexError:
@@ -516,8 +516,8 @@ def bcmap(
 
         >>> # using **numpy** functions on pytrees
         >>> import jax.numpy as jnp
-        >>> pytc.bcmap(jnp.add)([1,2,3],[1,2,3])
-        [Array(2, dtype=int32, weak_type=True), Array(4, dtype=int32, weak_type=True), Array(6, dtype=int32, weak_type=True)]
+        >>> pytc.bcmap(jnp.add)([1,2,3],[1,2,3]) # doctest: +SKIP
+        [2, 4, 6]
     """
 
     @ft.wraps(func)

@@ -154,7 +154,7 @@ def _is_lhs_rhs_equal(lhs, rhs) -> bool | jax.Array:
             try:
                 return bool(verdict)
             except Exception:
-                return verdict  #  fail under `jit`
+                return verdict  # fail under `jit`
         return False
     return lhs == rhs
 
