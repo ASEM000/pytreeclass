@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 from collections import OrderedDict, defaultdict
-from typing import Any, Callable, Mapping, NamedTuple, Sequence
+from typing import Any, Callable, NamedTuple, Sequence
 
 import jax.tree_util as jtu
 from jax._src.tree_util import _registry
@@ -15,11 +15,25 @@ from jax._src.tree_util import _registry
 PyTree = Any
 TraceType = Any
 
-_trace_registry: dict[type, _TraceRegistryEntry] = dict()
+
+def _jaxable_trace_func(tree: Any) -> list[TraceType]:
+    # fallback trace function in case no trace function is registered for a given
+    # class in the `trace` registry
+    # get leaves from the `jax` registry
+    leaves, _ = _registry.get(type(tree)).to_iter(tree)  # type: ignore
+    # TODO: fetch from `jax` key registry once min jax version>=0.4.6
+    names = (f"leaf_{i}" for i in range(len(leaves)))
+    types = map(type, leaves)
+    indices = range(len(leaves))
+    metadatas = (dict(id=id(leaf)) for leaf in leaves)
+    return [*zip(names, types, indices, metadatas)]
 
 
 class _TraceRegistryEntry(NamedTuple):
     to_iter: Callable[..., Any]
+
+
+_trace_registry = defaultdict(lambda: _TraceRegistryEntry(_jaxable_trace_func))
 
 
 def _validate_trace_func(
@@ -144,19 +158,6 @@ def _namedtuple_trace_func(tree: Any) -> list[TraceType]:
     return [*zip(names, types, indices, metadatas)]
 
 
-def _jaxable_trace_func(tree: Any) -> list[TraceType]:
-    # fallback trace function in case no trace function is registered for a given
-    # class in the `trace` registry
-    # get leaves from the `jax` registry
-    leaves, _ = _registry.get(type(tree)).to_iter(tree)  # type: ignore
-    # TODO: fetch from `jax` key registry once min jax version>=0.4.6
-    names = (f"leaf_{i}" for i in range(len(leaves)))
-    types = map(type, leaves)
-    indices = range(len(leaves))
-    metadatas = (dict(id=id(leaf)) for leaf in leaves)
-    return [*zip(names, types, indices, metadatas)]
-
-
 # register trace functions for common types
 register_pytree_node_trace(tuple, _sequence_trace_func)
 register_pytree_node_trace(list, _sequence_trace_func)
@@ -183,11 +184,7 @@ def flatten_one_trace_level(
 
         # trace handler for the current tree
         # defaults to `_jaxable_trace_func`
-        traces = (
-            _trace_registry[type(tree)].to_iter(tree)
-            if type(tree) in _trace_registry
-            else _jaxable_trace_func(tree)
-        )
+        traces = _trace_registry[type(tree)].to_iter(tree)
 
     elif isinstance(tree, tuple) and hasattr(tree, "_fields"):
         # this conforms to the `jax` convention for namedtuples

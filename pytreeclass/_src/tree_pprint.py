@@ -13,6 +13,7 @@ from typing import Any, Callable, Literal
 import jax
 import numpy as np
 from jax._src.custom_derivatives import custom_jvp
+from jax.util import unzip2
 from jaxlib.xla_extension import PjitFunction
 
 import pytreeclass as pytc
@@ -399,8 +400,8 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
                 ├── [1]=30
                 └── [2]=A(x=10, y=(..., ...), z=40)
     """
-    traces, leaves = zip(
-        *pytc.tree_leaves_with_trace(
+    traces, leaves = unzip2(
+        pytc.tree_leaves_with_trace(
             tree=tree,
             is_leaf=pytc.is_frozen,
             is_trace_leaf=_is_trace_leaf_depth_factory(depth),
@@ -490,8 +491,8 @@ def tree_mermaid(
         # specifically we use c_size_t to avoid negative values in the hash that is not supported by mermaid
         return ctypes.c_size_t(hash(input)).value
 
-    traces, leaves = zip(
-        *pytc.tree_leaves_with_trace(
+    traces, leaves = unzip2(
+        pytc.tree_leaves_with_trace(
             tree=tree,
             is_leaf=pytc.is_frozen,
             is_trace_leaf=_is_trace_leaf_depth_factory(depth),
@@ -590,7 +591,7 @@ def _format_count(node_count, newline=False):
 def _calculate_leaf_trace_stats(tree: Any) -> tuple[int | complex, int | complex]:
     # calcuate some stats of a single subtree defined
     counts = sizes = 0
-    _, leaves = zip(*pytc.tree_leaves_with_trace(tree, is_leaf=pytc.is_frozen))
+    _, leaves = unzip2(pytc.tree_leaves_with_trace(tree, is_leaf=pytc.is_frozen))
 
     for leaf in leaves:
         # unfrozen leaf
@@ -802,8 +803,8 @@ def tree_summary(
     """
     ROWS = [["Name", "Type", "Count", "Size"]]
 
-    traces, leaves = zip(
-        *pytc.tree_leaves_with_trace(
+    traces, leaves = unzip2(
+        pytc.tree_leaves_with_trace(
             tree,
             is_leaf=pytc.is_frozen,
             is_trace_leaf=_is_trace_leaf_depth_factory(depth),
