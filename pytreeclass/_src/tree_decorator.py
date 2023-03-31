@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import copy
-import dataclasses as dc
 import functools as ft
-import inspect
 import sys
 from collections import defaultdict
 from contextlib import contextmanager
@@ -11,12 +9,10 @@ from types import FunctionType, MappingProxyType
 from typing import Any, Callable, Mapping, NamedTuple, Sequence, TypeVar
 
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
-_MUTABLE = "__mutable__"
-_POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (list, dict, set)
 _ANNOTATIONS = "__annotations__"
-_WRAPPED = "__wrapped__"
-
+_POST_INIT = "__post_init__"
+_MUTABLE = "__mutable__"
 T = TypeVar("T")
 
 PyTree = Any
@@ -54,11 +50,6 @@ def is_treeclass(item: Any) -> bool:
     """Returns `True` if a class or instance is a `treeclass`."""
     klass = item if isinstance(item, type) else type(item)
     return klass in _field_registry
-
-
-@ft.lru_cache
-def _is_one_arg_func(func: Callable) -> bool:
-    return len(inspect.signature(func).parameters) == 1
 
 
 class Field(NamedTuple):
@@ -133,13 +124,9 @@ def field(
     # sanity check for callbacks
     for index, callback in enumerate(callbacks):
         if not isinstance(callback, Callable):  # type: ignore
-            msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
-            msg += f" at index={index}"
+            msg = "`callbacks` must be a Sequence of functions, "
+            msg += f"got `{type(callbacks).__name__}` at index={index}"
             raise TypeError(msg)
-        if not _is_one_arg_func(callback):
-            msg = "`callbacks` must be a Sequence of functions with 1 argument, that takes the value as argument"
-            msg += f"got {type(callbacks)} at index={index}"
-            raise ValueError(msg)
 
     # set name and type post initialization
     return Field(
@@ -154,6 +141,14 @@ def field(
         metadata=metadata,  # type: ignore
         callbacks=callbacks,
     )
+
+
+def fields(item: Any) -> Sequence[Field]:
+    """Get the fields of a `treeclass` instance."""
+    if (klass := item if isinstance(item, type) else type(item)) not in _field_registry:
+        raise TypeError(f"Cannot get fields of {item!r}.")
+
+    return tuple(_field_registry[klass].values())
 
 
 def _generate_field_map(klass: type) -> dict[str, Field]:
@@ -187,7 +182,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         if name == "self":
             # while `dataclasses` allows `self` as a field name, its confusing
             # and not recommended. so raise an error
-            msg = f"Field name cannot be `self`"
+            msg = "Field name cannot be `self`."
             raise ValueError(msg)
 
         if isinstance(value, Field):
@@ -307,18 +302,39 @@ def _generate_init(klass: type) -> FunctionType:
 
 @contextmanager
 def _mutable_context(tree: PyTree, *, kopy: bool = False):
-    def mutate_step(tree: PyTree):
-        ovars(tree)[_MUTABLE] = True
-        return tree
-
-    def immutate_step(tree):
-        del ovars(tree)[_MUTABLE]
-        return tree
-
     tree = copy.copy(tree) if kopy else tree
-    mutate_step(tree)
+    ovars(tree)[_MUTABLE] = True
     yield tree
-    immutate_step(tree)
+    ovars(tree).pop(_MUTABLE, None)
+
+
+def _setattr(self: PyTree, key: str, value: Any) -> None:
+    if _MUTABLE not in ovars(self):
+        # default behavior for frozen instances
+        msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
+        raise AttributeError(msg)
+
+    if key in _field_registry[type(self)]:
+        # apply the callbacks on setting the value
+        # check if the key is a field name
+        for callback in _field_registry[type(self)][key].callbacks:
+            try:
+                # callback is a function that takes the value of the field
+                # and returns a modified value
+                value = callback(value)
+            except Exception as e:
+                msg = f"Error for field=`{key}`:\n{e}"
+                raise type(e)(msg)
+
+    # set the value
+    ovars(self)[key] = value  # type: ignore
+
+
+def _delattr(self, key: str) -> None:
+    # Delete the attribute if tree is not frozen
+    if _MUTABLE not in ovars(self):
+        raise AttributeError(f"Cannot delete {key}.")
+    del ovars(self)[key]
 
 
 def _init_wrapper(init_func: Callable) -> Callable:
@@ -332,57 +348,27 @@ def _init_wrapper(init_func: Callable) -> Callable:
                 # even if the init method is not code-generated.
                 post_init_func(self)
 
-        # non-initialized fields
+        # handle non-initialized fields
         if len(keys := set(_field_registry[type(self)]) - set(ovars(self))) > 0:
             msg = f"Uninitialized fields: ({', '.join(keys)}) "
             msg += f"in class `{type(self).__name__}`"
             raise AttributeError(msg)
 
+        if wrapper.has_run is False:
+            # handle instance variables of registered types
+            # for the first time the init method is called
+            wrapper.has_run = True
+            for key in set(ovars(self)) - set(_field_registry[type(self)]):
+                if type(value := getattr(self, key)) in _field_registry:
+                    # auto registers the instance value if it is a registered `treeclass`
+                    # this behavior is similar to PyTorch behavior in `nn.Module`
+                    # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
+                    # the behavior is useful to avoid repetitive code pattern in field definition and
+                    # and initialization inside init method.
+                    field = Field(name=key, type=type(value), init=False)
+                    register_pytree_field_map(type(self), {key: field})
+
         return output
 
+    wrapper.has_run = False
     return wrapper
-
-
-def _setattr(self: PyTree, key: str, value: Any) -> None:
-    if _MUTABLE not in ovars(self):
-        # default behavior for frozen instances
-        msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
-        raise AttributeError(msg)
-
-    # apply the callbacks on setting the value
-    # check if the key is a field name
-    if key in _field_registry[type(self)]:
-        for callback in _field_registry[type(self)][key].callbacks:
-            try:
-                # callback is a function that takes the value of the field
-                # and returns a modified value
-                value = callback(value)
-            except Exception as e:
-                msg = f"Error for field=`{key}`:\n{e}"
-                raise type(e)(msg)
-
-    elif type(value) in _field_registry:
-        # auto registers the instance value if it is a registered `treeclass`
-        # this behavior is similar to PyTorch behavior in `nn.Module`
-        # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
-        register_pytree_field_map(type(self), {key: Field(name=key, type=type(value))})
-
-    # set the value
-    ovars(self)[key] = value  # type: ignore
-
-
-def _delattr(self, key: str) -> None:
-    # Delete the attribute if tree is not frozen
-    if _MUTABLE not in ovars(self):
-        raise AttributeError(f"Cannot delete {key}.")
-    del ovars(self)[key]
-
-
-def fields(item: Any) -> Sequence[Field]:
-    """Get the fields of a `treeclass` instance."""
-    if not is_treeclass(item):
-        raise TypeError(f"Cannot get fields from {_field_registry!r}.")
-
-    klass = item if isinstance(item, type) else type(item)
-    field_map = _field_registry[klass]
-    return tuple(field_map[k] for k in field_map if isinstance(field_map[k], Field))

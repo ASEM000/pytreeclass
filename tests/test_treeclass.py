@@ -1,7 +1,6 @@
 import copy
 import dataclasses as dc
 import functools as ft
-from typing import Tuple
 
 import jax
 import jax.tree_util as jtu
@@ -470,11 +469,13 @@ def test_callbacks():
         class Test:
             a: int = pytc.field(callbacks=[1])
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
 
         @ft.partial(pytc.treeclass, leafwise=True)
         class Test:
             a: int = pytc.field(callbacks=[lambda: True])
+
+        Test(a=1)
 
 
 def test_treeclass_frozen_field():

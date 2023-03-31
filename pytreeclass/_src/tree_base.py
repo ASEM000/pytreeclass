@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 import functools as ft
-import operator as op
-from math import ceil, floor, trunc
 from typing import Any, Callable, TypeVar
 
-import jax
-import jax.numpy as jnp
 import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
@@ -18,11 +14,17 @@ from pytreeclass._src.tree_decorator import (
     _init_wrapper,
     _setattr,
     field,
+    fields,
     ovars,
     register_pytree_field_map,
 )
-from pytreeclass._src.tree_freeze import _tree_hash, _tree_unwrap
-from pytreeclass._src.tree_indexer import tree_indexer
+from pytreeclass._src.tree_freeze import ImmutableWrapper, tree_hash
+from pytreeclass._src.tree_indexer import (
+    _leafwise_transform,
+    is_tree_equal,
+    tree_copy,
+    tree_indexer,
+)
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_trace import register_pytree_node_trace
 
@@ -62,8 +64,7 @@ def _tree_trace(
     names = (f"{key}" for key in keys)
     types = map(type, leaves)
     indices = range(len(leaves))
-    fields = (_field_registry[type(tree)][key] for key in keys)
-    metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields)  # type: ignore
+    metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields(tree))  # type: ignore
     return [*zip(names, types, indices, metadatas)]
 
 
@@ -85,6 +86,16 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
 
 def _getattr_wrapper(getattr_method):
+    def tree_unwrap(value: Any) -> Any:
+        # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
+        def is_leaf(x: Any) -> bool:
+            return isinstance(x, ImmutableWrapper) or type(x) in _field_registry
+
+        def unwrap(value: Any) -> Any:
+            return value.unwrap() if isinstance(value, ImmutableWrapper) else value
+
+        return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
+
     @ft.wraps(getattr_method)
     def wrapper(self, key: str) -> Any:
         # this current approach replaces the older metdata based approach
@@ -112,7 +123,7 @@ def _getattr_wrapper(getattr_method):
         # unwrap non-`treeclass` wrapped instance variables
         # so the getattr will always return unwrapped values.
         # this renders the wrapped instance variables transparent to the user
-        return _tree_unwrap(value) if key in ovars(self) else value
+        return tree_unwrap(value) if key in ovars(self) else value
 
     return wrapper
 
@@ -147,123 +158,6 @@ def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
     return wrapper
 
 
-def _is_lhs_rhs_equal(lhs, rhs) -> bool | jax.Array:
-    if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
-        if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
-            verdict = jnp.array_equal(lhs, rhs)
-            try:
-                return bool(verdict)
-            except Exception:
-                return verdict  # fail under `jit`
-        return False
-    return lhs == rhs
-
-
-def is_tree_equal(*trees: Any) -> bool | jax.Array:
-    """Return `True` if all pytrees are equal.
-
-    Note:
-        trees are compared using their leaves and treedefs.
-        For `array` leaves `jnp.array_equal` is used, for other leaves
-        method `__eq__` is used.
-
-    Note:
-        Under `jit` the return type is boolean `jax.Array` instead of python `bool`.
-    """
-
-    tree0, *rest = trees
-    leaves0, treedef0 = jtu.tree_flatten(tree0)
-    verdict = True
-
-    for tree in rest:
-        leaves, treedef = jtu.tree_flatten(tree)
-        if (treedef != treedef0) or verdict is False:
-            return False
-        verdict = ft.reduce(op.and_, map(_is_lhs_rhs_equal, leaves0, leaves), verdict)
-    return verdict
-
-
-def _tree_copy(tree: PyTree) -> PyTree:
-    """Return a copy of the tree."""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore
-
-
-def _unary_op(func):
-    def wrapper(self):
-        return jtu.tree_map(func, self)
-
-    return ft.wraps(func)(wrapper)
-
-
-def _binary_op(func):
-    def wrapper(lhs, rhs=None):
-        if isinstance(rhs, type(lhs)):
-            return jtu.tree_map(func, lhs, rhs)
-        return jtu.tree_map(lambda x: func(x, rhs), lhs)
-
-    return ft.wraps(func)(wrapper)
-
-
-def _swop(func):
-    # swaping the arguments of a two-arg function
-    return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
-
-
-def _leafwise_transform(klass: type[T]) -> type[T]:
-    # add leafwise transform methods to the class
-    # that enable the user to apply a function to
-    # all the leaves of the tree
-    for key, method in (
-        ("__abs__", _unary_op(abs)),
-        ("__add__", _binary_op(op.add)),
-        ("__and__", _binary_op(op.and_)),
-        ("__ceil__", _unary_op(ceil)),
-        ("__divmod__", _binary_op(divmod)),
-        ("__eq__", _binary_op(op.eq)),
-        ("__floor__", _unary_op(floor)),
-        ("__floordiv__", _binary_op(op.floordiv)),
-        ("__ge__", _binary_op(op.ge)),
-        ("__gt__", _binary_op(op.gt)),
-        ("__invert__", _unary_op(op.invert)),
-        ("__le__", _binary_op(op.le)),
-        ("__lshift__", _binary_op(op.lshift)),
-        ("__lt__", _binary_op(op.lt)),
-        ("__matmul__", _binary_op(op.matmul)),
-        ("__mod__", _binary_op(op.mod)),
-        ("__mul__", _binary_op(op.mul)),
-        ("__ne__", _binary_op(op.ne)),
-        ("__neg__", _unary_op(op.neg)),
-        ("__or__", _binary_op(op.or_)),
-        ("__pos__", _unary_op(op.pos)),
-        ("__pow__", _binary_op(op.pow)),
-        ("__radd__", _binary_op(_swop(op.add))),
-        ("__rand__", _binary_op(_swop(op.and_))),
-        ("__rdivmod__", _binary_op(_swop(divmod))),
-        ("__rfloordiv__", _binary_op(_swop(op.floordiv))),
-        ("__rlshift__", _binary_op(_swop(op.lshift))),
-        ("__rmatmul__", _binary_op(_swop(op.matmul))),
-        ("__rmod__", _binary_op(_swop(op.mod))),
-        ("__rmul__", _binary_op(_swop(op.mul))),
-        ("__ror__", _binary_op(_swop(op.or_))),
-        ("__round__", _binary_op(round)),
-        ("__rpow__", _binary_op(_swop(op.pow))),
-        ("__rrshift__", _binary_op(_swop(op.rshift))),
-        ("__rshift__", _binary_op(op.rshift)),
-        ("__rsub__", _binary_op(_swop(op.sub))),
-        ("__rtruediv__", _binary_op(_swop(op.truediv))),
-        ("__rxor__", _binary_op(_swop(op.xor))),
-        ("__sub__", _binary_op(op.sub)),
-        ("__truediv__", _binary_op(op.truediv)),
-        ("__trunc__", _unary_op(trunc)),
-        ("__xor__", _binary_op(op.xor)),
-    ):
-        if key not in vars(klass):
-            # do not override any user defined methods
-            # this behavior similar is to `dataclasses.dataclass`
-            setattr(klass, key, method)
-    return klass
-
-
 def _treeclass_transform(klass: type[T]) -> type[T]:
     # the method is called after registering the class with `_register_treeclass`
     # cached to prevent wrapping the same class multiple times
@@ -282,23 +176,21 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
         # generate the init method in case it is not defined by the user
         setattr(klass, "__init__", _generate_init(klass))
 
-    # wrappers to enable the field initialization,
-    # callback functionality and transparent wrapper behavior
     for key, wrapper in (
         ("__init__", _init_wrapper),
         ("__init_subclass__", _init_subclass_wrapper),
         ("__getattribute__", _getattr_wrapper),
     ):
-        # use cache to prevent transforming the same class multiple times
-        # this can lead to recursion errors from wrapping the same method multiple times
+        # wrappers to enable the field initialization,
+        # callback functionality and transparent wrapper behavior
         setattr(klass, key, wrapper(getattr(klass, key)))
 
     # basic optional methods
     for key, method in (
         ("__repr__", tree_repr),
         ("__str__", tree_str),
-        ("__copy__", _tree_copy),
-        ("__hash__", _tree_hash),
+        ("__copy__", tree_copy),
+        ("__hash__", tree_hash),
         ("__eq__", is_tree_equal),
         ("__match_args__", tuple(_field_registry[klass].keys())),
         ("at", property(tree_indexer)),
