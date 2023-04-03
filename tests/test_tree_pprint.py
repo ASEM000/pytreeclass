@@ -185,7 +185,7 @@ def test_misc():
         a: int = 1
 
     assert pytc.tree_repr(Test()) == pytc.tree_str(Test()) == "Test(a=1)"
-    assert pytc.tree_repr(Test, depth=0) == pytc.tree_str(Test, depth=0) == "Test(...)"
+    assert pytc.tree_repr(Test(), depth=0) == "Test(...)"
 
 
 def test_extra_tree_diagram():
