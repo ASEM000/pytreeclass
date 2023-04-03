@@ -65,6 +65,8 @@ def test_repr():
         == "Repr1(\n  a=1, \n  b='string', \n  c=1.0, \n  d='aaaaa', \n  e=[...], \n  f={...}, \n  g={...}, \n  h=f32[5,1](μ=1.00, σ=0.00, ∈[1.00,1.00]), \n  i=f32[1,6](μ=1.00, σ=0.00, ∈[1.00,1.00]), \n  j=f32[1,1,4,5](μ=1.00, σ=0.00, ∈[1.00,1.00]), \n  l=namedtuple(...), \n  m=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00]), \n  n=bool[0], \n  o=c64[2]\n)"
     )
 
+    assert tree_repr(r1, depth=0) == "Repr1(...)"
+
 
 def test_str():
     assert (
@@ -183,6 +185,7 @@ def test_misc():
         a: int = 1
 
     assert pytc.tree_repr(Test()) == pytc.tree_str(Test()) == "Test(a=1)"
+    assert pytc.tree_repr(Test, depth=0) == pytc.tree_str(Test, depth=0) == "Test(...)"
 
 
 def test_extra_tree_diagram():
