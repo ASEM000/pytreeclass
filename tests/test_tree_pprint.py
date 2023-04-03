@@ -166,6 +166,7 @@ def test_misc():
         pass
 
     assert tree_repr(example) == tree_str(example) == "example(a, b, *c, d, e, **f)"
+    assert tree_repr(example, depth=-1) == "..."
 
     # example = jax.jit(example)
     # assert (

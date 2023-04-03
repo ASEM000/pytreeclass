@@ -54,8 +54,6 @@ def _node_pprint(
         return _dataclass_pprint(node, indent, kind, width, depth)
     if pytc.is_treeclass(node):
         return _treeclass_pprint(node, indent, kind, width, depth)
-    if pytc.is_frozen(node):
-        return f"#{_node_pprint(node.unwrap(), indent, kind, width,depth)}"
     return _general_pprint(node, indent, kind, width, depth)
 
 
@@ -315,10 +313,10 @@ def tree_repr(
         >>> tree = {'a' : 1, 'b' : [2, 3], 'c' : {'d' : 4, 'e' : 5} , 'f' : jnp.array([6, 7])}
 
         >>> print(pytc.tree_repr(tree, depth=0))
-        {a:..., b:..., c:..., f:...}
+        {...}
 
         >>> print(pytc.tree_repr(tree, depth=1))
-        {a:1, b:[..., ...], c:{d:..., e:...}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
+        {a:1, b:[...], c:{...}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
 
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
@@ -345,11 +343,8 @@ def tree_str(
         >>> import jax.numpy as jnp
         >>> tree = {'a' : 1, 'b' : [2, 3], 'c' : {'d' : 4, 'e' : 5} , 'f' : jnp.array([6, 7])}
 
-        >>> print(pytc.tree_str(tree, depth=0))
-        {a:..., b:..., c:..., f:...}
-
         >>> print(pytc.tree_str(tree, depth=1))
-        {a:1, b:[..., ...], c:{d:..., e:...}, f:[6 7]}
+        {a:1, b:[...], c:{...}, f:[6 7]}
 
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
@@ -548,7 +543,7 @@ def tree_diagram(
         >>> print(pytc.tree_diagram(B(), depth=1))
         B
         ├── a=10
-        └── b=(..., ..., ...)
+        └── b=(...)
 
 
         >>> print(pytc.tree_diagram(B(), depth=2))
@@ -557,7 +552,7 @@ def tree_diagram(
         └── b:tuple
             ├── [0]=20
             ├── [1]=30
-            └── [2]=A(x=10, y=(..., ...), z=40)
+            └── [2]=A(x=10, y=(...), z=40)
     """
     indent_repr = tree_indent(
         tree,
