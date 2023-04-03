@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import ctypes
 import dataclasses as dc
 import functools as ft
 import inspect
 import math
-import sys
+from collections import defaultdict
 from itertools import chain
 from types import FunctionType
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Sequence
 
 import jax
 import numpy as np
@@ -23,7 +22,11 @@ PrintKind = Literal["repr", "str"]
 
 
 def _node_pprint(
-    node: Any, indent: int, kind: PrintKind, width: int, depth: int | float
+    node: Any,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int | float,
 ) -> str:
     if depth < 0:
         return "..."
@@ -51,13 +54,15 @@ def _node_pprint(
         return _dataclass_pprint(node, indent, kind, width, depth)
     if pytc.is_treeclass(node):
         return _treeclass_pprint(node, indent, kind, width, depth)
-    if pytc.is_frozen(node):
-        return f"#{_node_pprint(node.unwrap(), indent, kind, width,depth)}"
     return _general_pprint(node, indent, kind, width, depth)
 
 
 def _general_pprint(
-    node: Any, indent: int, kind: PrintKind, width: int, depth: int
+    node: Any,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
     del depth
 
@@ -89,7 +94,11 @@ def _shape_dtype_pprint(
 
 
 def _numpy_pprint(
-    node: np.ndarray | jax.Array, indent: int, kind: PrintKind, width: int, depth: int
+    node: np.ndarray | jax.Array,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape"""
     if kind == "str":
@@ -120,7 +129,11 @@ def _numpy_pprint(
 
 @ft.lru_cache
 def _func_pprint(
-    func: Callable, indent: int, kind: PrintKind, width: int, depth: int
+    func: Callable,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
     # Pretty print function
     # Example:
@@ -143,77 +156,133 @@ def _func_pprint(
 
 
 def _list_pprint(
-    node: list, indent: int, kind: PrintKind, width: int, depth: int
+    node: list,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
-    fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
-    fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+    if depth == 0:
+        fmt = "..."
+    else:
+        fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
+        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+
     fmt = "[\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "]"
     return _format_width(fmt, width)
 
 
 def _tuple_pprint(
-    node: tuple, indent: int, kind: PrintKind, width: int, depth: int
+    node: tuple,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
-    fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
-    fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+    if depth == 0:
+        fmt = "..."
+    else:
+        fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
+        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = "(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
     return _format_width(fmt, width)
 
 
-def _set_pprint(node: set, indent: int, kind: PrintKind, width: int, depth: int) -> str:
-    fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
-    fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+def _set_pprint(
+    node: set,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
+) -> str:
+    if depth == 0:
+        fmt = "..."
+    else:
+        fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
+        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = "{\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "}"
     return _format_width(fmt, width)
 
 
 def _dict_pprint(
-    node: dict, indent: int, kind: PrintKind, width: int, depth: int
+    node: dict,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
-    fmt = (f"{k}:{_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in node.items())  # fmt: skip
-    fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+    if depth == 0:
+        fmt = "..."
+    else:
+        kvs = node.items()
+        fmt = (f"{k}:{_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
+        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = "{\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "}"
     return _format_width(fmt, width)
 
 
 def _namedtuple_pprint(
-    node: Any, indent: int, kind: PrintKind, width: int, depth: int
+    node: Any,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
-    items = node._asdict().items()
-    fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in items)
-    fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+    if depth == 0:
+        fmt = "..."
+    else:
+        kvs = node._asdict().items()
+        fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
+        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = "namedtuple(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
     return _format_width(fmt, width)
 
 
 def _dataclass_pprint(
-    node: Any, indent: int, kind: PrintKind, width: int, depth: int
+    node: Any,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
     name = type(node).__name__
-    fields = dc.fields(node)
-    vs = (vars(node)[F.name] for F in fields if F.repr)
-    fs = (F for F in fields if F.repr)
-    fmt = (f"{f.name}={_node_pprint(v,indent+1,kind,width,depth-1)}"for f, v in zip(fs, vs))  # fmt: skip
-    fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+
+    if depth == 0:
+        fmt = "..."
+    else:
+        kvs = ((F.name, vars(node)[F.name]) for F in dc.fields(node) if F.repr)
+        fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
+        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+
     fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
     return _format_width(fmt, width)
 
 
 def _treeclass_pprint(
-    node: Any, indent: int, kind: PrintKind, width: int, depth: int
+    node: Any,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
     name = type(node).__name__
-    fields = pytc.fields(node)
-    vs = (vars(node)[F.name] for F in fields if F.repr)
-    fs = (F for F in fields if F.repr)
-    fmt = (f"{f.name}={_node_pprint(v,indent+1,kind,width,depth-1)}"for f, v in zip(fs, vs))  # fmt: skip
-    fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+    if depth == 0:
+        fmt = "..."
+
+    else:
+        kvs = ((F.name, vars(node)[F.name]) for F in pytc.fields(node) if F.repr)
+        fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
+        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
     return _format_width(fmt, width)
 
 
 def _node_type_pprint(
-    node: jax.Array | np.ndarray, indent: int, kind: PrintKind, width: int, depth: int
+    node: jax.Array | np.ndarray,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
     if isinstance(node, (jax.Array, np.ndarray)):
         shape_dype = node.shape, node.dtype
@@ -221,14 +290,6 @@ def _node_type_pprint(
     else:
         fmt = f"{type(node).__name__}"
     return _format_width(fmt, width)
-
-
-def _should_omit_trace(metadatas) -> bool:
-    for metadata in metadatas:
-        if isinstance(metadata, dict) and "repr" in metadata:
-            if metadata["repr"] is False:
-                return True
-    return False
 
 
 def tree_repr(
@@ -252,10 +313,10 @@ def tree_repr(
         >>> tree = {'a' : 1, 'b' : [2, 3], 'c' : {'d' : 4, 'e' : 5} , 'f' : jnp.array([6, 7])}
 
         >>> print(pytc.tree_repr(tree, depth=0))
-        {a:..., b:..., c:..., f:...}
+        {...}
 
         >>> print(pytc.tree_repr(tree, depth=1))
-        {a:1, b:[..., ...], c:{d:..., e:...}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
+        {a:1, b:[...], c:{...}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
 
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
@@ -282,11 +343,8 @@ def tree_str(
         >>> import jax.numpy as jnp
         >>> tree = {'a' : 1, 'b' : [2, 3], 'c' : {'d' : 4, 'e' : 5} , 'f' : jnp.array([6, 7])}
 
-        >>> print(pytc.tree_str(tree, depth=0))
-        {a:..., b:..., c:..., f:...}
-
         >>> print(pytc.tree_str(tree, depth=1))
-        {a:1, b:[..., ...], c:{d:..., e:...}, f:[6 7]}
+        {a:1, b:[...], c:{...}, f:[6 7]}
 
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
@@ -294,11 +352,11 @@ def tree_str(
     return _node_pprint(tree, 0, "str", width, depth).expandtabs(tabwidth)
 
 
-def _resolve_names(names, width: int) -> str:
+def _resolve_names(names: Sequence[str], width: int) -> str:
     # given a trace with a tuple of names, we resolve the names
     # to a single string
-    path = names[0]
-    for name in names[1:]:
+    path, *paths = names
+    for name in paths:
         path += "" if name.startswith("[") else "."
         path += _node_pprint(name, 0, "str", width, float("inf"))
     return path
@@ -317,42 +375,154 @@ def _is_trace_leaf_depth_factory(depth: int):
     return is_trace_leaf
 
 
-def _sibling_nodes_count_at_all_depth(lhs_trace, traces: tuple[Any]) -> list[int]:
-    # given a trace and a list of traces, we count the number of nodes
-    # at each depth that are siblings of the lhs_trace
-    def sibling_nodes_count_at_depth(lhs_trace: Any, traces: tuple[Any], depth: int):
-        result = set()
-        start = False
-        for trace in traces:
-            _, __, indices, ___ = trace
-            if len(indices) > depth and indices[:depth] == lhs_trace[2][:depth]:
-                start = True
-                # mere existence of a name at a given depth means
-                # that there is a node at that depth
-                result.add(indices[: depth + 1])
-            elif start is True:
-                # we already found the first sibling, so if we are here
-                # it means that we have reached the end of the siblings
-                break
-        return len(result)
+def tree_indent(
+    tree: Any,
+    *,
+    width: int = 60,
+    depth: int | float = float("inf"),
+    is_leaf: Callable[[Any], bool] | None = None,
+    tabwidth: int | None = 4,
+):
+    """Returns a string representation of the tree with indentation.
 
-    depth, result = 0, []
-    while True:
-        if (out := sibling_nodes_count_at_depth(lhs_trace, traces, depth=depth)) == 0:
-            break
-        else:
-            result += [out]
-            depth += 1
-    return result
+    Args:
+        tree: The tree to be printed.
+        width: The maximum width of leaf nodes line.
+        depth: The maximum depth of the tree to be printed.
+        is_leaf: A function that takes a node and returns True if it is a leaf node.
+        tabwidth: The number of spaces per indentation level. if `None` then tabs are not expanded.
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> tree = [1, [2, 3], [4, [5, 6]]]
+        >>> print(pytc.tree_indent(tree))
+        list
+            [0]=1
+            [1]:list
+                [0]=2
+                [1]=3
+            [2]:list
+                [0]=4
+                [1]:list
+                    [0]=5
+                    [1]=6
+
+    """
+    traces_leaves = pytc.tree_leaves_with_trace(
+        tree=tree,
+        is_leaf=is_leaf,
+        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+    )
+
+    fmt = f"{type(tree).__name__}"
+    seen = set()
+
+    for trace, leaf in traces_leaves:
+        names, types = trace[0], trace[1]
+
+        for j, (name, type_) in enumerate(zip(names, types)):
+            if names[: j + 1] in seen:
+                continue  # skip printing the common parent node twice
+            seen.add(names[: j + 1])
+
+            fmt += "\n" + "\t" * (j + 1)
+            fmt += f"{_node_pprint(name,0,'str',width, depth )}"
+            fmt += (
+                f"={_node_pprint(leaf,indent=j+1,kind='repr',width=width, depth=depth-1)}"
+                if j == len(names) - 1
+                else f":{type_.__name__}"
+            )
+    return fmt if tabwidth is None else fmt.expandtabs(tabwidth)
 
 
-def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
+def _group_by_depth(input: str) -> dict[int, list[list[int]]]:
+    # >>> out = """L2
+    # 	e=4
+    # 	f:L1
+    # 		c:L0
+    # 			a=1
+    # 			b=2
+    # 		d=3
+    # 	g:L0
+    # 		a=1
+    # 		b=2
+    # 	h=5"""
+    #
+    # >>> print(_group_by_depth(out))
+    # {
+    #   3:[[4, 5]],
+    #   2:[[3, 6], [8, 9]],
+    #   0:[[0]],
+    #   1:[[1, 2, 7, 10]]
+    # }
+    # in essence, the map key is the depth of the node, and the value is a list of line indices
+    # each list of line indices is a parent node with line indices of its children
+    depth_line_index_map = defaultdict(list)
+    stack_map = defaultdict(list)
+    prev_depth = 0
+    lines = input.splitlines()
+
+    for line_index, line in enumerate(lines):
+        cur_depth = len(line) - len(line.lstrip("\t"))
+        stack_map[cur_depth] += [line_index]
+        if cur_depth < prev_depth and prev_depth in stack_map:
+            depth_line_index_map[prev_depth] += [stack_map.pop(prev_depth)]
+        prev_depth = cur_depth
+
+    for key in stack_map:
+        depth_line_index_map[key] += [stack_map[key]]
+    del stack_map
+
+    return dict(depth_line_index_map)
+
+
+def _indent_to_diagram(input: str, tabwidth: int = 4) -> str:
+    # input is a string of tab \t indented text
+    # conversion alphabet
+    vmark = ("│\t")[:tabwidth]  # vertical mark
+    lmark = ("└" + "─" * (tabwidth - 2) + (" \t"))[:tabwidth]  # last mark
+    cmark = ("├" + "─" * (tabwidth - 2) + (" \t"))[:tabwidth]  # connector mark
+    smark = (" \t")[:tabwidth]  # space mark
+
+    depth_line_index_map = _group_by_depth(input)
+    lines = input.splitlines()
+
+    for depth in depth_line_index_map:
+        # iterate over groups of line indices at this depth
+        for parent_lines_indices in depth_line_index_map[depth]:
+            # iterate over line indices groups
+            for i, line_index in enumerate(parent_lines_indices):
+                # iterate over line indices at a group at this depth
+                is_last = i == len(parent_lines_indices) - 1
+
+                marker = ""
+                for j in range(1, depth):
+                    max_line_index = depth_line_index_map.get(j, [[-1]])[-1][-1]
+                    marker += vmark if max_line_index > line_index else smark
+
+                if depth > 0:
+                    marker += lmark if is_last else cmark
+
+                lines[line_index] = marker + lines[line_index].lstrip("\t")
+
+    return "\n".join(lines).expandtabs(tabwidth)
+
+
+def tree_diagram(
+    tree: Any,
+    *,
+    width: int = 60,
+    depth: int | float = float("inf"),
+    is_leaf: Callable[[Any], bool] | None = None,
+    tabwidth: int = 4,
+):
     """Pretty print arbitrary PyTrees tree with tree structure diagram.
 
     Args:
         tree: PyTree
         depth: depth of the tree to print. default is max depth
-        width: max width of the str string
+        width: max width of line. default is 60
+        is_leaf: function to determine if a node is a leaf. default is None
 
     Example:
         >>> import pytreeclass as pytc
@@ -372,80 +542,60 @@ def tree_diagram(tree, *, width: int = 60, depth: int | float = float("inf")):
 
         >>> print(pytc.tree_diagram(B(), depth=1))
         B
-            ├── a=10
-            └── b=(..., ..., ...)
+        ├── a=10
+        └── b=(...)
 
 
         >>> print(pytc.tree_diagram(B(), depth=2))
         B
-            ├── a=10
-            └── b:tuple
-                ├── [0]=20
-                ├── [1]=30
-                └── [2]=A(x=10, y=(..., ...), z=40)
+        ├── a=10
+        └── b:tuple
+            ├── [0]=20
+            ├── [1]=30
+            └── [2]=A(x=10, y=(...), z=40)
     """
-    traces, leaves = unzip2(
-        pytc.tree_leaves_with_trace(
-            tree=tree,
-            is_leaf=pytc.is_frozen,
-            is_trace_leaf=_is_trace_leaf_depth_factory(depth),
-        )
+    indent_repr = tree_indent(
+        tree,
+        width=width,
+        depth=depth,
+        is_leaf=is_leaf,
+        tabwidth=None,
     )
 
-    fmt = f"{type(tree).__name__}"
+    return _indent_to_diagram(indent_repr, tabwidth=tabwidth)
 
-    for i, (trace, leaf) in enumerate(zip(traces, leaves)):
-        # i iterates over traces
-        names, types, indices, metadatas = trace
 
-        if _should_omit_trace(metadatas):
-            continue
+def _indent_to_mermaid(input: str, tabwidth: int) -> str:
+    # input is a string of tab \t indented text
 
-        sibling_nodes_count = _sibling_nodes_count_at_all_depth(trace, traces)
+    depth_line_index_map = _group_by_depth(input)
+    lines = input.splitlines()
 
-        for j, (name, type_) in enumerate(zip(names, types)):
-            # skip printing the common parent node twice
-            prev_names, _, __, ___ = traces[i - 1]
+    output = "flowchart LR\n"
 
-            if i > 0 and prev_names[: j + 1] == names[: j + 1]:
-                continue
+    for depth in depth_line_index_map:
+        # iterate over groups of line indices at this depth
+        for parent_lines_indices in depth_line_index_map[depth]:
+            # iterate over line indices groups
+            for line_index in parent_lines_indices:
+                if depth == 0:
+                    line = "<b>" + lines[line_index].lstrip("\t") + "</b>"
+                    output += f"\tid{line_index}({line})\n"
 
-            fmt += "\n\t"
-
-            for k in range(j):
-                # handle printing the left lines for each depth
-                if indices[k] == sibling_nodes_count[k] - 1:
-                    # do not print the left line
-                    # └── A
-                    #     └── B
-                    fmt += " \t"
                 else:
-                    # print the left line
-                    # ├── A
-                    # │   └── B
-                    # └── C
-                    fmt += "│\t"
-
-            if indices[j] == (sibling_nodes_count[j] - 1):
-                # check if we are at the last node in the current depth
-                fmt += "└"
-            else:
-                fmt += "├"
-
-            fmt += f"── {_node_pprint(name,0,'str',width, depth )}"
-
-            if j == len(names) - 1:
-                # if we are at the leaf node, print the value as `=value`
-                fmt += f"={_node_pprint(leaf,j+1,'repr',width, depth-1)}"
-            else:
-                # if we are not at the leaf node, print the type as `:type`
-                fmt += f":{type_.__name__}"
-
-    return fmt.expandtabs(4)
+                    # get the line indices of the previous depth (parent nodes)
+                    parent_lines = chain.from_iterable(depth_line_index_map[depth - 1])
+                    parent_line_index = [x for x in parent_lines if x < line_index][-1]
+                    line = "</b>" + lines[line_index].lstrip("\t") + "</b>"
+                    output += f'\tid{parent_line_index} --- id{line_index}("{line}")\n'
+    return output.expandtabs(tabwidth)
 
 
 def tree_mermaid(
-    tree: PyTree, width: int = 60, depth: int | float = float("inf")
+    tree: PyTree,
+    width: int = 60,
+    depth: int | float = float("inf"),
+    is_leaf: Callable[[Any], bool] | None = None,
 ) -> str:
     # def _generate_mermaid_link(mermaid_string: str) -> str:
     #     """generate a one-time link mermaid diagram"""
@@ -457,52 +607,15 @@ def tree_mermaid(
 
     """generate a mermaid diagram syntax for arbitrary PyTrees."""
 
-    def bold_text(text: str) -> str:
-        # bold a text in ansci code
-        return "<b>" + text + "</b>"
-
-    def node_id(input):
-        # hash a value by its location in a tree. used to connect values in mermaid
-        # specifically we use c_size_t to avoid negative values in the hash that is not supported by mermaid
-        return ctypes.c_size_t(hash(input)).value
-
-    traces, leaves = unzip2(
-        pytc.tree_leaves_with_trace(
-            tree=tree,
-            is_leaf=pytc.is_frozen,
-            is_trace_leaf=_is_trace_leaf_depth_factory(depth),
-        )
+    indent_repr = tree_indent(
+        tree,
+        width=width,
+        depth=depth,
+        is_leaf=is_leaf,
+        tabwidth=None,
     )
-    # in case of a single node tree or depth=0, avoid printing the node twice
-    # once for the trace and once for the summary
 
-    root_id = node_id((0, 0, -1, 0))
-    fmt = f"flowchart LR\n\tid{root_id}({bold_text(type(tree).__name__)})"
-    cur_id = None
-
-    for trace, leaf in zip(traces, leaves):
-        names, types, indices, metadatas = trace
-
-        if _should_omit_trace(metadatas):
-            continue
-
-        count, size = _calculate_leaf_trace_stats(leaf)
-        count = _format_count(count) + " leaf"
-        size = _format_size(size)
-
-        for depth, (name, type_) in enumerate(zip(names, types)):
-            name = _node_pprint(name, 0, "str", width, depth)
-
-            prev_id = root_id if depth == 0 else cur_id
-            cur_id = node_id((depth, tuple(indices), prev_id))
-            fmt += f"\n\tid{prev_id}"
-            stats = f'|"{count}<br>{size}"|' if depth == len(names) - 1 else ""
-            fmt += "--->" + stats
-            is_last = depth == len(names) - 1
-            value = f"={_node_pprint(leaf,0,'repr',width,depth)}" if is_last else ""
-            fmt += f'id{cur_id}("{bold_text(name)}:{type_.__name__}{value}")'
-
-    return fmt.expandtabs(4)
+    return _indent_to_mermaid(indent_repr, tabwidth=4)
 
 
 def _format_width(string, width=60):
@@ -513,61 +626,10 @@ def _format_width(string, width=60):
     return string.replace("\n", "").replace("\t", "")
 
 
-def _format_size(node_size: float | int | complex, newline=False):
-    # return formatted size from inexact(exact) complex number
-    # Examples:
-    #     >>> _format_size(1024)
-    #     '1.00KB'
-    #     >>> _format_size(1024**2)
-    #     '1.00MB'
-
-    mark = "\n" if newline else ""
-    order_kw = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-
-    if isinstance(node_size, complex):
-        # define order of magnitude
-        real_size_order = int(math.log(max(node_size.real, 1), 1024))
-        imag_size_order = int(math.log(max(node_size.imag, 1), 1024))
-        fmt = f"{(node_size.real)/(1024**real_size_order):.2f}{order_kw[real_size_order]}{mark}"
-        fmt += f"({(node_size.imag)/(1024**imag_size_order):.2f}{order_kw[imag_size_order]})"
-        return fmt
-
-    size_order = int(math.log(node_size, 1024)) if node_size > 0 else 0
-    return f"{(node_size)/(1024**size_order):.2f}{order_kw[size_order]}"
-
-
-def _format_count(node_count, newline=False):
-    # return formatted count from inexact(exact) complex number
-    # Examples:
-    #     >>> _format_count(1024)
-    #     '1,024'
-
-    #     >>> _format_count(1024**2)
-    #     '1,048,576'
-
-    mark = "\n" if newline else ""
-
-    if isinstance(node_count, complex):
-        return f"{int(node_count.real):,}{mark}({int(node_count.imag):,})"
-
-    if isinstance(node_count, (float, int)):
-        return f"{int(node_count):,}"
-
-    raise TypeError(f"node_count must be int or float, got {type(node_count)}")
-
-
-def _calculate_leaf_trace_stats(tree: Any) -> tuple[int | complex, int | complex]:
-    # calcuate some stats of a single subtree defined
-    counts = sizes = 0
-    _, leaves = unzip2(pytc.tree_leaves_with_trace(tree, is_leaf=pytc.is_frozen))
-
-    for leaf in leaves:
-        # unfrozen leaf
-        # array count is the product of the shape. if the node is not an array, then the count is 1
-        counts += int(np.array(leaf.shape).prod()) if hasattr(leaf, "shape") else 1
-        sizes += leaf.nbytes if hasattr(leaf, "nbytes") else sys.getsizeof(leaf)
-
-    return (counts, sizes)
+def _calculate_count(leaf: Any) -> tuple[int, int]:
+    if hasattr(leaf, "shape") and hasattr(leaf, "nbytes"):
+        return int(np.array(leaf.shape).prod())
+    return 1
 
 
 # table printing
@@ -698,11 +760,12 @@ def _resolve_line(cols: list[str]) -> str:
     return "".join(map(lambda x: "".join(x), cols))
 
 
-def _table(lines: list[list[str]]) -> str:
+def _table(rows: list[list[str]], transpose: bool = False) -> str:
     # Create a table with self aligning rows and cols
 
     # Args:
-    #     lines (Sequence[str,...]): list of lists of cols values
+    #     rows: list of lists of row values
+    #     transpose: transpose the table. i.e. rows become cols and cols become rows
 
     # Returns:
     #     str: box string
@@ -718,30 +781,35 @@ def _table(lines: list[list[str]]) -> str:
     #     │2│40000000│
     #     └─┴────────┘
 
-    for i, _cells in enumerate(zip(*lines)):
+    cols = rows if transpose else [list(c) for c in zip(*rows)]
+
+    for i, _cells in enumerate(zip(*cols)):
         max_cell_height = max(map(lambda x: x.count("\n"), _cells))
         for j in range(len(_cells)):
-            lines[j][i] += "\n" * (max_cell_height - lines[j][i].count("\n"))
+            cols[j][i] += "\n" * (max_cell_height - cols[j][i].count("\n"))
 
-    return _hstack(*(_vbox(*col) for col in lines))
+    return _hstack(*(_vbox(*col) for col in cols))
 
 
 def tree_summary(
-    tree: PyTree, *, width: int = 60, depth: int | float = float("inf")
+    tree: PyTree,
+    *,
+    depth: int | float = float("inf"),
+    is_leaf: Callable[[Any], bool] | None = None,
 ) -> str:
     """Print a summary of an arbitrary PyTree.
 
     Args:
         tree: pytree to summarize (ex. list, tuple, dict, dataclass, jax.numpy.ndarray)
-        depth: depth to traverse the tree. defaults to maximum depth.
+        depth: max depth to traverse the tree. defaults to maximum depth = float("inf")
+        is_leaf: function to determine if a node is a leaf. defaults to None
 
     Returns:
-        str: summary of the tree structure
-            1st column: is the path to the node
-            2nd column: is the type of the node
-            3rd column: is the number of leaves in the node (the number of frozen leaves displayed between parenthesis)
-            4th column: is the size of the node (the size of frozen leaves displayed between parenthesis)
-            Last row  : type of parent, number of leaves and size of parent
+        String summary of the tree structure
+        - First column: is the path to the node
+        - Second column: is the type of the node
+        - Third column: is the number of leaves in the node (1 for non-array leaves and array size for array leaves)
+        - Last row: type of parent, number of leaves and size of parent
 
     Note:
         Array elements are considered as leaves, for example `jnp.array([1,2,3])` has 3 leaves
@@ -749,80 +817,64 @@ def tree_summary(
     Example:
         >>> import pytreeclass as pytc
         >>> print(pytc.tree_summary([1,[2,[3]]]))
-        ┌─────────┬────┬─────┬──────┐
-        │Name     │Type│Count│Size  │
-        ├─────────┼────┼─────┼──────┤
-        │[0]      │int │1    │28.00B│
-        ├─────────┼────┼─────┼──────┤
-        │[1][0]   │int │1    │28.00B│
-        ├─────────┼────┼─────┼──────┤
-        │[1][1][0]│int │1    │28.00B│
-        ├─────────┼────┼─────┼──────┤
-        │Σ        │list│3    │84.00B│
-        └─────────┴────┴─────┴──────┘
+        ┌─────────┬────┬─────┐
+        │Name     │Type│Count│
+        ├─────────┼────┼─────┤
+        │[0]      │int │1    │
+        ├─────────┼────┼─────┤
+        │[1][0]   │int │1    │
+        ├─────────┼────┼─────┤
+        │[1][1][0]│int │1    │
+        ├─────────┼────┼─────┤
+        │Σ        │list│3    │
+        └─────────┴────┴─────┘
     """
-    ROWS = [["Name", "Type", "Count", "Size"]]
+    ROWS = [["Name", "Type", "Count"]]
+    COUNT = 0
 
+    # use `unzip2` from `jax.util` to avoid [] leaves
+    # based on this issue:
     traces, leaves = unzip2(
         pytc.tree_leaves_with_trace(
             tree,
-            is_leaf=pytc.is_frozen,
+            is_leaf=is_leaf,
             is_trace_leaf=_is_trace_leaf_depth_factory(depth),
         )
     )
-    # in case of a single node tree or depth=0, avoid printing the node twice
-    # once for the trace and once for the summary
-    traces = traces if len(traces) > 1 else ()
 
     for trace, leaf in zip(traces, leaves):
-        names, _, __, metadatas = trace
+        count = _calculate_count(leaf)
+        COUNT += count
 
-        if _should_omit_trace(metadatas):
+        if trace == ((), (), (), ()):
+            # avoid printing the leaf trace (which is the root of the tree)
+            # twice, once as a leaf and once as the root at the end
             continue
 
-        row = [_resolve_names(names, width)]
+        paths = _resolve_names(names=trace[0], width=60)
+        types = _node_type_pprint(leaf, indent=0, kind="str", width=60, depth=depth)
+        counts = f"{count:,}"
+        ROWS += [[paths, types, counts]]
 
-        # type name row
-        row += [_node_type_pprint(leaf, 0, "str", width, depth)]
+    paths = "Σ"
+    types = _node_type_pprint(tree, indent=0, kind="str", width=60, depth=depth)
+    counts = f"{COUNT:,}"
+    ROWS += [[paths, types, counts]]
 
-        # count and size row
-        count, size = _calculate_leaf_trace_stats(leaf)
-        leaves_count = _format_count(count.real + count.imag)
-        leaves_size = _format_size(size.real + size.imag)
-
-        # add frozen stats only if there are frozen leaves
-        leaves_count += f"({_format_count(count.imag)})" if count.imag > 0 else ""
-        leaves_size += f"({_format_size(size.imag)})" if size.imag > 0 else ""
-        row += [leaves_count, leaves_size]
-
-        ROWS += [row]
-
-    COUNT = complex(0)
-    SIZE = complex(0)
-
-    for trace, leaf in pytc.tree_leaves_with_trace(tree, is_leaf=pytc.is_frozen):
-        count, size = _calculate_leaf_trace_stats(leaf)
-        COUNT += count
-        SIZE += size
-
-    total_count = COUNT.real + COUNT.imag
-    total_size = SIZE.real + SIZE.imag
-
-    row = ["Σ"]
-    row += [_node_type_pprint(tree, 0, "repr", width, depth)]
-    total_count = _format_count(total_count)
-
-    total_size = _format_size(total_size)
-    row += [total_count, total_size]
-    ROWS += [row]
-
-    COLS = [list(c) for c in zip(*ROWS)]
-    layer_table = _table(COLS)
-    return layer_table.expandtabs(8)
+    return _table(ROWS)
 
 
-def tree_repr_with_trace(tree: PyTree) -> PyTree:
+def tree_repr_with_trace(
+    tree: PyTree,
+    is_leaf: Callable[[Any], bool] | None = None,
+    transpose: bool = False,
+) -> PyTree:
     """Return a PyTree with the same structure, but with the leaves replaced by a summary of the trace.
+
+    Args:
+        tree: pytree to summarize.
+        is_leaf: function to determine if a node is a leaf. defaults to None
+        transpose: transpose the table. i.e. rows become cols and cols become rows
 
     Example:
         >>> import pytreeclass as pytc
@@ -856,6 +908,22 @@ def tree_repr_with_trace(tree: PyTree) -> PyTree:
             └──────────┴─────┘
         )
 
+        >>> print(pytc.tree_repr_with_trace(Test(), transpose=True))  # doctest: +SKIP
+        Test(
+        a=
+            ┌─────┬─────────┬─────────┬──────────┐
+            │Value│Name path│Type path│Index path│
+            ├─────┼─────────┼─────────┼──────────┤
+            │1    │a        │int      │0         │
+            └─────┴─────────┴─────────┴──────────┘,
+        b=
+            ┌─────┬─────────┬─────────┬──────────┐
+            │Value│Name path│Type path│Index path│
+            ├─────┼─────────┼─────────┼──────────┤
+            │2.0  │b        │float    │1         │
+            └─────┴─────────┴─────────┴──────────┘
+        )
+
     Note:
         This function can be useful for debugging and raising descriptive errors.
     """
@@ -874,8 +942,6 @@ def tree_repr_with_trace(tree: PyTree) -> PyTree:
         ROWS += [["Index path", indices]]
 
         # make a pretty table for each leaf
-        COLS = [list(c) for c in zip(*ROWS)]
+        return _table(ROWS, transpose=transpose)
 
-        return _table(COLS)
-
-    return pytc.tree_map_with_trace(leaf_trace_summary, tree)
+    return pytc.tree_map_with_trace(leaf_trace_summary, tree, is_leaf=is_leaf)

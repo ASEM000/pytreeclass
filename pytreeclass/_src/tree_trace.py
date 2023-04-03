@@ -12,6 +12,7 @@ from jax._src.tree_util import _registry
 # the code style is heavilty influenced by `jax.tree_util`
 # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
 
+
 PyTree = Any
 TraceType = Any
 
@@ -43,7 +44,7 @@ def _validate_trace_func(
     # validation is only performed once
     @ft.wraps(trace_func)
     def wrapper(tree):
-        if getattr(wrapper, "is_validated", False):
+        if wrapper.has_run is True:
             return trace_func(tree)
 
         for trace in (traces := trace_func(tree)):
@@ -79,9 +80,10 @@ def _validate_trace_func(
                 msg += f" Expected an integer, got {trace[2]}"
                 raise TypeError(msg)
 
-        setattr(wrapper, "is_validated", True)
+        wrapper.has_run = True
         return traces
 
+    wrapper.has_run = False
     return wrapper
 
 
@@ -252,7 +254,9 @@ def tree_leaves_with_trace(
 
 
 def tree_flatten_with_trace(
-    tree: PyTree, *, is_leaf: Callable[[Any], bool] | None = None
+    tree: PyTree,
+    *,
+    is_leaf: Callable[[Any], bool] | None = None,
 ) -> tuple[Sequence[tuple[TraceType, Any]], jtu.PyTreeDef]:
     """Similar to jax.tree_util.tree_flatten` but returns the objects too as well
 

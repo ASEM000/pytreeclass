@@ -7,7 +7,7 @@ import jax
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _WRAPPED, _field_registry, ovars
+_WRAPPED = "__wrapped__"
 
 PyTree = Any
 
@@ -24,21 +24,9 @@ def _hash_node(node: Any) -> int:
     return hash(node)
 
 
-def _tree_hash(tree: PyTree) -> int:
+def tree_hash(tree: PyTree) -> int:
     hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
     return hash((*hashed, jtu.tree_structure(tree)))
-
-
-def _unwrap(value: Any) -> Any:
-    return value.unwrap() if isinstance(value, ImmutableWrapper) else value
-
-
-def _tree_unwrap(value: PyTree) -> PyTree:
-    # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
-    def is_leaf(x: Any) -> bool:
-        return isinstance(x, ImmutableWrapper) or type(x) in _field_registry
-
-    return jtu.tree_map(_unwrap, value, is_leaf=is_leaf)
 
 
 class ImmutableWrapper:
@@ -78,7 +66,7 @@ class ImmutableWrapper:
 
     def __init__(self, x: Any) -> None:
         # disable composition of Wrappers
-        ovars(self)[_WRAPPED] = _unwrap(x)
+        vars(self)[_WRAPPED] = x.unwrap() if isinstance(x, ImmutableWrapper) else x
 
     def unwrap(self) -> Any:
         return getattr(self, _WRAPPED)
@@ -122,7 +110,7 @@ def _frozen_flatten(tree: Any) -> tuple[tuple, Any]:
 
 def _frozen_unflatten(treedef: Any, _: Sequence[Any]) -> PyTree:
     tree = object.__new__(FrozenWrapper)  # type: ignore
-    ovars(tree)[_WRAPPED] = treedef.unwrap()
+    vars(tree)[_WRAPPED] = treedef.unwrap()
     return tree
 
 

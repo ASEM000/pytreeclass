@@ -10,6 +10,7 @@ from pytreeclass._src.tree_freeze import (
 from pytreeclass._src.tree_indexer import bcmap, tree_indexer
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
+    tree_indent,
     tree_mermaid,
     tree_repr,
     tree_repr_with_trace,
@@ -35,6 +36,7 @@ __all__ = (
     "tree_mermaid",
     "tree_repr",
     "tree_str",
+    "tree_indent",
     "tree_summary",
     "tree_trace_summary",
     # freeze/unfreeze utils
