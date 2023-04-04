@@ -107,7 +107,6 @@ doctest_global_setup = """
 import jax
 import jax.numpy as jnp
 import pytreeclass
-from sphinxcontrib.mermaid.directives import mermaid
 """
 doctest_default_flags = (
     doctest.ELLIPSIS
