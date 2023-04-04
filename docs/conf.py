@@ -44,7 +44,6 @@ html_logo = "_static/logo.svg"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "myst_parser",
     "sphinx_copybutton",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
@@ -108,6 +107,7 @@ doctest_global_setup = """
 import jax
 import jax.numpy as jnp
 import pytreeclass
+from sphinxcontrib.mermaid.directives import mermaid
 """
 doctest_default_flags = (
     doctest.ELLIPSIS

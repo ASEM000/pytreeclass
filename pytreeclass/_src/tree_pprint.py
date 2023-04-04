@@ -618,19 +618,21 @@ def tree_mermaid(
         >>> import pytreeclass as pytc
         >>> tree = [1, [2, 3], [4, [5, 6]]]
         >>> print(pytc.tree_mermaid(tree, depth=1))  # doctest: +SKIP
-        ```{mermaid}
+
+        .. mermaid::
+
             flowchart LR
-            id2 --- id3("</b>[0]=2</b>")
-            id2 --- id4("</b>[1]=3</b>")
-            id5 --- id6("</b>[0]=4</b>")
-            id5 --- id7("</b>[1]:list</b>")
-            id0(<b>list</b>)
-            id0 --- id1("</b>[0]=1</b>")
-            id0 --- id2("</b>[1]:list</b>")
-            id0 --- id5("</b>[2]:list</b>")
-            id7 --- id8("</b>[0]=5</b>")
-            id7 --- id9("</b>[1]=6</b>")
-        ```
+
+                id2 --- id3("</b>[0]=2</b>")
+                id2 --- id4("</b>[1]=3</b>")
+                id5 --- id6("</b>[0]=4</b>")
+                id5 --- id7("</b>[1]:list</b>")
+                id0(<b>list</b>)
+                id0 --- id1("</b>[0]=1</b>")
+                id0 --- id2("</b>[1]:list</b>")
+                id0 --- id5("</b>[2]:list</b>")
+                id7 --- id8("</b>[0]=5</b>")
+                id7 --- id9("</b>[1]=6</b>")
     """
 
     indent_repr = tree_indent(

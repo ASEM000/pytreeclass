@@ -54,7 +54,7 @@ Pretty Printing API
 .. autofunction:: tree_repr_with_trace
 
 Wrapping and freezing API
--------------------
+-------------------------
 
 .. currentmodule:: pytreeclass 
 
