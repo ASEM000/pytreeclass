@@ -355,19 +355,22 @@ def _init_wrapper(init_func: Callable) -> Callable:
             raise AttributeError(msg)
 
         if wrapper.has_run is False:
-            # handle instance variables of registered types
-            # for the first time the init method is called
+            # handle instance variables of registered types once per class
             wrapper.has_run = True
-            for key in set(ovars(self)) - set(_field_registry[type(self)]):
-                if type(value := getattr(self, key)) in _field_registry:
-                    # auto registers the instance value if it is a registered `treeclass`
-                    # this behavior is similar to PyTorch behavior in `nn.Module`
-                    # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
-                    # the behavior is useful to avoid repetitive code pattern in field definition and
-                    # and initialization inside init method.
+            # auto registers the instance value if it is a registered `treeclass`
+            # this behavior is similar to PyTorch behavior in `nn.Module`
+            # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
+            # the behavior is useful to avoid repetitive code pattern in field definition and
+            # and initialization inside init method.
+            for key in ovars(self):
+                if (
+                    key not in _field_registry[type(self)]
+                    and type(value := ovars(self)[key]) in _field_registry
+                ):
+                    # register the field with `init=False`.the field is not part of
+                    # the init method signature, but defined in the `__post_init__` method
                     field = Field(name=key, type=type(value), init=False)
                     register_pytree_field_map(type(self), {key: field})
-
         return output
 
     wrapper.has_run = False
