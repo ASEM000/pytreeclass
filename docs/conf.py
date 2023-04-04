@@ -56,6 +56,7 @@ extensions = [
     "sphinx_autodoc_typehints",
     "nbsphinx",
     "IPython.sphinxext.ipython_console_highlighting",
+    "sphinxcontrib.mermaid",
 ]
 
 
