@@ -46,9 +46,7 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     return tree
 
 
-def _tree_flatten(
-    tree: PyTree,
-) -> tuple[list[Any], tuple[tuple[str, ...], dict[str, Any]]]:
+def _tree_flatten(tree: PyTree):
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
     static, dynamic = dict(ovars(tree)), dict()
     for key in _field_registry[type(tree)]:
@@ -56,9 +54,7 @@ def _tree_flatten(
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
 
-def _tree_trace(
-    tree: PyTree,
-) -> list[tuple[Any, Any, int, Any]]:
+def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
     """Trace flatten rule to be used with the `tree_trace` module."""
     leaves, (keys, _) = _tree_flatten(tree)
     names = (f"{key}" for key in keys)
@@ -85,7 +81,7 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     return klass
 
 
-def _getattr_wrapper(getattr_method):
+def _getattribute_wrapper(getattribute_method):
     def tree_unwrap(value: Any) -> Any:
         # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
         def is_leaf(x: Any) -> bool:
@@ -96,7 +92,7 @@ def _getattr_wrapper(getattr_method):
 
         return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
 
-    @ft.wraps(getattr_method)
+    @ft.wraps(getattribute_method)
     def wrapper(self, key: str) -> Any:
         # this current approach replaces the older metdata based approach
         # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`.
@@ -119,7 +115,7 @@ def _getattr_wrapper(getattr_method):
         # Tree(a=#1)  # frozen value is displayed in the repr with a prefix `#`
         # >>> tree.a
         # 1  # the value is unwrapped when accessed directly
-        value = getattr_method(self, key)
+        value = getattribute_method(self, key)
         # unwrap non-`treeclass` wrapped instance variables
         # so the getattr will always return unwrapped values.
         # this renders the wrapped instance variables transparent to the user
@@ -179,7 +175,7 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     for key, wrapper in (
         ("__init__", _init_wrapper),
         ("__init_subclass__", _init_subclass_wrapper),
-        ("__getattribute__", _getattr_wrapper),
+        ("__getattribute__", _getattribute_wrapper),
     ):
         # wrappers to enable the field initialization,
         # callback functionality and transparent wrapper behavior

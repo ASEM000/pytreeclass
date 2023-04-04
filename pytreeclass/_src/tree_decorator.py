@@ -12,7 +12,6 @@ _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _MUTABLE_TYPES = (list, dict, set)
 _ANNOTATIONS = "__annotations__"
 _POST_INIT = "__post_init__"
-_MUTABLE = "__mutable__"
 T = TypeVar("T")
 
 PyTree = Any
@@ -31,6 +30,10 @@ PyTree = Any
 # in this implementation, the fields are stored in a `defaultdict` as an extra precaution
 # to avoid user-side modification of the fields while maintaining a cleaner namespace
 _field_registry: dict[type, Mapping[str, Field]] = defaultdict(dict)
+
+# id of instances that are mutable. used during class initialization
+# to allow for the instance to be initialized.
+_mutable_instance_registry: set[int] = set()
 
 
 def register_pytree_field_map(klass: type[T], field_map: Mapping[str, Field]) -> None:
@@ -303,13 +306,13 @@ def _generate_init(klass: type) -> FunctionType:
 @contextmanager
 def _mutable_context(tree: PyTree, *, kopy: bool = False):
     tree = copy.copy(tree) if kopy else tree
-    ovars(tree)[_MUTABLE] = True
+    _mutable_instance_registry.add(id(tree))
     yield tree
-    ovars(tree).pop(_MUTABLE, None)
+    _mutable_instance_registry.discard(id(tree))
 
 
 def _setattr(self: PyTree, key: str, value: Any) -> None:
-    if _MUTABLE not in ovars(self):
+    if id(self) not in _mutable_instance_registry:
         # default behavior for frozen instances
         msg = f"Cannot set {key}={value!r}. Use `.at['{key}'].set({value!r})` instead."
         raise AttributeError(msg)
@@ -332,12 +335,28 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
 
 def _delattr(self, key: str) -> None:
     # Delete the attribute if tree is not frozen
-    if _MUTABLE not in ovars(self):
+    if id(self) not in _mutable_instance_registry:
         raise AttributeError(f"Cannot delete {key}.")
     del ovars(self)[key]
 
 
 def _init_wrapper(init_func: Callable) -> Callable:
+    def register_instance_registered_types(self: PyTree) -> None:
+        for key in ovars(self):
+            # auto registers the instance value if it is a registered `treeclass`
+            # this behavior is similar to PyTorch behavior in `nn.Module`
+            # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
+            # the behavior is useful to avoid repetitive code pattern in field definition and
+            # and initialization inside init method.
+            if key in _field_registry[type(self)]:
+                continue
+
+            if type(value := ovars(self)[key]) in _field_registry:
+                # register the field with `init=False`.the field is not part of
+                # the init method signature, but defined in the `__post_init__` method
+                field = Field(name=key, type=type(value), init=False)
+                register_pytree_field_map(type(self), {key: field})
+
     @ft.wraps(init_func)
     def wrapper(self, *a, **k) -> None:
         with _mutable_context(self):
@@ -355,22 +374,10 @@ def _init_wrapper(init_func: Callable) -> Callable:
             raise AttributeError(msg)
 
         if wrapper.has_run is False:
-            # handle instance variables of registered types once per class
+            # register instance fields once per class
+            register_instance_registered_types(self)
             wrapper.has_run = True
-            # auto registers the instance value if it is a registered `treeclass`
-            # this behavior is similar to PyTorch behavior in `nn.Module`
-            # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
-            # the behavior is useful to avoid repetitive code pattern in field definition and
-            # and initialization inside init method.
-            for key in ovars(self):
-                if (
-                    key not in _field_registry[type(self)]
-                    and type(value := ovars(self)[key]) in _field_registry
-                ):
-                    # register the field with `init=False`.the field is not part of
-                    # the init method signature, but defined in the `__post_init__` method
-                    field = Field(name=key, type=type(value), init=False)
-                    register_pytree_field_map(type(self), {key: field})
+
         return output
 
     wrapper.has_run = False

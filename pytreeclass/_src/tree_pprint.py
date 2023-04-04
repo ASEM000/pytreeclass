@@ -408,16 +408,14 @@ def tree_indent(
                     [1]=6
 
     """
-    traces_leaves = pytc.tree_leaves_with_trace(
-        tree=tree,
-        is_leaf=is_leaf,
-        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
-    )
-
     fmt = f"{type(tree).__name__}"
     seen = set()
 
-    for trace, leaf in traces_leaves:
+    for trace, leaf in pytc.tree_leaves_with_trace(
+        tree=tree,
+        is_leaf=is_leaf,
+        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+    ):
         names, types = trace[0], trace[1]
 
         for j, (name, type_) in enumerate(zip(names, types)):
@@ -618,21 +616,17 @@ def tree_mermaid(
         >>> import pytreeclass as pytc
         >>> tree = [1, [2, 3], [4, [5, 6]]]
         >>> print(pytc.tree_mermaid(tree, depth=1))  # doctest: +SKIP
-
-        .. mermaid::
-
-            flowchart LR
-
-                id2 --- id3("</b>[0]=2</b>")
-                id2 --- id4("</b>[1]=3</b>")
-                id5 --- id6("</b>[0]=4</b>")
-                id5 --- id7("</b>[1]:list</b>")
-                id0(<b>list</b>)
-                id0 --- id1("</b>[0]=1</b>")
-                id0 --- id2("</b>[1]:list</b>")
-                id0 --- id5("</b>[2]:list</b>")
-                id7 --- id8("</b>[0]=5</b>")
-                id7 --- id9("</b>[1]=6</b>")
+        flowchart LR
+            id2 --- id3("</b>[0]=2</b>")
+            id2 --- id4("</b>[1]=3</b>")
+            id5 --- id6("</b>[0]=4</b>")
+            id5 --- id7("</b>[1]:list</b>")
+            id0(<b>list</b>)
+            id0 --- id1("</b>[0]=1</b>")
+            id0 --- id2("</b>[1]:list</b>")
+            id0 --- id5("</b>[2]:list</b>")
+            id7 --- id8("</b>[0]=5</b>")
+            id7 --- id9("</b>[1]=6</b>")
     """
 
     indent_repr = tree_indent(
