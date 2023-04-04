@@ -11,6 +11,7 @@ Public API
     field
     fields
     tree_diagram
+    tree_indent
     tree_mermaid
     tree_repr
     tree_str
@@ -45,6 +46,7 @@ Pretty Printing API
 .. currentmodule:: pytreeclass 
 
 .. autofunction:: tree_diagram
+.. autofunction:: tree_indent
 .. autofunction:: tree_mermaid 
 .. autofunction:: tree_repr 
 .. autofunction:: tree_str
