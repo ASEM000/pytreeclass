@@ -160,7 +160,7 @@ def _reduce_at_mask(
     return jtu.tree_reduce(func, tree, initializer)
 
 
-class _TreeAtMask(NamedTuple):
+class TreeAtMask(NamedTuple):
     tree: PyTree
     where: PyTree
 
@@ -193,30 +193,25 @@ class _TreeAtMask(NamedTuple):
         where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
         return _reduce_at_mask(self.tree, where, func, initializer, is_leaf)
 
+    def __getitem__(self, rhs_where: str | int | PyTree) -> TreeAtMask:
+        if isinstance(rhs_where, (str, int)):
+            # promote `rhs` path to boolean mask
+            mask = self.tree != self.tree
+            mask = mask.at[rhs_where].set(True)
+            rhs_where = mask
 
-def _at_mask(tree: PyTree, where: PyTree) -> PyTree:
-    class TreeAtMask(_TreeAtMask):
-        def __getitem__(self, rhs_where: str | int | PyTree):
-            if isinstance(rhs_where, (str, int)):
-                # promote `rhs` path to boolean mask
-                mask = self.tree != self.tree
-                mask = mask.at[rhs_where].set(True)
-                rhs_where = mask
+        rhs_where = self.where & rhs_where
+        return TreeAtMask(tree=self.tree, where=rhs_where)
 
-            rhs_where = self.where & rhs_where
-            return TreeAtMask(tree=tree, where=rhs_where)
+    def __getattr__(self, name: str) -> TreeAtMask:
+        # support for nested `.at`
+        if name == "at":
+            # pass the current where condition to the next level
+            return TreeAtMask(tree=self.tree, where=self.where)
 
-        def __getattr__(self, name):
-            # support for nested `.at`
-            if name == "at":
-                # pass the current where condition to the next level
-                return TreeAtMask(tree=tree, where=self.where)
-
-            msg = f"{name} is not a valid attribute of {self}\n"
-            msg += f"Did you mean to use .at[{name!r}]?"
-            raise AttributeError(msg)
-
-    return TreeAtMask(tree=tree, where=where)
+        msg = f"{name} is not a valid attribute of {self}\n"
+        msg += f"Did you mean to use .at[{name!r}]?"
+        raise AttributeError(msg)
 
 
 # tree indexing by name or index  path
@@ -342,7 +337,7 @@ def _reduce_at_trace(
     return jtu.tree_reduce(func, tree, initializer=initializer)
 
 
-class _TreeAtPath(NamedTuple):
+class TreeAtTrace(NamedTuple):
     tree: PyTree
     where: tuple[int | str]
 
@@ -350,7 +345,10 @@ class _TreeAtPath(NamedTuple):
         return _get_at_trace(self.tree, self.where, is_leaf)
 
     def set(
-        self, set_value: Any, *, is_leaf: Callable[[Any], bool] | None = None
+        self,
+        set_value: Any,
+        *,
+        is_leaf: Callable[[Any], bool] | None = None,
     ) -> PyTree:
         return _set_at_trace(self.tree, self.where, set_value, is_leaf)
 
@@ -390,39 +388,64 @@ class _TreeAtPath(NamedTuple):
             value = method(*a, **k)
         return value, tree
 
+    def __getitem__(self, rhs_where: tuple[str | int] | PyTree):
+        if isinstance(rhs_where, type(self.tree)):
+            # promote `lhs` name path to boolean mask
+            # and pass to `TreeAtMask`
+            lhs_mask = self.tree != self.tree
+            (lhs_where,) = self.where
+            lhs_mask = lhs_mask.at[lhs_where].set(True)
+            return TreeAtMask(tree=self.tree, where=lhs_mask & rhs_where)
 
-def _at_trace(tree: PyTree, where: tuple[str | int] | PyTree) -> PyTree:
-    class TreeAtPath(_TreeAtPath):
-        def __getitem__(self, rhs_where: tuple[str | int] | PyTree):
-            # support for nested `.at``
+        # case for name/index path rhs
+        rhs_where = (*self.where, rhs_where)
+        return TreeAtTrace(tree=self.tree, where=rhs_where)
 
-            if isinstance(rhs_where, type(tree)):
-                # promote `lhs` name path to boolean mask
-                # and pass to `TreeAtMask`
-                lhs_mask = self.tree != self.tree
-                (lhs_where,) = self.where
-                lhs_mask = lhs_mask.at[lhs_where].set(True)
-                return _at_mask(tree=tree, where=lhs_mask & rhs_where)
+    def __getattr__(self, name: str) -> TreeAtTrace:
+        # support nested `.at``
+        # for example `.at[A].at[B]` represents model.A.B
+        if name == "at":
+            # pass the current tree and the current path to the next `.at`
+            return TreeAtTrace(tree=self.tree, where=self.where)
 
-            # case for name/index path rhs
-            rhs_where = (*self.where, rhs_where)
-            return _at_trace(tree=tree, where=rhs_where)
-
-        def __getattr__(self, name):
-            # support nested `.at``
-            # for example `.at[A].at[B]` represents model.A.B
-            if name == "at":
-                # pass the current tree and the current path to the next `.at`
-                return TreeAtPath(tree=tree, where=self.where)
-
-            msg = f"{name} is not a valid attribute of {self}\n"
-            msg += f"Did you mean to use .at[{name!r}]?"
-            raise AttributeError(msg)
-
-    return TreeAtPath(tree=tree, where=where)
+        msg = f"{name} is not a valid attribute of {self}\n"
+        msg += f"Did you mean to use .at[{name!r}]?"
+        raise AttributeError(msg)
 
 
-def tree_indexer(tree: PyTree) -> PyTree:
+class AtIndexer(NamedTuple):
+    tree: PyTree
+
+    def __getitem__(self, where: Any) -> TreeAtTrace | TreeAtMask:
+        if isinstance(where, (str, int)):
+            # indexing by name or index
+            # name and index rules are defined using
+            # `register_pytree_node_trace_func`
+            return TreeAtTrace(tree=self.tree, where=(where,))
+
+        if isinstance(where, (type(self.tree), type(...))):
+            # indexing by boolean pytree
+            # Ellipsis as an alias for all elements
+            # model.at[model == model ] <--> model.at[...]
+            return TreeAtMask(tree=self.tree, where=where)
+
+        raise NotImplementedError(
+            f"Indexing with {type(where).__name__} is not implemented.\n"
+            "Example of supported indexing:\n\n"
+            "@pytc.treeclass\n"
+            f"class {type(self.tree).__name__}:\n"
+            "    ...\n\n"
+            f">>> tree = {type(self.tree).__name__}(...)\n"
+            ">>> # indexing by boolean pytree\n"
+            ">>> tree.at[tree > 0].get()\n\n"
+            ">>> # indexing by attribute name\n"
+            ">>> tree.at[`attribute_name`].get()\n\n"
+            ">>> # indexing by attribute index\n"
+            ">>> tree.at[`attribute_index`].get()"
+        )
+
+
+def tree_indexer(tree: PyTree) -> AtIndexer:
     """Adds `.at` indexing abilities to a PyTree.
 
     Example:
@@ -458,37 +481,7 @@ def tree_indexer(tree: PyTree) -> PyTree:
         >>> Tree(1, 2).at["a"].get()
         Tree(a=1, b=None)
     """
-
-    class AtIndexer:
-        def __getitem__(self, where):
-            if isinstance(where, (str, int)):
-                # indexing by name or index
-                # name and index rules are defined using
-                # `register_pytree_node_trace_func`
-                return _at_trace(tree=tree, where=(where,))
-
-            if isinstance(where, (type(tree), type(...))):
-                # indexing by boolean pytree
-                # Ellipsis as an alias for all elements
-                # model.at[model == model ] <--> model.at[...]
-                return _at_mask(tree=tree, where=where)
-
-            raise NotImplementedError(
-                f"Indexing with {type(where).__name__} is not implemented.\n"
-                "Example of supported indexing:\n\n"
-                "@pytc.treeclass\n"
-                f"class {type(tree).__name__}:\n"
-                "    ...\n\n"
-                f">>> tree = {type(tree).__name__}(...)\n"
-                ">>> # indexing by boolean pytree\n"
-                ">>> tree.at[tree > 0].get()\n\n"
-                ">>> # indexing by attribute name\n"
-                ">>> tree.at[`attribute_name`].get()\n\n"
-                ">>> # indexing by attribute index\n"
-                ">>> tree.at[`attribute_index`].get()"
-            )
-
-    return AtIndexer()
+    return AtIndexer(tree=tree)
 
 
 class BroadcastablePartial(ft.partial):
@@ -500,7 +493,6 @@ class BroadcastablePartial(ft.partial):
         return self.func(*args, *iargs, **keywords)
 
 
-@ft.lru_cache(maxsize=None)
 def bcmap(
     func: Callable[..., Any], *, is_leaf: Callable[[Any], bool] | None = None
 ) -> Callable:
@@ -625,7 +617,7 @@ def _swop(func):
     return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
 
 
-def _leafwise_transform(klass: type[T]) -> type[T]:
+def _leafwise_transform(klass: T) -> T:
     # add leafwise transform methods to the class
     # that enable the user to apply a function to
     # all the leaves of the tree
@@ -716,6 +708,6 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
     return verdict
 
 
-def tree_copy(tree: PyTree) -> PyTree:
+def tree_copy(tree: T) -> T:
     """Return a copy of the tree."""
     return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore

@@ -633,8 +633,8 @@ def test_repr_str():
 
     t = Tree()
 
-    assert repr(t.at["a"]) == "TreeAtPath(tree=Tree(a=1, b=2), where=('a',))"
-    assert str(t.at["a"]) == "TreeAtPath(tree=Tree(a=1, b=2), where=('a',))"
+    assert repr(t.at["a"]) == "TreeAtTrace(tree=Tree(a=1, b=2), where=('a',))"
+    assert str(t.at["a"]) == "TreeAtTrace(tree=Tree(a=1, b=2), where=('a',))"
     assert repr(t.at[...]) == "TreeAtMask(tree=Tree(a=1, b=2), where=Ellipsis)"
 
 

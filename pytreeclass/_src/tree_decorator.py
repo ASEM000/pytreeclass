@@ -380,7 +380,7 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     """Unflatten rule for `treeclass` to use with `jax.tree_unflatten`."""
-    tree = getattr(object, "__new__")(klass)
+    tree = object.__new__(klass)
     # update through vars, to avoid calling the `setattr` method
     # that will check for callbacks.
     # calling `setattr` will trigger any defined callbacks by the user
@@ -410,7 +410,7 @@ def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
     return [*zip(names, types, indices, metadatas)]
 
 
-def _register_treeclass(klass: type[T]) -> type[T]:
+def _register_treeclass(klass: T) -> T:
     if klass not in _field_registry:
         # there are two cases where a class is registered more than once:
         # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
@@ -425,6 +425,17 @@ def _register_treeclass(klass: type[T]) -> type[T]:
         # register the flatten/unflatten rules with jax
         jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
     return klass
+
+
+def _tree_unwrap(value: Any) -> Any:
+    # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
+    def is_leaf(x: Any) -> bool:
+        return isinstance(x, ImmutableWrapper) or type(x) in _field_registry
+
+    def unwrap(value: Any) -> Any:
+        return value.unwrap() if isinstance(value, ImmutableWrapper) else value
+
+    return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
 
 
 def _getattribute_wrapper(getattribute_method):
@@ -449,20 +460,10 @@ def _getattribute_wrapper(getattribute_method):
     # Tree(a=#1)  # frozen value is displayed in the repr with a prefix `#`
     # >>> tree.a
     # 1  # the value is unwrapped when accessed directly
-    def tree_unwrap(value: Any) -> Any:
-        # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
-        def is_leaf(x: Any) -> bool:
-            return isinstance(x, ImmutableWrapper) or type(x) in _field_registry
-
-        def unwrap(value: Any) -> Any:
-            return value.unwrap() if isinstance(value, ImmutableWrapper) else value
-
-        return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
-
     @ft.wraps(getattribute_method)
     def wrapper(self, key: str) -> Any:
         value = getattribute_method(self, key)
-        return tree_unwrap(value) if key in getattribute_method(self, _VARS) else value
+        return _tree_unwrap(value) if key in getattribute_method(self, _VARS) else value
 
     return wrapper
 
@@ -497,7 +498,7 @@ def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
     return wrapper
 
 
-def _treeclass_transform(klass: type[T]) -> type[T]:
+def _treeclass_transform(klass: T) -> T:
     # the method is called after registering the class with `_register_treeclass`
     # cached to prevent wrapping the same class multiple times
 
@@ -542,7 +543,7 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
 
 
 @dataclass_transform(field_specifiers=(field,))
-def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
+def treeclass(klass: T, *, leafwise: bool = False) -> T:
     """Convert a class to a JAX compatible tree structure.
 
     Args:
