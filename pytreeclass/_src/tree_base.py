@@ -82,6 +82,27 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
 
 def _getattribute_wrapper(getattribute_method):
+    # this current approach replaces the older metdata based approach
+    # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`.
+    # the metadata approach is defined at class variable and can not be changed at runtime while the current
+    # approach is more flexible because it can be changed at runtime using `tree_map` or by using `at`
+    # moreover, metadata-based approach falls short when handling nested data structures values.
+    # for example if a field value is a tuple of (1, 2, 3), then metadata-based approach will only be able
+    # to freeze the whole tuple, but not its elements.
+    # with the current approach, we can use `tree_map`/ or direct application to freeze certain tuple elements
+    # and leave the rest of the tuple as is.
+    # another pro of the current approach is that the field metadata is not checked during flattening/unflattening
+    # so in essence, it's more efficient than the metadata-based approach during applying `jax` transformations
+    # that flatten/unflatten the tree.
+    # Example: when fetching `tree.a` it will be unwrapped
+    # >>> @pytc.treeclass
+    # ... class Tree:
+    # ...    a:int = pytc.freeze(1)
+    # >>> tree = Tree()
+    # >>> tree
+    # Tree(a=#1)  # frozen value is displayed in the repr with a prefix `#`
+    # >>> tree.a
+    # 1  # the value is unwrapped when accessed directly
     def tree_unwrap(value: Any) -> Any:
         # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
         def is_leaf(x: Any) -> bool:
@@ -94,60 +115,36 @@ def _getattribute_wrapper(getattribute_method):
 
     @ft.wraps(getattribute_method)
     def wrapper(self, key: str) -> Any:
-        # this current approach replaces the older metdata based approach
-        # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`.
-        # the metadata approach is defined at class variable and can not be changed at runtime while the current
-        # approach is more flexible because it can be changed at runtime using `tree_map` or by using `at`
-        # moreover, metadata-based approach falls short when handling nested data structures values.
-        # for example if a field value is a tuple of (1, 2, 3), then metadata-based approach will only be able
-        # to freeze the whole tuple, but not its elements.
-        # with the current approach, we can use `tree_map`/ or direct application to freeze certain tuple elements
-        # and leave the rest of the tuple as is.
-        # another pro of the current approach is that the field metadata is not checked during flattening/unflattening
-        # so in essence, it's more efficient than the metadata-based approach during applying `jax` transformations
-        # that flatten/unflatten the tree.
-        # Example: when fetching `tree.a` it will be unwrapped
-        # >>> @pytc.treeclass
-        # ... class Tree:
-        # ...    a:int = pytc.freeze(1)
-        # >>> tree = Tree()
-        # >>> tree
-        # Tree(a=#1)  # frozen value is displayed in the repr with a prefix `#`
-        # >>> tree.a
-        # 1  # the value is unwrapped when accessed directly
         value = getattribute_method(self, key)
-        # unwrap non-`treeclass` wrapped instance variables
-        # so the getattr will always return unwrapped values.
-        # this renders the wrapped instance variables transparent to the user
         return tree_unwrap(value) if key in ovars(self) else value
 
     return wrapper
 
 
 def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
+    # Non-decorated subclasses uses the base `treeclass` leaves only
+    # this behavior is aligned with `dataclasses` not registering non-decorated
+    # subclasses dataclass fields. for example:
+    # >>> @treeclass
+    # ... class A:
+    # ...   a:int=1
+    # >>> class B(A):
+    # ...    b:int=2
+    # >>> tree = B()
+    # >>> jax.tree_leaves(tree)
+    # [1]
+    # however if we decorate `B` with `treeclass` then the fields of `B` will be registered as leaves
+    # >>> @treeclass
+    # ... class B(A):
+    # ...    b:int=2
+    # >>> tree = B()
+    # >>> jax.tree_leaves(tree)
+    # [1, 2]
+    # this behavior is different from `flax.struct.dataclass`
+    # as it does not register non-decorated subclasses field that inherited from decorated subclasses.
     @classmethod  # type: ignore
     @ft.wraps(init_subclass_method)
     def wrapper(klass: type, *a, **k) -> None:
-        # Non-decorated subclasses uses the base `treeclass` leaves only
-        # this behavior is aligned with `dataclasses` not registering non-decorated
-        # subclasses dataclass fields. for example:
-        # >>> @treeclass
-        # ... class A:
-        # ...   a:int=1
-        # >>> class B(A):
-        # ...    b:int=2
-        # >>> tree = B()
-        # >>> jax.tree_leaves(tree)
-        # [1]
-        # however if we decorate `B` with `treeclass` then the fields of `B` will be registered as leaves
-        # >>> @treeclass
-        # ... class B(A):
-        # ...    b:int=2
-        # >>> tree = B()
-        # >>> jax.tree_leaves(tree)
-        # [1, 2]
-        # this behavior is different from `flax.struct.dataclass`
-        # as it does not register non-decorated subclasses field that inherited from decorated subclasses.
         init_subclass_method(*a, **k)
         _register_treeclass(klass)
 
@@ -188,7 +185,6 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
         ("__copy__", tree_copy),
         ("__hash__", tree_hash),
         ("__eq__", is_tree_equal),
-        ("__match_args__", tuple(_field_registry[klass].keys())),
         ("at", property(tree_indexer)),
     ):
         if key not in vars(klass):

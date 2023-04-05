@@ -934,7 +934,7 @@ In essence, each leaf contains information about the name path, type path, and i
 <tr><td align="center">Keyword-only args</td> <td align="center">✅</td>  <td align="center">✅ 3.10+</td></tr>
 <tr><td align="center">Positional-only args</td> <td align="center">✅</td>  <td align="center"></td></tr>
 <tr><td align="center">Frozen instance</td> <td align="center">✅**</td>  <td align="center">✅</td></tr>
-<tr><td align="center">Match args support</td> <td align="center">✅</td>  <td align="center">✅</td></tr>
+<tr><td align="center">Match args support</td> <td align="center"></td>  <td align="center">✅</td></tr>
 <tr><td align="center">Support callbacks</td> <td align="center">✅</td>  <td align="center"></td></tr>
 </table>
 
