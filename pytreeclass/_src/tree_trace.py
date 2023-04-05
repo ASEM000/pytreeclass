@@ -14,7 +14,7 @@ from jax._src.tree_util import _registry
 
 
 PyTree = Any
-TraceType = Any
+TraceType = tuple[str, Any, tuple[int, int], Any]
 
 
 def _jaxable_trace_func(tree: Any) -> list[TraceType]:

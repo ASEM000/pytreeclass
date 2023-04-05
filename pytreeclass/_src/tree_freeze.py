@@ -101,7 +101,7 @@ class FrozenWrapper(ImmutableWrapper):
         return self.unwrap() == rhs.unwrap()
 
     def __hash__(self) -> int:
-        return hash(self.unwrap())
+        return tree_hash(self.unwrap())
 
 
 def _frozen_flatten(tree: Any) -> tuple[tuple, Any]:

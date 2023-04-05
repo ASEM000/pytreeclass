@@ -1,5 +1,4 @@
-from pytreeclass._src.tree_base import is_tree_equal, treeclass
-from pytreeclass._src.tree_decorator import field, fields, is_treeclass
+from pytreeclass._src.tree_decorator import field, fields, is_treeclass, treeclass
 from pytreeclass._src.tree_freeze import (
     ImmutableWrapper,
     freeze,
@@ -7,7 +6,7 @@ from pytreeclass._src.tree_freeze import (
     is_nondiff,
     unfreeze,
 )
-from pytreeclass._src.tree_indexer import bcmap, tree_indexer
+from pytreeclass._src.tree_indexer import bcmap, is_tree_equal, tree_indexer
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_indent,

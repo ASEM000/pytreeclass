@@ -7,7 +7,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_freeze import _HashableWrapper
+from pytreeclass._src.tree_freeze import _HashableWrapper, tree_hash
 
 
 def test_freeze_unfreeze():
@@ -383,7 +383,7 @@ def test_freeze_nondiff_func():
 
 def test_wrapper():
     # only apply last wrapper
-    assert hash((pytc.freeze(1))) == hash(1)
+    assert hash((pytc.freeze(1))) == tree_hash(1)
 
     lhs = _HashableWrapper(1)
     # test getter

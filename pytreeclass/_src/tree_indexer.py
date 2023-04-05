@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import copy
 import functools as ft
 import operator as op
 from collections.abc import Callable
+from contextlib import contextmanager
 from math import ceil, floor, trunc
 from typing import Any, NamedTuple, TypeVar
 
@@ -14,13 +16,38 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_decorator import _mutable_context
 from pytreeclass._src.tree_trace import tree_map_with_trace
 
 PyTree = Any
 _no_initializer = object()
 _non_partial = object()
 T = TypeVar("T")
+
+# allow methods in mutable context to be called without raising an error
+# this is done by registering the instance id in a set before entering the
+# mutable context and removing it after exiting the context
+_mutable_instance_registry: set[int] = set()
+
+
+def _conditional_mutable_method(method: Callable) -> Callable:
+    # decorator to allow for decorated methods to be called
+    # within the mutable context and raise an error otherwise
+    @ft.wraps(method)
+    def wrapper(self, *a, **k):
+        if id(self) in _mutable_instance_registry:
+            return method(self, *a, **k)
+        msg = f"Cannot call `{method.__name__}` on frozen instance."
+        raise AttributeError(msg)
+
+    return wrapper
+
+
+@contextmanager
+def _mutable_context(tree: PyTree, *, kopy: bool = False):
+    tree = copy.copy(tree) if kopy else tree
+    _mutable_instance_registry.add(id(tree))
+    yield tree
+    _mutable_instance_registry.discard(id(tree))
 
 
 def _is_leaf_bool(node: Any) -> bool:
