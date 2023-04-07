@@ -393,7 +393,7 @@ def test_wrapper():
     # comparison with the wrapped object
     assert lhs != 1
     # hash of the wrapped object
-    assert hash(lhs) == hash(1)
+    assert hash(lhs) == tree_hash(1)
 
     # test immutability
     frozen_value = pytc.freeze(1)

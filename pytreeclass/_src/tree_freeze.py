@@ -88,7 +88,7 @@ class _HashableWrapper(ImmutableWrapper):
         return _hash_node(self.unwrap()) == _hash_node(rhs.unwrap())
 
     def __hash__(self) -> int:
-        return _hash_node(self.unwrap())
+        return tree_hash(self.unwrap())
 
 
 class FrozenWrapper(ImmutableWrapper):
