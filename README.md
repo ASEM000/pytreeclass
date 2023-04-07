@@ -886,7 +886,7 @@ For example for the previous tree, the reuslting trace path for each leaf is :
 ```python
 >>> name_tree = pytc.tree_map_with_trace(lambda trace,x : trace[0], tree)
 >>> print(name_tree)
-Tree(a=(Tree, a), b=((Tree, b, [0]), (Tree, b, [1])), c=(Tree, c))
+Tree(a=(a), b=((b, [0]), (b, [1])), c=(c))
 ```
 
 ### Typed tree variant
@@ -895,12 +895,9 @@ Tree(a=(Tree, a), b=((Tree, b, [0]), (Tree, b, [1])), c=(Tree, c))
 >>> type_tree = pytc.tree_map_with_trace(lambda trace,x : f"{trace[1]!s}", tree)
 >>> print(type_tree)
 Tree(
-  a=(<class '__main__.Tree'>, <class 'int'>),
-  b=(
-    (<class '__main__.Tree'>, <class 'tuple'>, <class 'float'>),
-    (<class '__main__.Tree'>, <class 'tuple'>, <class 'float'>)
-  ),
-  c=(<class '__main__.Tree'>, <class 'jaxlib.xla_extension.ArrayImpl'>)
+  a=(<class 'int'>,),
+  b=((<class 'tuple'>, <class 'float'>), (<class 'tuple'>, <class 'float'>)),
+  c=(<class 'jaxlib.xla_extension.ArrayImpl'>,)
 )
 ```
 
@@ -909,7 +906,7 @@ Tree(
 ```python
 >>> index_tree = pytc.tree_map_with_trace(lambda trace,x : trace[2], tree)
 >>> print(index_tree)
-Tree(a=(0, 0), b=((0, 1, 0), (0, 1, 1)), c=(0, 2))
+Tree(a=(0), b=((1, 0), (1, 1)), c=(2))
 ```
 
 In essence, each leaf contains information about the name path, type path, and indices path. The rules for custom types can be registered using `pytc.register_pytree_node_trace`

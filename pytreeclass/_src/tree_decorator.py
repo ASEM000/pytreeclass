@@ -62,8 +62,6 @@ def is_treeclass(item: Any) -> bool:
 
 
 class Field(NamedTuple):
-    # Immutable version of dataclasses.Field
-    # with the addition `callbacks` attributes
     name: str | None = None
     type: type | None = None
     default: Any = _NOT_SET
@@ -74,6 +72,9 @@ class Field(NamedTuple):
     pos_only: bool = False
     metadata: MappingProxyType[str, Any] | None = None
     callbacks: Sequence[Any] = ()
+
+    def __hash__(self) -> int:
+        return tree_hash(self)
 
 
 def field(
@@ -160,19 +161,23 @@ def fields(item: Any) -> Sequence[Field]:
     return tuple(_field_registry[klass].values())
 
 
+@ft.lru_cache
 def _generate_field_map(klass: type) -> dict[str, Field]:
     # get all the fields of the class and its base classes
     # get the fields of the class and its base classes
     field_map = dict()
 
-    for base in reversed(klass.__mro__):
+    if klass is object:
+        # base case for recursion to stop
+        return field_map
+
+    for base in reversed(klass.__mro__[1:]):
         # get the fields of the base class in the MRO
         # in reverse order to ensure the correct order of the fields
         # are preserved, i.e. the fields of the base class are added first
         # and the fields of the derived class are added last so that
         # in case of name collision, the derived class fields are preserved
-        if base in _field_registry:
-            field_map.update(_field_registry[base])
+        field_map.update(_generate_field_map(base))
 
     # transform the annotated attributes of the class into Fields
     # while assigning the default values of the Fields to the annotated attributes
@@ -542,7 +547,7 @@ def _treeclass_transform(klass: T) -> T:
     return klass
 
 
-@dataclass_transform(field_specifiers=(field,))
+@dataclass_transform(field_specifiers=(field, Field))
 def treeclass(klass: T, *, leafwise: bool = False) -> T:
     """Convert a class to a JAX compatible tree structure.
 
