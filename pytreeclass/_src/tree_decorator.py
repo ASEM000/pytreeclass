@@ -72,6 +72,7 @@ class Field(NamedTuple):
     pos_only: bool = False
     metadata: MappingProxyType[str, Any] | None = None
     callbacks: Sequence[Any] = ()
+    alias: str | None = None
 
     def __hash__(self) -> int:
         return tree_hash(self)
@@ -87,6 +88,7 @@ def field(
     pos_only: bool = False,
     metadata: dict[str, Any] | None = None,  # type: ignore
     callbacks: Sequence[Any] = (),
+    alias: str | None = None,
 ) -> Field:
     """
     Args:
@@ -98,16 +100,42 @@ def field(
         pos_only: Whether the field is positional-only. Mutually exclusive with `kw_only`.
         metadata: A mapping of user-defined data for the field.
         callbacks: A sequence of functions to called on `setattr` during initialization to modify the field value.
+        alias: An a alias for the field name in the constructor.
 
     Example:
         >>> import pytreeclass as pytc
+        >>> def instance_cb_factory(klass):
+        ...    def wrapper(x):
+        ...        assert isinstance(x, klass)
+        ...        return x
+        ...    return wrapper
+
+
+        >>> def positive_check_callback(x):
+        ...    assert x > 0
+        ...    return x
+
         >>> @pytc.treeclass
-        ... class Foo:
-        ...     x: int = pytc.field(callbacks=[lambda x: x + 1])  # value is incremented by 1 after initialization
-        >>> foo = Foo(x=1)
-        >>> foo.x
-        2
+        ... class Employee:
+        ...    # assert employee `name` is str
+        ...    name: str = pytc.field(callbacks=[instance_cb_factory(str)])
+        ...    # use callback compostion to assert employee `age` is int and positive
+        ...    age: int = pytc.field(callbacks=[instance_cb_factory(int), positive_check_callback])
+        ...    # use `id` in the constructor for `_id` attribute
+        ...    # this is useful for private attributes that are not supposed to be accessed directly
+        ...    # and hide it from the repr, also add extra info for this field
+        ...    _id: int = pytc.field(alias="id", repr=False)
+
+        >>> tree = Employee(name="Asem", age=10, id=1)
+        >>> print(tree)  # _id is not shown
+        Employee(name=Asem, age=10)
+        >>> assert tree._id == 1  # this is the private attribute
     """
+    if not isinstance(alias, (str, type(None))):
+        msg = "`alias` must be a string or None, "
+        msg += f"got type=`{type(alias).__name__}` instead."
+        raise TypeError(msg)
+
     if default is not _NOT_SET and factory is not None:
         # mutually exclusive arguments
         # this is the similar behavior to `dataclasses`
@@ -150,6 +178,7 @@ def field(
         pos_only=pos_only,
         metadata=metadata,  # type: ignore
         callbacks=callbacks,
+        alias=alias,
     )
 
 
@@ -249,11 +278,12 @@ def _generate_init_code(fields: Sequence[Field]):
     head = body = ""
 
     for field in fields:
-        key = field.name
+        name = field.name  # name in body
+        alias = field.alias or name  # name in constructor
 
-        mark0 = f"field_map['{key}'].default"
-        mark1 = f"field_map['{key}'].factory()"
-        mark2 = f"self.{key}"
+        mark0 = f"field_map['{name}'].default"
+        mark1 = f"field_map['{name}'].factory()"
+        mark2 = f"self.{name}"
 
         if field.kw_only and "*" not in head and field.init:
             # if the field is keyword only, and we have not added the `*` yet
@@ -262,18 +292,18 @@ def _generate_init_code(fields: Sequence[Field]):
         if field.default is not _NOT_SET:
             # we add the default into the function head (def f(.. x= default_value))
             # if the the field require initialization. if not, then omit it from head
-            head += f"{key}={mark0}, " if field.init else ""
+            head += f"{alias}={mark0}, " if field.init else ""
             # we then add self.x = x for the body function if field is initialized
             # otherwise, define the default value inside the body ( self.x = default_value)
-            body += f"\t\t{mark2}=" + (f"{key}\n " if field.init else f"{mark0}\n")
+            body += f"\t\t{mark2}=" + (f"{alias}\n " if field.init else f"{mark0}\n")
         elif field.factory is not None:
             # same story for functions as above
-            head += f"{key}={mark1}, " if field.init else ""
-            body += f"\t\t{mark2}=" + (f"{key}\n" if field.init else f"{mark1}\n")
+            head += f"{alias}={mark1}, " if field.init else ""
+            body += f"\t\t{mark2}=" + (f"{alias}\n" if field.init else f"{mark1}\n")
         else:
             # no defaults are added
-            head += f"{key}, " if field.init else ""
-            body += f"\t\t{mark2}={key}\n " if field.init else ""
+            head += f"{alias}, " if field.init else ""
+            body += f"\t\t{mark2}={alias}\n " if field.init else ""
 
         if field.pos_only and field.init:
             # if the field is positional only, we add a "/" marker after it

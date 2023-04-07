@@ -109,6 +109,15 @@ def test_field():
         Test()
 
 
+def test_field_alias():
+    @pytc.treeclass
+    class Tree:
+        _name: str = pytc.field(alias="name")
+
+    tree = Tree(name="test")
+    assert tree._name == "test"
+
+
 def test_field_nondiff():
     @ft.partial(pytc.treeclass, leafwise=True)
     class Test:
