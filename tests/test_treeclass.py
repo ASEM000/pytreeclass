@@ -1,6 +1,7 @@
 import copy
 import dataclasses as dc
 import functools as ft
+from typing import Any
 
 import jax
 import jax.tree_util as jtu
@@ -9,23 +10,29 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_decorator import _field_registry
 
 
-def test_field():
-    with pytest.raises(ValueError):
-        pytc.field(default=1, factory=lambda: 1)
-
-    assert pytc.field(default=1).default == 1
-
-    with pytest.raises(TypeError):
-        pytc.field(metadata=1)
-
+def test_field_metadata():
     @ft.partial(pytc.treeclass, leafwise=True)
     class Test:
         a: int = pytc.field(default=1, metadata={"a": 1})
 
-    assert _field_registry[Test]["a"].metadata["a"] == 1
+    assert Test().__field_map__["a"].metadata["a"] == 1
+
+
+def test_field_mutually_exclusive():
+    with pytest.raises(ValueError):
+        pytc.field(default=1, factory=lambda: 1)
+
+    with pytest.raises(ValueError):
+        pytc.field(default=1, pos_only=True, kw_only=True)
+
+
+def test_field():
+    assert pytc.field(default=1).default == 1
+
+    with pytest.raises(TypeError):
+        pytc.field(metadata=1)
 
     @ft.partial(pytc.treeclass, leafwise=True)
     class Test:
@@ -61,13 +68,6 @@ def test_field():
 
     assert Test(a=1, b=2).a == 1
 
-    with pytest.raises(ValueError):
-        # keyword only and pos_only are mutually exclusive
-        @ft.partial(pytc.treeclass, leafwise=True)
-        class Test:
-            a: int = pytc.field(default=1, pos_only=True, kw_only=True)
-
-    # pos_only, kw_only
     @ft.partial(pytc.treeclass, leafwise=True)
     class Test:
         a: int = pytc.field(default=1, pos_only=True)
@@ -95,7 +95,7 @@ def test_field():
     with pytest.raises(TypeError):
         pytc.fields(1)
 
-    assert len(pytc.fields(Test)) == 2
+    assert len(pytc.fields(Test())) == 2
 
     @pytc.treeclass
     class Test:
@@ -126,25 +126,6 @@ def test_field_hash():
 
 
 def test_field_nondiff():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
-        a: int = 1
-        b: int = 2
-        c: int = 3
-
-    test = Test()
-
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
-        a: jnp.ndarray
-        b: jnp.ndarray
-
-        def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
-            self.a = a
-            self.b = b
-
-    test = Test()
-
     @ft.partial(pytc.treeclass, leafwise=True)
     class Test:
         a: jnp.ndarray
@@ -740,3 +721,25 @@ def test_repeated_treeclass():
         a: int = pytc.field()
 
     assert True
+
+
+def test_instance_field_map():
+    @pytc.treeclass
+    class Parameter:
+        value: Any
+
+    @pytc.treeclass
+    class Tree:
+        bias: int = 0
+
+        def add_param(self, name, param):
+            return setattr(self, name, param)
+
+    tree = Tree()
+
+    _, tree_with_weight = tree.at["add_param"]("weight", Parameter(3))
+
+    assert tree.__field_map__ != tree_with_weight.__field_map__
+    assert tree_with_weight.weight == Parameter(3)
+    assert "weight" not in vars(tree)
+    assert "weight" not in tree.__field_map__

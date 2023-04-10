@@ -617,7 +617,7 @@ def _swop(func):
     return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
 
 
-def _leafwise_transform(klass: T) -> T:
+def _leafwise_transform(klass: type[T]) -> type[T]:
     # add leafwise transform methods to the class
     # that enable the user to apply a function to
     # all the leaves of the tree

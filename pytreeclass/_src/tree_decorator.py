@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import functools as ft
 import sys
-from collections import defaultdict
+from contextlib import suppress
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, Mapping, NamedTuple, Sequence, TypeVar
+from typing import Any, Callable, NamedTuple, Sequence, TypeVar
 
 import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
@@ -26,39 +26,18 @@ _MUTABLE_TYPES = (list, dict, set)
 _ANNOTATIONS = "__annotations__"
 _POST_INIT = "__post_init__"
 _VARS = "__dict__"
+_FIELD_MAP = "__field_map__"
 T = TypeVar("T")
 
 
 PyTree = Any
 
-
-"""Define custom frozen `dataclasses.dataclass`-like decorator"""
-# similar to dataclass decorator for init code generation
-# the motivation for writing this is to avoid the need to use dataclasses
-# especially after this update https://github.com/google/jax/issues/14295
-# in essence, after this upadte jax arrays are considred mutable by the field logic
-
-
-# A registry to store the fields of the `treeclass` wrapped classes. fields are a similar concept to
-# `dataclasses.Field` but with the addition of `callbacks` attribute
-# While `dataclasses` fields are added as a class attribute to the class under `__dataclass_fields__`
-# in this implementation, the fields are stored in a `defaultdict` as an extra precaution
-# to avoid user-side modification of the fields while maintaining a cleaner namespace
-_field_registry: dict[type, Mapping[str, Field]] = defaultdict(dict)
-
-
-def register_pytree_field_map(klass: type[T], field_map: Mapping[str, Field]) -> None:
-    # register the field map of a class to the registry
-    # field map is a mapping of field name to `Field` object
-    # the fields are used to generate the `__init__`, `__str__`, `__repr__` functions
-    # and to define the leaves in `tree_flatten` and `tree_unflatten` functions
-    _field_registry[klass].update(field_map)
+"""Define a class decorator that is compatible with JAX's transformation."""
 
 
 def is_treeclass(item: Any) -> bool:
-    """Returns `True` if a class or instance is a `treeclass`."""
-    klass = item if isinstance(item, type) else type(item)
-    return klass in _field_registry
+    """Returns `True` if an instance of class is decorated by `treeclass`"""
+    return hasattr(item, _FIELD_MAP)
 
 
 class Field(NamedTuple):
@@ -184,10 +163,10 @@ def field(
 
 def fields(item: Any) -> Sequence[Field]:
     """Get the fields of a `treeclass` instance."""
-    if (klass := item if isinstance(item, type) else type(item)) not in _field_registry:
+    if not hasattr(item, _FIELD_MAP):
         raise TypeError(f"Cannot get fields of {item!r}.")
 
-    return tuple(_field_registry[klass].values())
+    return tuple(vars(item)[_FIELD_MAP].values())
 
 
 @ft.lru_cache
@@ -345,12 +324,12 @@ def _generate_init(klass: type) -> FunctionType:
 
 
 @_conditional_mutable_method
-def _setattr(self: PyTree, key: str, value: Any) -> None:
+def _setattr(tree: PyTree, key: str, value: Any) -> None:
     # setattr under `_mutable_context` context otherwise raise an error
-    if key in _field_registry[type(self)]:
+    if key in (field_map := vars(tree)[_FIELD_MAP]):
         # apply the callbacks on setting the value
         # check if the key is a field name
-        for callback in _field_registry[type(self)][key].callbacks:
+        for callback in field_map[key].callbacks:
             try:
                 # callback is a function that takes the value of the field
                 # and returns a modified value
@@ -359,57 +338,44 @@ def _setattr(self: PyTree, key: str, value: Any) -> None:
                 msg = f"Error for field=`{key}`:\n{e}"
                 raise type(e)(msg)
 
-    vars(self)[key] = value  # type: ignore
+    if is_treeclass(value):
+        # auto registers the instance value if it is a registered `treeclass`
+        # this behavior is similar to PyTorch behavior in `nn.Module`
+        # with instances of `Parameter`/`Module`.
+        # the behavior is useful to avoid repetitive code pattern in field definition and
+        # and initialization inside init method.
+        F = Field(type=type(value), init=False, name=key)
+        vars(tree)[_FIELD_MAP] = {**vars(tree)[_FIELD_MAP], **{key: F}}
+
+    vars(tree)[key] = value  # type: ignore
 
 
 @_conditional_mutable_method
-def _delattr(self, key: str) -> None:
+def _delattr(tree, key: str) -> None:
     # delete the attribute under `_mutable_context` context
     # otherwise raise an error
-    del vars(self)[key]
+    del vars(tree)[key]
 
 
 def _init_wrapper(init_func: Callable) -> Callable:
-    def register_instance_registered_types(self: PyTree) -> None:
-        for key in vars(self):
-            # auto registers the instance value if it is a registered `treeclass`
-            # this behavior is similar to PyTorch behavior in `nn.Module`
-            # with `Parameter` class. where registered classes are equivalent to nn.Parameter.
-            # the behavior is useful to avoid repetitive code pattern in field definition and
-            # and initialization inside init method.
-            if key in _field_registry[type(self)]:
-                continue
-
-            if type(value := vars(self)[key]) in _field_registry:
-                # register the field with `init=False`.the field is not part of
-                # the init method signature, but defined in the `__post_init__` method
-                field = Field(name=key, type=type(value), init=False)
-                register_pytree_field_map(type(self), {key: field})
-
     @ft.wraps(init_func)
-    def wrapper(self, *a, **k) -> None:
-        with _mutable_context(self):
-            output = init_func(self, *a, **k)
+    def wrapper(tree, *a, **k) -> None:
+        with _mutable_context(tree):
+            vars(tree)[_FIELD_MAP] = dict(_generate_field_map(type(tree)))
+            output = init_func(tree, *a, **k)
 
-            if post_init_func := getattr(type(self), _POST_INIT, None):
+            if post_init_func := getattr(type(tree), _POST_INIT, None):
                 # to simplify the logic, we call the post init method
                 # even if the init method is not code-generated.
-                post_init_func(self)
+                post_init_func(tree)
 
         # handle non-initialized fields
-        if len(keys := set(_field_registry[type(self)]) - set(vars(self))) > 0:
+        if len(keys := set(vars(tree)[_FIELD_MAP]) - set(vars(tree))) > 0:
             msg = f"Uninitialized fields: ({', '.join(keys)}) "
-            msg += f"in class `{type(self).__name__}`"
+            msg += f"in class `{type(tree).__name__}`"
             raise AttributeError(msg)
-
-        if wrapper.has_run is False:
-            # register instance fields once per class
-            register_instance_registered_types(self)
-            wrapper.has_run = True
-
         return output
 
-    wrapper.has_run = False
     return wrapper
 
 
@@ -430,7 +396,7 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
 def _tree_flatten(tree: PyTree):
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
     static, dynamic = dict(vars(tree)), dict()
-    for key in _field_registry[type(tree)]:
+    for key in static[_FIELD_MAP]:
         dynamic[key] = static.pop(key)
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
@@ -445,8 +411,9 @@ def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
     return [*zip(names, types, indices, metadatas)]
 
 
-def _register_treeclass(klass: T) -> T:
-    if klass not in _field_registry:
+def _register_treeclass(klass: type[T]) -> type[T]:
+    with suppress(ValueError):
+        # `ValueError` is raised for duplicate registration.
         # there are two cases where a class is registered more than once:
         # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
         # second when a class is decorated with `treeclass` and has a parent class that is decorated with `treeclass`
@@ -455,17 +422,16 @@ def _register_treeclass(klass: T) -> T:
         # but we are trying to stay away from deep magic.
         # register the trace flatten rule
         register_pytree_node_trace(klass, _tree_trace)
-        # register the generated field map
-        register_pytree_field_map(klass, _generate_field_map(klass))
         # register the flatten/unflatten rules with jax
         jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
+
     return klass
 
 
 def _tree_unwrap(value: Any) -> Any:
     # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
     def is_leaf(x: Any) -> bool:
-        return isinstance(x, ImmutableWrapper) or type(x) in _field_registry
+        return isinstance(x, ImmutableWrapper) or is_treeclass(x)
 
     def unwrap(value: Any) -> Any:
         return value.unwrap() if isinstance(value, ImmutableWrapper) else value
@@ -473,7 +439,7 @@ def _tree_unwrap(value: Any) -> Any:
     return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
 
 
-def _getattribute_wrapper(getattribute_method):
+def _getattribute_wrapper(getattribute_method: Callable[[T, str], Any]):
     # this current approach replaces the older metdata based approach
     # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`.
     # the metadata approach is defined at class variable and can not be changed at runtime while the current
@@ -496,9 +462,9 @@ def _getattribute_wrapper(getattribute_method):
     # >>> tree.a
     # 1  # the value is unwrapped when accessed directly
     @ft.wraps(getattribute_method)
-    def wrapper(self, key: str) -> Any:
-        value = getattribute_method(self, key)
-        return _tree_unwrap(value) if key in getattribute_method(self, _VARS) else value
+    def wrapper(tree, key: str) -> Any:
+        value = getattribute_method(tree, key)
+        return _tree_unwrap(value) if key in getattribute_method(tree, _VARS) else value
 
     return wrapper
 
@@ -533,7 +499,7 @@ def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
     return wrapper
 
 
-def _treeclass_transform(klass: T) -> T:
+def _treeclass_transform(klass: type[T]) -> type[T]:
     # the method is called after registering the class with `_register_treeclass`
     # cached to prevent wrapping the same class multiple times
 
@@ -578,7 +544,7 @@ def _treeclass_transform(klass: T) -> T:
 
 
 @dataclass_transform(field_specifiers=(field, Field))
-def treeclass(klass: T, *, leafwise: bool = False) -> T:
+def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     """Convert a class to a JAX compatible tree structure.
 
     Args:

@@ -5,6 +5,7 @@ import functools as ft
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
+import numpy.testing as npt
 import pytest
 
 import pytreeclass as pytc
@@ -352,15 +353,19 @@ def test_reduce_and_its_derivatives():
             lambda x, y: jnp.minimum(x, jnp.min(y)), initializer=jnp.inf
         )
     ) == 0.98507565
-    assert (
+    npt.assert_allclose(
         tree.at[tree > 0].reduce(
             lambda x, y: jnp.maximum(x, jnp.max(y)), initializer=-jnp.inf
-        )
-    ) == 1.3969219
-    assert (
-        tree.at[tree > 0].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
-    ) == 10.6970625
-    assert (tree.at[tree > 0].reduce(lambda x, y: x * jnp.product(y), initializer=1)) == 1.8088213  # fmt: skip
+        ),
+        1.3969219,
+    )
+    npt.assert_allclose(
+        tree.at[tree > 0].reduce(lambda x, y: x + jnp.sum(y), initializer=0), 10.6970625
+    )
+    npt.assert_allclose(
+        tree.at[tree > 0].reduce(lambda x, y: x * jnp.product(y), initializer=1),
+        1.8088213,
+    )
 
 
 def test_is_leaf():
