@@ -344,8 +344,8 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
         # with instances of `Parameter`/`Module`.
         # the behavior is useful to avoid repetitive code pattern in field definition and
         # and initialization inside init method.
-        F = Field(type=type(value), init=False, name=key)
-        vars(tree)[_FIELD_MAP] = {**vars(tree)[_FIELD_MAP], **{key: F}}
+        kv = {key: Field(type=type(value), init=False, name=key)}
+        vars(tree)[_FIELD_MAP] = MappingProxyType({**vars(tree)[_FIELD_MAP], **kv})
 
     vars(tree)[key] = value  # type: ignore
 
@@ -361,7 +361,8 @@ def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
     def wrapper(tree, *a, **k) -> None:
         with _mutable_context(tree):
-            vars(tree)[_FIELD_MAP] = dict(_generate_field_map(type(tree)))
+            kvs = dict(_generate_field_map(type(tree)))
+            vars(tree)[_FIELD_MAP] = MappingProxyType(kvs)
             output = init_func(tree, *a, **k)
 
             if post_init_func := getattr(type(tree), _POST_INIT, None):
@@ -370,7 +371,7 @@ def _init_wrapper(init_func: Callable) -> Callable:
                 post_init_func(tree)
 
         # handle non-initialized fields
-        if len(keys := set(vars(tree)[_FIELD_MAP]) - set(vars(tree))) > 0:
+        if len(keys := set(kvs) - set(vars(tree))) > 0:
             msg = f"Uninitialized fields: ({', '.join(keys)}) "
             msg += f"in class `{type(tree).__name__}`"
             raise AttributeError(msg)
