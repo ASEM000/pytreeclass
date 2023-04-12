@@ -199,7 +199,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
     for name in (annotation_map := vars(klass)[_ANNOTATIONS]):
         # get the value associated with the type hint
         # in essence will skip any non type-hinted attributes
-        value = getattr(klass, name, _NOT_SET)
+        value = vars(klass).get(name, _NOT_SET)
         # at this point we stick to the type hint provided by the user
         # inconsistency between the type hint and the value will be handled later
         type = annotation_map[name]
