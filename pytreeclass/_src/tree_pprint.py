@@ -234,7 +234,8 @@ def _namedtuple_pprint(
         kvs = node._asdict().items()
         fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
         fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
-    fmt = "namedtuple(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
+    name = type(node).__name__
+    fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
     return _format_width(fmt, width)
 
 
