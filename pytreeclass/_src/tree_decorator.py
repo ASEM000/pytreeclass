@@ -56,6 +56,9 @@ class Field(NamedTuple):
     def __hash__(self) -> int:
         return tree_hash(self)
 
+    def __repr__(self) -> str:
+        return tree_repr(self)
+
 
 def field(
     *,

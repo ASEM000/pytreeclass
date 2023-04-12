@@ -94,8 +94,7 @@ def register_pytree_node_trace(
     """
     Args:
         klass: The class of the object to be traced.
-        trace_func:
-            A function that takes an instance of type `klass` and defines the flatten rule
+        trace_func:A function that takes an instance of type `klass` and defines the flatten rule
             for the object (name, type, index, metadata) for each leaf in the object.
 
     Example:
