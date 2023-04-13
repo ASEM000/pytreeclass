@@ -9,7 +9,7 @@ from typing import Any, Callable, NamedTuple, Sequence, TypeVar
 import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
-from pytreeclass._src.tree_freeze import ImmutableWrapper, tree_hash
+from pytreeclass._src.tree_freeze import tree_hash
 from pytreeclass._src.tree_indexer import (
     _conditional_mutable_method,
     _leafwise_transform,
@@ -429,17 +429,6 @@ def _register_treeclass(klass: type[T]) -> type[T]:
         jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
 
     return klass
-
-
-def _tree_unwrap(value: Any) -> Any:
-    # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
-    def is_leaf(x: Any) -> bool:
-        return isinstance(x, ImmutableWrapper) or is_treeclass(x)
-
-    def unwrap(value: Any) -> Any:
-        return value.unwrap() if isinstance(value, ImmutableWrapper) else value
-
-    return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
 
 
 def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:

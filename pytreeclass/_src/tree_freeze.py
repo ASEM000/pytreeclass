@@ -29,44 +29,10 @@ def tree_hash(tree: PyTree) -> int:
     return hash((*hashed, jtu.tree_structure(tree)))
 
 
-class ImmutableWrapper:
-    """Base class for all immutable wrappers that gets a special treatment inside `treeclass` wrapped classes.
-    In essence, this wrapper is rendered transparent inside `treeclass` wrapped classes
-    so that the wrapped value can be accessed directly, without the need to call `unwrap`.
-    This behavior is useful for myriads of use cases, such as freezing a value to avoid updating it
-    by `jax` transformations, or wrapping a value to make it hashable.
-
-    Example:
-        >>> import jax.tree_util as jut
-        >>> import pytreeclass as pytc
-        >>> @jtu.register_pytree_node_class
-        ... class TransparentWrapper(pytc.ImmutableWrapper):
-        ...    def __repr__(self):
-        ...        return f"TransparentWrapper({self.__wrapped__!r})"
-        ...    def tree_flatten(self):
-        ...        # return the unwrapped value as a tuple
-        ...        return (self.unwrap(),), None
-        ...    @classmethod
-        ...    def tree_unflatten(cls, _, xs):
-        ...        return TransparentWrapper(xs[0])
-
-        >>> @pytc.treeclass
-        ... class Tree:
-        ...    a:int = TransparentWrapper(1)
-        >>> tree = Tree()
-        >>> # no need to unwrap the value when accessing it
-        >>> assert type(tree.a)  is int
-        >>> print(tree)
-        Tree(a=TransparentWrapper(1))
-        >>> jtu.tree_leaves(tree)
-        [1]
-        >>> jtu.tree_leaves(tree, is_leaf=lambda x: isinstance(x, TransparentWrapper))
-        [TransparentWrapper(1)]
-    """
-
+class _ImmutableWrapper:
     def __init__(self, x: Any) -> None:
         # disable composition of Wrappers
-        vars(self)[_WRAPPED] = x.unwrap() if isinstance(x, ImmutableWrapper) else x
+        vars(self)[_WRAPPED] = x.unwrap() if isinstance(x, _ImmutableWrapper) else x
 
     def unwrap(self) -> Any:
         return getattr(self, _WRAPPED)
@@ -78,7 +44,7 @@ class ImmutableWrapper:
         raise AttributeError("Cannot delete from frozen instance.")
 
 
-class _HashableWrapper(ImmutableWrapper):
+class _HashableWrapper(_ImmutableWrapper):
     # used to wrap metadata to make it hashable
     # this is intended to wrap frozen values to avoid error when comparing
     # the metadata.
@@ -91,7 +57,7 @@ class _HashableWrapper(ImmutableWrapper):
         return tree_hash(self.unwrap())
 
 
-class FrozenWrapper(ImmutableWrapper):
+class FrozenWrapper(_ImmutableWrapper):
     def __repr__(self):
         return f"#{self.unwrap()!r}"
 
@@ -144,6 +110,8 @@ def freeze(wrapped: Any) -> FrozenWrapper:
         ...     a: float
         ...     @jax.value_and_grad
         ...     def __call__(self, x):
+        ...         # unfreeze `a` to update it
+        ...         self = jax.tree_util.tree_map(pytc.unfreeze, self, is_leaf=pytc.is_frozen)
         ...         return x ** self.a
 
         >>> # without `freeze` wrapping `a`, `a` will be updated
@@ -180,7 +148,6 @@ def unfreeze(x: Any) -> Any:
         >>> frozen_value = pytc.freeze(1)
         >>> pytc.unfreeze(frozen_value)
         1
-
         >>> # usage with `jax.tree_map`
         >>> frozen_tree = jtu.tree_map(pytc.freeze, {"a": 1, "b": 2})
         >>> unfrozen_tree = jtu.tree_map(pytc.unfreeze, frozen_tree, is_leaf=pytc.is_frozen)
