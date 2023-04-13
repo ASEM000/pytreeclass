@@ -25,7 +25,7 @@ _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _MUTABLE_TYPES = (list, dict, set)
 _ANNOTATIONS = "__annotations__"
 _POST_INIT = "__post_init__"
-_FIELD_MAP = "__field_map__"
+_FIELDS = "__fields__"
 T = TypeVar("T")
 
 
@@ -34,9 +34,13 @@ PyTree = Any
 """Define a class decorator that is compatible with JAX's transformation."""
 
 
-def is_treeclass(item: Any) -> bool:
-    """Returns `True` if an instance of class is decorated by `treeclass`"""
-    return hasattr(item, _FIELD_MAP)
+def is_treeclass(node: Any) -> bool:
+    """Returns `True` if class or instance is a `treeclass`."""
+    # use `_setattr` as a proxy for `treeclass` as overriding `__setattr__
+    # or `__delattr__` is not allowed, this behavior is similar
+    # to `dataclasses.dataclass(frozen=True)` restriction.
+    klass = node if isinstance(node, type) else type(node)
+    return getattr(klass, "__setattr__", None) is _setattr
 
 
 class Field(NamedTuple):
@@ -53,7 +57,23 @@ class Field(NamedTuple):
     alias: str | None = None
 
     def __hash__(self) -> int:
-        return tree_hash(self)
+        # since `_generate_init_code` is caching the `fields`, then it is better
+        # only hash arguments that are used in generating the init code string
+        # this is avoid rewrtining the same final init code string multiple times.
+        return tree_hash(
+            (
+                self.name,
+                self.default,
+                self.factory,
+                self.init,
+                self.kw_only,
+                self.pos_only,
+                self.alias,
+            )
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return hash(self) == hash(other)
 
     def __repr__(self) -> str:
         return tree_repr(self)
@@ -165,10 +185,10 @@ def field(
 
 def fields(item: Any) -> Sequence[Field]:
     """Get the fields of a `treeclass` instance."""
-    if not hasattr(item, _FIELD_MAP):
+    if not hasattr(item, _FIELDS):
         raise TypeError(f"Cannot get fields of {item!r}.")
 
-    return tuple(vars(item)[_FIELD_MAP].values())
+    return tuple(vars(item)[_FIELDS].values())
 
 
 @ft.lru_cache
@@ -304,18 +324,13 @@ def _generate_init_code(fields: Sequence[Field]):
 
 
 def _generate_init(klass: type) -> FunctionType:
-    # generate the field map for the class
     field_map = _generate_field_map(klass)
-    # generate init method
     local_namespace = dict()  # type: ignore
     global_namespace = vars(sys.modules[klass.__module__])
-
-    # generate the init method code string
-    # in here, we generate the function head and body and add `default`/`factory`
-    exec(_generate_init_code(field_map.values()), global_namespace, local_namespace)
+    init_code = _generate_init_code(tuple(field_map.values()))
+    exec(init_code, global_namespace, local_namespace)
     method = local_namespace["closure"](field_map)
 
-    # inject the method into the class namespace
     return FunctionType(
         code=method.__code__,
         globals=global_namespace,
@@ -328,7 +343,7 @@ def _generate_init(klass: type) -> FunctionType:
 @_conditional_mutable_method
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
     # setattr under `_mutable_context` context otherwise raise an error
-    if key in (field_map := vars(tree)[_FIELD_MAP]):
+    if key in (field_map := vars(tree)[_FIELDS]):
         # apply the callbacks on setting the value
         # check if the key is a field name
         for callback in field_map[key].callbacks:
@@ -347,7 +362,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
         # the behavior is useful to avoid repetitive code pattern in field definition and
         # and initialization inside init method.
         kv = {key: Field(type=type(value), init=False, name=key)}
-        vars(tree)[_FIELD_MAP] = MappingProxyType({**vars(tree)[_FIELD_MAP], **kv})
+        vars(tree)[_FIELDS] = MappingProxyType({**vars(tree)[_FIELDS], **kv})
 
     vars(tree)[key] = value  # type: ignore
 
@@ -364,7 +379,7 @@ def _init_wrapper(init_func: Callable) -> Callable:
     def wrapper(tree, *a, **k) -> None:
         with _mutable_context(tree):
             kvs = dict(_generate_field_map(type(tree)))
-            vars(tree)[_FIELD_MAP] = MappingProxyType(kvs)
+            vars(tree)[_FIELDS] = MappingProxyType(kvs)
             output = init_func(tree, *a, **k)
 
             if post_init_func := getattr(type(tree), _POST_INIT, None):
@@ -399,7 +414,7 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
 def _tree_flatten(tree: PyTree):
     """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
     static, dynamic = dict(vars(tree)), dict()
-    for key in static[_FIELD_MAP]:
+    for key in static[_FIELDS]:
         dynamic[key] = static.pop(key)
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
@@ -483,8 +498,8 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
         ("__init__", _init_wrapper),
         ("__init_subclass__", _init_subclass_wrapper),
     ):
-        # wrappers to enable the field initialization,
-        # callback functionality and transparent wrapper behavior
+        # wrappers to enable the field initialization, and registering
+        # the class with jax
         setattr(klass, key, wrapper(getattr(klass, key)))
 
     # basic optional methods
