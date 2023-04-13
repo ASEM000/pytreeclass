@@ -359,6 +359,7 @@ def test_freeze_nondiff_func():
 
     @jax.value_and_grad
     def loss_func(model):
+        model = model.at[...].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
         return jnp.mean((model(1.0) - 0.5) ** 2)
 
     @jax.jit

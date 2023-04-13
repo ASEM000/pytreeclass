@@ -1,11 +1,5 @@
 from pytreeclass._src.tree_decorator import field, fields, is_treeclass, treeclass
-from pytreeclass._src.tree_freeze import (
-    ImmutableWrapper,
-    freeze,
-    is_frozen,
-    is_nondiff,
-    unfreeze,
-)
+from pytreeclass._src.tree_freeze import freeze, is_frozen, is_nondiff, unfreeze
 from pytreeclass._src.tree_indexer import bcmap, is_tree_equal, tree_indexer
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
@@ -43,7 +37,6 @@ __all__ = (
     "is_frozen",
     "freeze",
     "unfreeze",
-    "ImmutableWrapper",
     # masking and indexing utils
     "bcmap",
     "tree_indexer",
@@ -54,4 +47,4 @@ __all__ = (
     "tree_repr_with_trace",
 )
 
-__version__ = "0.2.6"
+__version__ = "0.2.7"

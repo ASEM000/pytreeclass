@@ -9,7 +9,7 @@ from typing import Any, Callable, NamedTuple, Sequence, TypeVar
 import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
-from pytreeclass._src.tree_freeze import ImmutableWrapper, tree_hash
+from pytreeclass._src.tree_freeze import tree_hash
 from pytreeclass._src.tree_indexer import (
     _conditional_mutable_method,
     _leafwise_transform,
@@ -25,7 +25,6 @@ _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
 _MUTABLE_TYPES = (list, dict, set)
 _ANNOTATIONS = "__annotations__"
 _POST_INIT = "__post_init__"
-_VARS = "__dict__"
 _FIELD_MAP = "__field_map__"
 T = TypeVar("T")
 
@@ -55,6 +54,9 @@ class Field(NamedTuple):
 
     def __hash__(self) -> int:
         return tree_hash(self)
+
+    def __repr__(self) -> str:
+        return tree_repr(self)
 
 
 def field(
@@ -196,7 +198,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
     for name in (annotation_map := vars(klass)[_ANNOTATIONS]):
         # get the value associated with the type hint
         # in essence will skip any non type-hinted attributes
-        value = getattr(klass, name, _NOT_SET)
+        value = vars(klass).get(name, _NOT_SET)
         # at this point we stick to the type hint provided by the user
         # inconsistency between the type hint and the value will be handled later
         type = annotation_map[name]
@@ -429,47 +431,6 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     return klass
 
 
-def _tree_unwrap(value: Any) -> Any:
-    # enables the transparent wrapper behavior iniside `treeclass` wrapped classes
-    def is_leaf(x: Any) -> bool:
-        return isinstance(x, ImmutableWrapper) or is_treeclass(x)
-
-    def unwrap(value: Any) -> Any:
-        return value.unwrap() if isinstance(value, ImmutableWrapper) else value
-
-    return jtu.tree_map(unwrap, value, is_leaf=is_leaf)
-
-
-def _getattribute_wrapper(getattribute_method: Callable[[T, str], Any]):
-    # this current approach replaces the older metdata based approach
-    # that is used in `dataclasses`-based libraries like `flax.struct.dataclass` and v0.1 of `treeclass`.
-    # the metadata approach is defined at class variable and can not be changed at runtime while the current
-    # approach is more flexible because it can be changed at runtime using `tree_map` or by using `at`
-    # moreover, metadata-based approach falls short when handling nested data structures values.
-    # for example if a field value is a tuple of (1, 2, 3), then metadata-based approach will only be able
-    # to freeze the whole tuple, but not its elements.
-    # with the current approach, we can use `tree_map`/ or direct application to freeze certain tuple elements
-    # and leave the rest of the tuple as is.
-    # another pro of the current approach is that the field metadata is not checked during flattening/unflattening
-    # so in essence, it's more efficient than the metadata-based approach during applying `jax` transformations
-    # that flatten/unflatten the tree.
-    # Example: when fetching `tree.a` it will be unwrapped
-    # >>> @pytc.treeclass
-    # ... class Tree:
-    # ...    a:int = pytc.freeze(1)
-    # >>> tree = Tree()
-    # >>> tree
-    # Tree(a=#1)  # frozen value is displayed in the repr with a prefix `#`
-    # >>> tree.a
-    # 1  # the value is unwrapped when accessed directly
-    @ft.wraps(getattribute_method)
-    def wrapper(tree, key: str) -> Any:
-        value = getattribute_method(tree, key)
-        return _tree_unwrap(value) if key in getattribute_method(tree, _VARS) else value
-
-    return wrapper
-
-
 def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
     # Non-decorated subclasses uses the base `treeclass` leaves only
     # this behavior is aligned with `dataclasses` not registering non-decorated
@@ -521,7 +482,6 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     for key, wrapper in (
         ("__init__", _init_wrapper),
         ("__init_subclass__", _init_subclass_wrapper),
-        ("__getattribute__", _getattribute_wrapper),
     ):
         # wrappers to enable the field initialization,
         # callback functionality and transparent wrapper behavior
@@ -544,7 +504,7 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     return klass
 
 
-@dataclass_transform(field_specifiers=(field, Field))
+@dataclass_transform(field_specifiers=(field, Field), frozen_default=True)
 def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     """Convert a class to a JAX compatible tree structure.
 

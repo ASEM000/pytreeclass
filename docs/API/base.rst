@@ -62,7 +62,6 @@ Wrapping and freezing API
 .. autofunction:: is_frozen
 .. autofunction:: freeze
 .. autofunction:: unfreeze
-.. autoclass:: ImmutableWrapper
 
 
 Advanced API
