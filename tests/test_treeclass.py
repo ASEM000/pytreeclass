@@ -17,7 +17,17 @@ def test_field_metadata():
     class Test:
         a: int = pytc.field(default=1, metadata={"a": 1})
 
-    assert Test().__field_map__["a"].metadata["a"] == 1
+    assert Test().__fields__["a"].metadata["a"] == 1
+
+
+def test_is_treeclass():
+    @ft.partial(pytc.treeclass, leafwise=True)
+    class Test:
+        a: int = 1
+
+    assert pytc.is_treeclass(Test)
+    assert pytc.is_treeclass(Test())
+    assert not pytc.is_treeclass(int)
 
 
 def test_field_mutually_exclusive():
@@ -122,7 +132,9 @@ def test_field_alias():
 
 
 def test_field_hash():
-    hash(pytc.field(default=1)) == hash(pytc.field(default=1))
+    f1 = pytc.field(default=1.0, callbacks=[lambda x: x])
+    f2 = pytc.field(default=1.0)
+    hash(f1) == hash(f2)
 
 
 def test_field_nondiff():
@@ -739,7 +751,15 @@ def test_instance_field_map():
 
     _, tree_with_weight = tree.at["add_param"]("weight", Parameter(3))
 
-    assert tree.__field_map__ != tree_with_weight.__field_map__
+    assert tree.__fields__ != tree_with_weight.__fields__
     assert tree_with_weight.weight == Parameter(3)
     assert "weight" not in vars(tree)
-    assert "weight" not in tree.__field_map__
+    assert "weight" not in tree.__fields__
+
+
+def test_field_repr():
+    assert (
+        repr(pytc.field())
+        # trunk-ignore(flake8/E501)
+        == "Field(\n  name=None, \n  type=None, \n  default=?, \n  factory=None, \n  init=True, \n  repr=True, \n  kw_only=False, \n  pos_only=False, \n  metadata=None, \n  callbacks=(), \n  alias=None\n)"
+    )
