@@ -482,7 +482,7 @@ def test_treeclass_frozen_field():
 
     t = Test(1)
 
-    assert t.a == 1
+    assert t.a == pytc.freeze(1)
     assert jtu.tree_leaves(t) == []
 
 

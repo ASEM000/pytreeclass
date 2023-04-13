@@ -275,16 +275,37 @@ Lets optimize our parameters
 
 ```python
 
+import pytreeclass as pytc
+import jax
+import jax.numpy as jnp
+
+
+@pytc.treeclass
+class Tree:
+    a: int = 1
+    b: tuple[float] = (2., 3.)
+    c: jax.Array = jnp.array([4., 5., 6.])
+
+    def __call__(self, x):
+        return self.a + self.b[0] + self.c + x
+
+
+tree = Tree()
+
+
 @jax.grad
-def loss_func(tree:Tree, x:jax.Array):
+def loss_func(tree: Tree, x: jax.Array):
+    tree = tree.at[...].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)  # <--- unfreeze the tree before calling it
     preds = jax.vmap(tree)(x)  # <--- vectorize the tree call over the leading axis
     return jnp.mean(preds**2)  # <--- return the mean squared error
 
+
 @jax.jit
-def train_step(tree:Tree, x:jax.Array):
+def train_step(tree: Tree, x: jax.Array):
     grads = loss_func(tree, x)
     # apply a small gradient step
-    return jax.tree_util.tree_map(lambda x, g: x - 1e-3*g, tree, grads)
+    return jax.tree_util.tree_map(lambda x, g: x - 1e-3 * g, tree, grads)
+
 
 # lets freeze the non-differentiable parts of the tree
 # in essence any non inexact type should be frozen to
@@ -292,17 +313,20 @@ def train_step(tree:Tree, x:jax.Array):
 jaxable_tree = jax.tree_util.tree_map(lambda x: pytc.freeze(x) if pytc.is_nondiff(x) else x, tree)
 
 for epoch in range(1_000):
-    jaxable_tree = train_step(jaxable_tree, jnp.ones([10,1]))
+    jaxable_tree = train_step(jaxable_tree, jnp.ones([10, 1]))
 
 print(jaxable_tree)
 # **the `frozen` params have "#" prefix**
-#Tree(a=#1, b=(-4.2826524, 3.0), c=[2.3924797 2.905778  3.4190805])
+# Tree(a=#1, b=(-4.2826524, 3.0), c=[2.3924797 2.905778  3.4190805])
 
 
 # unfreeze the tree
-tree = jax.tree_util.tree_map(pytc.unfreeze, jaxable_tree, is_leaf=pytc.is_frozen)
+tree = jaxable_tree.at[...].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+# the previous line is equivalent to:
+# >>> tree = jax.tree_util.tree_map(pytc.unfreeze, jaxable_tree, is_leaf=pytc.is_frozen)
 print(tree)
 # Tree(a=1, b=(-4.2826524, 3.0), c=[2.3924797 2.905778  3.4190805])
+
 ```
 
 </details>
@@ -526,30 +550,39 @@ tree = Tree(1.0)
 ```python
 import functools as ft
 import pytreeclass as pytc
+import jax
+import jax.tree_util as jtu
+import jax.numpy as jnp
+
 
 @ft.partial(pytc.treeclass, leafwise=True)
 class Tree:
-    a:int = 1
-    b:tuple[float] = (2.,3.)
-    c:jax.Array = jnp.array([4.,5.,6.])
+    a: int = 1
+    b: tuple[float] = (2., 3.)
+    c: jax.Array = jnp.array([4., 5., 6.])
 
     def __call__(self, x):
         return self.a + self.b[0] + self.c + x
+
 
 tree = Tree()
 
 tree + 100
 # Tree(a=101, b=(102.0, 103.0), c=f32[3](μ=105.00, σ=0.82, ∈[104.00,106.00]))
 
+
 @jax.grad
-def loss_func(tree:Tree, x:jax.Array):
+def loss_func(tree: Tree, x: jax.Array):
+    tree = jtu.tree_map(pytc.unfreeze, tree, is_leaf=pytc.is_frozen)  # <--- unfreeze the tree before calling it
     preds = jax.vmap(tree)(x)  # <--- vectorize the tree call over the leading axis
     return jnp.mean(preds**2)  # <--- return the mean squared error
 
+
 @jax.jit
-def train_step(tree:Tree, x:jax.Array):
+def train_step(tree: Tree, x: jax.Array):
     grads = loss_func(tree, x)
-    return tree - grads*1e-3  # <--- eliminate `tree_map`
+    return tree - grads * 1e-3  # <--- eliminate `tree_map`
+
 
 # lets freeze the non-differentiable parts of the tree
 # in essence any non inexact type should be frozen to
@@ -557,17 +590,17 @@ def train_step(tree:Tree, x:jax.Array):
 jaxable_tree = jax.tree_util.tree_map(lambda x: pytc.freeze(x) if pytc.is_nondiff(x) else x, tree)
 
 for epoch in range(1_000):
-    jaxable_tree = train_step(jaxable_tree, jnp.ones([10,1]))
+    jaxable_tree = train_step(jaxable_tree, jnp.ones([10, 1]))
 
 print(jaxable_tree)
 # **the `frozen` params have "#" prefix**
-# Tree(a=#1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ])
+# Tree(a=#1, b=(-4.2826524, 3.0), c=[2.3924797 2.905778  3.4190805])
 
 
 # unfreeze the tree
 tree = jax.tree_util.tree_map(pytc.unfreeze, jaxable_tree, is_leaf=pytc.is_frozen)
 print(tree)
-# Tree(a=1, b=(-4.7176366, 3.0), c=[2.4973059 2.760783  3.024264 ])
+# Tree(a=1, b=(-4.2826524, 3.0), c=[2.3924797 2.905778  3.4190805])
 ```
 
 </details>

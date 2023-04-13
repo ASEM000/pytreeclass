@@ -52,6 +52,7 @@ def test_jit_freeze():
 
     @jax.value_and_grad
     def loss_func(model, x, y):
+        model = model.at[...].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
         return jnp.mean((model(x) - y) ** 2)
 
     @jax.jit
