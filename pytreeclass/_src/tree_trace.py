@@ -26,8 +26,7 @@ def _jaxable_trace_func(tree: Any) -> list[TraceType]:
     names = (f"leaf_{i}" for i in range(len(leaves)))
     types = map(type, leaves)
     indices = range(len(leaves))
-    metadatas = (dict(id=id(leaf)) for leaf in leaves)
-    return [*zip(names, types, indices, metadatas)]
+    return [*zip(names, types, indices)]
 
 
 class _TraceRegistryEntry(NamedTuple):
@@ -55,14 +54,14 @@ def _validate_trace_func(
                 msg += f"Expected a list or tuple, got {trace}"
                 raise TypeError(msg)
 
-            if len(trace) != 4:
+            if len(trace) != 3:
                 msg = "Trace length is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
-                msg += "Expected 4 entries, in the order of"
-                msg += f"(name, type, index, metadata), got {trace}"
+                msg += "Expected 3 entries, in the order of"
+                msg += f"(name, type, index), got {trace}"
                 raise ValueError(msg)
 
-            if not isinstance(trace[0], str):
+            if not isinstance(trace[0], (str, type(None))):
                 msg = "Trace name entry is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
                 msg += f" Expected a string, got {trace[0]}"
@@ -74,7 +73,7 @@ def _validate_trace_func(
                 msg += f" Expected a type, got {trace[1]}"
                 raise TypeError(msg)
 
-            if not isinstance(trace[2], int):
+            if not isinstance(trace[2], (int, type(None))):
                 msg = "Trace index entry is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
                 msg += f" Expected an integer, got {trace[2]}"
@@ -95,7 +94,7 @@ def register_pytree_node_trace(
     Args:
         klass: The class of the object to be traced.
         trace_func:A function that takes an instance of type `klass` and defines the flatten rule
-            for the object (name, type, index, metadata) for each leaf in the object.
+            for the object (name, type, index) for each leaf in the object.
 
     Example:
         >>> import jax
@@ -103,21 +102,19 @@ def register_pytree_node_trace(
         >>> class UserList(list):
         ...     pass
         >>> def user_list_trace_func(tree:UserList):
-        ...     # (1) define name for each leaf
-        ...     names = (f"leaf{i}" for i in range(len(tree)))
+        ...     # (1) define name for each leaf if exists, `None` otherwise
+        ...     names = (None,) * len(tree)
         ...     # (2) define types for each leaf
         ...     types = (type(leaf) for leaf in tree)
-        ...     # (3) index for each leaf in the level
+        ...     # (3) index for each leaf in the level if exists, `None` otherwise
         ...     indices = range(len(tree))
-        ...     # (4) define metadatas (if any) for each leaf
-        ...     metadatas = (() for _ in range(len(tree)))
-        ...     # return a list of tuples (name, type, index, metadata)
-        ...     return [*zip(names, types, indices, metadatas)]
+        ...     # return a list of tuples (name, type, index)
+        ...     return [*zip(names, types, indices)]
         >>> pytc.register_pytree_node_trace(UserList, user_list_trace_func)
 
     Note:
         The `trace_func` should return a list of tuples in the order of
-        (name, type, index, metadata) for each leaf in the object.
+        (name, type, index) for each leaf in the object.
         The format of the trace is validated on the first call and will raise
         `TypeError` or `ValueError` if the format is not correct.
 
@@ -136,27 +133,24 @@ def register_pytree_node_trace(
 
 
 def _sequence_trace_func(tree: Sequence) -> list[TraceType]:
-    names = (f"[{i}]" for i in range(len(tree)))
+    names = (None for _ in range(len(tree)))
     types = map(type, tree)
     indices = range(len(tree))
-    metadatas = (dict(id=id(leaf)) for leaf in tree)
-    return [*zip(names, types, indices, metadatas)]
+    return [*zip(names, types, indices)]
 
 
 def _dict_trace_func(tree: dict) -> list[TraceType]:
     names = (f"['{k}']" for k in tree)
     types = (type(tree[key]) for key in tree)
-    indices = range(len(tree))
-    metadatas = (dict(repr=not k.startswith("_"), id=id(tree[k])) for k in tree)
-    return [*zip(names, types, indices, metadatas)]
+    indices = (None for _ in tree)
+    return [*zip(names, types, indices)]
 
 
 def _namedtuple_trace_func(tree: Any) -> list[TraceType]:
-    names = (f"['{field}']" for field in tree._fields)
+    names = tree._fields
     types = (type(getattr(tree, field)) for field in tree._fields)
     indices = range(len(tree))
-    metadatas = (dict(id=id(getattr(tree, field))) for field in tree._fields)
-    return [*zip(names, types, indices, metadatas)]
+    return [*zip(names, types, indices)]
 
 
 # register trace functions for common types
@@ -201,7 +195,6 @@ def flatten_one_trace_level(
             (*tree_trace[0], rhs_trace[0]),  # names
             (*tree_trace[1], rhs_trace[1]),  # types
             (*tree_trace[2], rhs_trace[2]),  # indices
-            (*tree_trace[3], rhs_trace[3]),  # metadatas
         )
         yield from flatten_one_trace_level(leaf_trace, leaf, is_leaf, is_trace_leaf)
 
@@ -226,29 +219,8 @@ def tree_leaves_with_trace(
         >>> import pytreeclass as pytc
         >>> tree = [1, [2, [3]]]
         >>> traces, _ = zip(*pytc.tree_leaves_with_trace(tree))
-        >>> # print(pytc.tree_repr(traces))
-        >>> # (
-        >>> # (('[0]'), (<class 'int'>), (0), ({id:4383785200})),
-        >>> # (
-        >>> #     ('[1]', '[0]'),
-        >>> #     (<class 'list'>, <class 'int'>),
-        >>> #     (1, 0),
-        >>> #     ({id:4558856448}, {id:4383785232})
-        >>> # ),
-        >>> # (
-        >>> #     ('[1]', '[1]', '[0]'),
-        >>> #     (<class 'list'>, <class 'list'>, <class 'int'>),
-        >>> #     (1, 1, 0),
-        >>> #     ({id:4558856448}, {id:4558857472}, {id:4383785264})
-        >>> # )
-        >>> # )
-
-    Note:
-        `metadata` path can hold any information about the object. PyTreeClass stores the object id
-        for the common data structures like `list`, `tuple`, `dict`, `set`, `namedtuple`, and `treeclass` wrapped
-        classes.
     """
-    trace = ((), (), (), ())
+    trace = ((), (), ())
     return list(flatten_one_trace_level(trace, tree, is_leaf, is_trace_leaf))
 
 
@@ -339,7 +311,7 @@ def tree_map_with_trace(
 
 
         >>> def map_func(trace, leaf):
-        ...    names, _, __, ___ = trace
+        ...    names, _, __ = trace
         ...    if "['a']" in names:
         ...        return leaf + 100
         ...    return leaf
@@ -347,7 +319,7 @@ def tree_map_with_trace(
         {'a': [101, 102], 'b': 4, 'c': [5, 6]}
 
         >>> def map_func(trace, leaf):
-        ...    _, types, __, ___ = trace
+        ...    _, types, __ = trace
         ...    if list in types:
         ...        return leaf + 100
         ...    return leaf

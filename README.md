@@ -815,9 +815,8 @@ class FlaxTree:
 def pytc_flatten_rule(tree):
     names =("a","b","c")
     types = map(type, (tree.a, tree.b, tree.c))
-    indices = range(3)
-    metadatas= (None, None, None)
-    return [*zip(names, types, indices, metadatas)]
+    indices = range(3)  # make it indexable like namedtuple
+    return [*zip(names, types, indices)]
 
 pytc.register_pytree_node_trace(FlaxTree, pytc_flatten_rule)
 
@@ -886,7 +885,7 @@ flax_tree.at["a"].set(10)
 
 V0.2 of `PyTreeClass` register common python datatypes and `treeclass` wrapped class to `trace` registry.
 While `jax` uses `jax.tree_util.register_pytree_node` to define `flatten_rule` for leaves, `PyTreeClass` extends on this
-By registering the `flatten_rule` of (1) names, (2) types, (3) indexing, (4) metadata -if exists-
+By registering the `flatten_rule` of (1) names, (2) types, (3) indexing
 
 For demonstration , the following figure contains the 4 variants of the same `Tree` instance define
 

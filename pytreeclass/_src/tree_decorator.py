@@ -21,7 +21,12 @@ from pytreeclass._src.tree_indexer import (
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_trace import register_pytree_node_trace
 
-_NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "?"})()
+
+class NOT_SET:
+    __repr__ = lambda _: "?"
+
+
+_NOT_SET = NOT_SET()
 _MUTABLE_TYPES = (list, dict, set)
 _ANNOTATIONS = "__annotations__"
 _POST_INIT = "__post_init__"
@@ -35,12 +40,8 @@ PyTree = Any
 
 
 def is_treeclass(node: Any) -> bool:
-    """Returns `True` if class or instance is a `treeclass`."""
-    # use `_setattr` as a proxy for `treeclass` as overriding `__setattr__
-    # or `__delattr__` is not allowed, this behavior is similar
-    # to `dataclasses.dataclass(frozen=True)` restriction.
-    klass = node if isinstance(node, type) else type(node)
-    return getattr(klass, "__setattr__", None) is _setattr
+    """Check if a node is a `treeclass`."""
+    return (node if isinstance(node, type) else type(node)).__setattr__ is _setattr
 
 
 class Field(NamedTuple):
@@ -56,27 +57,23 @@ class Field(NamedTuple):
     callbacks: Sequence[Any] = ()
     alias: str | None = None
 
-    def __hash__(self) -> int:
-        # since `_generate_init_code` is caching the `fields`, then it is better
-        # only hash arguments that are used in generating the init code string
-        # this is avoid rewrtining the same final init code string multiple times.
-        return tree_hash(
-            (
-                self.name,
-                self.default,
-                self.factory,
-                self.init,
-                self.kw_only,
-                self.pos_only,
-                self.alias,
-            )
-        )
-
     def __eq__(self, other: Any) -> bool:
         return hash(self) == hash(other)
 
     def __repr__(self) -> str:
         return tree_repr(self)
+
+    def __hash__(self) -> int:
+        parameters = (
+            self.name,
+            self.default,
+            self.factory,
+            self.init,
+            self.kw_only,
+            self.pos_only,
+            self.alias,
+        )
+        return tree_hash(parameters)
 
 
 def field(
@@ -138,14 +135,11 @@ def field(
         raise TypeError(msg)
 
     if default is not _NOT_SET and factory is not None:
-        # mutually exclusive arguments
-        # this is the similar behavior to `dataclasses`
         msg = "`default` and `factory` are mutually exclusive arguments."
         msg += f"got default={default} and factory={factory}"
         raise ValueError(msg)
 
     if kw_only is True and pos_only is True:
-        # mutually exclusive arguments
         msg = "`kw_only` and `pos_only` are mutually exclusive arguments."
         msg += f"got kw_only={kw_only} and pos_only={pos_only}"
         raise ValueError(msg)
@@ -155,19 +149,16 @@ def field(
     elif metadata is not None:
         raise TypeError("`metadata` must be a Mapping or None")
 
-    # check if `callbacks` is a Sequence of functions
     if not isinstance(callbacks, Sequence):
         msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
         raise TypeError(msg)
 
-    # sanity check for callbacks
     for index, callback in enumerate(callbacks):
         if not isinstance(callback, Callable):  # type: ignore
             msg = "`callbacks` must be a Sequence of functions, "
             msg += f"got `{type(callbacks).__name__}` at index={index}"
             raise TypeError(msg)
 
-    # set name and type post initialization
     return Field(
         name=None,
         type=None,
@@ -193,34 +184,22 @@ def fields(item: Any) -> Sequence[Field]:
 
 @ft.lru_cache
 def _generate_field_map(klass: type) -> dict[str, Field]:
-    # get all the fields of the class and its base classes
-    # get the fields of the class and its base classes
     field_map = dict()
 
     if klass is object:
-        # base case for recursion to stop
         return field_map
 
     for base in reversed(klass.__mro__[1:]):
-        # get the fields of the base class in the MRO
-        # in reverse order to ensure the correct order of the fields
-        # are preserved, i.e. the fields of the base class are added first
-        # and the fields of the derived class are added last so that
-        # in case of name collision, the derived class fields are preserved
+        # get the fields of the base class in the MRO in reverse order to ensure
+        # the correct order of the fields are preserved
         field_map.update(_generate_field_map(base))
 
-    # transform the annotated attributes of the class into Fields
-    # while assigning the default values of the Fields to the annotated attributes
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
     if _ANNOTATIONS not in vars(klass):
         return field_map
 
     for name in (annotation_map := vars(klass)[_ANNOTATIONS]):
-        # get the value associated with the type hint
-        # in essence will skip any non type-hinted attributes
         value = vars(klass).get(name, _NOT_SET)
-        # at this point we stick to the type hint provided by the user
-        # inconsistency between the type hint and the value will be handled later
         type = annotation_map[name]
 
         if name == "self":
@@ -230,12 +209,9 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
             raise ValueError(msg)
 
         if isinstance(value, Field):
-            # the annotated attribute is a `Field``
-            # example case: `x: Any = field(default=1)`
-            # assign the name and type to the Field from the annotation
+            # case: `x: Any = field(default=1)`
             if isinstance(value.default, _MUTABLE_TYPES):
                 # example case: `x: Any = field(default=[1, 2, 3])`
-                # https://github.com/ericvsmith/dataclasses/issues/3
                 msg = f"Mutable default value of field `{name}` is not allowed, use "
                 msg += f"`factory=lambda: {value.default}` instead."
                 raise TypeError(msg)
@@ -245,37 +221,24 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         elif isinstance(value, _MUTABLE_TYPES):
             # https://github.com/ericvsmith/dataclasses/issues/3
             # example case: `x: Any = [1, 2, 3]`
-            # this is the prime motivation for writing this decorator
-            # as from python 3.11, jax arrays `dataclasses` will raise an error if
-            # `JAX` arrays are used as default values.
-            # the `dataclasses` logic is flawed by using `__hash__` existence
-            # as a proxy for immutability, which is not the case for `JAX` arrays
-            # which are immutable but do not have a `__hash__` method
             msg = f"Mutable value= {(value)} is not allowed"
             msg += f" for field `{name}` in class `{klass.__name__}`.\n"
             msg += f" use `field(... ,factory=lambda:{value})` instead"
             raise TypeError(msg)
 
         elif value is _NOT_SET:
-            # nothing is assigned to the annotated attribute
-            # example case: `x: Any`
-            # create a Field and assign it to the class
+            # case: `x: Any`
             field_map[name] = Field(name=name, type=type)
 
         else:
-            # example case: `x: int = 1`
-            # create a Field and assign default value to the class
+            # case: `x: int = 1`
             field_map[name] = Field(name=name, type=type, default=value)
 
     return field_map
 
 
 @ft.lru_cache
-def _generate_init_code(fields: Sequence[Field]):
-    # generate the init method code string
-    # in here, we generate the function head and body and add `default`/`factory`
-    # for example, if we have a class with fields `x` and `y`
-    # then generated code will something like  `def __init__(self, x, y): self.x = x; self.y = y`
+def _generate_init_code(fields: Sequence[Field]) -> str:
     head = body = ""
 
     for field in fields:
@@ -287,18 +250,14 @@ def _generate_init_code(fields: Sequence[Field]):
         mark2 = f"self.{name}"
 
         if field.kw_only and "*" not in head and field.init:
-            # if the field is keyword only, and we have not added the `*` yet
             head += "*, "
 
         if field.default is not _NOT_SET:
-            # we add the default into the function head (def f(.. x= default_value))
-            # if the the field require initialization. if not, then omit it from head
+            # in head: def f(.. x= default_value)
             head += f"{alias}={mark0}, " if field.init else ""
-            # we then add self.x = x for the body function if field is initialized
-            # otherwise, define the default value inside the body ( self.x = default_value)
+            # in body:  self.x = default_value
             body += f"\t\t{mark2}=" + (f"{alias}\n " if field.init else f"{mark0}\n")
         elif field.factory is not None:
-            # same story for functions as above
             head += f"{alias}={mark1}, " if field.init else ""
             body += f"\t\t{mark2}=" + (f"{alias}\n" if field.init else f"{mark1}\n")
         else:
@@ -307,18 +266,14 @@ def _generate_init_code(fields: Sequence[Field]):
             body += f"\t\t{mark2}={alias}\n " if field.init else ""
 
         if field.pos_only and field.init:
-            # if the field is positional only, we add a "/" marker after it
             if "/" in head:
                 head = head.replace("/,", "")
 
             head += "/, "
 
-    # in case no field is initialized, we add a pass statement to the body
-    # to avoid syntax error in the generated code
+    # add pass to avoid syntax error if all fields are ignored
     body += "\t\tpass"
-    # add the body to the head
     body = "\tdef __init__(self, " + head[:-2] + "):\n" + body
-    # use closure to be able to reference default values of all types
     body = f"def closure(field_map):\n{body}\n\treturn __init__"
     return body.expandtabs(4)
 
@@ -342,10 +297,7 @@ def _generate_init(klass: type) -> FunctionType:
 
 @_conditional_mutable_method
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
-    # setattr under `_mutable_context` context otherwise raise an error
     if key in (field_map := vars(tree)[_FIELDS]):
-        # apply the callbacks on setting the value
-        # check if the key is a field name
         for callback in field_map[key].callbacks:
             try:
                 # callback is a function that takes the value of the field
@@ -398,21 +350,16 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
 
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
-    """Unflatten rule for `treeclass` to use with `jax.tree_unflatten`."""
     tree = object.__new__(klass)
     # update through vars, to avoid calling the `setattr` method
     # that will check for callbacks.
-    # calling `setattr` will trigger any defined callbacks by the user
-    # on each unflattening which is not efficient.
-    # however it might be useful to constantly check if the updated value is
-    # satisfying the constraints defined by the user in the callbacks.
     vars(tree).update(treedef[1])
     vars(tree).update(zip(treedef[0], leaves))
     return tree
 
 
 def _tree_flatten(tree: PyTree):
-    """Flatten rule for `treeclass` to use with `jax.tree_flatten`."""
+    # Flatten rule for `treeclass` to use with `jax.tree_flatten`
     static, dynamic = dict(vars(tree)), dict()
     for key in static[_FIELDS]:
         dynamic[key] = static.pop(key)
@@ -420,13 +367,12 @@ def _tree_flatten(tree: PyTree):
 
 
 def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
-    """Trace flatten rule to be used with the `tree_trace` module."""
+    # Trace flatten rule to be used with the `tree_trace` module
     leaves, (keys, _) = _tree_flatten(tree)
     names = (f"{key}" for key in keys)
     types = map(type, leaves)
     indices = range(len(leaves))
-    metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields(tree))  # type: ignore
-    return [*zip(names, types, indices, metadatas)]
+    return [*zip(names, types, indices)]
 
 
 def _register_treeclass(klass: type[T]) -> type[T]:
@@ -436,8 +382,6 @@ def _register_treeclass(klass: type[T]) -> type[T]:
         # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
         # second when a class is decorated with `treeclass` and has a parent class that is decorated with `treeclass`
         # in that case `__init_subclass__` registers the class before the decorator registers it.
-        # this can be also be done using metaclass that registers the class on initialization
-        # but we are trying to stay away from deep magic.
         # register the trace flatten rule
         register_pytree_node_trace(klass, _tree_trace)
         # register the flatten/unflatten rules with jax
@@ -448,25 +392,6 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
 def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
     # Non-decorated subclasses uses the base `treeclass` leaves only
-    # this behavior is aligned with `dataclasses` not registering non-decorated
-    # subclasses dataclass fields. for example:
-    # >>> @treeclass
-    # ... class A:
-    # ...   a:int=1
-    # >>> class B(A):
-    # ...    b:int=2
-    # >>> tree = B()
-    # >>> jax.tree_leaves(tree)
-    # [1]
-    # however if we decorate `B` with `treeclass` then the fields of `B` will be registered as leaves
-    # >>> @treeclass
-    # ... class B(A):
-    # ...    b:int=2
-    # >>> tree = B()
-    # >>> jax.tree_leaves(tree)
-    # [1, 2]
-    # this behavior is different from `flax.struct.dataclass`
-    # as it does not register non-decorated subclasses field that inherited from decorated subclasses.
     @classmethod  # type: ignore
     @ft.wraps(init_subclass_method)
     def wrapper(klass: type, *a, **k) -> None:
@@ -477,9 +402,6 @@ def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
 
 
 def _treeclass_transform(klass: type[T]) -> type[T]:
-    # the method is called after registering the class with `_register_treeclass`
-    # cached to prevent wrapping the same class multiple times
-
     for key, method in (("__setattr__", _setattr), ("__delattr__", _delattr)):
         # basic required methods
         if key in vars(klass):

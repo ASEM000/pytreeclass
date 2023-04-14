@@ -7,7 +7,7 @@ import math
 from collections import defaultdict
 from itertools import chain
 from types import FunctionType
-from typing import Any, Callable, Literal, Sequence
+from typing import Any, Callable, Literal
 
 import jax
 import numpy as np
@@ -353,12 +353,14 @@ def tree_str(
     return _node_pprint(tree, 0, "str", width, depth).expandtabs(tabwidth)
 
 
-def _resolve_names(names: Sequence[str], width: int) -> str:
+def _resolve_names(trace, width: int) -> str:
     # given a trace with a tuple of names, we resolve the names
     # to a single string
-    path, *paths = names
-    for name in paths:
-        path += "" if name.startswith("[") else "."
+    names, _, indices = trace
+    path = ""
+    for i, (name, index) in enumerate(zip(names, indices)):
+        name = f"[{index}]" if name is None else name
+        path += "" if name.startswith("[") else ("." if i > 0 else "")
         path += _node_pprint(name, 0, "str", width, float("inf"))
     return path
 
@@ -369,7 +371,7 @@ def _is_trace_leaf_depth_factory(depth: int):
     def is_trace_leaf(trace) -> bool:
         # trace is a tuple of (names, leaves, tracers, aux_data)
         # done like this to ensure 4-tuple unpacking
-        names, _, __, ___ = trace
+        names, _, __ = trace
         # stop tracing if depth is reached
         return False if depth is None else (depth <= len(names))
 
@@ -417,13 +419,15 @@ def tree_indent(
         is_leaf=is_leaf,
         is_trace_leaf=_is_trace_leaf_depth_factory(depth),
     ):
-        names, types = trace[0], trace[1]
+        names, types, indices = trace
 
-        for j, (name, type_) in enumerate(zip(names, types)):
-            if names[: j + 1] in seen:
-                continue  # skip printing the common parent node twice
-            seen.add(names[: j + 1])
+        for j, (name, type_, index) in enumerate(zip(names, types, indices)):
+            if (cur := (names[: j + 1], types[: j + 1], indices[: j + 1])) in seen:
+                # skip printing the common parent node twice
+                continue
+            seen.add(cur)
 
+            name = f"[{index}]" if name is None else name
             fmt += "\n" + "\t" * (j + 1)
             fmt += f"{_node_pprint(name,0,'str',width, depth )}"
             fmt += (
@@ -869,12 +873,12 @@ def tree_summary(
         count = _calculate_count(leaf)
         COUNT += count
 
-        if trace == ((), (), (), ()):
+        if trace == ((), (), ()):
             # avoid printing the leaf trace (which is the root of the tree)
             # twice, once as a leaf and once as the root at the end
             continue
 
-        paths = _resolve_names(names=trace[0], width=60)
+        paths = _resolve_names(trace, width=60)
         types = _node_type_pprint(leaf, indent=0, kind="str", width=60, depth=depth)
         counts = f"{count:,}"
         ROWS += [[paths, types, counts]]
