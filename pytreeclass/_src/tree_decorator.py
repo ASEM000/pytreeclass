@@ -372,8 +372,7 @@ def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
     names = (f"{key}" for key in keys)
     types = map(type, leaves)
     indices = range(len(leaves))
-    metadatas = (dict(repr=F.repr, id=id(getattr(tree, F.name))) for F in fields(tree))  # type: ignore
-    return [*zip(names, types, indices, metadatas)]
+    return [*zip(names, types, indices)]
 
 
 def _register_treeclass(klass: type[T]) -> type[T]:

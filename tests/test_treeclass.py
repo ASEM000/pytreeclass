@@ -593,8 +593,7 @@ def test_incorrect_trace_func():
     def trace_func(tree):
         names = ("a",)
         types = (type(tree.a),)
-        indices = (0,)
-        return [*zip(names, types, indices)]
+        return [*zip(names, types)]
 
     flatten_func = lambda tree: ((tree.a,), None)
     unflatten_func = lambda _, x: T(x)
@@ -625,7 +624,7 @@ def test_incorrect_trace_func():
 
     pytc.register_pytree_node_trace(T, trace_func)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError):
         # improper name entry
         pytc.tree_leaves_with_trace(T())
 
@@ -637,8 +636,7 @@ def test_incorrect_trace_func():
         names = ("a",)
         types = (1,)
         indices = (0,)
-        metadatas = (None,)
-        return [*zip(names, types, indices, metadatas)]
+        return [*zip(names, types, indices)]
 
     flatten_func = lambda tree: ((tree.a,), None)
     unflatten_func = lambda _, x: T(x)
@@ -659,8 +657,7 @@ def test_incorrect_trace_func():
         names = ("a",)
         types = (int,)
         indices = ("a",)
-        metadatas = (None,)
-        return [*zip(names, types, indices, metadatas)]
+        return [*zip(names, types, indices)]
 
     flatten_func = lambda tree: ((tree.a,), None)
     unflatten_func = lambda _, x: T(x)
@@ -700,8 +697,7 @@ def test_incorrect_trace_func():
         names = ("a",)
         types = (int,)
         indices = (0,)
-        metadatas = (None,)
-        return [*zip(names, types, indices, metadatas)]
+        return [*zip(names, types, indices)]
 
     flatten_func = lambda tree: ((tree.a,), None)
     unflatten_func = lambda _, x: T(x)

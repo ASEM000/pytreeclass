@@ -226,7 +226,7 @@ def _get_at_trace(
     where = tuple(where)
 
     def lhs_get(trace, leaf):
-        names, _, indices, __ = trace
+        names, _, indices = trace
         for i, item in enumerate(where):
             try:
                 if (isinstance(item, int) and indices[i] != item) or (
@@ -253,7 +253,7 @@ def _set_at_trace(
     where = tuple(where)
 
     def lhs_set(trace, leaf, set_value: Any):
-        names, _, indices, __ = trace
+        names, _, indices = trace
         for i, item in enumerate(where):
             try:
                 if (isinstance(item, int) and indices[i] != item) or (
@@ -284,7 +284,7 @@ def _apply_at_trace(
     where = tuple(where)
 
     def lhs_apply(trace, leaf):
-        names, _, indices, __ = trace
+        names, _, indices = trace
 
         for i, item in enumerate(where):
             try:
@@ -316,7 +316,7 @@ def _reduce_at_trace(
     where = tuple(where)
 
     def lhs_reduce(trace, leaf):
-        names, _, indices, __ = trace
+        names, _, indices = trace
 
         for i, item in enumerate(where):
             try:
