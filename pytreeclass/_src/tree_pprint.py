@@ -419,7 +419,7 @@ def tree_indent(
         is_leaf=is_leaf,
         is_trace_leaf=_is_trace_leaf_depth_factory(depth),
     ):
-        names, types, indices = trace[0], trace[1], trace[2]
+        names, types, indices = trace
 
         for j, (name, type_, index) in enumerate(zip(names, types, indices)):
             if (cur := (names[: j + 1], types[: j + 1], indices[: j + 1])) in seen:
