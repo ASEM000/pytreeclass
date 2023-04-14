@@ -102,11 +102,11 @@ def register_pytree_node_trace(
         >>> class UserList(list):
         ...     pass
         >>> def user_list_trace_func(tree:UserList):
-        ...     # (1) define name for each leaf
-        ...     names = (f"leaf{i}" for i in range(len(tree)))
+        ...     # (1) define name for each leaf if exists, `None` otherwise
+        ...     names = (None,) * len(tree)
         ...     # (2) define types for each leaf
         ...     types = (type(leaf) for leaf in tree)
-        ...     # (3) index for each leaf in the level
+        ...     # (3) index for each leaf in the level if exists, `None` otherwise
         ...     indices = range(len(tree))
         ...     # return a list of tuples (name, type, index)
         ...     return [*zip(names, types, indices)]
