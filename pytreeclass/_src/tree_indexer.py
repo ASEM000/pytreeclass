@@ -472,9 +472,8 @@ def tree_indexer(tree: PyTree) -> AtIndexer:
         >>> def test_trace_func(tree):
         ...     names = ("a", "b")
         ...     types = (type(tree.a), type(tree.b))
-        ...     indices = (0, 1)
-        ...     metadatas = (None, None)
-        ...     return [*zip(names, types, indices, metadatas)]
+        ...     indices = (None, None) # use None to indicate that the attribute is not indexable
+        ...     return [*zip(names, types, indices)]
 
         >>> pytc.register_pytree_node_trace(Tree, test_trace_func)
 
