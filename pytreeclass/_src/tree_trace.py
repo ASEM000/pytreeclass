@@ -133,7 +133,7 @@ def register_pytree_node_trace(
 
 
 def _sequence_trace_func(tree: Sequence) -> list[TraceType]:
-    names = (None for _ in range(len(tree)))
+    names = (None,) * len(tree)
     types = map(type, tree)
     indices = range(len(tree))
     return [*zip(names, types, indices)]
@@ -142,7 +142,7 @@ def _sequence_trace_func(tree: Sequence) -> list[TraceType]:
 def _dict_trace_func(tree: dict) -> list[TraceType]:
     names = (f"['{k}']" for k in tree)
     types = (type(tree[key]) for key in tree)
-    indices = (None for _ in tree)
+    indices = (None,) * len(tree)
     return [*zip(names, types, indices)]
 
 
@@ -267,7 +267,6 @@ def tree_map_with_trace(
         >>> tree = {"a": [1, 2], "b": 4, "c": [5, 6]}
         >>> # the tree above is visualized as:
         >>> # value tree:
-        >>> #        tree
         >>> #          |
         >>> #    ---------------
         >>> #    |      |      |
@@ -277,7 +276,6 @@ def tree_map_with_trace(
         >>> #  1    2       5     6
 
         >>> # named tree:
-        >>> #        `dict`
         >>> #          |
         >>> #    ---------------
         >>> #    |      |      |
@@ -288,7 +286,6 @@ def tree_map_with_trace(
         >>> #`[0]``[1]`   `[0]` `[1]`
 
         >>> # type tree:
-        >>> #        <dict>
         >>> #          |
         >>> #    ---------------
         >>> #    |      |      |
@@ -299,7 +296,6 @@ def tree_map_with_trace(
         >>> # <int><int>   <int><int>
 
         >>> # index tree:
-        >>> #          0
         >>> #          |
         >>> #    ---------------
         >>> #    |      |      |
@@ -308,7 +304,6 @@ def tree_map_with_trace(
         >>> #  ------       -------
         >>> #  |    |       |     |
         >>> #  0    1       0     1
-
 
         >>> def map_func(trace, leaf):
         ...    names, _, __ = trace

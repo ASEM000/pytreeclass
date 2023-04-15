@@ -442,7 +442,7 @@ print(counter.calls) # 10
 
 <details><summary>[Advanced] Register custom user-defined classes to work with visualization and indexing tools. </summary>
 
-Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, index, and metadatas of certain leaf along its path.
+Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, and index of certain leaf along its path.
 
 Here is an example of registering
 
@@ -467,11 +467,10 @@ def tree_unflatten(_, children):
 
 # PyTreeClass flatten rule
 def pytc_tree_flatten(tree):
-    names = ("a", "b")
+    names = ("a", "b") # or (`None`, `None`) if name is not defined
     types = (type(tree.a), type(tree.b))
-    indices = (0,1)
-    metadatas = (None, None)
-    return [*zip(names, types, indices, metadatas)]
+    indices = (0,1)  # or (`None`, `None`) if index is not defined
+    return [*zip(names, types, indices)]
 
 
 # Register with `jax`
