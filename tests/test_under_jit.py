@@ -12,8 +12,8 @@ import pytreeclass as pytc
 def test_jit_freeze():
     @ft.partial(pytc.treeclass, leafwise=True)
     class Linear:
-        weight: jnp.ndarray
-        bias: jnp.ndarray
+        weight: jax.Array
+        bias: jax.Array
         name: str
 
         def __init__(self, key, in_dim, out_dim):
@@ -109,16 +109,16 @@ def test_jit_freeze():
 def test_ops_with_jit():
     @ft.partial(pytc.treeclass, leafwise=True)
     class T0:
-        a: int = 1
-        b: int = 2
-        c: int = 3
+        a: jax.Array = jnp.array(1)
+        b: jax.Array = jnp.array(2)
+        c: jax.Array = jnp.array(3)
 
     @ft.partial(pytc.treeclass, leafwise=True)
     class T1:
-        a: int = 1
-        b: int = 2
-        c: int = 3
-        d: jnp.ndarray = pytc.field(factory=lambda: jnp.array([1, 2, 3]))
+        a: jax.Array = jnp.array(1)
+        b: jax.Array = jnp.array(2)
+        c: jax.Array = jnp.array(3)
+        d: jax.Array = jnp.array([1, 2, 3])
 
     @jax.jit
     def getter(tree):
@@ -133,16 +133,18 @@ def test_ops_with_jit():
         return tree.at[...].apply(lambda _: 0)
 
     with pytest.raises(jax.errors.ConcretizationTypeError):
-        getter(T0())
+        pytc.is_tree_equal(getter(T0()), T0())
 
     assert pytc.is_tree_equal(T0(0, 0, 0), setter(T0()))
 
     assert pytc.is_tree_equal(T0(0, 0, 0), applier(T0()))
 
     with pytest.raises(jax.errors.ConcretizationTypeError):
-        getter(T1())
+        pytc.is_tree_equal(getter(T1()), T1())
 
-    assert pytc.is_tree_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), setter(T1()))
+    assert pytc.is_tree_equal(
+        T1(jnp.array(0), jnp.array(0), jnp.array(0), jnp.array([0, 0, 0])), setter(T1())
+    )
 
     assert pytc.is_tree_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1()))
 
