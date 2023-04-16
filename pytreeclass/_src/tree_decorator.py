@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools as ft
 import sys
+from collections.abc import MutableMapping, MutableSequence
 from contextlib import suppress
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence, TypeVar
@@ -26,15 +27,13 @@ class NOT_SET:
     __repr__ = lambda _: "?"
 
 
-_NOT_SET = NOT_SET()
-_MUTABLE_TYPES = (list, dict, set)
-_ANNOTATIONS = "__annotations__"
-_POST_INIT = "__post_init__"
-_FIELDS = "__fields__"
-T = TypeVar("T")
-
-
 PyTree = Any
+T = TypeVar("T")
+_NOT_SET = NOT_SET()
+_FIELDS = "__fields__"
+_POST_INIT = "__post_init__"
+_MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
+
 
 """Define a class decorator that is compatible with JAX's transformation."""
 
@@ -195,10 +194,10 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         field_map.update(_generate_field_map(base))
 
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
-    if _ANNOTATIONS not in vars(klass):
+    if "__annotations__" not in vars(klass):
         return field_map
 
-    for name in (annotation_map := vars(klass)[_ANNOTATIONS]):
+    for name in (annotation_map := vars(klass)["__annotations__"]):
         value = vars(klass).get(name, _NOT_SET)
         type = annotation_map[name]
 
