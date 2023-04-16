@@ -584,9 +584,17 @@ def test_method_call():
         def increment(self):
             self.a += 1
 
+        def show(self):
+            return 1
+
     t = Tree()
 
+    @pytc.treeclass
+    class Tree2:
+        b: Tree = Tree()
+
     assert pytc.is_tree_equal(t.at["increment"]()[1], Tree(2))
+    assert pytc.is_tree_equal(Tree2().at["b"].at["show"]()[0], 1)
 
     with pytest.raises(AttributeError):
         t.at["bla"]()
