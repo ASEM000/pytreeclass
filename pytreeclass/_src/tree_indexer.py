@@ -9,7 +9,7 @@ import operator as op
 from collections.abc import Callable
 from contextlib import contextmanager
 from math import ceil, floor, trunc
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, NamedTuple, Sequence, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -18,9 +18,11 @@ import numpy as np
 
 from pytreeclass._src.tree_trace import tree_map_with_trace
 
-PyTree = Any
+EllipsisType = type(Ellipsis)
+TraceType = Any
 _no_initializer = object()
 _non_partial = object()
+PyTree = TypeVar("PyTree")
 T = TypeVar("T")
 
 # allow methods in mutable context to be called without raising an error
@@ -50,39 +52,22 @@ def _mutable_context(tree: PyTree, *, kopy: bool = False):
     _mutable_instance_registry.discard(id(tree))
 
 
-def _is_leaf_bool(node: Any) -> bool:
-    if hasattr(node, "dtype"):
-        return node.dtype == "bool"
-    return isinstance(node, bool)
-
-
-def _check_valid_mask_leaf(where: Any):
-    if not _is_leaf_bool(where) and where is not None:
-        raise TypeError(f"All tree leaves must be boolean.Found {(where)}")
-    return where
-
-
-def _true_tree(tree: PyTree, is_leaf) -> PyTree:
-    return jtu.tree_map(lambda _: True, tree, is_leaf=is_leaf)
-
-
 # tree indexing by boolean PyTree
 
 
 def _get_at_mask(
     tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool] | None
 ) -> PyTree:
-    def lhs_get(lhs: Any, where: Any):
+    def leaf_get(leaf: Any, where: Any):
         # check if where is a boolean leaf inside the `tree_map`
         # to avoid extrachecks in `tree_map`
-        where = _check_valid_mask_leaf(where)
-        if isinstance(lhs, (jax.Array, np.ndarray)):
+        if isinstance(leaf, (jax.Array, np.ndarray)):
             # return empty array instead of None if condition is not met
             # not `jittable` as size of array changes
-            return lhs[jnp.where(where)]
-        return lhs if where else None
+            return leaf[jnp.where(where)]
+        return leaf if where else None
 
-    return jtu.tree_map(lhs_get, tree, where, is_leaf=is_leaf)
+    return jtu.tree_map(leaf_get, tree, where, is_leaf=is_leaf)
 
 
 def _set_at_mask(
@@ -91,19 +76,18 @@ def _set_at_mask(
     set_value: Any,
     is_leaf: Callable[[Any], bool] | None,
 ) -> PyTree:
-    def lhs_set(lhs: Any, where: Any, set_value: Any):
+    def leaf_set(leaf: Any, where: Any, set_value: Any):
         # check if where is a boolean leaf inside the `tree_map`
         # to avoid extrachecks in `tree_map`
-        where = _check_valid_mask_leaf(where)
-        if isinstance(lhs, (jax.Array, np.ndarray)):
+        if isinstance(leaf, (jax.Array, np.ndarray)):
             if jnp.isscalar(set_value):
-                # apply scalar set_value to lhs array if condition is met
-                return jnp.where(where, set_value, lhs)
+                # apply scalar set_value to leaf array if condition is met
+                return jnp.where(where, set_value, leaf)
             # set_value is not scalar
-            return set_value if jnp.all(where) else lhs
-        # lhs is not an array and set_value, so we apply the set_value to the
-        # lhs if the condition is met
-        return set_value if (where is True) else lhs
+            return set_value if jnp.all(where) else leaf
+        # leaf is not an array and set_value, so we apply the set_value to the
+        # leaf if the condition is met
+        return set_value if (where is True) else leaf
 
     if isinstance(set_value, type(tree)) and (
         jtu.tree_structure(tree, is_leaf=is_leaf)
@@ -114,12 +98,12 @@ def _set_at_mask(
         # if tree2 is a pytree of same structure as tree
         # instead of making each leaf of tree a copy of tree2
         # is design is similar to `numpy` design `Array.at[...].set(Array)`
-        return jtu.tree_map(lhs_set, tree, where, set_value, is_leaf=is_leaf)
+        return jtu.tree_map(leaf_set, tree, where, set_value, is_leaf=is_leaf)
 
     # set_value is broadcasted to tree leaves
     # for example tree.at[where].set(1) will set all tree leaves to 1
-    partial_lhs_set = lambda lhs, where: lhs_set(lhs, where, set_value)
-    return jtu.tree_map(partial_lhs_set, tree, where, is_leaf=is_leaf)
+    partial_leaf_set = lambda leaf, where: leaf_set(leaf, where, set_value)
+    return jtu.tree_map(partial_leaf_set, tree, where, is_leaf=is_leaf)
 
 
 def _apply_at_mask(
@@ -128,21 +112,21 @@ def _apply_at_mask(
     func: Callable[[Any], Any],
     is_leaf: Callable[[Any], bool] | None,
 ) -> PyTree:
-    def lhs_apply(lhs: Any, where: bool):
+    def leaf_apply(leaf: Any, where: bool):
         # check if where is a boolean leaf inside the `tree_map`
         # to avoid extrachecks in `tree_map`
-        where, value = _check_valid_mask_leaf(where), func(lhs)
-        if isinstance(lhs, (jax.Array, np.ndarray)):
+        value = func(leaf)
+        if isinstance(leaf, (jax.Array, np.ndarray)):
             try:
-                # lhs is an array with scalar output
-                return jnp.where(where, value, lhs)
+                # leaf is an array with scalar output
+                return jnp.where(where, value, leaf)
             except TypeError:
                 # set_value is not `scalar` type
-                return value if jnp.all(where) else lhs
-        # lhs is not an array and value is not scalar
-        return value if (where is True) else lhs
+                return value if jnp.all(where) else leaf
+        # leaf is not an array and value is not scalar
+        return value if (where is True) else leaf
 
-    return jtu.tree_map(lhs_apply, tree, where, is_leaf=is_leaf)
+    return jtu.tree_map(leaf_apply, tree, where, is_leaf=is_leaf)
 
 
 def _reduce_at_mask(
@@ -152,282 +136,78 @@ def _reduce_at_mask(
     initializer: Any = _no_initializer,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> Any:
-    # note: current `jax`` implementation of `tree_reduce`
-    # does not support `is_leaf` argument, but it is supported here
     tree = tree.at[where].get(is_leaf=is_leaf)
     if initializer is _no_initializer:
         return jtu.tree_reduce(func, tree)
     return jtu.tree_reduce(func, tree, initializer)
 
 
-class TreeAtMask(NamedTuple):
-    tree: PyTree
-    where: PyTree
-
-    def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
-        where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
-        return _get_at_mask(self.tree, where, is_leaf)
-
-    def set(
-        self, set_value: Any, *, is_leaf: Callable[[Any], bool] | None = None
-    ) -> PyTree:
-        where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
-        return _set_at_mask(self.tree, where, set_value, is_leaf)
-
-    def apply(
-        self,
-        func: Callable[[Any], Any],
-        *,
-        is_leaf: Callable[[Any], bool] | None = None,
+def _merge_where(
+    tree: PyTree,
+    where: tuple[int | str | PyTree | EllipsisType, ...],
+    is_leaf: Callable[[Any], bool] | None = None,
+):
+    def merge_non_boolean_where(
+        where: tuple[int | str | EllipsisType, ...],
+        trace: Sequence[TraceType],
+        leaf: Any,
     ):
-        where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
-        return _apply_at_mask(self.tree, where, func, is_leaf)
-
-    def reduce(
-        self,
-        func: Callable[[Any, Any], Any],
-        initializer: Callable[[Any, Any], Any] | Any = _no_initializer,
-        *,
-        is_leaf: Callable[[Any], bool] | None = None,
-    ) -> Any:
-        where = _true_tree(self.tree, is_leaf) if self.where is ... else self.where
-        return _reduce_at_mask(self.tree, where, func, initializer, is_leaf)
-
-    def __getitem__(self, rhs_where: str | int | PyTree) -> TreeAtMask:
-        if isinstance(rhs_where, (str, int)):
-            # promote `rhs` path to boolean mask
-            mask = self.tree != self.tree
-            mask = mask.at[rhs_where].set(True)
-            rhs_where = mask
-
-        rhs_where = self.where & rhs_where
-        return TreeAtMask(tree=self.tree, where=rhs_where)
-
-    def __getattr__(self, name: str) -> TreeAtMask:
-        # support for nested `.at`
-        if name == "at":
-            # pass the current where condition to the next level
-            return TreeAtMask(tree=self.tree, where=self.where)
-
-        msg = f"{name} is not a valid attribute of {self}\n"
-        msg += f"Did you mean to use .at[{name!r}]?"
-        raise AttributeError(msg)
-
-
-# tree indexing by name or index  path
-
-
-def _get_at_trace(
-    tree: PyTree,
-    where: tuple[int | str, ...],
-    is_leaf: Callable[[Any], bool] | None = None,
-) -> PyTree:
-    # canonicalize `where` to `tuple` to conform to leaf trace type
-    where = tuple(where)
-
-    def lhs_get(trace, leaf):
         names, _, indices = trace
+        is_array = isinstance(leaf, (jax.Array, np.ndarray))
+
+        if len(where) > len(indices):
+            return jnp.zeros_like(leaf, dtype=bool) if is_array else False
         for i, item in enumerate(where):
-            try:
-                if (isinstance(item, int) and indices[i] != item) or (
-                    isinstance(item, str) and names[i] != item
-                ):
-                    return None
-            except IndexError:
-                msg = f"Out of bounds path={where} for leaf={leaf}."
-                msg += f" Path length={len(where)} is longer than "
-                msg += f"leaf path levels={len(indices)-1}."
-                raise IndexError(msg)
-        return leaf
+            if item is ... or indices[i] == item or names[i] == item:
+                # no mismatch in where and trace
+                continue
+            return jnp.zeros_like(leaf, dtype=bool) if is_array else False
+        return jnp.ones_like(leaf, dtype=bool) if is_array else True
 
-    return tree_map_with_trace(lhs_get, tree, is_leaf=is_leaf)
+    def merge_boolean_where(*leaves):
+        def is_leaf_bool(leaf: Any) -> bool:
+            if hasattr(leaf, "dtype"):
+                return leaf.dtype == "bool"
+            return isinstance(leaf, bool)
 
-
-def _set_at_trace(
-    tree: PyTree,
-    where: tuple[int | str, ...],
-    set_value: Any,
-    is_leaf: Callable[[Any], bool] | None = None,
-) -> PyTree:
-    # canonicalize `where` to `tuple` to conform to leaf trace type
-    where = tuple(where)
-
-    def lhs_set(trace, leaf, set_value: Any):
-        names, _, indices = trace
-        for i, item in enumerate(where):
-            try:
-                if (isinstance(item, int) and indices[i] != item) or (
-                    isinstance(item, str) and names[i] != item
-                ):
-                    return leaf
-            except IndexError:
-                msg = f"Out of bounds path={where} for leaf={leaf}."
-                msg += f" Path length={len(where)} is longer than "
-                msg += f"leaf path levels={len(indices)-1}."
-                raise IndexError(msg)
-        # consider the same structure PyTree case tree.at[...].set(tree)
-        return set_value
-
-    # set_value is broadcasted to tree leaves
-    # for example tree.at[where].set(1) will set all tree leaves to 1
-    partial_lhs_set = lambda trace, lhs: lhs_set(trace, lhs, set_value)
-    return tree_map_with_trace(partial_lhs_set, tree, is_leaf=is_leaf)
-
-
-def _apply_at_trace(
-    tree: PyTree,
-    where: tuple[int | str, ...],
-    func: Callable,
-    is_leaf: Callable[[Any], bool] | None = None,
-) -> PyTree:
-    # canonicalize `where` to `tuple` to conform to leaf trace type
-    where = tuple(where)
-
-    def lhs_apply(trace, leaf):
-        names, _, indices = trace
-
-        for i, item in enumerate(where):
-            try:
-                if (isinstance(item, int) and indices[i] != item) or (
-                    isinstance(item, str) and names[i] != item
-                ):
-                    return leaf
-            except IndexError:
-                msg = f"Out of bounds path={where} for leaf={leaf}."
-                msg += f" Path length={len(where)} is longer than "
-                msg += f"leaf path levels={len(indices)-1}."
-                raise IndexError(msg)
-        return func(leaf)
-
-    return tree_map_with_trace(lhs_apply, tree, is_leaf=is_leaf)
-
-
-def _reduce_at_trace(
-    tree: PyTree,
-    where: tuple[str | int, ...],
-    func: Callable[[Any, Any], Any],
-    initializer: Any = _no_initializer,
-    is_leaf: Callable[[Any], bool] | None = None,
-) -> PyTree:
-    # note: current `jax`` implementation of tree_reduce does
-    # not support `is_leaf` argument using `tree_map_with_trace` with `is_leaf` argument
-    # achieves the same result
-    # canonicalize `where` to `tuple` to conform to leaf trace type
-    where = tuple(where)
-
-    def lhs_reduce(trace, leaf):
-        names, _, indices = trace
-
-        for i, item in enumerate(where):
-            try:
-                if (isinstance(item, int) and indices[i] != item) or (
-                    isinstance(item, str) and names[i] != item
-                ):
-                    return None
-            except IndexError:
-                msg = f"Out of bounds path={where} for leaf={leaf}."
-                msg += f" Path length={len(where)} is more than "
-                msg += f"leaf path levels={len(indices)-1}."
-                raise IndexError(msg)
-        return leaf
-
-    tree = tree_map_with_trace(lhs_reduce, tree, is_leaf=is_leaf)
-    if initializer is _no_initializer:
-        return jtu.tree_reduce(func, tree)
-    return jtu.tree_reduce(func, tree, initializer=initializer)
-
-
-class TreeAtTrace(NamedTuple):
-    tree: PyTree
-    where: tuple[int | str]
-
-    def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
-        return _get_at_trace(self.tree, self.where, is_leaf)
-
-    def set(
-        self,
-        set_value: Any,
-        *,
-        is_leaf: Callable[[Any], bool] | None = None,
-    ) -> PyTree:
-        return _set_at_trace(self.tree, self.where, set_value, is_leaf)
-
-    def apply(
-        self,
-        func: Callable[[Any], Any],
-        *,
-        is_leaf: Callable[[Any], bool] | None = None,
-    ) -> PyTree:
-        return _apply_at_trace(self.tree, self.where, func, is_leaf)
-
-    def reduce(
-        self,
-        func: Callable[[Any, Any], Any],
-        *,
-        initializer: Any = _no_initializer,
-        is_leaf: Callable[[Any], bool] | None = None,
-    ) -> Any:
-        return _reduce_at_trace(self.tree, self.where, func, initializer, is_leaf)
-
-    def __call__(self, *a, **k) -> tuple[Any, PyTree]:
-        # return the output of the method called on the attribute
-        # along with the new tree
-        # this method first creates a copy of the tree,
-        # next it unfreezes the tree then calls the method on the attribute
-        # and finally freezes the tree again
-        with _mutable_context(self.tree, kopy=True) as tree:
-            # check if the attribute is a string
-            (method_name,) = self.where
-            if not isinstance(method_name, str):
-                msg = "Expected method name to be a string, "
-                msg += f"Found method_name=`{method_name}` "
-                msg += f"of type={type(method_name).__name__}."
+        verdict = True
+        for leaf in leaves:
+            if not is_leaf_bool(leaf):
+                msg = f"Expected boolean leaf, found {type(leaf).__name__}."
                 raise TypeError(msg)
+            verdict &= leaf
+        return verdict
 
-            method = getattr(tree, method_name)
-            value = method(*a, **k)
-        return value, tree
+    mask = None
 
-    def __getitem__(self, rhs_where: tuple[str | int] | PyTree):
-        if isinstance(rhs_where, type(self.tree)):
-            # promote `lhs` name path to boolean mask
-            # and pass to `TreeAtMask`
-            lhs_mask = self.tree != self.tree
-            (lhs_where,) = self.where
-            lhs_mask = lhs_mask.at[lhs_where].set(True)
-            return TreeAtMask(tree=self.tree, where=lhs_mask & rhs_where)
+    if non_boolean_where := [i for i in where if isinstance(i, (int, str, type(...)))]:
+        func = ft.partial(merge_non_boolean_where, non_boolean_where)
+        mask = tree_map_with_trace(func, tree, is_leaf=is_leaf)
 
-        # case for name/index path rhs
-        rhs_where = (*self.where, rhs_where)
-        return TreeAtTrace(tree=self.tree, where=rhs_where)
+    if boolean_where := [i for i in where if isinstance(i, type(tree))]:
+        args = (mask, *boolean_where) if mask else boolean_where
+        mask = jtu.tree_map(merge_boolean_where, *args)
 
-    def __getattr__(self, name: str) -> TreeAtTrace:
-        # support nested `.at``
-        # for example `.at[A].at[B]` represents model.A.B
-        if name == "at":
-            # pass the current tree and the current path to the next `.at`
-            return TreeAtTrace(tree=self.tree, where=self.where)
+    return mask
 
-        msg = f"{name} is not a valid attribute of {self}\n"
-        msg += f"Did you mean to use .at[{name!r}]?"
-        raise AttributeError(msg)
+
+def _recursive_getattr(tree: Any, where: tuple[str, ...]):
+    def step(tree: Any, where: tuple[str, ...]):
+        if len(where) == 1:
+            return getattr(tree, where[0])
+        return step(getattr(tree, where[0]), where[1:])
+
+    return step(tree, where)
 
 
 class AtIndexer(NamedTuple):
+    # base class for indexing with `.at`
     tree: PyTree
+    where: tuple[str | int] | PyTree
 
-    def __getitem__(self, where: Any) -> TreeAtTrace | TreeAtMask:
-        if isinstance(where, (str, int)):
-            # indexing by name or index
-            # name and index rules are defined using
-            # `register_pytree_node_trace_func`
-            return TreeAtTrace(tree=self.tree, where=(where,))
-
-        if isinstance(where, (type(self.tree), type(...))):
-            # indexing by boolean pytree
-            # Ellipsis as an alias for all elements
-            # model.at[model == model ] <--> model.at[...]
-            return TreeAtMask(tree=self.tree, where=where)
+    def __getitem__(self, where: str | int | PyTree | EllipsisType) -> AtIndexer:
+        if isinstance(where, (type(self.tree), str, int, EllipsisType)):
+            return AtIndexer(self.tree, (*self.where, where))
 
         raise NotImplementedError(
             f"Indexing with {type(where).__name__} is not implemented.\n"
@@ -443,6 +223,54 @@ class AtIndexer(NamedTuple):
             ">>> # indexing by attribute index\n"
             ">>> tree.at[`attribute_index`].get()"
         )
+
+    def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
+        where = _merge_where(self.tree, self.where, is_leaf)
+        return _get_at_mask(self.tree, where, is_leaf)
+
+    def set(
+        self,
+        set_value: Any,
+        *,
+        is_leaf: Callable[[Any], bool] | None = None,
+    ) -> PyTree:
+        where = _merge_where(self.tree, self.where, is_leaf)
+        return _set_at_mask(self.tree, where, set_value, is_leaf)
+
+    def apply(
+        self,
+        func: Callable[[Any], Any],
+        *,
+        is_leaf: Callable[[Any], bool] | None = None,
+    ) -> PyTree:
+        where = _merge_where(self.tree, self.where, is_leaf)
+        return _apply_at_mask(self.tree, where, func, is_leaf)
+
+    def reduce(
+        self,
+        func: Callable[[Any, Any], Any],
+        *,
+        initializer: Any = _no_initializer,
+        is_leaf: Callable[[Any], bool] | None = None,
+    ) -> Any:
+        where = _merge_where(self.tree, self.where, is_leaf)
+        return _reduce_at_mask(self.tree, where, func, initializer, is_leaf)
+
+    def __getattr__(self, name: str) -> AtIndexer:
+        # support nested `.at``
+        # for example `.at[A].at[B]` represents model.A.B
+        if name == "at":
+            # pass the current tree and the current path to the next `.at`
+            return AtIndexer(tree=self.tree, where=self.where)
+
+        msg = f"{name} is not a valid attribute of {self}\n"
+        msg += f"Did you mean to use .at[{name!r}]?"
+        raise AttributeError(msg)
+
+    def __call__(self, *a, **k) -> tuple[Any, PyTree]:
+        with _mutable_context(self.tree, kopy=True) as tree:
+            value = _recursive_getattr(tree, self.where)(*a, **k)
+        return value, tree
 
 
 def tree_indexer(tree: PyTree) -> AtIndexer:
@@ -480,7 +308,7 @@ def tree_indexer(tree: PyTree) -> AtIndexer:
         >>> Tree(1, 2).at["a"].get()
         Tree(a=1, b=None)
     """
-    return AtIndexer(tree=tree)
+    return AtIndexer(tree=tree, where=())
 
 
 class BroadcastablePartial(ft.partial):
@@ -493,7 +321,9 @@ class BroadcastablePartial(ft.partial):
 
 
 def bcmap(
-    func: Callable[..., Any], *, is_leaf: Callable[[Any], bool] | None = None
+    func: Callable[..., Any],
+    *,
+    is_leaf: Callable[[Any], bool] | None = None,
 ) -> Callable:
     """(map)s a function over pytrees leaves with automatic (b)road(c)asting for scalar arguments
 
@@ -603,17 +433,17 @@ def _unary_op(func):
 
 
 def _binary_op(func):
-    def wrapper(lhs, rhs=None):
-        if isinstance(rhs, type(lhs)):
-            return jtu.tree_map(func, lhs, rhs)
-        return jtu.tree_map(lambda x: func(x, rhs), lhs)
+    def wrapper(leaf, rhs=None):
+        if isinstance(rhs, type(leaf)):
+            return jtu.tree_map(func, leaf, rhs)
+        return jtu.tree_map(lambda x: func(x, rhs), leaf)
 
     return ft.wraps(func)(wrapper)
 
 
 def _swop(func):
     # swaping the arguments of a two-arg function
-    return ft.wraps(func)(lambda lhs, rhs: func(rhs, lhs))
+    return ft.wraps(func)(lambda leaf, rhs: func(rhs, leaf))
 
 
 def _leafwise_transform(klass: type[T]) -> type[T]:
@@ -671,16 +501,16 @@ def _leafwise_transform(klass: type[T]) -> type[T]:
     return klass
 
 
-def _is_lhs_rhs_equal(lhs, rhs) -> bool | jax.Array:
-    if hasattr(lhs, "shape") and hasattr(lhs, "dtype"):
+def _is_leaf_rhs_equal(leaf, rhs) -> bool | jax.Array:
+    if hasattr(leaf, "shape") and hasattr(leaf, "dtype"):
         if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
-            verdict = jnp.array_equal(lhs, rhs)
+            verdict = jnp.array_equal(leaf, rhs)
             try:
                 return bool(verdict)
             except Exception:
                 return verdict  # fail under `jit`
         return False
-    return lhs == rhs
+    return leaf == rhs
 
 
 def is_tree_equal(*trees: Any) -> bool | jax.Array:
@@ -703,7 +533,7 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
         leaves, treedef = jtu.tree_flatten(tree)
         if (treedef != treedef0) or verdict is False:
             return False
-        verdict = ft.reduce(op.and_, map(_is_lhs_rhs_equal, leaves0, leaves), verdict)
+        verdict = ft.reduce(op.and_, map(_is_leaf_rhs_equal, leaves0, leaves), verdict)
     return verdict
 
 

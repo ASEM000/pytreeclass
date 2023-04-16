@@ -758,3 +758,11 @@ def test_field_repr():
         # trunk-ignore(flake8/E501)
         == "Field(\n  name=None, \n  type=None, \n  default=?, \n  factory=None, \n  init=True, \n  repr=True, \n  kw_only=False, \n  pos_only=False, \n  metadata=None, \n  callbacks=(), \n  alias=None\n)"
     )
+
+
+def test_field_factory():
+    @pytc.treeclass
+    class Tree:
+        a: int = pytc.field(factory=lambda: 1)
+
+    assert Tree().a == 1
