@@ -18,12 +18,13 @@ import numpy as np
 
 from pytreeclass._src.tree_trace import tree_map_with_trace
 
+T = TypeVar("T")
+PyTree = TypeVar("PyTree")
 EllipsisType = type(Ellipsis)
 TraceType = Any
+
 _no_initializer = object()
 _non_partial = object()
-PyTree = TypeVar("PyTree")
-T = TypeVar("T")
 
 # allow methods in mutable context to be called without raising an error
 # this is done by registering the instance id in a set before entering the

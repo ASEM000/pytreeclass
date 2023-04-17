@@ -7,7 +7,7 @@ from contextlib import suppress
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence, TypeVar
 
-import jax.tree_util as jtu
+from jax.tree_util import register_pytree_node
 from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_freeze import tree_hash
@@ -27,10 +27,11 @@ class NOT_SET:
     __repr__ = lambda _: "?"
 
 
-PyTree = Any
 T = TypeVar("T")
+PyTree = Any
+
 _NOT_SET = NOT_SET()
-_FIELDS = "__fields__"
+_FIELDS = "_fields"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 
@@ -177,8 +178,6 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         return field_map
 
     for base in reversed(klass.__mro__[1:]):
-        # get the fields of the base class in the MRO in reverse order to ensure
-        # the correct order of the fields are preserved
         field_map.update(_generate_field_map(base))
 
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
@@ -192,8 +191,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         if name == "self":
             # while `dataclasses` allows `self` as a field name, its confusing
             # and not recommended. so raise an error
-            msg = "Field name cannot be `self`."
-            raise ValueError(msg)
+            raise ValueError("Field name cannot be `self`.")
 
         if isinstance(value, Field):
             # case: `x: Any = field(default=1)`
@@ -232,59 +230,42 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
 
-        mark0 = f"field_map['{name}'].default"
-        mark1 = f"field_map['{name}'].factory()"
-        mark2 = f"self.{name}"
-
         if field.kw_only and "*" not in head and field.init:
             head += "*, "
 
         if field.default is not _NOT_SET:
-            # in head: def f(.. x= default_value)
-            head += f"{alias}={mark0}, " if field.init else ""
-            # in body:  self.x = default_value
-            body += f"\t\t{mark2}=" + (f"{alias}\n " if field.init else f"{mark0}\n")
+            vref = f"field_map['{name}'].default"
+            head += f"{alias}={vref}, " if field.init else ""
+            body += f"\t\tself.{name}=" + (f"{alias}\n " if field.init else f"{vref}\n")
         elif field.factory is not None:
-            head += f"{alias}={mark1}, " if field.init else ""
-            body += f"\t\t{mark2}=" + (f"{alias}\n" if field.init else f"{mark1}\n")
+            vref = f"field_map['{name}'].factory()"
+            head += f"{alias}={vref}, " if field.init else ""
+            body += f"\t\tself.{name}=" + (f"{alias}\n" if field.init else f"{vref}\n")
         else:
-            # no defaults are added
             head += f"{alias}, " if field.init else ""
-            body += f"\t\t{mark2}={alias}\n " if field.init else ""
+            body += f"\t\tself.{name}={alias}\n " if field.init else ""
 
         if field.pos_only and field.init:
-            if "/" in head:
-                head = head.replace("/,", "")
+            head = head.replace("/,", "") + "/, "
 
-            head += "/, "
-
-    # add pass to avoid syntax error if all fields are ignored
-    body += "\t\tpass"
+    body += "\t\tpass"  # add pass to avoid syntax error if all fields are ignored
     body = "\tdef __init__(self, " + head[:-2] + "):\n" + body
     body = f"def closure(field_map):\n{body}\n\treturn __init__"
     return body.expandtabs(4)
 
 
-def _generate_init(klass: type) -> FunctionType:
+def _generate_init_method(klass: type) -> FunctionType:
     field_map = _generate_field_map(klass)
-    local_namespace = dict()  # type: ignore
-    global_namespace = vars(sys.modules[klass.__module__])
     init_code = _generate_init_code(tuple(field_map.values()))
-    exec(init_code, global_namespace, local_namespace)
+    exec(init_code, vars(sys.modules[klass.__module__]), local_namespace := dict())
     method = local_namespace["closure"](field_map)
-
-    return FunctionType(
-        code=method.__code__,
-        globals=global_namespace,
-        name=method.__name__,
-        argdefs=method.__defaults__,
-        closure=method.__closure__,
-    )
+    method.__qualname__ = f"{klass.__qualname__}.__init__"
+    return method
 
 
 @_conditional_mutable_method
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
-    if key in (field_map := vars(tree)[_FIELDS]):
+    if key in (field_map := vars(tree).get(_FIELDS, ())):
         for callback in field_map[key].callbacks:
             try:
                 # callback is a function that takes the value of the field
@@ -317,8 +298,7 @@ def _init_wrapper(init_func: Callable) -> Callable:
     @ft.wraps(init_func)
     def wrapper(tree, *a, **k) -> None:
         with _mutable_context(tree):
-            kvs = dict(_generate_field_map(type(tree)))
-            vars(tree)[_FIELDS] = MappingProxyType(kvs)
+            setattr(tree, _FIELDS, MappingProxyType((_generate_field_map(type(tree)))))
             output = init_func(tree, *a, **k)
 
             if post_init_func := getattr(type(tree), _POST_INIT, None):
@@ -327,9 +307,8 @@ def _init_wrapper(init_func: Callable) -> Callable:
                 post_init_func(tree)
 
         # handle non-initialized fields
-        if len(keys := set(kvs) - set(vars(tree))) > 0:
-            msg = f"Uninitialized fields: ({', '.join(keys)}) "
-            msg += f"in class `{type(tree).__name__}`"
+        if len(keys := set(vars(tree)[_FIELDS]) - set(vars(tree))) > 0:
+            msg = f"Uninitialized fields: ({', '.join(keys)}) in class `{type(tree).__name__}`"
             raise AttributeError(msg)
         return output
 
@@ -337,16 +316,15 @@ def _init_wrapper(init_func: Callable) -> Callable:
 
 
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
+    # unflatten rule for `treeclass` to use with `jax.tree_unflatten`
     tree = object.__new__(klass)
-    # update through vars, to avoid calling the `setattr` method
-    # that will check for callbacks.
     vars(tree).update(treedef[1])
     vars(tree).update(zip(treedef[0], leaves))
     return tree
 
 
 def _tree_flatten(tree: PyTree):
-    # Flatten rule for `treeclass` to use with `jax.tree_flatten`
+    # flatten rule for `treeclass` to use with `jax.tree_flatten`
     static, dynamic = dict(vars(tree)), dict()
     for key in static.get(_FIELDS, ()):
         dynamic[key] = static.pop(key)
@@ -365,14 +343,9 @@ def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
 def _register_treeclass(klass: type[T]) -> type[T]:
     with suppress(ValueError):
         # `ValueError` is raised for duplicate registration.
-        # there are two cases where a class is registered more than once:
-        # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
-        # second when a class is decorated with `treeclass` and has a parent class that is decorated with `treeclass`
-        # in that case `__init_subclass__` registers the class before the decorator registers it.
-        # register the trace flatten rule
         register_pytree_node_trace(klass, _tree_trace)
         # register the flatten/unflatten rules with jax
-        jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
+        register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
 
     return klass
 
@@ -395,13 +368,14 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
             if vars(klass)[key] is method:
                 return klass  # already transformed
             # the user defined a method that conflicts with the required method
-            msg = f"Unable to transform the class `{klass.__name__}` with {key} method defined."
+            msg = f"Unable to transform the class `{klass.__name__}` "
+            msg += f"with resereved `{key}` method defined on the class."
             raise TypeError(msg)
         setattr(klass, key, method)
 
     if "__init__" not in vars(klass):
         # generate the init method in case it is not defined by the user
-        setattr(klass, "__init__", _generate_init(klass))
+        setattr(klass, "__init__", _generate_init_method(klass))
 
     for key, wrapper in (
         ("__init__", _init_wrapper),

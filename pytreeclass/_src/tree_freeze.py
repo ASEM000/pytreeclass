@@ -57,12 +57,12 @@ class _HashableWrapper(_ImmutableWrapper):
         return tree_hash(self.unwrap())
 
 
-class FrozenWrapper(_ImmutableWrapper):
+class _FrozenWrapper(_ImmutableWrapper):
     def __repr__(self):
         return f"#{self.unwrap()!r}"
 
     def __eq__(self, rhs: Any) -> bool:
-        if not isinstance(rhs, FrozenWrapper):
+        if not isinstance(rhs, _FrozenWrapper):
             return False
         return self.unwrap() == rhs.unwrap()
 
@@ -70,20 +70,18 @@ class FrozenWrapper(_ImmutableWrapper):
         return tree_hash(self.unwrap())
 
 
-def _frozen_flatten(tree: Any) -> tuple[tuple, Any]:
+def _flatten(tree: Any) -> tuple[tuple, Any]:
     return (None,), _HashableWrapper(tree.unwrap())
 
 
-def _frozen_unflatten(treedef: Any, _: Sequence[Any]) -> PyTree:
-    tree = object.__new__(FrozenWrapper)  # type: ignore
-    vars(tree)[_WRAPPED] = treedef.unwrap()
-    return tree
+def _unflatten(treedef: Any, _: Sequence[Any]) -> PyTree:
+    return _FrozenWrapper(treedef.unwrap())
 
 
-jtu.register_pytree_node(FrozenWrapper, _frozen_flatten, _frozen_unflatten)
+jtu.register_pytree_node(_FrozenWrapper, _flatten, _unflatten)
 
 
-def freeze(wrapped: Any) -> FrozenWrapper:
+def freeze(wrapped: Any) -> _FrozenWrapper:
     r"""Freeze a value to avoid updating it by `jax` transformations.
 
     Example:
@@ -134,7 +132,7 @@ def freeze(wrapped: Any) -> FrozenWrapper:
         value: 4.0
         grad: Test(a=#2.0)
     """
-    return FrozenWrapper(wrapped)
+    return _FrozenWrapper(wrapped)
 
 
 def unfreeze(x: Any) -> Any:
@@ -154,12 +152,12 @@ def unfreeze(x: Any) -> Any:
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
-    return x.unwrap() if isinstance(x, FrozenWrapper) else x
+    return x.unwrap() if isinstance(x, _FrozenWrapper) else x
 
 
 def is_frozen(wrapped: Any) -> bool:
     """Returns True if the value is a frozen wrapper."""
-    return isinstance(wrapped, FrozenWrapper)
+    return isinstance(wrapped, _FrozenWrapper)
 
 
 def is_nondiff(x: Any) -> bool:

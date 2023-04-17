@@ -17,7 +17,7 @@ def test_field_metadata():
     class Test:
         a: int = pytc.field(default=1, metadata={"a": 1})
 
-    assert Test().__fields__["a"].metadata["a"] == 1
+    assert Test()._fields["a"].metadata["a"] == 1
 
 
 def test_is_treeclass():
@@ -741,10 +741,10 @@ def test_instance_field_map():
 
     _, tree_with_weight = tree.at["add_param"]("weight", Parameter(3))
 
-    assert tree.__fields__ != tree_with_weight.__fields__
+    assert tree._fields != tree_with_weight._fields
     assert tree_with_weight.weight == Parameter(3)
     assert "weight" not in vars(tree)
-    assert "weight" not in tree.__fields__
+    assert "weight" not in tree._fields
 
 
 def test_field_factory():
