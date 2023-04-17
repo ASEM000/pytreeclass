@@ -24,9 +24,9 @@ def _hash_node(node: Any) -> int:
     return hash(node)
 
 
-def tree_hash(tree: PyTree) -> int:
-    hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(tree))
-    return hash((*hashed, jtu.tree_structure(tree)))
+def tree_hash(*trees: PyTree) -> int:
+    hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(trees))
+    return hash((*hashed, jtu.tree_structure(trees)))
 
 
 class _ImmutableWrapper:

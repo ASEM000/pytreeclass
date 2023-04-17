@@ -60,7 +60,7 @@ class Field(NamedTuple):
         return hash(self) == hash(other)
 
     def __hash__(self) -> int:
-        parameters = (
+        return tree_hash(
             self.name,
             self.default,
             self.factory,
@@ -69,7 +69,6 @@ class Field(NamedTuple):
             self.pos_only,
             self.alias,
         )
-        return tree_hash(parameters)
 
 
 def field(
