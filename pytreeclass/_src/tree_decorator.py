@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import functools as ft
 import sys
+from abc import ABCMeta
 from collections.abc import MutableMapping, MutableSequence
-from contextlib import suppress
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, NamedTuple, Sequence, TypeVar
 
-import jax.tree_util as jtu
+from jax.tree_util import register_pytree_node
 from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_freeze import tree_hash
@@ -30,17 +30,12 @@ class NOT_SET:
 PyTree = Any
 T = TypeVar("T")
 _NOT_SET = NOT_SET()
-_FIELDS = "__fields__"
+_FIELDS = "_fields"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 
 
 """Define a class decorator that is compatible with JAX's transformation."""
-
-
-def is_treeclass(node: Any) -> bool:
-    """Check if a node is a `treeclass`."""
-    return (node if isinstance(node, type) else type(node)).__setattr__ is _setattr
 
 
 class Field(NamedTuple):
@@ -108,8 +103,7 @@ def field(
         ...    assert x > 0
         ...    return x
 
-        >>> @pytc.treeclass
-        ... class Employee:
+        >>> class Employee(pytc.TreeClass):
         ...    # assert employee `name` is str
         ...    name: str = pytc.field(callbacks=[instance_cb_factory(str)])
         ...    # use callback compostion to assert employee `age` is int and positive
@@ -231,26 +225,26 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
     for field in fields:
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
+        fref = f"field_map['{name}']"
 
-        mark0 = f"field_map['{name}'].default"
-        mark1 = f"field_map['{name}'].factory()"
-        mark2 = f"self.{name}"
+        body += f"\t\tself.{name}="
 
         if field.kw_only and "*" not in head and field.init:
             head += "*, "
 
         if field.default is not _NOT_SET:
             # in head: def f(.. x= default_value)
-            head += f"{alias}={mark0}, " if field.init else ""
-            # in body:  self.x = default_value
-            body += f"\t\t{mark2}=" + (f"{alias}\n " if field.init else f"{mark0}\n")
+            head += f"{alias}={fref}.default, " if field.init else ""
+            body += f"{alias}\n " if field.init else f"{fref}.default\n"
+
         elif field.factory is not None:
-            head += f"{alias}={mark1}, " if field.init else ""
-            body += f"\t\t{mark2}=" + (f"{alias}\n" if field.init else f"{mark1}\n")
+            head += f"{alias}={fref}.factory(), " if field.init else ""
+            body += f"{alias}\n" if field.init else f"{fref}.factory()\n"
+
         else:
             # no defaults are added
             head += f"{alias}, " if field.init else ""
-            body += f"\t\t{mark2}={alias}\n " if field.init else ""
+            body += f"{alias}\n " if field.init else ""
 
         if field.pos_only and field.init:
             if "/" in head:
@@ -258,28 +252,20 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
 
             head += "/, "
 
-    # add pass to avoid syntax error if all fields are ignored
-    body += "\t\tpass"
+    body += "\t\tpass"  # add pass to avoid syntax error if all fields are ignored
     body = "\tdef __init__(self, " + head[:-2] + "):\n" + body
     body = f"def closure(field_map):\n{body}\n\treturn __init__"
     return body.expandtabs(4)
 
 
-def _generate_init(klass: type) -> FunctionType:
+def _generate_init_method(klass: type) -> FunctionType:
     field_map = _generate_field_map(klass)
-    local_namespace = dict()  # type: ignore
     global_namespace = vars(sys.modules[klass.__module__])
     init_code = _generate_init_code(tuple(field_map.values()))
-    exec(init_code, global_namespace, local_namespace)
+    exec(init_code, global_namespace, local_namespace := dict())
     method = local_namespace["closure"](field_map)
-
-    return FunctionType(
-        code=method.__code__,
-        globals=global_namespace,
-        name=method.__name__,
-        argdefs=method.__defaults__,
-        closure=method.__closure__,
-    )
+    method.__qualname__ = f"{klass.__qualname__}.__init__"
+    return method
 
 
 @_conditional_mutable_method
@@ -294,7 +280,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
                 msg = f"Error for field=`{key}`:\n{e}"
                 raise type(e)(msg)
 
-    elif is_treeclass(value):
+    elif isinstance(value, TreeClass):
         # auto registers the instance value if it is a registered `treeclass`
         # this behavior is similar to PyTorch behavior in `nn.Module`
         # with instances of `Parameter`/`Module`.
@@ -313,40 +299,16 @@ def _delattr(tree, key: str) -> None:
     del vars(tree)[key]
 
 
-def _init_wrapper(init_func: Callable) -> Callable:
-    @ft.wraps(init_func)
-    def wrapper(tree, *a, **k) -> None:
-        with _mutable_context(tree):
-            kvs = dict(_generate_field_map(type(tree)))
-            vars(tree)[_FIELDS] = MappingProxyType(kvs)
-            output = init_func(tree, *a, **k)
-
-            if post_init_func := getattr(type(tree), _POST_INIT, None):
-                # to simplify the logic, we call the post init method
-                # even if the init method is not code-generated.
-                post_init_func(tree)
-
-        # handle non-initialized fields
-        if len(keys := set(kvs) - set(vars(tree))) > 0:
-            msg = f"Uninitialized fields: ({', '.join(keys)}) "
-            msg += f"in class `{type(tree).__name__}`"
-            raise AttributeError(msg)
-        return output
-
-    return wrapper
-
-
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
+    # unflatten rule for `treeclass` to use with `jax.tree_unflatten`
     tree = object.__new__(klass)
-    # update through vars, to avoid calling the `setattr` method
-    # that will check for callbacks.
     vars(tree).update(treedef[1])
     vars(tree).update(zip(treedef[0], leaves))
     return tree
 
 
 def _tree_flatten(tree: PyTree):
-    # Flatten rule for `treeclass` to use with `jax.tree_flatten`
+    # flatten rule for `treeclass` to use with `jax.tree_flatten`
     static, dynamic = dict(vars(tree)), dict()
     for key in static.get(_FIELDS, ()):
         dynamic[key] = static.pop(key)
@@ -362,32 +324,6 @@ def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
     return [*zip(names, types, indices)]
 
 
-def _register_treeclass(klass: type[T]) -> type[T]:
-    with suppress(ValueError):
-        # `ValueError` is raised for duplicate registration.
-        # there are two cases where a class is registered more than once:
-        # first, when a class is decorated with `treeclass` more than once (e.g. `treeclass(treeclass(Class))`)
-        # second when a class is decorated with `treeclass` and has a parent class that is decorated with `treeclass`
-        # in that case `__init_subclass__` registers the class before the decorator registers it.
-        # register the trace flatten rule
-        register_pytree_node_trace(klass, _tree_trace)
-        # register the flatten/unflatten rules with jax
-        jtu.register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))  # type: ignore
-
-    return klass
-
-
-def _init_subclass_wrapper(init_subclass_method: Callable) -> Callable:
-    # Non-decorated subclasses uses the base `treeclass` leaves only
-    @classmethod  # type: ignore
-    @ft.wraps(init_subclass_method)
-    def wrapper(klass: type, *a, **k) -> None:
-        init_subclass_method(*a, **k)
-        _register_treeclass(klass)
-
-    return wrapper
-
-
 def _treeclass_transform(klass: type[T]) -> type[T]:
     for key, method in (("__setattr__", _setattr), ("__delattr__", _delattr)):
         # basic required methods
@@ -400,16 +336,7 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
         setattr(klass, key, method)
 
     if "__init__" not in vars(klass):
-        # generate the init method in case it is not defined by the user
-        setattr(klass, "__init__", _generate_init(klass))
-
-    for key, wrapper in (
-        ("__init__", _init_wrapper),
-        ("__init_subclass__", _init_subclass_wrapper),
-    ):
-        # wrappers to enable the field initialization, and registering
-        # the class with jax
-        setattr(klass, key, wrapper(getattr(klass, key)))
+        setattr(klass, "__init__", _generate_init_method(klass))
 
     # basic optional methods
     for key, method in (
@@ -428,8 +355,29 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     return klass
 
 
+class TreeClassMeta(ABCMeta):
+    def __call__(klass: type[T], *a, **k) -> T:
+        self = klass.__new__(klass, *a, **k)
+
+        with _mutable_context(self):
+            vars(self)[_FIELDS] = MappingProxyType(_generate_field_map(klass))
+            klass.__init__(self, *a, **k)
+
+            if post_init_func := getattr(klass, _POST_INIT, None):
+                # to simplify the logic, we call the post init method
+                # even if the init method is not code-generated.
+                post_init_func(self)
+
+        # handle non-initialized fields
+        if len(keys := set(getattr(self, _FIELDS)) - set(vars(self))) > 0:
+            msg = f"Uninitialized fields: ({', '.join(keys)}) "
+            msg += f"in class `{type(self).__name__}`"
+            raise AttributeError(msg)
+        return self
+
+
 @dataclass_transform(field_specifiers=(field, Field), frozen_default=True)
-def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
+class TreeClass(metaclass=TreeClassMeta):
     """Convert a class to a JAX compatible tree structure.
 
     Args:
@@ -442,8 +390,7 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
         >>> import pytreeclass as pytc
 
         >>> # Tree leaves are defined by type hinted fields at the class level
-        >>> @pytc.treeclass
-        ... class Tree:
+        >>> class Tree(pytc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
@@ -451,8 +398,7 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
         [1, 2.0]
 
         >>> # Leaf-wise math operations are supported by setting `leafwise=True`
-        >>> @ft.partial(pytc.treeclass, leafwise=True)
-        ... class Tree:
+        >>> class Tree(pytc.TreeClass, leafwise=True):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
@@ -460,8 +406,7 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
         Tree(a=2, b=3.0)
 
         >>> # Advanced indexing is supported using `at` property
-        >>> @pytc.treeclass
-        ... class Tree:
+        ... class Tree(pytc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
@@ -491,13 +436,9 @@ def treeclass(klass: type[T], *, leafwise: bool = False) -> type[T]:
     Raises:
         TypeError: if the input is not a class.
     """
-    klass = _register_treeclass(klass)
-    # add math operations methods if leafwise
-    # do not override any user defined methods
-    klass = _leafwise_transform(klass) if leafwise else klass
-    # add `repr`,'str', 'at', 'copy', 'hash', 'copy'
-    # add the immutable setters and deleters
-    # generate the `__init__` method if not present using type hints.
-    klass = _treeclass_transform(klass)
 
-    return klass
+    def __init_subclass__(klass: type[T], leafwise: bool = False) -> None:
+        _leafwise_transform(klass) if leafwise else klass
+        _treeclass_transform(klass)
+        register_pytree_node_trace(klass, _tree_trace)
+        register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))

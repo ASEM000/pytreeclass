@@ -1,6 +1,5 @@
 import copy
 import dataclasses as dc
-import functools as ft
 from typing import Any
 
 import jax
@@ -13,21 +12,10 @@ import pytreeclass as pytc
 
 
 def test_field_metadata():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass, leafwise=True):
         a: int = pytc.field(default=1, metadata={"a": 1})
 
-    assert Test().__fields__["a"].metadata["a"] == 1
-
-
-def test_is_treeclass():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
-        a: int = 1
-
-    assert pytc.is_treeclass(Test)
-    assert pytc.is_treeclass(Test())
-    assert not pytc.is_treeclass(int)
+    assert Test()._fields["a"].metadata["a"] == 1
 
 
 def test_field_mutually_exclusive():
@@ -44,8 +32,7 @@ def test_field():
     with pytest.raises(TypeError):
         pytc.field(metadata=1)
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(default=1, pos_only=True)
         b: int = 2
 
@@ -56,8 +43,7 @@ def test_field():
     assert Test(1, b=2).a == 1
     assert Test(1, 2).b == 2
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(default=1, pos_only=True)
         b: int = pytc.field(default=2, pos_only=True)
 
@@ -65,8 +51,7 @@ def test_field():
     assert Test(1, 2).b == 2
 
     # keyword only
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(default=1, kw_only=True)
         b: int = 2
 
@@ -78,8 +63,7 @@ def test_field():
 
     assert Test(a=1, b=2).a == 1
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(default=1, pos_only=True)
         b: int = pytc.field(default=2, kw_only=True)
 
@@ -92,8 +76,7 @@ def test_field():
         Test(a=1, b=2)
 
     # test when init is False
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(default=1, init=False, kw_only=True)
         b: int = 2
 
@@ -102,8 +85,7 @@ def test_field():
 
     assert Test(b=2).a == 1
 
-    @pytc.treeclass
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(default=1)
         b: int = pytc.field(factory=lambda: 1)
 
@@ -115,8 +97,7 @@ def test_field():
 
 
 def test_field_alias():
-    @pytc.treeclass
-    class Tree:
+    class Tree(pytc.TreeClass):
         _name: str = pytc.field(alias="name")
 
     tree = Tree(name="test")
@@ -133,8 +114,7 @@ def test_field_hash():
 
 
 def test_field_nondiff():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: jnp.ndarray
         b: jnp.ndarray
 
@@ -150,8 +130,7 @@ def test_field_nondiff():
 
     assert jtu.tree_leaves(test) == []
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: jnp.ndarray
         b: jnp.ndarray
 
@@ -164,8 +143,7 @@ def test_field_nondiff():
 
 
 def test_hash():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class T:
+    class T(pytc.TreeClass):
         a: jnp.ndarray
 
     # with pytest.raises(TypeError):
@@ -173,8 +151,7 @@ def test_hash():
 
 
 def test_post_init():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = 1
 
         def __post_init__(self):
@@ -186,8 +163,7 @@ def test_post_init():
 
 
 def test_subclassing():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class L0:
+    class L0(pytc.TreeClass):
         a: int = 1
         b: int = 3
         c: int = 5
@@ -201,7 +177,6 @@ def test_subclassing():
         def __post_init__(self):
             self.c = 5
 
-    @ft.partial(pytc.treeclass, leafwise=True)
     class L1(L0):
         a: int = 2
         b: int = 4
@@ -225,14 +200,11 @@ def test_subclassing():
 
     l1 = L1()
 
-    # leaves of L0 are only considered
-    # as L1 is not decorated with @treeclass
-    assert jtu.tree_leaves(l1) == [1, 3, 5]
+    assert jtu.tree_leaves(l1) == [2, 4, 5]
 
 
 def test_registering_state():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class L0:
+    class L0(pytc.TreeClass):
         def __init__(self):
             self.a = 10
             self.b = 20
@@ -245,8 +217,7 @@ def test_registering_state():
 
 
 def test_copy():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class L0:
+    class L0(pytc.TreeClass):
         a: int = 1
         b: int = 3
         c: int = 5
@@ -259,8 +230,7 @@ def test_copy():
 
 
 def test_delattr():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class L0:
+    class L0(pytc.TreeClass):
         a: int = 1
         b: int = 3
         c: int = 5
@@ -270,8 +240,7 @@ def test_delattr():
     with pytest.raises(AttributeError):
         del t.a
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class L2:
+    class L2(pytc.TreeClass):
         a: int = 1
 
         def delete(self, name):
@@ -286,7 +255,7 @@ def test_delattr():
 # def test_getattr():
 #     with pytest.raises(AttributeError):
 
-#         @ft.partial(pytc.treeclass, leafwise=True)
+#
 #         class L2:
 #             a: int = 1
 
@@ -295,7 +264,7 @@ def test_delattr():
 
 #     with pytest.raises(AttributeError):
 
-#         @ft.partial(pytc.treeclass, leafwise=True)
+#
 #         class L3:
 #             a: int = 1
 
@@ -304,7 +273,7 @@ def test_delattr():
 
 
 # def test_treeclass_decorator_arguments():
-#     @ft.partial(pytc.treeclass, leafwise=True)(order=False)
+#   (order=False)
 #     class Test:
 #         a: int = 1
 #         b: int = 2
@@ -320,12 +289,10 @@ def test_is_tree_equal():
     assert pytc.is_tree_equal(1, 2.0) is False
     assert pytc.is_tree_equal([1, 2], [1, 2])
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test1:
+    class Test1(pytc.TreeClass):
         a: int = 1
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test2:
+    class Test2(pytc.TreeClass):
         a: jnp.ndarray
 
         def __init__(self) -> None:
@@ -336,8 +303,7 @@ def test_is_tree_equal():
     assert pytc.is_tree_equal(jnp.array([1, 2, 3]), jnp.array([1, 2, 3]))
     assert pytc.is_tree_equal(jnp.array([1, 2, 3]), jnp.array([1, 3, 3])) is False
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test3:
+    class Test3(pytc.TreeClass):
         a: int = 1
         b: int = 2
 
@@ -347,12 +313,10 @@ def test_is_tree_equal():
 
 
 def test_params():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class l0:
+    class l0(pytc.TreeClass):
         a: int = 2
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class l1:
+    class l1(pytc.TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -368,37 +332,25 @@ def test_params():
 def test_mutable_field():
     with pytest.raises(TypeError):
 
-        @ft.partial(pytc.treeclass, leafwise=True)
-        class Test:
+        class Test(pytc.TreeClass):
             a: list = [1, 2, 3]
 
     with pytest.raises(TypeError):
 
-        @ft.partial(pytc.treeclass, leafwise=True)
-        class Test:
+        class Test2(pytc.TreeClass):
             a: list = pytc.field(default=[1, 2, 3])
-
-
-def test_non_class_input():
-    with pytest.raises(TypeError):
-
-        @ft.partial(pytc.treeclass, leafwise=True)
-        def f(x):
-            return x
 
 
 def test_setattr_delattr():
     with pytest.raises(TypeError):
 
-        @ft.partial(pytc.treeclass, leafwise=True)
-        class Test:
+        class Test(pytc.TreeClass):
             def __setattr__(self, k, v):
                 pass
 
     with pytest.raises(TypeError):
 
-        @ft.partial(pytc.treeclass, leafwise=True)
-        class _:
+        class _(pytc.TreeClass):
             def __delattr__(self, k):
                 pass
 
@@ -420,8 +372,7 @@ def test_callbacks():
 
         return _range_validator
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(callbacks=[instance_validator(int)])
 
     with pytest.raises(AssertionError):
@@ -429,8 +380,7 @@ def test_callbacks():
 
     assert Test(a=1).a == 1
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(callbacks=[instance_validator((int, float))])
 
     assert Test(a=1).a == 1
@@ -439,8 +389,7 @@ def test_callbacks():
     with pytest.raises(AssertionError):
         Test(a="a")
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(callbacks=[range_validator(0, 10)])
 
     with pytest.raises(AssertionError):
@@ -451,8 +400,7 @@ def test_callbacks():
     with pytest.raises(AssertionError):
         Test(a=11)
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(callbacks=[range_validator(0, 10), instance_validator(int)])
 
     with pytest.raises(AssertionError):
@@ -463,28 +411,24 @@ def test_callbacks():
 
     with pytest.raises(TypeError):
 
-        @ft.partial(pytc.treeclass, leafwise=True)
-        class Test:
+        class Test(pytc.TreeClass):
             a: int = pytc.field(callbacks=1)
 
     with pytest.raises(TypeError):
 
-        @ft.partial(pytc.treeclass, leafwise=True)
-        class Test:
+        class Test(pytc.TreeClass):
             a: int = pytc.field(callbacks=[1])
 
     with pytest.raises(TypeError):
 
-        @ft.partial(pytc.treeclass, leafwise=True)
-        class Test:
+        class Test(pytc.TreeClass):
             a: int = pytc.field(callbacks=[lambda: True])
 
         Test(a=1)
 
 
 def test_treeclass_frozen_field():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(callbacks=[pytc.freeze])
 
     t = Test(1)
@@ -494,8 +438,7 @@ def test_treeclass_frozen_field():
 
 
 def test_key_error():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field()
 
         def __init__(self) -> None:
@@ -506,8 +449,7 @@ def test_key_error():
 
 
 def test_super():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         # a:int
         def __init__(self) -> None:
             super().__init__()
@@ -516,8 +458,7 @@ def test_super():
 
 
 def test_optional_attrs():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         def __repr__(self):
             return "a"
 
@@ -531,8 +472,7 @@ def test_optional_attrs():
 
 
 def test_override_repr():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Test:
+    class Test(pytc.TreeClass):
         def __repr__(self):
             return "a"
 
@@ -544,8 +484,7 @@ def test_override_repr():
 
 
 def test_optional_param():
-    @ft.partial(pytc.treeclass, leafwise=False)
-    class Test:
+    class Test(pytc.TreeClass):
         a: int = pytc.field(default=1)
 
     with pytest.raises(TypeError):
@@ -565,8 +504,7 @@ def benchmark_treeclass_instance():
     count = 10
     annot = {f"leaf_{i}": int for i in range(count)}
     leaves = {f"leaf_{i}": i for i in range(count)}
-    Tree = type("Tree", (), {"__annotations__": annot, **leaves})
-    Tree = pytc.treeclass(Tree)
+    Tree = type("Tree", (pytc.TreeClass,), {"__annotations__": annot, **leaves})
     return Tree()
 
 
@@ -711,27 +649,15 @@ def test_incorrect_trace_func():
 def test_self_field_name():
     with pytest.raises(ValueError):
 
-        @pytc.treeclass
-        class Tree:
+        class Tree(pytc.TreeClass):
             self: int = pytc.field()
 
 
-def test_repeated_treeclass():
-    @pytc.treeclass
-    @pytc.treeclass
-    class Tree:
-        a: int = pytc.field()
-
-    assert True
-
-
 def test_instance_field_map():
-    @pytc.treeclass
-    class Parameter:
+    class Parameter(pytc.TreeClass):
         value: Any
 
-    @pytc.treeclass
-    class Tree:
+    class Tree(pytc.TreeClass):
         bias: int = 0
 
         def add_param(self, name, param):
@@ -741,15 +667,14 @@ def test_instance_field_map():
 
     _, tree_with_weight = tree.at["add_param"]("weight", Parameter(3))
 
-    assert tree.__fields__ != tree_with_weight.__fields__
+    assert tree._fields != tree_with_weight._fields
     assert tree_with_weight.weight == Parameter(3)
     assert "weight" not in vars(tree)
-    assert "weight" not in tree.__fields__
+    assert "weight" not in tree._fields
 
 
 def test_field_factory():
-    @pytc.treeclass
-    class Tree:
+    class Tree(pytc.TreeClass):
         a: int = pytc.field(factory=lambda: 1)
 
     assert Tree().a == 1

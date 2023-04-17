@@ -1,4 +1,3 @@
-import functools as ft
 from typing import Callable, Sequence
 
 import jax
@@ -12,8 +11,7 @@ import pytreeclass as pytc
 
 
 def test_nn():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Linear:
+    class Linear(pytc.TreeClass, leafwise=True):
         weight: jax.Array
         bias: jax.Array
 
@@ -24,8 +22,7 @@ def test_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class StackedLinear:
+    class StackedLinear(pytc.TreeClass, leafwise=True):
         layers: Sequence[Linear]
 
         def __init__(self, key, layers):
@@ -63,8 +60,7 @@ def test_nn():
 
 
 def test_nn_with_func_input():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Linear:
+    class Linear(pytc.TreeClass, leafwise=True):
         weight: jax.Array
         bias: jax.Array
         act_func: Callable
@@ -85,8 +81,7 @@ def test_nn_with_func_input():
 
 
 def test_compact_nn():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Linear:
+    class Linear(pytc.TreeClass, leafwise=True):
         weight: jax.Array
         bias: jax.Array
 
@@ -97,8 +92,7 @@ def test_compact_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class StackedLinear:
+    class StackedLinear(pytc.TreeClass, leafwise=True):
         def __init__(self, key, in_dim, out_dim, hidden_dim):
             keys = jr.split(key, 3)
 
@@ -138,8 +132,7 @@ def test_compact_nn():
 
 
 def test_freeze_nondiff():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Linear:
+    class Linear(pytc.TreeClass, leafwise=True):
         weight: jax.Array
         bias: jax.Array
         count: int
@@ -154,8 +147,7 @@ def test_freeze_nondiff():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class StackedLinear:
+    class StackedLinear(pytc.TreeClass, leafwise=True):
         name: str
         exact_array: jax.Array
         bool_array: jax.Array

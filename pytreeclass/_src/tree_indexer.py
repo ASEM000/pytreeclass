@@ -212,8 +212,7 @@ class AtIndexer(NamedTuple):
         raise NotImplementedError(
             f"Indexing with {type(where).__name__} is not implemented.\n"
             "Example of supported indexing:\n\n"
-            "@pytc.treeclass\n"
-            f"class {type(self.tree).__name__}:\n"
+            f"class {type(self.tree).__name__}:(pytc.TreeClass)\n"
             "    ...\n\n"
             f">>> tree = {type(self.tree).__name__}(...)\n"
             ">>> # indexing by boolean pytree\n"
@@ -336,8 +335,7 @@ def bcmap(
         >>> import pytreeclass as pytc
         >>> import functools as ft
 
-        >>> @ft.partial(pytc.treeclass, leafwise=True)
-        ... class Test:
+        >>> class Test(pytc.TreeClass, leafwise=True):
         ...    a: tuple[int] = (1,2,3)
         ...    b: tuple[int] = (4,5,6)
         ...    c: jax.Array = jnp.array([1,2,3])

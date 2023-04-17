@@ -12,7 +12,6 @@ from jax._src.tree_util import _registry
 # the code style is heavilty influenced by `jax.tree_util`
 # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
 
-
 PyTree = Any
 TraceType = Any
 
@@ -64,7 +63,7 @@ def _validate_trace_func(
             if not isinstance(trace[0], (str, type(None))):
                 msg = "Trace name entry is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
-                msg += f" Expected a string, got {trace[0]}"
+                msg += f" Expected a string or `None`, got {trace[0]}"
                 raise TypeError(msg)
 
             if not isinstance(trace[1], type):
@@ -76,7 +75,7 @@ def _validate_trace_func(
             if not isinstance(trace[2], (int, type(None))):
                 msg = "Trace index entry is not defined properly for "
                 msg += f"class=`{type(tree).__name__}`."
-                msg += f" Expected an integer, got {trace[2]}"
+                msg += f" Expected an integer or `None`, got {trace[2]}"
                 raise TypeError(msg)
 
         wrapper.has_run = True
@@ -220,8 +219,7 @@ def tree_leaves_with_trace(
         >>> tree = [1, [2, [3]]]
         >>> traces, _ = zip(*pytc.tree_leaves_with_trace(tree))
     """
-    trace = ((), (), ())
-    return list(flatten_one_trace_level(trace, tree, is_leaf, is_trace_leaf))
+    return list(flatten_one_trace_level(((), (), ()), tree, is_leaf, is_trace_leaf))
 
 
 def tree_flatten_with_trace(

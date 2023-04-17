@@ -52,7 +52,7 @@ def _node_pprint(
         return _dict_pprint(node, indent, kind, width, depth)
     if dc.is_dataclass(node):
         return _dataclass_pprint(node, indent, kind, width, depth)
-    if pytc.is_treeclass(node):
+    if isinstance(node, pytc.TreeClass):
         return _treeclass_pprint(node, indent, kind, width, depth)
     return _general_pprint(node, indent, kind, width, depth)
 
@@ -86,7 +86,6 @@ def _shape_dtype_pprint(
     shape = shape.replace("(", "[")
     shape = shape.replace(")", "]")
     shape = shape.replace(" ", ",")
-    shape = shape.replace("[]", "[0]")
     dtype = f"{node.dtype}".replace("int", "i")
     dtype = dtype.replace("float", "f")
     dtype = dtype.replace("complex", "c")
@@ -251,8 +250,7 @@ def _dataclass_pprint(
     if depth == 0:
         fmt = "..."
     else:
-        kfs = getattr(node, "__dataclass_fields__").items()
-        kvs = ((k, vars(node)[k]) for k, f in kfs if f.repr)
+        kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
         fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
         fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
 
@@ -272,8 +270,7 @@ def _treeclass_pprint(
         fmt = "..."
 
     else:
-        kfs = getattr(node, "__fields__").items()
-        kvs = ((k, vars(node)[k]) for k, f in kfs if f.repr)
+        kvs = ((k, vars(node)[k]) for k, f in node._fields.items() if f.repr)
         fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
         fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
@@ -531,14 +528,12 @@ def tree_diagram(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> @pytc.treeclass
-        ... class A:
+        >>> class A(pytc.TreeClass):
         ...        x: int = 10
         ...        y: int = (20,30)
         ...        z: int = 40
 
-        >>> @pytc.treeclass
-        ... class B:
+        >>> class B(pytc.TreeClass):
         ...     a: int = 10
         ...     b: tuple = (20,30, A())
 
@@ -907,8 +902,7 @@ def tree_repr_with_trace(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> @pytc.treeclass
-        ... class Test:
+        >>> class Test(pytc.TreeClass):
         ...    a:int = 1
         ...    b:float = 2.0
 
