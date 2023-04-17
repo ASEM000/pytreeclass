@@ -59,9 +59,6 @@ class Field(NamedTuple):
     def __eq__(self, other: Any) -> bool:
         return hash(self) == hash(other)
 
-    def __repr__(self) -> str:
-        return tree_repr(self)
-
     def __hash__(self) -> int:
         parameters = (
             self.name,
@@ -360,7 +357,7 @@ def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
 def _tree_flatten(tree: PyTree):
     # Flatten rule for `treeclass` to use with `jax.tree_flatten`
     static, dynamic = dict(vars(tree)), dict()
-    for key in static[_FIELDS]:
+    for key in static.get(_FIELDS, ()):
         dynamic[key] = static.pop(key)
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
