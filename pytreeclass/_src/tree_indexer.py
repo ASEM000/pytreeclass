@@ -61,7 +61,7 @@ def _get_at_mask(
     def leaf_get(leaf: Any, where: Any):
         # check if where is a boolean leaf inside the `tree_map`
         # to avoid extrachecks in `tree_map`
-        if isinstance(leaf, (jax.Array, np.ndarray)):
+        if isinstance(leaf, (jax.Array, np.ndarray)) and jnp.ndim(leaf) > 0:
             # return empty array instead of None if condition is not met
             # not `jittable` as size of array changes
             return leaf[jnp.where(where)]

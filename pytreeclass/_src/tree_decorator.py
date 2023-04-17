@@ -302,14 +302,14 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
                 msg = f"Error for field=`{key}`:\n{e}"
                 raise type(e)(msg)
 
-    if is_treeclass(value):
+    elif is_treeclass(value):
         # auto registers the instance value if it is a registered `treeclass`
         # this behavior is similar to PyTorch behavior in `nn.Module`
         # with instances of `Parameter`/`Module`.
         # the behavior is useful to avoid repetitive code pattern in field definition and
         # and initialization inside init method.
         kv = {key: Field(type=type(value), init=False, name=key)}
-        vars(tree)[_FIELDS] = MappingProxyType({**vars(tree)[_FIELDS], **kv})
+        vars(tree)[_FIELDS] = MappingProxyType({**field_map, **kv})
 
     vars(tree)[key] = value  # type: ignore
 
