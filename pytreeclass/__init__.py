@@ -1,4 +1,4 @@
-from pytreeclass._src.tree_decorator import field, fields, is_treeclass, treeclass
+from pytreeclass._src.tree_decorator import field, is_treeclass, treeclass
 from pytreeclass._src.tree_freeze import freeze, is_frozen, is_nondiff, unfreeze
 from pytreeclass._src.tree_indexer import bcmap, is_tree_equal, tree_indexer
 from pytreeclass._src.tree_pprint import (
@@ -23,7 +23,6 @@ __all__ = (
     "is_treeclass",
     "is_tree_equal",
     "field",
-    "fields",
     # pprint utils
     "tree_diagram",
     "tree_mermaid",

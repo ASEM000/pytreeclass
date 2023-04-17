@@ -251,7 +251,8 @@ def _dataclass_pprint(
     if depth == 0:
         fmt = "..."
     else:
-        kvs = ((F.name, vars(node)[F.name]) for F in dc.fields(node) if F.repr)
+        kfs = getattr(node, "__dataclass_fields__").items()
+        kvs = ((k, vars(node)[k]) for k, f in kfs if f.repr)
         fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
         fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
 
@@ -271,7 +272,8 @@ def _treeclass_pprint(
         fmt = "..."
 
     else:
-        kvs = ((F.name, vars(node)[F.name]) for F in pytc.fields(node) if F.repr)
+        kfs = getattr(node, "__fields__").items()
+        kvs = ((k, vars(node)[k]) for k, f in kfs if f.repr)
         fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
         fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"

@@ -37,8 +37,7 @@ core API
 .. autofunction:: treeclass 
 .. autofunction:: is_treeclass 
 .. autofunction:: is_tree_equal 
-.. autofunction:: field 
-.. autofunction:: fields
+.. autofunction:: field
 
 Pretty Printing API
 -------------------

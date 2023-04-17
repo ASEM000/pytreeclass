@@ -169,14 +169,6 @@ def field(
     )
 
 
-def fields(item: Any) -> Sequence[Field]:
-    """Get the fields of a `treeclass` instance."""
-    if not hasattr(item, _FIELDS):
-        raise TypeError(f"Cannot get fields of {item!r}.")
-
-    return tuple(vars(item)[_FIELDS].values())
-
-
 @ft.lru_cache
 def _generate_field_map(klass: type) -> dict[str, Field]:
     field_map = dict()

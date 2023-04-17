@@ -102,11 +102,6 @@ def test_field():
 
     assert Test(b=2).a == 1
 
-    with pytest.raises(TypeError):
-        pytc.fields(1)
-
-    assert len(pytc.fields(Test())) == 2
-
     @pytc.treeclass
     class Test:
         a: int = pytc.field(default=1)
