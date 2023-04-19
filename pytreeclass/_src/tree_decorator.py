@@ -27,8 +27,9 @@ class NOT_SET:
     __repr__ = lambda _: "?"
 
 
-PyTree = Any
 T = TypeVar("T")
+PyTree = Any
+
 _NOT_SET = NOT_SET()
 _FIELDS = "_fields"
 _POST_INIT = "__post_init__"
@@ -171,8 +172,6 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         return field_map
 
     for base in reversed(klass.__mro__[1:]):
-        # get the fields of the base class in the MRO in reverse order to ensure
-        # the correct order of the fields are preserved
         field_map.update(_generate_field_map(base))
 
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
@@ -186,8 +185,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
         if name == "self":
             # while `dataclasses` allows `self` as a field name, its confusing
             # and not recommended. so raise an error
-            msg = "Field name cannot be `self`."
-            raise ValueError(msg)
+            raise ValueError("Field name cannot be `self`.")
 
         if isinstance(value, Field):
             # case: `x: Any = field(default=1)`
@@ -225,32 +223,28 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
     for field in fields:
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
-        fref = f"field_map['{name}']"
 
-        body += f"\t\tself.{name}="
+        mark0 = f"field_map['{name}'].default"
+        mark1 = f"field_map['{name}'].factory()"
+        mark2 = f"self.{name}"
 
         if field.kw_only and "*" not in head and field.init:
             head += "*, "
 
         if field.default is not _NOT_SET:
-            # in head: def f(.. x= default_value)
-            head += f"{alias}={fref}.default, " if field.init else ""
-            body += f"{alias}\n " if field.init else f"{fref}.default\n"
-
+            vref = f"field_map['{name}'].default"
+            head += f"{alias}={vref}, " if field.init else ""
+            body += f"\t\tself.{name}=" + (f"{alias}\n " if field.init else f"{vref}\n")
         elif field.factory is not None:
-            head += f"{alias}={fref}.factory(), " if field.init else ""
-            body += f"{alias}\n" if field.init else f"{fref}.factory()\n"
-
+            vref = f"field_map['{name}'].factory()"
+            head += f"{alias}={vref}, " if field.init else ""
+            body += f"\t\tself.{name}=" + (f"{alias}\n" if field.init else f"{vref}\n")
         else:
-            # no defaults are added
             head += f"{alias}, " if field.init else ""
-            body += f"{alias}\n " if field.init else ""
+            body += f"\t\tself.{name}={alias}\n " if field.init else ""
 
         if field.pos_only and field.init:
-            if "/" in head:
-                head = head.replace("/,", "")
-
-            head += "/, "
+            head = head.replace("/,", "") + "/, "
 
     body += "\t\tpass"  # add pass to avoid syntax error if all fields are ignored
     body = "\tdef __init__(self, " + head[:-2] + "):\n" + body
@@ -260,9 +254,8 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
 
 def _generate_init_method(klass: type) -> FunctionType:
     field_map = _generate_field_map(klass)
-    global_namespace = vars(sys.modules[klass.__module__])
     init_code = _generate_init_code(tuple(field_map.values()))
-    exec(init_code, global_namespace, local_namespace := dict())
+    exec(init_code, vars(sys.modules[klass.__module__]), local_namespace := dict())
     method = local_namespace["closure"](field_map)
     method.__qualname__ = f"{klass.__qualname__}.__init__"
     return method
@@ -270,7 +263,7 @@ def _generate_init_method(klass: type) -> FunctionType:
 
 @_conditional_mutable_method
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
-    if key in (field_map := vars(tree)[_FIELDS]):
+    if key in (field_map := vars(tree).get(_FIELDS, ())):
         for callback in field_map[key].callbacks:
             try:
                 # callback is a function that takes the value of the field
@@ -331,7 +324,8 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
             if vars(klass)[key] is method:
                 return klass  # already transformed
             # the user defined a method that conflicts with the required method
-            msg = f"Unable to transform the class `{klass.__name__}` with {key} method defined."
+            msg = f"Unable to transform the class `{klass.__name__}` "
+            msg += f"with resereved `{key}` method defined on the class."
             raise TypeError(msg)
         setattr(klass, key, method)
 
