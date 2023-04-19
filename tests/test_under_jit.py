@@ -1,5 +1,3 @@
-import functools as ft
-
 import jax
 import jax.tree_util as jtu
 import numpy.testing as npt
@@ -10,8 +8,7 @@ import pytreeclass as pytc
 
 
 def test_jit_freeze():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class Linear:
+    class Linear(pytc.TreeClass, leafwise=True):
         weight: jax.Array
         bias: jax.Array
         name: str
@@ -26,8 +23,7 @@ def test_jit_freeze():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class StackedLinear:
+    class StackedLinear(pytc.TreeClass, leafwise=True):
         l1: Linear
         l2: Linear
         l3: Linear
@@ -107,14 +103,12 @@ def test_jit_freeze():
 
 
 def test_ops_with_jit():
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class T0:
+    class T0(pytc.TreeClass, leafwise=True):
         a: jax.Array = jnp.array(1)
         b: jax.Array = jnp.array(2)
         c: jax.Array = jnp.array(3)
 
-    @ft.partial(pytc.treeclass, leafwise=True)
-    class T1:
+    class T1(pytc.TreeClass, leafwise=True):
         a: jax.Array = jnp.array(1)
         b: jax.Array = jnp.array(2)
         c: jax.Array = jnp.array(3)

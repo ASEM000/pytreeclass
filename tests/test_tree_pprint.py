@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses as dc
-import functools as ft
 from collections import namedtuple
 
 # import jax
@@ -11,6 +10,7 @@ from jax import numpy as jnp
 
 import pytreeclass as pytc
 from pytreeclass import (
+    TreeClass,
     tree_diagram,
     tree_indent,
     tree_mermaid,
@@ -21,8 +21,7 @@ from pytreeclass import (
 )
 
 
-@ft.partial(pytc.treeclass, leafwise=True)
-class Repr1:
+class Repr1(TreeClass, leafwise=True):
     a: int = 1
     b: str = "string"
     c: float = 1.0
@@ -189,18 +188,15 @@ def test_misc():
 
 
 def test_extra_tree_diagram():
-    @pytc.treeclass
-    class L0:
+    class L0(TreeClass):
         a: int = 1
         b: int = 2
 
-    @pytc.treeclass
-    class L1:
+    class L1(TreeClass):
         c: L0 = L0()
         d: int = 3
 
-    @pytc.treeclass
-    class L2:
+    class L2(TreeClass):
         e: int = 4
         f: L1 = L1()
         g: L0 = L0()
@@ -214,12 +210,10 @@ def test_extra_tree_diagram():
 
     assert tree_indent(tree) == _tree_to_indent(out)
 
-    @pytc.treeclass
-    class L0:
+    class L0(TreeClass):
         a: int = 1
 
-    @pytc.treeclass
-    class L1:
+    class L1(TreeClass):
         b: L0 = L0()
 
     tree = L1()
@@ -237,8 +231,7 @@ def test_invalid_depth():
 
 
 def test_tree_repr_with_trace():
-    @pytc.treeclass
-    class Test:
+    class Test(TreeClass, leafwise=True):
         a: int = 1
         b: float = 2.0
 

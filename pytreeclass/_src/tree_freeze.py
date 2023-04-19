@@ -103,8 +103,7 @@ def freeze(wrapped: Any) -> _FrozenWrapper:
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
 
-        >>> @pytc.treeclass
-        ... class Test:
+        >>> class Test(pytc.TreeClass):
         ...     a: float
         ...     @jax.value_and_grad
         ...     def __call__(self, x):

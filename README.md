@@ -41,7 +41,7 @@ pip install git+https://github.com/ASEM000/PyTreeClass
 
 ## 📖 Description<a id="description"></a>
 
-`PyTreeClass` is a JAX-compatible `dataclass`-like decorator to create and operate on stateful JAX PyTrees.
+`PyTreeClass` is a JAX-compatible class builder to create and operate on stateful JAX PyTrees.
 
 The package aims to achieve _two goals_:
 
@@ -66,8 +66,7 @@ import jax
 import jax.numpy as jnp
 import pytreeclass as pytc
 
-@pytc.treeclass
-class Tree:
+class Tree(pytc.TreeClass):
     a:int = 1
     b:tuple[float] = (2.,3.)
     c:jax.Array = jnp.array([4.,5.,6.])
@@ -280,8 +279,7 @@ import jax
 import jax.numpy as jnp
 
 
-@pytc.treeclass
-class Tree:
+class Tree(pytc.TreeClass)
     a: int = 1
     b: tuple[float] = (2., 3.)
     c: jax.Array = jnp.array([4., 5., 6.])
@@ -405,7 +403,7 @@ print(tree.at[1].at[0].apply(lambda x: 10))
 
 ## 📜 Stateful computations<a id="stateful_computation"></a> </summary>
 
-First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using @pytc.treeclass no need to separate the instance variables ; instead the whole instance is passed as a state.
+First, [Under jax.jit jax requires states to be explicit](https://jax.readthedocs.io/en/latest/jax-101/07-state.html?highlight=state), this means that for any class instance; variables needs to be separated from the class and be passed explictly. However when using `TreeClass` no need to separate the instance variables ; instead the whole instance is passed as a state.
 
 Using the following pattern,Updating state **functionally** can be achieved under `jax.jit`
 
@@ -413,8 +411,7 @@ Using the following pattern,Updating state **functionally** can be achieved unde
 import jax
 import pytreeclass as pytc
 
-@pytc.treeclass
-class Counter:
+class Counter(pytc.TreeClass):
     calls : int = 0
 
     def increment(self):
@@ -525,8 +522,7 @@ def positive_int_callback(value):
     return value
 
 
-@pytc.treeclass
-class Tree:
+class Tree(pytc.TreeClass):
     in_features:int = pytc.field(callbacks=[positive_int_callback])
 
 
@@ -554,8 +550,7 @@ import jax.tree_util as jtu
 import jax.numpy as jnp
 
 
-@ft.partial(pytc.treeclass, leafwise=True)
-class Tree:
+class Tree(pytc.TreeClass, leafwise=True):
     a: int = 1
     b: tuple[float] = (2., 3.)
     c: jax.Array = jnp.array([4., 5., 6.])
@@ -613,8 +608,7 @@ import functools as ft
 import pytreeclass as pytc
 import jax.numpy as jnp
 
-@ft.partial(pytc.treeclass, leafwise=True)
-class Tree:
+class Tree(pytc.TreeClass, leafwise=True):
     a:int = 1
     b:tuple[float] = (2.,3.)
     c:jax.Array = jnp.array([4.,5.,6.])
@@ -699,8 +693,8 @@ lets then take this a step further to eliminate `mask` from the equation
 by using `pytreeclass` with `leafwise=True `
 
 ```python
-@ft.partial(pytc.treeclass, leafwise=True)
-class Tree:
+
+class Tree(pytc.TreeClass, leafwise=True):
     tree : tuple = ([1], {"a":1, "b":2}, (1,), -1,)
 
 tree = Tree()
@@ -893,8 +887,7 @@ import jax
 import jax.numpy as jnp
 import pytreeclass as pytc
 
-@pytc.treeclass
-class Tree:
+class Tree(pytc.TreeClass):
     a:int = 1
     b:tuple[float] = (2.,3.)
     c:jax.Array = jnp.array([4.,5.,6.])

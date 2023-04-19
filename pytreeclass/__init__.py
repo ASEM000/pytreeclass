@@ -1,4 +1,4 @@
-from pytreeclass._src.tree_decorator import field, is_treeclass, treeclass
+from pytreeclass._src.tree_decorator import TreeClass, field
 from pytreeclass._src.tree_freeze import freeze, is_frozen, is_nondiff, unfreeze
 from pytreeclass._src.tree_indexer import bcmap, is_tree_equal, tree_indexer
 from pytreeclass._src.tree_pprint import (
@@ -19,8 +19,7 @@ from pytreeclass._src.tree_trace import (
 
 __all__ = (
     # general utils
-    "treeclass",
-    "is_treeclass",
+    "TreeClass",
     "is_tree_equal",
     "field",
     # pprint utils
@@ -46,4 +45,4 @@ __all__ = (
     "tree_repr_with_trace",
 )
 
-__version__ = "0.2.9"
+__version__ = "0.3.0"

@@ -52,7 +52,7 @@ def _node_pprint(
         return _dict_pprint(node, indent, kind, width, depth)
     if dc.is_dataclass(node):
         return _dataclass_pprint(node, indent, kind, width, depth)
-    if pytc.is_treeclass(node):
+    if isinstance(node, pytc.TreeClass):
         return _treeclass_pprint(node, indent, kind, width, depth)
     return _general_pprint(node, indent, kind, width, depth)
 
@@ -528,14 +528,12 @@ def tree_diagram(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> @pytc.treeclass
-        ... class A:
+        >>> class A(pytc.TreeClass):
         ...        x: int = 10
         ...        y: int = (20,30)
         ...        z: int = 40
 
-        >>> @pytc.treeclass
-        ... class B:
+        >>> class B(pytc.TreeClass):
         ...     a: int = 10
         ...     b: tuple = (20,30, A())
 
@@ -904,8 +902,7 @@ def tree_repr_with_trace(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> @pytc.treeclass
-        ... class Test:
+        >>> class Test(pytc.TreeClass):
         ...    a:int = 1
         ...    b:float = 2.0
 
