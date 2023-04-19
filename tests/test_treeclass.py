@@ -670,7 +670,7 @@ def test_instance_field_map():
     assert tree._fields != tree_with_weight._fields
     assert tree_with_weight.weight == Parameter(3)
     assert "weight" not in vars(tree)
-    assert "weight" not in tree.__fields__
+    assert "weight" not in tree._fields
 
 
 def test_field_factory():
