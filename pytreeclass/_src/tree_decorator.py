@@ -12,9 +12,9 @@ from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_freeze import tree_hash
 from pytreeclass._src.tree_indexer import (
-    _conditional_mutable_method,
     _leafwise_transform,
     _mutable_context,
+    _mutable_instance_registry,
     is_tree_equal,
     tree_copy,
     tree_indexer,
@@ -224,10 +224,6 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
 
-        mark0 = f"field_map['{name}'].default"
-        mark1 = f"field_map['{name}'].factory()"
-        mark2 = f"self.{name}"
-
         if field.kw_only and "*" not in head and field.init:
             head += "*, "
 
@@ -261,8 +257,12 @@ def _generate_init_method(klass: type) -> FunctionType:
     return method
 
 
-@_conditional_mutable_method
 def _setattr(tree: PyTree, key: str, value: Any) -> None:
+    if id(tree) not in _mutable_instance_registry:
+        msg = f"Cannot set attribute `{key}` = {value!r} on immutable instance of "
+        msg += f"`{type(tree).__name__}`.\nUse `.at[`{key}`].set({value!r})` instead."
+        raise AttributeError(msg)
+
     if key in (field_map := vars(tree).get(_FIELDS, ())):
         for callback in field_map[key].callbacks:
             try:
@@ -285,10 +285,14 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
     vars(tree)[key] = value  # type: ignore
 
 
-@_conditional_mutable_method
 def _delattr(tree, key: str) -> None:
     # delete the attribute under `_mutable_context` context
     # otherwise raise an error
+    if id(tree) not in _mutable_instance_registry:
+        msg = f"Cannot delete attribute `{key}` on immutable instance of "
+        msg += f"`{type(tree).__name__}`.\n"
+        raise AttributeError(msg)
+
     del vars(tree)[key]
 
 
@@ -319,11 +323,8 @@ def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
 
 def _treeclass_transform(klass: type[T]) -> type[T]:
     for key, method in (("__setattr__", _setattr), ("__delattr__", _delattr)):
-        # basic required methods
         if key in vars(klass):
-            if vars(klass)[key] is method:
-                return klass  # already transformed
-            # the user defined a method that conflicts with the required method
+            # the user defined a method that conflicts with the reserved method
             msg = f"Unable to transform the class `{klass.__name__}` "
             msg += f"with resereved `{key}` method defined on the class."
             raise TypeError(msg)
@@ -346,6 +347,14 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
             # this behavior similar is to `dataclasses.dataclass`
             setattr(klass, key, method)
 
+    return klass
+
+
+def _register_treeclass(klass: type[T]) -> type[T]:
+    # handle all registration logic for `treeclass`
+    # TODO: register with jax path registry once jax version >= 0.4.7
+    register_pytree_node_trace(klass, _tree_trace)
+    register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))
     return klass
 
 
@@ -432,7 +441,6 @@ class TreeClass(metaclass=TreeClassMeta):
     """
 
     def __init_subclass__(klass: type[T], leafwise: bool = False) -> None:
-        _leafwise_transform(klass) if leafwise else klass
-        _treeclass_transform(klass)
-        register_pytree_node_trace(klass, _tree_trace)
-        register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))
+        klass = _register_treeclass(klass)
+        klass = _leafwise_transform(klass) if leafwise else klass
+        klass = _treeclass_transform(klass)

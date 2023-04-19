@@ -26,23 +26,11 @@ TraceType = Any
 _no_initializer = object()
 _non_partial = object()
 
-# allow methods in mutable context to be called without raising an error
+# allow methods in mutable context to be called without raising `AttributeError`
+# the instances are registered  during initialization and using `at` property with `__call__
 # this is done by registering the instance id in a set before entering the
 # mutable context and removing it after exiting the context
 _mutable_instance_registry: set[int] = set()
-
-
-def _conditional_mutable_method(method: Callable) -> Callable:
-    # decorator to allow for decorated methods to be called
-    # within the mutable context and raise an error otherwise
-    @ft.wraps(method)
-    def wrapper(self, *a, **k):
-        if id(self) in _mutable_instance_registry:
-            return method(self, *a, **k)
-        msg = f"Cannot call `{method.__name__}` on frozen instance."
-        raise AttributeError(msg)
-
-    return wrapper
 
 
 @contextmanager
@@ -159,17 +147,17 @@ def _merge_where(
         if len(where) > len(indices):
             return jnp.zeros_like(leaf, dtype=bool) if is_array else False
         for i, item in enumerate(where):
-            if item is ... or indices[i] == item or names[i] == item:
-                # no mismatch in where and trace
-                continue
-            return jnp.zeros_like(leaf, dtype=bool) if is_array else False
+            if not (item is ... or indices[i] == item or names[i] == item):
+                return jnp.zeros_like(leaf, dtype=bool) if is_array else False
         return jnp.ones_like(leaf, dtype=bool) if is_array else True
 
     def merge_boolean_where(*leaves):
         def is_leaf_bool(leaf: Any) -> bool:
-            if hasattr(leaf, "dtype"):
-                return leaf.dtype == "bool"
-            return isinstance(leaf, bool)
+            return (
+                leaf.dtype == "bool"
+                if hasattr(leaf, "dtype")
+                else isinstance(leaf, bool)
+            )
 
         verdict = True
         for leaf in leaves:
