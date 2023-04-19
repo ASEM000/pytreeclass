@@ -625,15 +625,6 @@ def test_iterable_node():
     assert pytc.is_tree_equal(t.at[...].set(True), Tree([True, True, True, True]))
 
 
-# def test_at_set_apply_is_leaf():
-#     @ft.partial(pytc.treeclass, leafwise=True)
-#     class Tree:
-#         a: int = 1
-#         b: int = 2
-
-# t = Tree()
-
-
 def test_call_context():
     class L2(TreeClass, leafwise=True):
         a: int = 1
