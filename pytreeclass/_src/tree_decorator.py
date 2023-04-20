@@ -435,6 +435,7 @@ class TreeClass(metaclass=TreeClassMeta):
     """
 
     def __init_subclass__(klass: type[T], leafwise: bool = False) -> None:
+        super().__init_subclass__()
         klass = _register_treeclass(klass)
         klass = _leafwise_transform(klass) if leafwise else klass
         klass = _treeclass_transform(klass)

@@ -15,9 +15,9 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
-from jax.util import unzip2
 
-from pytreeclass._src.tree_trace import tree_leaves_with_trace, tree_map_with_trace
+from pytreeclass._src.tree_pprint import tree_repr_with_trace
+from pytreeclass._src.tree_trace import tree_map_with_trace
 
 T = TypeVar("T")
 PyTree = Any
@@ -170,8 +170,8 @@ def _merge_where(
         mask = tree_map_with_trace(func, tree, is_leaf=is_leaf)
 
         if not match:
-            leaves, traces = unzip2(tree_leaves_with_trace(tree))
-            msg = f"No match is found for path={path_where} in `{tree}` of {leaves=} and {traces=}."
+            msg = f"No match is found for path={path_where} for tree with trace:\n"
+            msg += f"{tree_repr_with_trace(tree)}"
             raise LookupError(msg)
 
     if boolean_where := [i for i in where if isinstance(i, type(tree))]:
