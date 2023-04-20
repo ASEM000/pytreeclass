@@ -395,6 +395,49 @@ print(tree.at[1].at[0].apply(lambda x: 10))
 # Tree(a=1, b=(10, 3.0), c=[4. 5. 6.])
 ```
 
+### Mix, match , and chain index update
+
+```python
+
+import jax
+import jax.numpy as jnp
+import pytreeclass as pytc
+
+class Tree(pytc.TreeClass):
+    a: int = 1
+    b: str = "b"
+    c: float = 1.0
+    d: bool = True
+    e: tuple = (1, 2, 3)
+    f: jax.Array = jax.numpy.array([1, 2, 3])
+
+tree = Tree()
+
+integer_mask = jax.tree_util.tree_map(lambda x: isinstance(x, int), tree)
+
+tree = (
+    tree
+    .at["a"].set(10)
+    .at["b"].set("B")
+    .at["c"].set(10.0)
+    .at["d"].set(False)
+    .at["e"].at[0].set(10)  # set first element of tuple to 10
+    .at["f"].apply(jnp.sin)  # apply to all elements in array
+    .at[integer_mask].apply(float)  # cast all `int` to `float`
+)
+
+print(tree)
+# Tree(
+#   a=10.0,
+#   b=B,
+#   c=10.0,
+#   d=0.0,
+#   e=(10.0, 2.0, 3.0),
+#   f=[0.841471  0.9092974 0.14112  ]
+# )
+
+```
+
 </details>
 
 <details>

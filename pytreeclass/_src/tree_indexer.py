@@ -22,7 +22,6 @@ T = TypeVar("T")
 PyTree = TypeVar("PyTree")
 EllipsisType = type(Ellipsis)
 TraceType = Any
-
 _no_initializer = object()
 _non_partial = object()
 
@@ -48,13 +47,12 @@ def _get_at_mask(
     tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool] | None
 ) -> PyTree:
     def leaf_get(leaf: Any, where: Any):
-        # check if where is a boolean leaf inside the `tree_map`
-        # to avoid extrachecks in `tree_map`
-        if isinstance(leaf, (jax.Array, np.ndarray)) and jnp.ndim(leaf) > 0:
+        try:
             # return empty array instead of None if condition is not met
             # not `jittable` as size of array changes
             return leaf[jnp.where(where)]
-        return leaf if where else None
+        except TypeError:
+            return leaf if where else None
 
     return jtu.tree_map(leaf_get, tree, where, is_leaf=is_leaf)
 
@@ -66,14 +64,13 @@ def _set_at_mask(
     is_leaf: Callable[[Any], bool] | None,
 ) -> PyTree:
     def leaf_set(leaf: Any, where: Any, set_value: Any):
-        # check if where is a boolean leaf inside the `tree_map`
-        # to avoid extrachecks in `tree_map`
         if isinstance(leaf, (jax.Array, np.ndarray)):
-            if jnp.isscalar(set_value):
+            try:
                 # apply scalar set_value to leaf array if condition is met
                 return jnp.where(where, set_value, leaf)
-            # set_value is not scalar
-            return set_value if jnp.all(where) else leaf
+            except TypeError:
+                # set_value is not scalar
+                return set_value if jnp.all(where) else leaf
         # leaf is not an array and set_value, so we apply the set_value to the
         # leaf if the condition is met
         return set_value if (where is True) else leaf
@@ -102,18 +99,15 @@ def _apply_at_mask(
     is_leaf: Callable[[Any], bool] | None,
 ) -> PyTree:
     def leaf_apply(leaf: Any, where: bool):
-        # check if where is a boolean leaf inside the `tree_map`
-        # to avoid extrachecks in `tree_map`
-        value = func(leaf)
         if isinstance(leaf, (jax.Array, np.ndarray)):
             try:
                 # leaf is an array with scalar output
-                return jnp.where(where, value, leaf)
+                return jnp.where(where, func(leaf), leaf)
             except TypeError:
-                # set_value is not `scalar` type
-                return value if jnp.all(where) else leaf
+                # set_value is not `scalar` type but leaf is an array
+                return func(leaf) if jnp.all(where) else leaf
         # leaf is not an array and value is not scalar
-        return value if (where is True) else leaf
+        return func(leaf) if (where is True) else leaf
 
     return jtu.tree_map(leaf_apply, tree, where, is_leaf=is_leaf)
 

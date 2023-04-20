@@ -5,7 +5,7 @@ import sys
 from abc import ABCMeta
 from collections.abc import MutableMapping, MutableSequence
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, NamedTuple, Sequence, TypeVar
+from typing import Any, Callable, Hashable, NamedTuple, Sequence, TypeVar
 
 from jax.tree_util import register_pytree_node
 from typing_extensions import dataclass_transform
@@ -27,7 +27,7 @@ class NOT_SET:
     __repr__ = lambda _: "?"
 
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Hashable)
 PyTree = Any
 
 _NOT_SET = NOT_SET()
@@ -126,12 +126,12 @@ def field(
 
     if default is not _NOT_SET and factory is not None:
         msg = "`default` and `factory` are mutually exclusive arguments."
-        msg += f"got default={default} and factory={factory}"
+        msg += f"got {default}= and {factory=}"
         raise ValueError(msg)
 
     if kw_only is True and pos_only is True:
         msg = "`kw_only` and `pos_only` are mutually exclusive arguments."
-        msg += f"got kw_only={kw_only} and pos_only={pos_only}"
+        msg += f"got {kw_only=} and {pos_only=}"
         raise ValueError(msg)
 
     if isinstance(metadata, dict):
@@ -145,7 +145,7 @@ def field(
 
     for index, callback in enumerate(callbacks):
         if not isinstance(callback, Callable):  # type: ignore
-            msg = "`callbacks` must be a Sequence of functions, "
+            msg = "`callbacks` must be a Sequence of zero argument functions, "
             msg += f"got `{type(callbacks).__name__}` at index={index}"
             raise TypeError(msg)
 
@@ -165,18 +165,18 @@ def field(
 
 
 @ft.lru_cache
-def _generate_field_map(klass: type) -> dict[str, Field]:
-    field_map = dict()
+def _generate_field_map(klass: type) -> MappingProxyType[str, Field]:
+    field_map = dict()  # type: dict[str, Field]
 
     if klass is object:
-        return field_map
+        return MappingProxyType(field_map)
 
     for base in reversed(klass.__mro__[1:]):
         field_map.update(_generate_field_map(base))
 
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
     if "__annotations__" not in vars(klass):
-        return field_map
+        return MappingProxyType(field_map)
 
     for name in (annotation_map := vars(klass)["__annotations__"]):
         value = vars(klass).get(name, _NOT_SET)
@@ -213,7 +213,7 @@ def _generate_field_map(klass: type) -> dict[str, Field]:
             # case: `x: int = 1`
             field_map[name] = Field(name=name, type=type, default=value)
 
-    return field_map
+    return MappingProxyType(field_map)
 
 
 @ft.lru_cache
@@ -251,7 +251,7 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
 def _generate_init_method(klass: type) -> FunctionType:
     field_map = _generate_field_map(klass)
     init_code = _generate_init_code(tuple(field_map.values()))
-    exec(init_code, vars(sys.modules[klass.__module__]), local_namespace := dict())
+    exec(init_code, vars(sys.modules[klass.__module__]), local_namespace := dict())  # type: ignore
     method = local_namespace["closure"](field_map)
     method.__qualname__ = f"{klass.__qualname__}.__init__"
     return method
@@ -279,8 +279,8 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
         # with instances of `Parameter`/`Module`.
         # the behavior is useful to avoid repetitive code pattern in field definition and
         # and initialization inside init method.
-        kv = {key: Field(type=type(value), init=False, name=key)}
-        vars(tree)[_FIELDS] = MappingProxyType({**field_map, **kv})
+        field = Field(type=type(value), init=False, name=key)
+        vars(tree)[_FIELDS] = MappingProxyType({**field_map, key: field})  # type: ignore
 
     vars(tree)[key] = value  # type: ignore
 
@@ -298,7 +298,7 @@ def _delattr(tree, key: str) -> None:
 
 def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
     # unflatten rule for `treeclass` to use with `jax.tree_unflatten`
-    tree = object.__new__(klass)
+    tree = getattr(object, "__new__")(klass)
     vars(tree).update(treedef[1])
     vars(tree).update(zip(treedef[0], leaves))
     return tree
@@ -312,13 +312,12 @@ def _tree_flatten(tree: PyTree):
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
 
-def _tree_trace(tree: PyTree) -> list[tuple[Any, Any, Any, Any]]:
+def _tree_trace(tree: PyTree):
     # Trace flatten rule to be used with the `tree_trace` module
     leaves, (keys, _) = _tree_flatten(tree)
-    names = (f"{key}" for key in keys)
     types = map(type, leaves)
     indices = range(len(leaves))
-    return [*zip(names, types, indices)]
+    return [*zip(keys, types, indices)]
 
 
 def _treeclass_transform(klass: type[T]) -> type[T]:
@@ -360,11 +359,11 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
 class TreeClassMeta(ABCMeta):
     def __call__(klass: type[T], *a, **k) -> T:
-        self = klass.__new__(klass, *a, **k)
+        self = getattr(klass, "__new__")(klass, *a, **k)
 
         with _mutable_context(self):
-            vars(self)[_FIELDS] = MappingProxyType(_generate_field_map(klass))
-            klass.__init__(self, *a, **k)
+            setattr(self, _FIELDS, _generate_field_map(klass))
+            getattr(klass, "__init__")(self, *a, **k)
 
             if post_init_func := getattr(klass, _POST_INIT, None):
                 # to simplify the logic, we call the post init method
@@ -373,8 +372,7 @@ class TreeClassMeta(ABCMeta):
 
         # handle non-initialized fields
         if len(keys := set(getattr(self, _FIELDS)) - set(vars(self))) > 0:
-            msg = f"Uninitialized fields: ({', '.join(keys)}) "
-            msg += f"in class `{type(self).__name__}`"
+            msg = f"Uninitialized fields: ({', '.join(keys)}) in the instance of `{type(self).__name__}`"
             raise AttributeError(msg)
         return self
 
@@ -382,10 +380,6 @@ class TreeClassMeta(ABCMeta):
 @dataclass_transform(field_specifiers=(field, Field), frozen_default=True)
 class TreeClass(metaclass=TreeClassMeta):
     """Convert a class to a JAX compatible tree structure.
-
-    Args:
-        klass: class to be converted to a `treeclass`
-        leafwise: Wether to generate leafwise math operations methods. Defaults to `False`.
 
     Example:
         >>> import functools as ft
