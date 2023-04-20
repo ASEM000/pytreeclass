@@ -134,9 +134,14 @@ def test_freeze_with_ops():
 
     t = jtu.tree_map(pytc.freeze, (Test(100)))
 
-    assert pytc.is_tree_equal(t.at[...].set(0), t)
-    assert pytc.is_tree_equal(t.at[...].apply(lambda x: x + 1), t)
-    assert pytc.is_tree_equal(t.at[...].reduce(jnp.sin, initializer=0), 0.0)
+    with pytest.raises(LookupError):
+        pytc.is_tree_equal(t.at[...].set(0), t)
+
+    with pytest.raises(LookupError):
+        pytc.is_tree_equal(t.at[...].apply(lambda x: x + 1), t)
+
+    with pytest.raises(LookupError):
+        pytc.is_tree_equal(t.at[...].reduce(jnp.add, initializer=0), t)
 
     class Test(pytc.TreeClass, leafwise=True):
         x: jnp.ndarray

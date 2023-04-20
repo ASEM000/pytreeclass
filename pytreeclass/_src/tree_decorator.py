@@ -126,7 +126,7 @@ def field(
 
     if default is not _NOT_SET and factory is not None:
         msg = "`default` and `factory` are mutually exclusive arguments."
-        msg += f"got {default}= and {factory=}"
+        msg += f"got {default=} and {factory=}"
         raise ValueError(msg)
 
     if kw_only is True and pos_only is True:

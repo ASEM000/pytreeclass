@@ -15,11 +15,12 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
+from jax.util import unzip2
 
-from pytreeclass._src.tree_trace import tree_map_with_trace
+from pytreeclass._src.tree_trace import tree_leaves_with_trace, tree_map_with_trace
 
 T = TypeVar("T")
-PyTree = TypeVar("PyTree")
+PyTree = Any
 EllipsisType = type(Ellipsis)
 TraceType = Any
 _no_initializer = object()
@@ -64,21 +65,15 @@ def _set_at_mask(
     is_leaf: Callable[[Any], bool] | None,
 ) -> PyTree:
     def leaf_set(leaf: Any, where: Any, set_value: Any):
-        if isinstance(leaf, (jax.Array, np.ndarray)):
-            try:
-                # apply scalar set_value to leaf array if condition is met
-                return jnp.where(where, set_value, leaf)
-            except TypeError:
-                # set_value is not scalar
-                return set_value if jnp.all(where) else leaf
-        # leaf is not an array and set_value, so we apply the set_value to the
-        # leaf if the condition is met
-        return set_value if (where is True) else leaf
+        if not isinstance(leaf, (jax.Array, np.ndarray)):
+            return set_value if where else leaf
+        try:
+            return jnp.where(where, set_value, leaf)
+        except TypeError:
+            # set_value is not a valid input for where
+            return set_value if jnp.all(where) else leaf
 
-    if isinstance(set_value, type(tree)) and (
-        jtu.tree_structure(tree, is_leaf=is_leaf)
-        == jtu.tree_structure(set_value, is_leaf=is_leaf)
-    ):
+    if jtu.tree_structure(tree) == jtu.tree_structure(set_value):
         # do not broadcast set_value if it is a pytree of same structure
         # for example tree.at[where].set(tree2) will set all tree leaves to tree2 leaves
         # if tree2 is a pytree of same structure as tree
@@ -99,15 +94,16 @@ def _apply_at_mask(
     is_leaf: Callable[[Any], bool] | None,
 ) -> PyTree:
     def leaf_apply(leaf: Any, where: bool):
-        if isinstance(leaf, (jax.Array, np.ndarray)):
-            try:
-                # leaf is an array with scalar output
-                return jnp.where(where, func(leaf), leaf)
-            except TypeError:
-                # set_value is not `scalar` type but leaf is an array
-                return func(leaf) if jnp.all(where) else leaf
-        # leaf is not an array and value is not scalar
-        return func(leaf) if (where is True) else leaf
+        if not isinstance(leaf, (jax.Array, np.ndarray)):
+            # leaf is not an array and value is not scalar
+            return func(leaf) if where else leaf
+
+        try:
+            # leaf is an array with scalar output
+            return jnp.where(where, func(leaf), leaf)
+        except TypeError:
+            # set_value is not `scalar` type but leaf is an array
+            return func(leaf) if jnp.all(where) else leaf
 
     return jtu.tree_map(leaf_apply, tree, where, is_leaf=is_leaf)
 
@@ -119,7 +115,7 @@ def _reduce_at_mask(
     initializer: Any = _no_initializer,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> Any:
-    tree = tree.at[where].get(is_leaf=is_leaf)
+    tree = tree.at[where].get(is_leaf=is_leaf)  # type: ignore
     if initializer is _no_initializer:
         return jtu.tree_reduce(func, tree)
     return jtu.tree_reduce(func, tree, initializer)
@@ -130,11 +126,15 @@ def _merge_where(
     where: tuple[int | str | PyTree | EllipsisType, ...],
     is_leaf: Callable[[Any], bool] | None = None,
 ):
+    # a marker to indicate that the path is found
+    match = False
+
     def merge_non_boolean_where(
         where: tuple[int | str | EllipsisType, ...],
         trace: Sequence[TraceType],
         leaf: Any,
     ):
+        nonlocal match
         names, _, indices = trace
         is_array = isinstance(leaf, (jax.Array, np.ndarray))
 
@@ -143,6 +143,8 @@ def _merge_where(
         for i, item in enumerate(where):
             if not (item is ... or indices[i] == item or names[i] == item):
                 return jnp.zeros_like(leaf, dtype=bool) if is_array else False
+
+        match = True
         return jnp.ones_like(leaf, dtype=bool) if is_array else True
 
     def merge_boolean_where(*leaves):
@@ -156,16 +158,21 @@ def _merge_where(
         verdict = True
         for leaf in leaves:
             if not is_leaf_bool(leaf):
-                msg = f"Expected boolean leaf, found {type(leaf).__name__}."
+                msg = f"Expected boolean, got {leaf=}, of type {type(leaf).__name__}."
                 raise TypeError(msg)
             verdict &= leaf
         return verdict
 
     mask = None
 
-    if non_boolean_where := [i for i in where if isinstance(i, (int, str, type(...)))]:
-        func = ft.partial(merge_non_boolean_where, non_boolean_where)
+    if path_where := [i for i in where if isinstance(i, (int, str, type(...)))]:
+        func = ft.partial(merge_non_boolean_where, path_where)
         mask = tree_map_with_trace(func, tree, is_leaf=is_leaf)
+
+        if not match:
+            leaves, traces = unzip2(tree_leaves_with_trace(tree))
+            msg = f"No match is found for path={path_where} in `{tree}` of {leaves=} and {traces=}."
+            raise LookupError(msg)
 
     if boolean_where := [i for i in where if isinstance(i, type(tree))]:
         args = (mask, *boolean_where) if mask else boolean_where
@@ -251,7 +258,7 @@ class AtIndexer(NamedTuple):
 
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         with _mutable_context(self.tree, kopy=True) as tree:
-            value = _recursive_getattr(tree, self.where)(*a, **k)
+            value = _recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
         return value, tree
 
 

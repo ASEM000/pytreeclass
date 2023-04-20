@@ -115,8 +115,8 @@ def test_field_hash():
 
 def test_field_nondiff():
     class Test(pytc.TreeClass):
-        a: jnp.ndarray
-        b: jnp.ndarray
+        a: jax.Array
+        b: jax.Array
 
         def __init__(
             self,
@@ -131,8 +131,8 @@ def test_field_nondiff():
     assert jtu.tree_leaves(test) == []
 
     class Test(pytc.TreeClass):
-        a: jnp.ndarray
-        b: jnp.ndarray
+        a: jax.Array
+        b: jax.Array
 
         def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
             self.a = pytc.freeze(a)
@@ -144,7 +144,7 @@ def test_field_nondiff():
 
 def test_hash():
     class T(pytc.TreeClass):
-        a: jnp.ndarray
+        a: jax.Array
 
     # with pytest.raises(TypeError):
     hash(T(jnp.array([1, 2, 3])))
@@ -293,7 +293,7 @@ def test_is_tree_equal():
         a: int = 1
 
     class Test2(pytc.TreeClass):
-        a: jnp.ndarray
+        a: jax.Array
 
         def __init__(self) -> None:
             self.a = jnp.array([1, 2, 3])
