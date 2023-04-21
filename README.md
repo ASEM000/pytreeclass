@@ -57,7 +57,7 @@ The package aims to achieve _two goals_:
 
 <div align="center">
 <table>
-<tr><td align="center">Code</td> <td align="center">PyTree representation</td></tr>
+<tr><td align="center"></td> <td align="center"></td></tr>
 <tr>
 <td>
 
@@ -66,30 +66,68 @@ import jax
 import jax.numpy as jnp
 import pytreeclass as pytc
 
+
 class Tree(pytc.TreeClass):
-    a:int = 1
-    b:tuple[float] = (2.,3.)
-    c:jax.Array = jnp.array([4.,5.,6.])
+    a: int = 1
+    b: tuple[float] = (2, 3.)
+    c: jax.Array = jnp.array([4., 5., 6.])
 
     def __call__(self, x):
         return self.a + self.b[0] + self.c + x
 
+
 tree = Tree()
-```
+mask = jax.tree_map(lambda x: x > 5, tree)
+tree = (
+    tree
+    .at["a"].set(10)
+    .at["b"].at[0].set(10)
+    .at[mask].set(100)
+    )
 
-</td>
+print(tree)
+# Tree(a=10, b=(10, 3.0), c=[  4.   5. 100.])
 
-<td>
+print(pytc.tree_diagram(tree))
+# Tree
+# ├── a=10
+# ├── b:tuple
+# │   ├── [0]=10
+# │   └── [1]=3.0
+# └── c=f32[3](μ=36.33, σ=45.02, ∈[4.00,100.00])
 
-```python
-# leaves are parameters
+print(pytc.tree_summary(tree))
+# ┌────┬──────┬─────┐
+# │Name│Type  │Count│
+# ├────┼──────┼─────┤
+# │a   │int   │1    │
+# ├────┼──────┼─────┤
+# │b[0]│int   │1    │
+# ├────┼──────┼─────┤
+# │b[1]│float │1    │
+# ├────┼──────┼─────┤
+# │c   │f32[3]│3    │
+# ├────┼──────┼─────┤
+# │Σ   │Tree  │6    │
+# └────┴──────┴─────┘
 
-Tree
-    ├── a=1
-    ├── b:tuple
-    │   ├── [0]=2.0
-    │   └── [1]=3.0
-    └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+
+# ** pass it to jax transformations **
+
+# freeze all non-differentiable parameters to make it
+# work with jax trnasformations
+mask = jax.tree_map(pytc.is_nondiff, tree)
+tree = tree.at[mask].apply(pytc.freeze)
+
+@jax.jit
+@jax.grad
+def sum_tree(tree:Tree, x):
+    # unfreeze before calling tree
+    tree = tree.at[...].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+    return sum(tree(x))
+
+print(sum_tree(tree, 1.0))
+# Tree(a=#10, b=(#10, 0.0), c=[1. 1. 1.])
 ```
 
 </td>
