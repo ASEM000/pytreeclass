@@ -5,7 +5,7 @@ import operator as op
 from collections.abc import Callable
 from contextlib import contextmanager
 from math import ceil, floor, trunc
-from typing import Any, NamedTuple, Sequence, TypeVar
+from typing import Any, Hashable, NamedTuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
@@ -13,7 +13,6 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass._src.tree_pprint import tree_repr_with_trace
-from pytreeclass._src.tree_trace import tree_map_with_trace
 
 T = TypeVar("T")
 PyTree = Any
@@ -21,6 +20,16 @@ EllipsisType = type(Ellipsis)
 TraceType = Any
 _no_initializer = object()
 _non_partial = object()
+
+BuiltInKeyEntry = Union[
+    jtu.SequenceKey,
+    jtu.DictKey,
+    jtu.GetAttrKey,
+    jtu.FlattenedIndexKey,
+]
+
+KeyEntry = TypeVar("KeyEntry", bound=Hashable)
+KeyPath = tuple[KeyEntry, ...]
 
 # allow methods in mutable context to be called without raising `AttributeError`
 # the instances are registered  during initialization and using `at` property with `__call__
@@ -109,28 +118,36 @@ def _reduce_at_mask(
     return jtu.tree_reduce(func, tree, initializer)
 
 
+def _unpack_key_entry(entry: KeyEntry):
+    if isinstance(entry, jtu.GetAttrKey):
+        return entry.name
+    if isinstance(entry, jtu.SequenceKey):
+        return entry.idx
+    if isinstance(entry, (jtu.DictKey, jtu.FlattenedIndexKey)):
+        return entry.key
+    raise entry
+
+
 def _generate_path_mask(
     tree: PyTree,
-    where: tuple[int | str | EllipsisType, ...],
+    where: KeyPath,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTree:
-    # return a mask of the same structure as tree with True at the path where
-    # raise `LookupError` if the path is not found
     match = False
 
-    def map_func(trace: Sequence[TraceType], _: Any):
-        if len(where) > len(trace[0]):
+    def map_func(path, _: Any):
+        if len(where) > len(path):
             return False
 
-        for where_i, name_i, index_i in zip(where, trace[0], trace[2]):
-            if where_i not in (..., name_i, index_i):
+        for wi, pi in zip(where, path):
+            if wi not in (..., _unpack_key_entry(pi)):
                 return False
 
         nonlocal match
 
         return (match := True)
 
-    mask = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
+    mask = jtu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
 
     if not match:
         msg = f"No match is found for path={where} for tree with trace:\n"

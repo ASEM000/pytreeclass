@@ -7,7 +7,7 @@ from collections.abc import MutableMapping, MutableSequence
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, Hashable, NamedTuple, Sequence, TypeVar
 
-from jax.tree_util import register_pytree_node
+import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_freeze import tree_hash
@@ -312,6 +312,12 @@ def _tree_flatten(tree: PyTree):
     return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
 
+def _tree_flatten_with_keys(tree: PyTree):
+    # flatten rule for `treeclass` to use with `jax.tree_flatten_with_keys`
+    leaves, (keys, static) = _tree_flatten(tree)
+    return [(jtu.GetAttrKey(key), leaf) for leaf, key in zip(leaves, keys)], static
+
+
 def _tree_trace(tree: PyTree):
     # Trace flatten rule to be used with the `tree_trace` module
     leaves, (keys, _) = _tree_flatten(tree)
@@ -351,9 +357,13 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
 
 def _register_treeclass(klass: type[T]) -> type[T]:
     # handle all registration logic for `treeclass`
-    # TODO: register with jax path registry once jax version >= 0.4.7
     register_pytree_node_trace(klass, _tree_trace)
-    register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))
+    jtu.register_pytree_with_keys(
+        nodetype=klass,
+        flatten_func=_tree_flatten,
+        flatten_with_keys=_tree_flatten_with_keys,
+        unflatten_func=ft.partial(_tree_unflatten, klass),
+    )
     return klass
 
 
