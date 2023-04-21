@@ -955,7 +955,7 @@ def tree_repr_with_trace(
         # this can be useful in debugging and raising descriptive errors
         ROWS = [["Value", tree_repr(leaf)]]
 
-        names = "->".join(trace[0])
+        names = "->".join(str(i) for i in trace[0])
         ROWS += [["Name path", names]]
 
         types = "->".join(i.__name__ for i in trace[1])

@@ -1,9 +1,5 @@
-# this script defines methods used in indexing using `at` property
-# and decorator using to enable masking and math operations
-
 from __future__ import annotations
 
-import copy
 import functools as ft
 import operator as op
 from collections.abc import Callable
@@ -33,9 +29,15 @@ _non_partial = object()
 _mutable_instance_registry: set[int] = set()
 
 
+def tree_copy(tree: T) -> T:
+    """Return a copy of the tree."""
+    leaves, treedef = jtu.tree_flatten(tree)
+    return jtu.tree_unflatten(treedef, leaves)
+
+
 @contextmanager
 def _mutable_context(tree: PyTree, *, kopy: bool = False):
-    tree = copy.copy(tree) if kopy else tree
+    tree = tree_copy(tree) if kopy else tree
     _mutable_instance_registry.add(id(tree))
     yield tree
     _mutable_instance_registry.discard(id(tree))
@@ -48,12 +50,9 @@ def _get_at_mask(
     tree: PyTree, where: PyTree, is_leaf: Callable[[Any], bool] | None
 ) -> PyTree:
     def leaf_get(leaf: Any, where: Any):
-        try:
-            # return empty array instead of None if condition is not met
-            # not `jittable` as size of array changes
+        if isinstance(where, (jax.Array, np.ndarray)) and where.ndim != 0:
             return leaf[jnp.where(where)]
-        except TypeError:
-            return leaf if where else None
+        return leaf if where else None
 
     return jtu.tree_map(leaf_get, tree, where, is_leaf=is_leaf)
 
@@ -65,13 +64,9 @@ def _set_at_mask(
     is_leaf: Callable[[Any], bool] | None,
 ) -> PyTree:
     def leaf_set(leaf: Any, where: Any, set_value: Any):
-        if not isinstance(leaf, (jax.Array, np.ndarray)):
-            return set_value if where else leaf
-        try:
+        if isinstance(where, (jax.Array, np.ndarray)):
             return jnp.where(where, set_value, leaf)
-        except TypeError:
-            # set_value is not a valid input for where
-            return set_value if jnp.all(where) else leaf
+        return set_value if where else leaf
 
     if jtu.tree_structure(tree) == jtu.tree_structure(set_value):
         # do not broadcast set_value if it is a pytree of same structure
@@ -94,16 +89,9 @@ def _apply_at_mask(
     is_leaf: Callable[[Any], bool] | None,
 ) -> PyTree:
     def leaf_apply(leaf: Any, where: bool):
-        if not isinstance(leaf, (jax.Array, np.ndarray)):
-            # leaf is not an array and value is not scalar
-            return func(leaf) if where else leaf
-
-        try:
-            # leaf is an array with scalar output
+        if isinstance(where, (jax.Array, np.ndarray)):
             return jnp.where(where, func(leaf), leaf)
-        except TypeError:
-            # set_value is not `scalar` type but leaf is an array
-            return func(leaf) if jnp.all(where) else leaf
+        return func(leaf) if where else leaf
 
     return jtu.tree_map(leaf_apply, tree, where, is_leaf=is_leaf)
 
@@ -121,62 +109,68 @@ def _reduce_at_mask(
     return jtu.tree_reduce(func, tree, initializer)
 
 
-def _merge_where(
+def _generate_path_mask(
     tree: PyTree,
-    where: tuple[int | str | PyTree | EllipsisType, ...],
+    where: tuple[int | str | EllipsisType, ...],
     is_leaf: Callable[[Any], bool] | None = None,
-):
-    # a marker to indicate that the path is found
+) -> PyTree:
+    # return a mask of the same structure as tree with True at the path where
+    # raise `LookupError` if the path is not found
     match = False
 
-    def merge_non_boolean_where(
-        where: tuple[int | str | EllipsisType, ...],
-        trace: Sequence[TraceType],
-        leaf: Any,
-    ):
+    def map_func(trace: Sequence[TraceType], _: Any):
+        if len(where) > len(trace[0]):
+            return False
+
+        for where_i, name_i, index_i in zip(where, trace[0], trace[2]):
+            if where_i not in (..., name_i, index_i):
+                return False
+
         nonlocal match
-        names, _, indices = trace
-        is_array = isinstance(leaf, (jax.Array, np.ndarray))
 
-        if len(where) > len(indices):
-            return jnp.zeros_like(leaf, dtype=bool) if is_array else False
-        for i, item in enumerate(where):
-            if not (item is ... or indices[i] == item or names[i] == item):
-                return jnp.zeros_like(leaf, dtype=bool) if is_array else False
+        return (match := True)
 
-        match = True
-        return jnp.ones_like(leaf, dtype=bool) if is_array else True
+    mask = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
 
-    def merge_boolean_where(*leaves):
-        def is_leaf_bool(leaf: Any) -> bool:
-            return (
-                leaf.dtype == "bool"
-                if hasattr(leaf, "dtype")
-                else isinstance(leaf, bool)
-            )
+    if not match:
+        msg = f"No match is found for path={where} for tree with trace:\n"
+        msg += f"{tree_repr_with_trace(tree)}"
+        raise LookupError(msg)
 
+    return mask
+
+
+def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
+    def is_bool_leaf(leaf: Any) -> bool:
+        if hasattr(leaf, "dtype"):
+            return leaf.dtype == "bool"
+        return isinstance(leaf, bool)
+
+    def map_func(*leaves):
         verdict = True
         for leaf in leaves:
-            if not is_leaf_bool(leaf):
+            if not is_bool_leaf(leaf):
                 msg = f"Expected boolean, got {leaf=}, of type {type(leaf).__name__}."
                 raise TypeError(msg)
             verdict &= leaf
         return verdict
 
+    return jtu.tree_map(map_func, *masks)
+
+
+def _resolve_where(
+    tree: PyTree,
+    where: tuple[int | str | PyTree | EllipsisType, ...],
+    is_leaf: Callable[[Any], bool] | None = None,
+):
     mask = None
 
-    if path_where := [i for i in where if isinstance(i, (int, str, type(...)))]:
-        func = ft.partial(merge_non_boolean_where, path_where)
-        mask = tree_map_with_trace(func, tree, is_leaf=is_leaf)
+    if path := [i for i in where if isinstance(i, (int, str, type(...)))]:
+        mask = _generate_path_mask(tree, path, is_leaf=is_leaf)
 
-        if not match:
-            msg = f"No match is found for path={path_where} for tree with trace:\n"
-            msg += f"{tree_repr_with_trace(tree)}"
-            raise LookupError(msg)
-
-    if boolean_where := [i for i in where if isinstance(i, type(tree))]:
-        args = (mask, *boolean_where) if mask else boolean_where
-        mask = jtu.tree_map(merge_boolean_where, *args)
+    if maybe_bool_masks := [i for i in where if isinstance(i, type(tree))]:
+        all_masks = [mask, *maybe_bool_masks] if mask else maybe_bool_masks
+        mask = _combine_maybe_bool_masks(*all_masks)
 
     return mask
 
@@ -214,7 +208,7 @@ class AtIndexer(NamedTuple):
         )
 
     def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
-        where = _merge_where(self.tree, self.where, is_leaf)
+        where = _resolve_where(self.tree, self.where, is_leaf)
         return _get_at_mask(self.tree, where, is_leaf)
 
     def set(
@@ -223,7 +217,7 @@ class AtIndexer(NamedTuple):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> PyTree:
-        where = _merge_where(self.tree, self.where, is_leaf)
+        where = _resolve_where(self.tree, self.where, is_leaf)
         return _set_at_mask(self.tree, where, set_value, is_leaf)
 
     def apply(
@@ -232,7 +226,7 @@ class AtIndexer(NamedTuple):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> PyTree:
-        where = _merge_where(self.tree, self.where, is_leaf)
+        where = _resolve_where(self.tree, self.where, is_leaf)
         return _apply_at_mask(self.tree, where, func, is_leaf)
 
     def reduce(
@@ -242,7 +236,7 @@ class AtIndexer(NamedTuple):
         initializer: Any = _no_initializer,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> Any:
-        where = _merge_where(self.tree, self.where, is_leaf)
+        where = _resolve_where(self.tree, self.where, is_leaf)
         return _reduce_at_mask(self.tree, where, func, initializer, is_leaf)
 
     def __getattr__(self, name: str) -> AtIndexer:
@@ -523,8 +517,3 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
             return False
         verdict = ft.reduce(op.and_, map(_is_leaf_rhs_equal, leaves0, leaves), verdict)
     return verdict
-
-
-def tree_copy(tree: T) -> T:
-    """Return a copy of the tree."""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])  # type: ignore

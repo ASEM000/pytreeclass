@@ -1,7 +1,6 @@
 import jax
 import jax.tree_util as jtu
 import numpy.testing as npt
-import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
@@ -126,20 +125,18 @@ def test_ops_with_jit():
     def applier(tree):
         return tree.at[...].apply(lambda _: 0)
 
-    with pytest.raises(jax.errors.ConcretizationTypeError):
-        pytc.is_tree_equal(getter(T0()), T0())
+    # with pytest.raises(jax.errors.ConcretizationTypeError):
+    pytc.is_tree_equal(getter(T0()), T0())
 
     assert pytc.is_tree_equal(T0(0, 0, 0), setter(T0()))
 
     assert pytc.is_tree_equal(T0(0, 0, 0), applier(T0()))
 
-    with pytest.raises(jax.errors.ConcretizationTypeError):
-        pytc.is_tree_equal(getter(T1()), T1())
+    # with pytest.raises(jax.errors.ConcretizationTypeError):
+    pytc.is_tree_equal(getter(T1()), T1())
 
-    assert pytc.is_tree_equal(
-        T1(jnp.array(0), jnp.array(0), jnp.array(0), jnp.array([0, 0, 0])), setter(T1())
-    )
+    assert pytc.is_tree_equal(T1(0, 0, 0, 0), setter(T1()))
 
-    assert pytc.is_tree_equal(T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1()))
+    assert pytc.is_tree_equal(T1(0, 0, 0, 0), applier(T1()))
 
-    assert jax.jit(pytc.is_tree_equal)(T1(0, 0, 0, jnp.array([0, 0, 0])), applier(T1()))
+    assert jax.jit(pytc.is_tree_equal)(T1(0, 0, 0, 0), applier(T1()))
