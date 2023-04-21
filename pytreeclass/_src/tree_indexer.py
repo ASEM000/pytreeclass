@@ -5,7 +5,7 @@ import operator as op
 from collections.abc import Callable
 from contextlib import contextmanager
 from math import ceil, floor, trunc
-from typing import Any, Hashable, NamedTuple, TypeVar, Union
+from typing import Any, Hashable, NamedTuple, Tuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
@@ -29,7 +29,7 @@ BuiltInKeyEntry = Union[
 ]
 
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
-KeyPath = tuple[KeyEntry, ...]
+KeyPath = Tuple[KeyEntry, ...]
 
 # allow methods in mutable context to be called without raising `AttributeError`
 # the instances are registered  during initialization and using `at` property with `__call__

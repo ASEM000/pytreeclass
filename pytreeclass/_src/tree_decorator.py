@@ -313,9 +313,9 @@ def _tree_flatten(tree: PyTree):
 
 
 def _tree_flatten_with_keys(tree: PyTree):
-    # flatten rule for `treeclass` to use with `jax.tree_flatten_with_keys`
+    # flatten rule for `treeclass` to use with `jax.tree_util.tree_flatten_with_path`
     leaves, (keys, static) = _tree_flatten(tree)
-    return [(jtu.GetAttrKey(key), leaf) for leaf, key in zip(leaves, keys)], static
+    return [(jtu.GetAttrKey(key), leaf) for key, leaf in zip(keys, leaves)], static
 
 
 def _tree_trace(tree: PyTree):
