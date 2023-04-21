@@ -29,7 +29,7 @@ setup(
     author_email="asem00@kaist.ac.kr",
     keywords="python machine-learning pytorch jax",
     packages=find_namespace_packages(exclude=['examples", "tests","experimental']),
-    install_requires=["jax>=0.4.0"],
+    install_requires=["jax>=0.4.0", "typing-extensions"],
     zip_safe=False,
     python_requires=">=3.8",
     classifiers=[
