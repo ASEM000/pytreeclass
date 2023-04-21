@@ -69,7 +69,7 @@ import pytreeclass as pytc
 
 class Tree(pytc.TreeClass):
     a: int = 1
-    b: tuple[float] = (2, 3.)
+    b: tuple = (2, 3.)
     c: jax.Array = jnp.array([4., 5., 6.])
 
     def __call__(self, x):
