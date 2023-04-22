@@ -48,15 +48,16 @@ def flatten_one_trace_level(
         keys_leaves, _ = _registry_with_keypaths[type(tree)].flatten_with_keys(tree)
         keys, leaves = unzip2(keys_leaves)
 
-    elif type(tree) in _registry:
-        # trace handler for the current tree
-        leaves, _ = _registry[type(tree)].to_iter(tree)
-        keys = tuple(jtu.GetAttrKey(f"leaf_{i}") for i, _ in enumerate(leaves))
-
     elif isinstance(tree, tuple) and hasattr(tree, "_fields"):
         # this conforms to the `jax` convention for namedtuples
         leaves = (getattr(tree, field) for field in tree._fields)  # type: ignore
+        # use `NamedSequenceKey` to index by name and index unlike `jax` handler
         keys = tuple(NamedSequenceKey(idx, key) for idx, key in enumerate(tree._fields))  # type: ignore
+
+    elif type(tree) in _registry:
+        # no named handler for this type in key path
+        leaves, _ = _registry[type(tree)].to_iter(tree)
+        keys = tuple(jtu.GetAttrKey(f"leaf_{i}") for i, _ in enumerate(leaves))
 
     else:
         yield trace, tree
