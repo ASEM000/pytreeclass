@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses as dc
 from typing import Any, Callable, Hashable, Sequence, Tuple, TypeVar
 
 import jax.tree_util as jtu
@@ -19,6 +20,15 @@ TraceEntry = Tuple[KeyEntry, TypeEntry]
 KeyPath = Tuple[KeyEntry, ...]
 TypePath = Tuple[TypeEntry, ...]
 TraceType = Tuple[KeyPath, TypePath]
+
+
+@dc.dataclass(frozen=True)
+class NamedSequenceKey:
+    idx: int
+    key: Hashable
+
+    def __str__(self):
+        return f"[{repr(self.key)}]"
 
 
 def flatten_one_trace_level(
@@ -46,7 +56,7 @@ def flatten_one_trace_level(
     elif isinstance(tree, tuple) and hasattr(tree, "_fields"):
         # this conforms to the `jax` convention for namedtuples
         leaves = (getattr(tree, field) for field in tree._fields)  # type: ignore
-        keys = tuple(jtu.GetAttrKey(field) for field in tree._fields)  # type: ignore
+        keys = tuple(NamedSequenceKey(idx, key) for idx, key in enumerate(tree._fields))  # type: ignore
 
     else:
         yield trace, tree

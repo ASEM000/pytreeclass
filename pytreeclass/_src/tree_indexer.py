@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools as ft
 import operator as op
-from collections import defaultdict
 from collections.abc import Callable
 from contextlib import contextmanager
 from math import ceil, floor, trunc
@@ -14,7 +13,7 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass._src.tree_pprint import tree_repr_with_trace
-from pytreeclass._src.tree_trace import TraceType, tree_map_with_trace
+from pytreeclass._src.tree_trace import NamedSequenceKey, TraceType, tree_map_with_trace
 
 T = TypeVar("T")
 PyTree = Any
@@ -29,25 +28,21 @@ _non_partial = object()
 # mutable context and removing it after exiting the context
 _mutable_instance_registry: set[int] = set()
 
-# define rule for indexing matching through `at` property
-# for example `jax` internals uses `jtu.GetAttrKey` to index an attribute, however
-# its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]` to index an attribute
-# instead `tree.at['attr']` is more ergonomic
-_key_entry_registry: dict[type, Callable[[Any], Any]] = defaultdict(lambda x: x)
-_key_entry_registry[jtu.GetAttrKey] = lambda x: x.name
-_key_entry_registry[jtu.SequenceKey] = lambda x: x.idx
-_key_entry_registry[jtu.DictKey] = lambda x: x.key
-_key_entry_registry[jtu.FlattenedIndexKey] = lambda x: x.key
 
-
-def _unpack_key_entry(entry):
+def _unpack_entry(entry) -> tuple[Any, ...]:
+    # define rule for indexing matching through `at` property
+    # for example `jax` internals uses `jtu.GetAttrKey` to index an attribute, however
+    # its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]` to index an attribute
+    # instead `tree.at['attr']` is more ergonomic
     if isinstance(entry, jtu.GetAttrKey):
-        return entry.name
+        return (entry.name,)
     if isinstance(entry, jtu.SequenceKey):
-        return entry.idx
+        return (entry.idx,)
     if isinstance(entry, (jtu.DictKey, jtu.FlattenedIndexKey)):
-        return entry.key
-    return entry
+        return (entry.key,)
+    if isinstance(entry, NamedSequenceKey):
+        return (entry.idx, entry.key)
+    return (entry,)
 
 
 def tree_copy(tree: T) -> T:
@@ -144,7 +139,7 @@ def _generate_path_mask(
             return False
 
         for wi, key in zip(where, keys):
-            if wi not in (..., _key_entry_registry[type(key)](key)):
+            if wi not in (..., *_unpack_entry(key)):
                 return False
 
         nonlocal match

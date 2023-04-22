@@ -20,6 +20,7 @@ from pytreeclass._src.tree_indexer import (
     tree_indexer,
 )
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
+from pytreeclass._src.tree_trace import NamedSequenceKey
 
 
 class NOT_SET:
@@ -343,8 +344,11 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
     def tree_flatten_with_keys(tree: PyTree):
         # flatten rule for `treeclass` to use with `jax.tree_util.tree_flatten_with_path`
-        leaves, (keys, static) = tree_flatten(tree)
-        return [(jtu.GetAttrKey(key), leaf) for key, leaf in zip(keys, leaves)], static
+        static, dynamic = dict(vars(tree)), dict()
+        for key in static.get(_FIELDS, ()):
+            entry = NamedSequenceKey(len(dynamic), key)
+            dynamic[key] = (entry, static.pop(key))
+        return list(dynamic.values()), (tuple(dynamic.keys()), static)
 
     jtu.register_pytree_with_keys(
         nodetype=klass,
@@ -405,11 +409,10 @@ class TreeClass(metaclass=TreeClassMeta):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
-        >>> tree.at[0].get()
-        Tree(a=1, b=None)
         >>> tree.at["a"].get()
         Tree(a=1, b=None)
-
+        >>> tree.at[0].get()
+        Tree(a=1, b=None)
 
     Note:
         ``leafwise=True`` adds the following methods to the class
