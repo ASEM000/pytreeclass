@@ -28,7 +28,7 @@ class NamedSequenceKey:
     key: Hashable
 
     def __str__(self):
-        return f"[{repr(self.key)}]"
+        return f".{self.key}"
 
 
 def flatten_one_trace_level(
