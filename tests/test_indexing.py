@@ -653,14 +653,6 @@ def test_unsupported_indexing_type():
         t.at[None].set(1)
 
 
-def test_register_pytree_node_trace():
-    with pytest.raises(TypeError):
-        pytc.register_pytree_node_trace(None, None)
-
-    with pytest.raises(ValueError):
-        pytc.register_pytree_node_trace(list, lambda x: x)
-
-
 def test_mixed_not_implemented():
     class T(TreeClass):
         a: tuple[int, ...] = namedtuple("a", ["x", "y"])(1, 2)

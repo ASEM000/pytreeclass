@@ -5,11 +5,9 @@ Public API
 .. currentmodule:: pytreeclass 
 
 .. autosummary::
-    treeclass
-    is_treeclass
+    TreeClass
     is_tree_equal
     field
-    fields
     tree_diagram
     tree_indent
     tree_mermaid
@@ -20,10 +18,8 @@ Public API
     is_nondiff
     is_frozen
     unfreeze
-    ImmutableWrapper
     bcmap
     tree_indexer
-    register_pytree_node_trace
     tree_map_with_trace
     tree_leaves_with_trace
     tree_flatten_with_trace
@@ -34,8 +30,7 @@ core API
 
 .. currentmodule:: pytreeclass 
 
-.. autofunction:: treeclass 
-.. autofunction:: is_treeclass 
+.. autoclass:: TreeClass 
 .. autofunction:: is_tree_equal 
 .. autofunction:: field
 
@@ -69,7 +64,6 @@ Advanced API
 
 .. autofunction:: bcmap
 .. autofunction:: tree_indexer
-.. autofunction:: register_pytree_node_trace
 .. autofunction:: tree_map_with_trace
 .. autofunction:: tree_leaves_with_trace
 .. autofunction:: tree_flatten_with_trace
