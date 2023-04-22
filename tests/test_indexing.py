@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import namedtuple
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -665,3 +666,16 @@ def test_mixed_not_implemented():
 
     with pytest.raises(NotImplementedError):
         t.at[0].at[[1]].get()
+
+
+def test_nested_indexing():
+    class Dict(dict):
+        # test `FlattenedIndexKey`
+        pass
+
+    class Tree(pytc.TreeClass, leafwise=True):
+        a: Any = (1, {"b": Dict({"c": 1})})
+
+    tree = Tree()
+    assert jtu.tree_leaves(tree.at["a"].at[1].at["b"].get())[0] == Dict({"c": 1})
+    assert jtu.tree_leaves(tree.at[0].at[1].at["b"].get())[0] == Dict({"c": 1})
