@@ -7,7 +7,7 @@ from collections.abc import MutableMapping, MutableSequence
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, Hashable, NamedTuple, Sequence, TypeVar
 
-from jax.tree_util import register_pytree_node
+import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_freeze import tree_hash
@@ -20,7 +20,7 @@ from pytreeclass._src.tree_indexer import (
     tree_indexer,
 )
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
-from pytreeclass._src.tree_trace import register_pytree_node_trace
+from pytreeclass._src.tree_trace import NamedSequenceKey
 
 
 class NOT_SET:
@@ -111,7 +111,7 @@ def field(
         ...    age: int = pytc.field(callbacks=[instance_cb_factory(int), positive_check_callback])
         ...    # use `id` in the constructor for `_id` attribute
         ...    # this is useful for private attributes that are not supposed to be accessed directly
-        ...    # and hide it from the repr, also add extra info for this field
+        ...    # and hide it from the repr
         ...    _id: int = pytc.field(alias="id", repr=False)
 
         >>> tree = Employee(name="Asem", age=10, id=1)
@@ -296,30 +296,6 @@ def _delattr(tree, key: str) -> None:
     del vars(tree)[key]
 
 
-def _tree_unflatten(klass: type, treedef: Any, leaves: list[Any]):
-    # unflatten rule for `treeclass` to use with `jax.tree_unflatten`
-    tree = getattr(object, "__new__")(klass)
-    vars(tree).update(treedef[1])
-    vars(tree).update(zip(treedef[0], leaves))
-    return tree
-
-
-def _tree_flatten(tree: PyTree):
-    # flatten rule for `treeclass` to use with `jax.tree_flatten`
-    static, dynamic = dict(vars(tree)), dict()
-    for key in static.get(_FIELDS, ()):
-        dynamic[key] = static.pop(key)
-    return list(dynamic.values()), (tuple(dynamic.keys()), static)
-
-
-def _tree_trace(tree: PyTree):
-    # Trace flatten rule to be used with the `tree_trace` module
-    leaves, (keys, _) = _tree_flatten(tree)
-    types = map(type, leaves)
-    indices = range(len(leaves))
-    return [*zip(keys, types, indices)]
-
-
 def _treeclass_transform(klass: type[T]) -> type[T]:
     for key, method in (("__setattr__", _setattr), ("__delattr__", _delattr)):
         if key in vars(klass):
@@ -351,9 +327,35 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
 
 def _register_treeclass(klass: type[T]) -> type[T]:
     # handle all registration logic for `treeclass`
-    # TODO: register with jax path registry once jax version >= 0.4.7
-    register_pytree_node_trace(klass, _tree_trace)
-    register_pytree_node(klass, _tree_flatten, ft.partial(_tree_unflatten, klass))
+
+    def tree_unflatten(treedef: Any, leaves: list[Any]) -> T:
+        # unflatten rule for `treeclass` to use with `jax.tree_unflatten`
+        tree = getattr(object, "__new__")(klass)
+        vars(tree).update(treedef[1])
+        vars(tree).update(zip(treedef[0], leaves))
+        return tree
+
+    def tree_flatten(tree: T):
+        # flatten rule for `treeclass` to use with `jax.tree_flatten`
+        static, dynamic = dict(vars(tree)), dict()
+        for key in static.get(_FIELDS, ()):
+            dynamic[key] = static.pop(key)
+        return list(dynamic.values()), (tuple(dynamic.keys()), static)
+
+    def tree_flatten_with_keys(tree: PyTree):
+        # flatten rule for `treeclass` to use with `jax.tree_util.tree_flatten_with_path`
+        static, dynamic = dict(vars(tree)), dict()
+        for key in static.get(_FIELDS, ()):
+            entry = NamedSequenceKey(len(dynamic), key)
+            dynamic[key] = (entry, static.pop(key))
+        return list(dynamic.values()), (tuple(dynamic.keys()), static)
+
+    jtu.register_pytree_with_keys(
+        nodetype=klass,
+        flatten_func=tree_flatten,
+        flatten_with_keys=tree_flatten_with_keys,
+        unflatten_func=tree_unflatten,
+    )
     return klass
 
 
@@ -407,31 +409,45 @@ class TreeClass(metaclass=TreeClassMeta):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
-        >>> tree.at[0].get()
-        Tree(a=1, b=None)
         >>> tree.at["a"].get()
         Tree(a=1, b=None)
+        >>> tree.at[0].get()
+        Tree(a=1, b=None)
 
     Note:
-        Indexing is supported for {`list`, `tuple`, `dict`, `defaultdict`, `OrderedDict`, `namedtuple`}
-        and `treeclass` wrapped classes.
+        ``leafwise=True`` adds the following methods to the class
 
-        Extending indexing to other types is possible by registering the type with
-        `pytreeclass.register_pytree_node_trace`
+        ==================      ============
+        Method                  Operator
+        ==================      ============
+        ``__add__``              `+`
+        ``__and__``              `&`
+        ``__ceil__``             `math.ceil`
+        ``__divmod__``           `divmod`
+        ``__eq__``               `==`
+        ``__floor__``            math.floor
+        ``__floordiv__``         `//`
+        ``__ge__``               `>=`
+        ``__gt__``               `>`
+        ``__invert__``           `~`
+        ``__le__``               `<=`
+        ``__lshift__``           `<<`
+        ``__lt__``               `<`
+        ``__matmul__``           `@`
+        ``__mod__``              `%`
+        ``__mul__``              `*`
+        ``__ne__``               `!=`
+        ``__neg__``              `-`
+        ``__or__``               `|`
+        ``__pos__``              `+`
+        ``__pow__``              `**`
+        ``__round__``            `round`
+        ``__sub__``              `-`
+        ``__truediv__``          `/`
+        ``__trunc__``            `math.trunc`
+        ``__xor__``              `^`
+        ==================      ============
 
-    Note:
-        `leafwise`=True adds the following methods to the class:
-        .. code-block:: python
-            '__add__', '__and__', '__ceil__', '__divmod__', '__eq__', '__floor__', '__floordiv__',
-            '__ge__', '__gt__', '__invert__', '__le__', '__lshift__', '__lt__',
-            '__matmul__', '__mod__', '__mul__', '__ne__', '__neg__', '__or__', '__pos__',
-            '__pow__', '__radd__', '__rand__', '__rdivmod__', '__reduce__', '__rfloordiv__',
-            '__rlshift__', '__rmatmul__', '__rmod__', '__rmul__', '__ror__', '__round__', '__rpow__',
-            '__rrshift__', '__rshift__', '__rsub__', '__rtruediv__', '__rxor__', '__sub__',
-            '__truediv__', '__trunc__', '__xor__',
-
-    Raises:
-        TypeError: if the input is not a class.
     """
 
     def __init_subclass__(klass: type[T], *a, leafwise: bool = False, **k) -> None:

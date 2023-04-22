@@ -13,7 +13,7 @@
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11_-red)
-![pyver](https://img.shields.io/badge/jax-0.4+-red)
+![pyver](https://img.shields.io/badge/jax-0.4.7+-red)
 ![codestyle](https://img.shields.io/badge/codestyle-black-black)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/intro.ipynb)
 [![Downloads](https://pepy.tech/badge/pytreeclass)](https://pepy.tech/project/pytreeclass)
@@ -78,38 +78,36 @@ class Tree(pytc.TreeClass):
 
 tree = Tree()
 mask = jax.tree_map(lambda x: x > 5, tree)
-tree = (
-    tree
-    .at["a"].set(10)
-    .at["b"].at[0].set(10)
-    .at[mask].set(100)
-    )
+tree = tree \
+       .at["a"].set(10) \
+       .at["b"].at[0].set(10) \
+       .at[mask].set(100)
 
 print(tree)
 # Tree(a=10, b=(10, 3.0), c=[  4.   5. 100.])
 
 print(pytc.tree_diagram(tree))
 # Tree
-# ├── a=10
-# ├── b:tuple
+# ├── .a=10
+# ├── .b:tuple
 # │   ├── [0]=10
 # │   └── [1]=3.0
-# └── c=f32[3](μ=36.33, σ=45.02, ∈[4.00,100.00])
+# └── .c=f32[3](μ=36.33, σ=45.02, ∈[4.00,100.00])
 
 print(pytc.tree_summary(tree))
-# ┌────┬──────┬─────┐
-# │Name│Type  │Count│
-# ├────┼──────┼─────┤
-# │a   │int   │1    │
-# ├────┼──────┼─────┤
-# │b[0]│int   │1    │
-# ├────┼──────┼─────┤
-# │b[1]│float │1    │
-# ├────┼──────┼─────┤
-# │c   │f32[3]│3    │
-# ├────┼──────┼─────┤
-# │Σ   │Tree  │6    │
-# └────┴──────┴─────┘
+# ┌─────┬──────┬─────┐
+# │Name │Type  │Count│
+# ├─────┼──────┼─────┤
+# │.a   │int   │1    │
+# ├─────┼──────┼─────┤
+# │.b[0]│int   │1    │
+# ├─────┼──────┼─────┤
+# │.b[1]│float │1    │
+# ├─────┼──────┼─────┤
+# │.c   │f32[3]│3    │
+# ├─────┼──────┼─────┤
+# │Σ    │Tree  │6    │
+# └─────┴──────┴─────┘
 
 
 # ** pass it to jax transformations **
@@ -159,11 +157,11 @@ print(pytc.tree_summary(tree, depth=1))
 ┌────┬──────┬─────┐
 │Name│Type  │Count│
 ├────┼──────┼─────┤
-│a   │int   │1    │
+│.a  │int   │1    │
 ├────┼──────┼─────┤
-│b   │tuple │1    │
+│.b  │tuple │1    │
 ├────┼──────┼─────┤
-│c   │f32[3]│3    │
+│.c  │f32[3]│3    │
 ├────┼──────┼─────┤
 │Σ   │Tree  │5    │
 └────┴──────┴─────┘
@@ -177,9 +175,9 @@ print(pytc.tree_summary(tree, depth=1))
 
 print(pytc.tree_diagram(tree, depth=1))
 Tree
-├── a=1
-├── b=(...)
-└── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+├── .a=1
+├── .b=(...)
+└── .c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
 ```
 
  </td>
@@ -194,9 +192,9 @@ print(pytc.tree_mermaid(tree, depth=1))
 
 flowchart LR
     id0(<b>Tree</b>)
-    id0 --- id1("</b>a=1</b>")
-    id0 --- id2("</b>b=(...)</b>")
-    id0 --- id3("</b>c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])</b>")
+    id0 --- id1("</b>.a=1</b>")
+    id0 --- id2("</b>.b=(...)</b>")
+    id0 --- id3("</b>.c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])</b>")
 ```
 
 </td>
@@ -227,19 +225,19 @@ Tree(a=1, b=(...), c=[4. 5. 6.])
 
 ```python
 print(pytc.tree_summary(tree, depth=2))
-┌────┬──────┬─────┐
-│Name│Type  │Count│
-├────┼──────┼─────┤
-│a   │int   │1    │
-├────┼──────┼─────┤
-│b[0]│float │1    │
-├────┼──────┼─────┤
-│b[1]│float │1    │
-├────┼──────┼─────┤
-│c   │f32[3]│3    │
-├────┼──────┼─────┤
-│Σ   │Tree  │6    │
-└────┴──────┴─────┘
+┌─────┬──────┬─────┐
+│Name │Type  │Count│
+├─────┼──────┼─────┤
+│.a   │int   │1    │
+├─────┼──────┼─────┤
+│.b[0]│int   │1    │
+├─────┼──────┼─────┤
+│.b[1]│float │1    │
+├─────┼──────┼─────┤
+│.c   │f32[3]│3    │
+├─────┼──────┼─────┤
+│Σ    │Tree  │6    │
+└─────┴──────┴─────┘
 ```
 
 </td>
@@ -249,11 +247,11 @@ print(pytc.tree_summary(tree, depth=2))
 ```python
 print(pytc.tree_diagram(tree, depth=2))
 Tree
-├── a=1
-├── b:tuple
+├── .a=1
+├── .b:tuple
 │   ├── [0]=2.0
 │   └── [1]=3.0
-└── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+└── .c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
 ```
 
 </td>
@@ -269,9 +267,9 @@ flowchart LR
     id2 --- id3("</b>[0]=2.0</b>")
     id2 --- id4("</b>[1]=3.0</b>")
     id0(<b>Tree</b>)
-    id0 --- id1("</b>a=1</b>")
-    id0 --- id2("</b>b:tuple</b>")
-    id0 --- id5("</b>c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])</b>")
+    id0 --- id1("</b>.a=1</b>")
+    id0 --- id2("</b>.b:tuple</b>")
+    id0 --- id5("</b>.c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])</b>")
 ```
 
 </td>
@@ -517,75 +515,6 @@ print(counter.calls) # 10
 </details>
 
 ## ➕ More<a id="more"></a>
-
-<details><summary>[Advanced] Register custom user-defined classes to work with visualization and indexing tools. </summary>
-
-Similar to [`jax.tree_util.register_pytree_node`](https://jax.readthedocs.io/en/latest/pytrees.html#extending-pytrees), `PyTreeClass` register common data structures and `treeclass` wrapped classes to figure out how to define the names, types, and index of certain leaf along its path.
-
-Here is an example of registering
-
-```python
-
-class Tree:
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
-
-
-# jax flatten rule
-def tree_flatten(tree):
-    return (tree.a, tree.b), None
-
-# jax unflatten rule
-def tree_unflatten(_, children):
-    return Tree(*children)
-
-# PyTreeClass flatten rule
-def pytc_tree_flatten(tree):
-    names = ("a", "b") # or (`None`, `None`) if name is not defined
-    types = (type(tree.a), type(tree.b))
-    indices = (0,1)  # or (`None`, `None`) if index is not defined
-    return [*zip(names, types, indices)]
-
-
-# Register with `jax`
-jax.tree_util.register_pytree_node(Tree, tree_flatten, tree_unflatten)
-
-# Register the `Tree` class trace function to support indexing
-pytc.register_pytree_node_trace(Tree, pytc_tree_flatten)
-
-tree = Tree(1, 2)
-
-# works with jax
-jax.tree_util.tree_leaves(tree)  # [1, 2]
-
-# works with PyTreeClass viz tools
-print(pytc.tree_summary(tree))
-
-# ┌────┬────┬─────┬──────┐
-# │Name│Type│Count│Size  │
-# ├────┼────┼─────┼──────┤
-# │a   │int │1    │28.00B│
-# ├────┼────┼─────┼──────┤
-# │b   │int │1    │28.00B│
-# ├────┼────┼─────┼──────┤
-# │Σ   │Tree│2    │56.00B│
-# └────┴────┴─────┴──────┘
-
-```
-
-After registeration, you can use internal tools like
-
-- `pytc.tree_map_with_trace`
-- `pytc.tree_leaves_with_trace`
-- `pytc.tree_flatten_with_trace`
-
-More details on that soon.
-
-</details>
 
 <details> <summary>Validate or convert inputs using callbacks</summary>
 
@@ -868,9 +797,17 @@ print(pytc.tree_summary(tree, depth=2))
 <details><summary>Use PyTreeClass components with other libraries</summary>
 
 ```python
+
 import jax
 import pytreeclass as pytc
 from flax import struct
+
+import jax
+import pytreeclass as pytc
+from flax import struct
+
+# note that flax is registered with `jax.tree_util.register_pytree_with_keys`
+# otherwise for arbitrary objects you need to do the key registration
 
 @struct.dataclass
 class FlaxTree:
@@ -886,14 +823,6 @@ class FlaxTree:
     def at(self):
         return pytc.tree_indexer(self)
 
-def pytc_flatten_rule(tree):
-    names =("a","b","c")
-    types = map(type, (tree.a, tree.b, tree.c))
-    indices = range(3)  # make it indexable like namedtuple
-    return [*zip(names, types, indices)]
-
-pytc.register_pytree_node_trace(FlaxTree, pytc_flatten_rule)
-
 flax_tree = FlaxTree()
 
 print(f"{flax_tree!r}")
@@ -904,26 +833,26 @@ print(f"{flax_tree!s}")
 
 print(pytc.tree_diagram(flax_tree))
 # FlaxTree
-# ├── a=1
-# ├── b:tuple
+# ├── .a=1
+# ├── .b:tuple
 # │   ├── [0]=2.0
 # │   └── [1]=3.0
-# └── c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
+# └── .c=f32[3](μ=5.00, σ=0.82, ∈[4.00,6.00])
 
 print(pytc.tree_summary(flax_tree))
-# ┌────┬────────┬─────┐
-# │Name│Type    │Count│
-# ├────┼────────┼─────┤
-# │a   │int     │1    │
-# ├────┼────────┼─────┤
-# │b[0]│float   │1    │
-# ├────┼────────┼─────┤
-# │b[1]│float   │1    │
-# ├────┼────────┼─────┤
-# │c   │f32[3]  │3    │
-# ├────┼────────┼─────┤
-# │Σ   │FlaxTree│6    │
-# └────┴────────┴─────┘
+# ┌─────┬────────┬─────┐
+# │Name │Type    │Count│
+# ├─────┼────────┼─────┤
+# │.a   │int     │1    │
+# ├─────┼────────┼─────┤
+# │.b[0]│float   │1    │
+# ├─────┼────────┼─────┤
+# │.b[1]│float   │1    │
+# ├─────┼────────┼─────┤
+# │.c   │f32[3]  │3    │
+# ├─────┼────────┼─────┤
+# │Σ    │FlaxTree│6    │
+# └─────┴────────┴─────┘
 
 flax_tree.at[0].get()
 # FlaxTree(a=1, b=(None, None), c=None)
@@ -946,108 +875,10 @@ flax_tree.at["a"].set(10)
 <tr>
 
 <td><img src='assets/benchmark_cpu.png'></td>
-<td><img src='assets/benchmark_gpu.png'></td>
 
 </tr>
 
 </table>
-
-</details>
-
-<details> 
-<summary>Use tree_map_with_trace</summary>
-
-V0.2 of `PyTreeClass` register common python datatypes and `treeclass` wrapped class to `trace` registry.
-While `jax` uses `jax.tree_util.register_pytree_node` to define `flatten_rule` for leaves, `PyTreeClass` extends on this
-By registering the `flatten_rule` of (1) names, (2) types, (3) indexing
-
-For demonstration , the following figure contains the 4 variants of the same `Tree` instance define
-
-```python
-import jax
-import jax.numpy as jnp
-import pytreeclass as pytc
-
-class Tree(pytc.TreeClass):
-    a:int = 1
-    b:tuple[float] = (2.,3.)
-    c:jax.Array = jnp.array([4.,5.,6.])
-```
-
-![image](assets/tree_figures.png)
-
-1. Value leaves variant.
-2. Name leaves variant.
-3. Type leaves variant.
-4. Indexing leaves variant.
-
-The four variants can be accessed using `pytc.tree_map_with_trace` .
-Similar to `jax.tree_util.tree_map`, `pytc.tree_map_with_trace` accepts the map function, however the first argument must be the `trace` argument.
-Trace is a four item tuple consists of names,types,indices,metadatas path for each leaf.
-For example for the previous tree, the reuslting trace path for each leaf is :
-
-### Named tree variant
-
-```python
->>> name_tree = pytc.tree_map_with_trace(lambda trace,x : trace[0], tree)
->>> print(name_tree)
-Tree(a=(a), b=((b, [0]), (b, [1])), c=(c))
-```
-
-### Typed tree variant
-
-```python
->>> type_tree = pytc.tree_map_with_trace(lambda trace,x : f"{trace[1]!s}", tree)
->>> print(type_tree)
-Tree(
-  a=(<class 'int'>,),
-  b=((<class 'tuple'>, <class 'float'>), (<class 'tuple'>, <class 'float'>)),
-  c=(<class 'jaxlib.xla_extension.ArrayImpl'>,)
-)
-```
-
-### Index tree variant
-
-```python
->>> index_tree = pytc.tree_map_with_trace(lambda trace,x : trace[2], tree)
->>> print(index_tree)
-Tree(a=(0), b=((1, 0), (1, 1)), c=(2))
-```
-
-In essence, each leaf contains information about the name path, type path, and indices path. The rules for custom types can be registered using `pytc.register_pytree_node_trace`
-
-</details>
-
-<details>
-
-<summary> Comparison with dataclass </summary>
-
-<div align="center">
-<table>
-
-<tr><td></td>  <td>PyTreeClass</td>  <td>dataclass</td></tr>
-
-<tr><td align="center">Generated init method</td> <td align="center">✅</td>  <td align="center">✅</td></tr>
-<tr><td align="center">Generated repr method</td> <td align="center">✅</td>  <td align="center">✅</td></tr>
-<tr><td align="center">Generated str method</td> <td align="center">✅</td>  <td align="center"></td></tr>
-<tr><td align="center">Generated hash method</td> <td align="center">✅</td>  <td align="center">✅</td></tr>
-<tr><td align="center">Generated eq method</td> <td align="center">✅✅*</td>  <td align="center">✅</td></tr>
-<tr><td align="center">Support slots</td> <td align="center"></td>  <td align="center">✅</td></tr>
-<tr><td align="center">Keyword-only args</td> <td align="center">✅</td>  <td align="center">✅ 3.10+</td></tr>
-<tr><td align="center">Positional-only args</td> <td align="center">✅</td>  <td align="center"></td></tr>
-<tr><td align="center">Frozen instance</td> <td align="center">✅**</td>  <td align="center">✅</td></tr>
-<tr><td align="center">Match args support</td> <td align="center"></td>  <td align="center">✅</td></tr>
-<tr><td align="center">Support callbacks</td> <td align="center">✅</td>  <td align="center"></td></tr>
-<tr><td align="center">Support alias name</td> <td align="center">✅</td>  <td align="center"></td></tr>
-</table>
-
-</div>
-
-`*` Either compare the whole instance and return `True/False` or treating it leafwise using `treeclass(..., leafwise=True)` and retrurn `Tree(a=True, ....)`
-
-`**` Always frozen. non-frozen is not supported.
-
-`***` `treeclass` decorator is also a bit faster than `dataclasses.dataclass` [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/pytc_dc_benchmark.ipynb)
 
 </details>
 

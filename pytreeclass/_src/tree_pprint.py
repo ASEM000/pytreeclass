@@ -10,6 +10,7 @@ from types import FunctionType
 from typing import Any, Callable, Literal
 
 import jax
+import jax.tree_util as jtu
 import numpy as np
 from jax._src.custom_derivatives import custom_jvp
 from jax.util import unzip2
@@ -352,27 +353,15 @@ def tree_str(
     return _node_pprint(tree, 0, "str", width, depth).expandtabs(tabwidth)
 
 
-def _resolve_names(trace, width: int) -> str:
-    # given a trace with a tuple of names, we resolve the names
-    # to a single string
-    names, _, indices = trace
-    path = ""
-    for i, (name, index) in enumerate(zip(names, indices)):
-        name = f"[{index}]" if name is None else name
-        path += "" if name.startswith("[") else ("." if i > 0 else "")
-        path += _node_pprint(name, 0, "str", width, float("inf"))
-    return path
-
-
 def _is_trace_leaf_depth_factory(depth: int):
     # generate `is_trace_leaf` function to stop tracing at a certain `depth`
     # in essence, depth is the length of the trace entry
     def is_trace_leaf(trace) -> bool:
         # trace is a tuple of (names, leaves, tracers, aux_data)
         # done like this to ensure 4-tuple unpacking
-        names, _, __ = trace
+        keys, _ = trace
         # stop tracing if depth is reached
-        return False if depth is None else (depth <= len(names))
+        return False if depth is None else (depth <= len(keys))
 
     return is_trace_leaf
 
@@ -418,20 +407,20 @@ def tree_indent(
         is_leaf=is_leaf,
         is_trace_leaf=_is_trace_leaf_depth_factory(depth),
     ):
-        names, types, indices = trace
+        keys, types = trace
 
-        for j, (name, type_, index) in enumerate(zip(names, types, indices)):
-            if (cur := (names[: j + 1], types[: j + 1], indices[: j + 1])) in seen:
+        for j, (key, type_) in enumerate(zip(keys, types)):
+            if (cur := (keys[: j + 1], types[: j + 1])) in seen:
                 # skip printing the common parent node twice
                 continue
             seen.add(cur)
 
-            name = f"[{index}]" if name is None else name
+            name = str(key)
             fmt += "\n" + "\t" * (j + 1)
             fmt += f"{_node_pprint(name,0,'str',width, depth )}"
             fmt += (
                 f"={_node_pprint(leaf,indent=j+1,kind='repr',width=width, depth=depth-1)}"
-                if j == len(names) - 1
+                if j == len(keys) - 1
                 else f":{type_.__name__}"
             )
     return fmt if tabwidth is None else fmt.expandtabs(tabwidth)
@@ -542,14 +531,14 @@ def tree_diagram(
 
         >>> print(pytc.tree_diagram(B(), depth=1))
         B
-        ├── a=10
-        └── b=(...)
+        ├── .a=10
+        └── .b=(...)
 
 
         >>> print(pytc.tree_diagram(B(), depth=2))
         B
-        ├── a=10
-        └── b:tuple
+        ├── .a=10
+        └── .b:tuple
             ├── [0]=20
             ├── [1]=30
             └── [2]=A(x=10, y=(...), z=40)
@@ -870,12 +859,12 @@ def tree_summary(
         count = _calculate_count(leaf)
         COUNT += count
 
-        if trace == ((), (), ()):
+        if trace == ((), ()):
             # avoid printing the leaf trace (which is the root of the tree)
             # twice, once as a leaf and once as the root at the end
             continue
 
-        paths = _resolve_names(trace, width=60)
+        paths = jtu.keystr(trace[0])
         types = _node_type_pprint(leaf, indent=0, kind="str", width=60, depth=depth)
         counts = f"{count:,}"
         ROWS += [[paths, types, counts]]
@@ -953,6 +942,7 @@ def tree_repr_with_trace(
 
     def leaf_trace_summary(trace, leaf) -> str:
         # this can be useful in debugging and raising descriptive errors
+
         ROWS = [["Value", tree_repr(leaf)]]
 
         names = "->".join(str(i) for i in trace[0])
@@ -960,9 +950,6 @@ def tree_repr_with_trace(
 
         types = "->".join(i.__name__ for i in trace[1])
         ROWS += [["Type path", types]]
-
-        indices = "->".join(str(i) for i in trace[2])
-        ROWS += [["Index path", indices]]
 
         # make a pretty table for each leaf
         return _table(ROWS, transpose=transpose)

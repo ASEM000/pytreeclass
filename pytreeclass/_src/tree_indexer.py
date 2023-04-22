@@ -5,7 +5,7 @@ import operator as op
 from collections.abc import Callable
 from contextlib import contextmanager
 from math import ceil, floor, trunc
-from typing import Any, NamedTuple, Sequence, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -13,20 +13,36 @@ import jax.tree_util as jtu
 import numpy as np
 
 from pytreeclass._src.tree_pprint import tree_repr_with_trace
-from pytreeclass._src.tree_trace import tree_map_with_trace
+from pytreeclass._src.tree_trace import NamedSequenceKey, TraceType, tree_map_with_trace
 
 T = TypeVar("T")
 PyTree = Any
 EllipsisType = type(Ellipsis)
-TraceType = Any
 _no_initializer = object()
 _non_partial = object()
+
 
 # allow methods in mutable context to be called without raising `AttributeError`
 # the instances are registered  during initialization and using `at` property with `__call__
 # this is done by registering the instance id in a set before entering the
 # mutable context and removing it after exiting the context
 _mutable_instance_registry: set[int] = set()
+
+
+def _unpack_entry(entry) -> tuple[Any, ...]:
+    # define rule for indexing matching through `at` property
+    # for example `jax` internals uses `jtu.GetAttrKey` to index an attribute, however
+    # its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]` to index an attribute
+    # instead `tree.at['attr']` is more ergonomic
+    if isinstance(entry, jtu.GetAttrKey):
+        return (entry.name,)
+    if isinstance(entry, jtu.SequenceKey):
+        return (entry.idx,)
+    if isinstance(entry, (jtu.DictKey, jtu.FlattenedIndexKey)):
+        return (entry.key,)
+    if isinstance(entry, NamedSequenceKey):
+        return (entry.idx, entry.key)
+    return (entry,)
 
 
 def tree_copy(tree: T) -> T:
@@ -111,19 +127,19 @@ def _reduce_at_mask(
 
 def _generate_path_mask(
     tree: PyTree,
-    where: tuple[int | str | EllipsisType, ...],
+    where: tuple[int | str, ...],
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTree:
-    # return a mask of the same structure as tree with True at the path where
-    # raise `LookupError` if the path is not found
     match = False
 
-    def map_func(trace: Sequence[TraceType], _: Any):
-        if len(where) > len(trace[0]):
+    def map_func(path: TraceType, _: Any):
+        keys, _ = path
+
+        if len(where) > len(keys):
             return False
 
-        for where_i, name_i, index_i in zip(where, trace[0], trace[2]):
-            if where_i not in (..., name_i, index_i):
+        for wi, key in zip(where, keys):
+            if wi not in (..., *_unpack_entry(key)):
                 return False
 
         nonlocal match
@@ -260,33 +276,23 @@ def tree_indexer(tree: PyTree) -> AtIndexer:
     """Adds `.at` indexing abilities to a PyTree.
 
     Example:
-        >>> import jax
+        >>> import jax.tree_util as jtu
         >>> import pytreeclass as pytc
-
-        >>> @jax.tree_util.register_pytree_node_class
+        >>> @jax.tree_util.register_pytree_with_keys_class
         ... class Tree:
-        ...     def __init__(self, a, b):
-        ...         self.a = a
-        ...         self.b = b
-        ...     def tree_flatten(self):
-        ...         return (self.a, self.b), None
-        ...     @classmethod
-        ...     def tree_unflatten(cls, aux_data, children):
-        ...         return cls(*children)
-        ...     @property
-        ...     def at(self):
-        ...         return pytc.tree_indexer(self)
-        ...     def __repr__(self) -> str:
-        ...         return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
-
-        >>> # Register the `Tree` class trace function to support indexing
-        >>> def test_trace_func(tree):
-        ...     names = ("a", "b")
-        ...     types = (type(tree.a), type(tree.b))
-        ...     indices = (None, None) # use None to indicate that the attribute is not indexable
-        ...     return [*zip(names, types, indices)]
-
-        >>> pytc.register_pytree_node_trace(Tree, test_trace_func)
+        ...    def __init__(self, a, b):
+        ...        self.a = a
+        ...        self.b = b
+        ...    def tree_flatten_with_keys(self):
+        ...        return ((jtu.GetAttrKey("a"), self.a), (jtu.GetAttrKey("b"), self.b)), None
+        ...    @classmethod
+        ...    def tree_unflatten(cls, aux_data, children):
+        ...        return cls(*children)
+        ...    @property
+        ...    def at(self):
+        ...        return pytc.tree_indexer(self)
+        ...    def __repr__(self) -> str:
+        ...        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
 
         >>> Tree(1, 2).at["a"].get()
         Tree(a=1, b=None)
