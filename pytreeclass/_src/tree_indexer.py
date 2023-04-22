@@ -144,7 +144,7 @@ def _generate_path_mask(
             return False
 
         for wi, key in zip(where, keys):
-            if wi not in (..., _key_entry_registry[key]):
+            if wi not in (..., _key_entry_registry[type(key)](key)):
                 return False
 
         nonlocal match
