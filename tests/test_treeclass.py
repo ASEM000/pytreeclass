@@ -11,13 +11,6 @@ from jax import numpy as jnp
 import pytreeclass as pytc
 
 
-def test_field_metadata():
-    class Test(pytc.TreeClass, leafwise=True):
-        a: int = pytc.field(default=1, metadata={"a": 1})
-
-    assert Test()._fields["a"].metadata["a"] == 1
-
-
 def test_field_mutually_exclusive():
     with pytest.raises(ValueError):
         pytc.field(default=1, factory=lambda: 1)
@@ -189,7 +182,7 @@ def test_subclassing():
 
     l1 = L1()
 
-    assert jtu.tree_leaves(l1) == [2, 4, 5]
+    assert jtu.tree_leaves(l1) == [2, 4, 5, 5]
     assert l1.inc(10) == 20
     assert l1.sub(10) == 0
     assert l1.d == 5
@@ -539,10 +532,8 @@ def test_instance_field_map():
 
     _, tree_with_weight = tree.at["add_param"]("weight", Parameter(3))
 
-    assert tree._fields != tree_with_weight._fields
     assert tree_with_weight.weight == Parameter(3)
     assert "weight" not in vars(tree)
-    assert "weight" not in tree._fields
 
 
 def test_field_factory():

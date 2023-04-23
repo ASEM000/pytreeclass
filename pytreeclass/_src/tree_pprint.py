@@ -17,6 +17,7 @@ from jax.util import unzip2
 from jaxlib.xla_extension import PjitFunction
 
 import pytreeclass as pytc
+import pytreeclass._src as src
 
 PyTree = Any
 PrintKind = Literal["repr", "str"]
@@ -271,7 +272,8 @@ def _treeclass_pprint(
         fmt = "..."
 
     else:
-        kvs = ((k, vars(node)[k]) for k, f in node._fields.items() if f.repr)
+        skip = [k for k, f in src.build_field_map(type(node)).items() if not f.repr]
+        kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
         fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
         fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"

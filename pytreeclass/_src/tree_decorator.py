@@ -12,6 +12,7 @@ from typing_extensions import dataclass_transform
 
 from pytreeclass._src.tree_freeze import tree_hash
 from pytreeclass._src.tree_indexer import (
+    AtIndexer,
     _leafwise_transform,
     _mutable_context,
     _mutable_instance_registry,
@@ -31,7 +32,6 @@ T = TypeVar("T", bound=Hashable)
 PyTree = Any
 
 _NOT_SET = NOT_SET()
-_FIELDS = "_fields"
 _POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 
@@ -165,14 +165,14 @@ def field(
 
 
 @ft.lru_cache
-def _generate_field_map(klass: type) -> MappingProxyType[str, Field]:
+def build_field_map(klass: type) -> MappingProxyType[str, Field]:
     field_map = dict()  # type: dict[str, Field]
 
     if klass is object:
         return MappingProxyType(field_map)
 
     for base in reversed(klass.__mro__[1:]):
-        field_map.update(_generate_field_map(base))
+        field_map.update(build_field_map(base))
 
     # TODO: use inspect to get annotations, once we are on minimum python version >3.9
     if "__annotations__" not in vars(klass):
@@ -217,10 +217,10 @@ def _generate_field_map(klass: type) -> MappingProxyType[str, Field]:
 
 
 @ft.lru_cache
-def _generate_init_code(fields: Sequence[Field]) -> str:
+def _generate_init_code(build_field_map: Sequence[Field]) -> str:
     head = body = ""
 
-    for field in fields:
+    for field in build_field_map:
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
 
@@ -242,14 +242,14 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
         if field.pos_only and field.init:
             head = head.replace("/,", "") + "/, "
 
-    body += "\t\tpass"  # add pass to avoid syntax error if all fields are ignored
+    body += "\t\tpass"  # add pass to avoid syntax error if all fieds are ignored
     body = "\tdef __init__(self, " + head[:-2] + "):\n" + body
     body = f"def closure(field_map):\n{body}\n\treturn __init__"
     return body.expandtabs(4)
 
 
 def _generate_init_method(klass: type) -> FunctionType:
-    field_map = _generate_field_map(klass)
+    field_map = build_field_map(klass)
     init_code = _generate_init_code(tuple(field_map.values()))
     exec(init_code, vars(sys.modules[klass.__module__]), local_namespace := dict())  # type: ignore
     method = local_namespace["closure"](field_map)
@@ -263,7 +263,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
         msg += f"`{type(tree).__name__}`.\nUse `.at[`{key}`].set({value!r})` instead."
         raise AttributeError(msg)
 
-    if key in (field_map := vars(tree).get(_FIELDS, ())):
+    if key in (field_map := build_field_map(type(tree))):
         for callback in field_map[key].callbacks:
             try:
                 # callback is a function that takes the value of the field
@@ -272,15 +272,6 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
             except Exception as e:
                 msg = f"Error for field=`{key}`:\n{e}"
                 raise type(e)(msg)
-
-    elif isinstance(value, TreeClass):
-        # auto registers the instance value if it is a registered `treeclass`
-        # this behavior is similar to PyTorch behavior in `nn.Module`
-        # with instances of `Parameter`/`Module`.
-        # the behavior is useful to avoid repetitive code pattern in field definition and
-        # and initialization inside init method.
-        field = Field(type=type(value), init=False, name=key)
-        vars(tree)[_FIELDS] = MappingProxyType({**field_map, key: field})  # type: ignore
 
     vars(tree)[key] = value  # type: ignore
 
@@ -328,27 +319,24 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
 def _register_treeclass(klass: type[T]) -> type[T]:
     # handle all registration logic for `treeclass`
 
-    def tree_unflatten(treedef: Any, leaves: list[Any]) -> T:
+    def tree_unflatten(keys: tuple[str, ...], leaves: list[Any]) -> T:
         # unflatten rule for `treeclass` to use with `jax.tree_unflatten`
         tree = getattr(object, "__new__")(klass)
-        vars(tree).update(treedef[1])
-        vars(tree).update(zip(treedef[0], leaves))
+        vars(tree).update(zip(keys, leaves))
         return tree
 
     def tree_flatten(tree: T):
         # flatten rule for `treeclass` to use with `jax.tree_flatten`
-        static, dynamic = dict(vars(tree)), dict()
-        for key in static.get(_FIELDS, ()):
-            dynamic[key] = static.pop(key)
-        return list(dynamic.values()), (tuple(dynamic.keys()), static)
+        dynamic = dict(vars(tree))
+        return tuple(dynamic.values()), tuple(dynamic.keys())
 
-    def tree_flatten_with_keys(tree: PyTree):
+    def tree_flatten_with_keys(tree: T):
         # flatten rule for `treeclass` to use with `jax.tree_util.tree_flatten_with_path`
-        static, dynamic = dict(vars(tree)), dict()
-        for key in static.get(_FIELDS, ()):
-            entry = NamedSequenceKey(len(dynamic), key)
-            dynamic[key] = (entry, static.pop(key))
-        return list(dynamic.values()), (tuple(dynamic.keys()), static)
+        dynamic = dict(vars(tree))
+        for idx, key in enumerate(vars(tree)):
+            entry = NamedSequenceKey(idx, key)
+            dynamic[key] = (entry, dynamic[key])
+        return tuple(dynamic.values()), tuple(dynamic.keys())
 
     jtu.register_pytree_with_keys(
         nodetype=klass,
@@ -364,7 +352,6 @@ class TreeClassMeta(ABCMeta):
         self = getattr(klass, "__new__")(klass, *a, **k)
 
         with _mutable_context(self):
-            setattr(self, _FIELDS, _generate_field_map(klass))
             getattr(klass, "__init__")(self, *a, **k)
 
             if post_init_func := getattr(klass, _POST_INIT, None):
@@ -372,9 +359,9 @@ class TreeClassMeta(ABCMeta):
                 # even if the init method is not code-generated.
                 post_init_func(self)
 
-        # handle non-initialized fields
-        if len(keys := set(getattr(self, _FIELDS)) - set(vars(self))) > 0:
-            msg = f"Uninitialized fields: ({', '.join(keys)}) in the instance of `{type(self).__name__}`"
+        # handle non-initialized build_field_map
+        if len(keys := set(build_field_map(klass)) - set(vars(self))) > 0:
+            msg = f"Uninitialized build_field_map: ({', '.join(keys)}) in the instance of `{type(self).__name__}`"
             raise AttributeError(msg)
         return self
 
@@ -388,7 +375,7 @@ class TreeClass(metaclass=TreeClassMeta):
         >>> import jax
         >>> import pytreeclass as pytc
 
-        >>> # Tree leaves are defined by type hinted fields at the class level
+        >>> # Tree leaves are defined by type hinted build_field_map at the class level
         >>> class Tree(pytc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
@@ -455,3 +442,7 @@ class TreeClass(metaclass=TreeClassMeta):
         klass = _register_treeclass(klass)
         klass = _leafwise_transform(klass) if leafwise else klass
         klass = _treeclass_transform(klass)
+
+    @property
+    def at(self) -> AtIndexer:
+        ...
