@@ -216,11 +216,17 @@ def build_field_map(klass: type) -> MappingProxyType[str, Field]:
     return MappingProxyType(field_map)
 
 
+def fields(tree: Any) -> Sequence[Field]:
+    """Returns a tuple of `Field` objects for the given instance or class."""
+    klass = tree if isinstance(tree, type) else type(tree)
+    return tuple(build_field_map(klass).values())
+
+
 @ft.lru_cache
-def _generate_init_code(build_field_map: Sequence[Field]) -> str:
+def _generate_init_code(fields: Sequence[Field]) -> str:
     head = body = ""
 
-    for field in build_field_map:
+    for field in fields:
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
 
@@ -359,9 +365,9 @@ class TreeClassMeta(ABCMeta):
                 # even if the init method is not code-generated.
                 post_init_func(self)
 
-        # handle non-initialized build_field_map
+        # handle non-initialized fields
         if len(keys := set(build_field_map(klass)) - set(vars(self))) > 0:
-            msg = f"Uninitialized build_field_map: ({', '.join(keys)}) in the instance of `{type(self).__name__}`"
+            msg = f"Uninitialized fields: ({', '.join(keys)}) in the instance of `{type(self).__name__}`"
             raise AttributeError(msg)
         return self
 
@@ -375,7 +381,7 @@ class TreeClass(metaclass=TreeClassMeta):
         >>> import jax
         >>> import pytreeclass as pytc
 
-        >>> # Tree leaves are defined by type hinted build_field_map at the class level
+        >>> # Tree leaves are instance attributes
         >>> class Tree(pytc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
