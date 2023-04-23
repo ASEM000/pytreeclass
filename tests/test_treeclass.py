@@ -19,6 +19,15 @@ def test_field_mutually_exclusive():
         pytc.field(default=1, pos_only=True, kw_only=True)
 
 
+def test_fields():
+    class Test(pytc.TreeClass):
+        a: int = pytc.field(default=1, metadata={"meta": 1})
+        b: int = 2
+
+    assert len(pytc.fields(Test)) == 2
+    assert pytc.fields(Test)[0].metadata == {"meta": 1}
+
+
 def test_field():
     assert pytc.field(default=1).default == 1
 

@@ -8,6 +8,7 @@ Public API
     TreeClass
     is_tree_equal
     field
+    fields
     tree_diagram
     tree_indent
     tree_mermaid
@@ -33,6 +34,7 @@ core API
 .. autoclass:: TreeClass 
 .. autofunction:: is_tree_equal 
 .. autofunction:: field
+.. autofunction:: fields
 
 Pretty Printing API
 -------------------
