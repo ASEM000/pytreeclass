@@ -13,7 +13,7 @@
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11_-red)
-![pyver](https://img.shields.io/badge/jax-0.4.7+-red)
+![pyver](https://img.shields.io/badge/jax->=0.4.7-red)
 ![codestyle](https://img.shields.io/badge/codestyle-black-black)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/intro.ipynb)
 [![Downloads](https://pepy.tech/badge/pytreeclass)](https://pepy.tech/project/pytreeclass)

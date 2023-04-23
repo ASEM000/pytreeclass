@@ -325,16 +325,16 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
 def _register_treeclass(klass: type[T]) -> type[T]:
     # handle all registration logic for `treeclass`
 
-    def tree_unflatten(keys: tuple[str, ...], leaves: list[Any]) -> T:
+    def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
         # unflatten rule for `treeclass` to use with `jax.tree_unflatten`
         tree = getattr(object, "__new__")(klass)
         vars(tree).update(zip(keys, leaves))
         return tree
 
-    def tree_flatten(tree: T):
+    def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
         # flatten rule for `treeclass` to use with `jax.tree_flatten`
-        dynamic = dict(vars(tree))
-        return tuple(dynamic.values()), tuple(dynamic.keys())
+        keys, leaves = zip(*vars(tree).items())
+        return leaves, keys
 
     def tree_flatten_with_keys(tree: T):
         # flatten rule for `treeclass` to use with `jax.tree_util.tree_flatten_with_path`
@@ -398,7 +398,7 @@ class TreeClass(metaclass=TreeClassMeta):
         Tree(a=2, b=3.0)
 
         >>> # Advanced indexing is supported using `at` property
-        ... class Tree(pytc.TreeClass):
+        >>> class Tree(pytc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
