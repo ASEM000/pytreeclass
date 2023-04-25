@@ -149,8 +149,10 @@ def _generate_path_mask(
     mask = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
 
     if not match:
-        msg = f"No match is found for path={where} for tree with trace:\n"
-        msg += f"{tree_repr_with_trace(tree)}"
+        fmt = "/".join(map(str, where))
+        msg = f"No leaf match is found for path={fmt} for tree with trace:\n"
+        msg += f"{tree_repr_with_trace(tree)}\n"
+        msg += f"with mask={mask}"
         raise LookupError(msg)
 
     return mask

@@ -333,8 +333,8 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
     def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
         # flatten rule for `treeclass` to use with `jax.tree_flatten`
-        keys, leaves = zip(*vars(tree).items())
-        return leaves, keys
+        dynamic = vars(tree)
+        return tuple(dynamic.values()), tuple(dynamic.keys())
 
     def tree_flatten_with_keys(tree: T):
         # flatten rule for `treeclass` to use with `jax.tree_util.tree_flatten_with_path`
@@ -413,32 +413,32 @@ class TreeClass(metaclass=TreeClassMeta):
         ==================      ============
         Method                  Operator
         ==================      ============
-        ``__add__``              `+`
-        ``__and__``              `&`
-        ``__ceil__``             `math.ceil`
-        ``__divmod__``           `divmod`
-        ``__eq__``               `==`
-        ``__floor__``            math.floor
-        ``__floordiv__``         `//`
-        ``__ge__``               `>=`
-        ``__gt__``               `>`
-        ``__invert__``           `~`
-        ``__le__``               `<=`
-        ``__lshift__``           `<<`
-        ``__lt__``               `<`
-        ``__matmul__``           `@`
-        ``__mod__``              `%`
-        ``__mul__``              `*`
-        ``__ne__``               `!=`
-        ``__neg__``              `-`
-        ``__or__``               `|`
-        ``__pos__``              `+`
-        ``__pow__``              `**`
-        ``__round__``            `round`
-        ``__sub__``              `-`
-        ``__truediv__``          `/`
-        ``__trunc__``            `math.trunc`
-        ``__xor__``              `^`
+        ``__add__``              ``+``
+        ``__and__``              ``&``
+        ``__ceil__``             ``math.ceil``
+        ``__divmod__``           ``divmod``
+        ``__eq__``               ``==``
+        ``__floor__``            ``math.floor``
+        ``__floordiv__``         ``//``
+        ``__ge__``               ``>=``
+        ``__gt__``               ``>``
+        ``__invert__``           ``~``
+        ``__le__``               ``<=``
+        ``__lshift__``           ``<<``
+        ``__lt__``               ``<``
+        ``__matmul__``           ``@``
+        ``__mod__``              ``%``
+        ``__mul__``              ``*``
+        ``__ne__``               ``!=``
+        ``__neg__``              ``-``
+        ``__or__``               ``|``
+        ``__pos__``              ``+``
+        ``__pow__``              ``**``
+        ``__round__``            ``round``
+        ``__sub__``              ``-``
+        ``__truediv__``          ``/``
+        ``__trunc__``            ``math.trunc``
+        ``__xor__``              ``^``
         ==================      ============
 
     """
