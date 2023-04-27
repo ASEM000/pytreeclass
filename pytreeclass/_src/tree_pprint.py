@@ -354,7 +354,7 @@ def tree_str(
     return _node_pprint(tree, 0, "str", width, depth).expandtabs(tabwidth)
 
 
-def _is_trace_leaf_depth_factory(depth: int):
+def _is_trace_leaf_depth_factory(depth: int | float):
     # generate `is_trace_leaf` function to stop tracing at a certain `depth`
     # in essence, depth is the length of the trace entry
     def is_trace_leaf(trace) -> bool:
@@ -370,7 +370,6 @@ def _is_trace_leaf_depth_factory(depth: int):
 def tree_indent(
     tree: Any,
     *,
-    width: int = 60,
     depth: int | float = float("inf"),
     is_leaf: Callable[[Any], bool] | None = None,
     tabwidth: int | None = 4,
@@ -379,7 +378,6 @@ def tree_indent(
 
     Args:
         tree: The tree to be printed.
-        width: The maximum width of leaf nodes line.
         depth: The maximum depth of the tree to be printed.
         is_leaf: A function that takes a node and returns True if it is a leaf node.
         tabwidth: The number of spaces per indentation level. if `None` then tabs are not expanded.
@@ -402,6 +400,7 @@ def tree_indent(
     """
     fmt = f"{type(tree).__name__}"
     seen = set()
+    width = 60
 
     for trace, leaf in pytc.tree_leaves_with_trace(
         tree=tree,
@@ -418,9 +417,9 @@ def tree_indent(
 
             name = str(key)
             fmt += "\n" + "\t" * (j + 1)
-            fmt += f"{_node_pprint(name,0,'str',width, depth )}"
+            fmt += f"{_node_pprint(name,0,'str',width, 0)}"
             fmt += (
-                f"={_node_pprint(leaf,indent=j+1,kind='repr',width=width, depth=depth-1)}"
+                f"={_node_pprint(leaf,indent=j+1,kind='repr',width=width, depth=0)}"
                 if j == len(keys) - 1
                 else f":{type_.__name__}"
             )
@@ -503,7 +502,6 @@ def _indent_to_diagram(input: str, tabwidth: int = 4) -> str:
 def tree_diagram(
     tree: Any,
     *,
-    width: int = 60,
     depth: int | float = float("inf"),
     is_leaf: Callable[[Any], bool] | None = None,
     tabwidth: int = 4,
@@ -513,7 +511,6 @@ def tree_diagram(
     Args:
         tree: PyTree
         depth: depth of the tree to print. default is max depth
-        width: max width of line. default is 60
         is_leaf: function to determine if a node is a leaf. default is None
 
     Example:
@@ -546,7 +543,6 @@ def tree_diagram(
     """
     indent_repr = tree_indent(
         tree,
-        width=width,
         depth=depth,
         is_leaf=is_leaf,
         tabwidth=None,
@@ -583,7 +579,6 @@ def _indent_to_mermaid(input: str, tabwidth: int) -> str:
 
 def tree_mermaid(
     tree: PyTree,
-    width: int = 60,
     depth: int | float = float("inf"),
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> str:
@@ -600,7 +595,6 @@ def tree_mermaid(
 
     Args:
         tree: PyTree
-        width: max width of line. default is 60
         depth: depth of the tree to print. default is max depth
         is_leaf: function to determine if a node is a leaf. default is None
 
@@ -623,7 +617,6 @@ def tree_mermaid(
 
     indent_repr = tree_indent(
         tree,
-        width=width,
         depth=depth,
         is_leaf=is_leaf,
         tabwidth=None,
