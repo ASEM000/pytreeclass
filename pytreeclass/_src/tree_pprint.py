@@ -539,7 +539,7 @@ def tree_diagram(
         └── .b:tuple
             ├── [0]=20
             ├── [1]=30
-            └── [2]=A(x=10, y=(...), z=40)
+            └── [2]=A(...)
     """
     indent_repr = tree_indent(
         tree,
