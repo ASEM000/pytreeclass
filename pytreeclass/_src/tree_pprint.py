@@ -488,7 +488,7 @@ def tree_diagram(
         ...     b: tuple = (20,30, A())
 
         >>> print(pytc.tree_diagram(B(), depth=0))
-        B
+        B(...)
 
         >>> print(pytc.tree_diagram(B(), depth=1))
         B

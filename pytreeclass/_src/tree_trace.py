@@ -172,14 +172,12 @@ class Node:
         key: Any,
         type: type = None,
         value: Any = None,
-        parent: Any = None,
-        children: dict[Any, Node] | None = None,
     ):
         self.key = key
         self.type = type
         self.value = value
-        self.parent = parent
-        self.children = children or {}
+        self.parent = None
+        self.children = {}
 
     def add_child(self, child: Node) -> None:
         # add child node to this node and set

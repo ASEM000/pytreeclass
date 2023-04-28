@@ -12,6 +12,7 @@ import pytest
 import pytreeclass as pytc
 from pytreeclass import TreeClass
 from pytreeclass._src.tree_indexer import _mutable_context
+from pytreeclass._src.tree_trace import construct_tree
 
 
 class Tree(TreeClass, leafwise=True):
@@ -679,3 +680,12 @@ def test_nested_indexing():
     tree = Tree()
     assert jtu.tree_leaves(tree.at["a"].at[1].at["b"].get())[0] == Dict({"c": 1})
     assert jtu.tree_leaves(tree.at[0].at[1].at["b"].get())[0] == Dict({"c": 1})
+
+
+def test_construct_tree():
+    tree = construct_tree([1, 2, [3, 4]])
+
+    assert repr(tree) == "Node(key=None, type=list, value=[1, 2, [3, 4]])"
+
+    with pytest.raises(TypeError):
+        tree.add_child("a")
