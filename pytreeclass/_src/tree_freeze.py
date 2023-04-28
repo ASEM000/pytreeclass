@@ -53,7 +53,7 @@ class _HashableWrapper(_ImmutableWrapper):
         return tree_hash(self.unwrap())
 
 
-def error_func(opname: str, tree):
+def _frozen_error(opname: str, tree):
     raise NotImplementedError(
         f"Cannot apply `{opname}` operation a frozen object `{tree!r}`.\n"
         "Unfreeze the object first to apply operations to it\n"
@@ -62,10 +62,6 @@ def error_func(opname: str, tree):
         ">>> import pytreeclass as pytc\n"
         ">>> tree = jax.tree_map(pytc.unfreeze, tree, is_leaf=pytc.is_frozen)"
     )
-
-
-def _raise_frozen_error(opname: str):
-    return lambda self, *_, **__: error_func(opname, self)
 
 
 class _FrozenWrapper(_ImmutableWrapper):
@@ -80,26 +76,22 @@ class _FrozenWrapper(_ImmutableWrapper):
     def __hash__(self) -> int:
         return tree_hash(self.unwrap())
 
-    # raise helpful error message when trying
-    # to interact with frozen object
-    __add__ = __radd__ = __iadd__ = _raise_frozen_error("+")
-    __sub__ = __rsub__ = __isub__ = _raise_frozen_error("-")
-    __mul__ = __rmul__ = __imul__ = _raise_frozen_error("*")
-    __matmul__ = __rmatmul__ = __imatmul__ = _raise_frozen_error("@")
-    __truediv__ = __rtruediv__ = __itruediv__ = _raise_frozen_error("/")
-    __floordiv__ = __rfloordiv__ = __ifloordiv__ = _raise_frozen_error("//")
-    __mod__ = __rmod__ = __imod__ = _raise_frozen_error("%")
-    __pow__ = __rpow__ = __ipow__ = _raise_frozen_error("**")
-    __lshift__ = __rlshift__ = __ilshift__ = _raise_frozen_error("<<")
-    __rshift__ = __rrshift__ = __irshift__ = _raise_frozen_error(">>")
-    __and__ = __rand__ = __iand__ = _raise_frozen_error("and")
-    __xor__ = __rxor__ = __ixor__ = _raise_frozen_error("xor")
-    __or__ = __ror__ = __ior__ = _raise_frozen_error("or")
-    __neg__ = __pos__ = __abs__ = __invert__ = _raise_frozen_error("unary operator")
-    __lt__ = __le__ = __gt__ = __ge__ = _raise_frozen_error("comparison")
-    __getitem__ = __setitem__ = __delitem__ = _raise_frozen_error("")
-    __iter__ = __next__ = __len__ = _raise_frozen_error("iteration")
-    __call__ = _raise_frozen_error("call")
+    # raise helpful error message when trying to interact with frozen object
+    __add__ = __radd__ = __iadd__ = lambda x, _: _frozen_error("+", x)
+    __sub__ = __rsub__ = __isub__ = lambda x, _: _frozen_error("-", x)
+    __mul__ = __rmul__ = __imul__ = lambda x, _: _frozen_error("*", x)
+    __matmul__ = __rmatmul__ = __imatmul__ = lambda x, _: _frozen_error("@", x)
+    __truediv__ = __rtruediv__ = __itruediv__ = lambda x, _: _frozen_error("/", x)
+    __floordiv__ = __rfloordiv__ = __ifloordiv__ = lambda x, _: _frozen_error("//", x)
+    __mod__ = __rmod__ = __imod__ = lambda x, _: _frozen_error("%", x)
+    __pow__ = __rpow__ = __ipow__ = lambda x, _: _frozen_error("**", x)
+    __lshift__ = __rlshift__ = __ilshift__ = lambda x, _: _frozen_error("<<", x)
+    __rshift__ = __rrshift__ = __irshift__ = lambda x, _: _frozen_error(">>", x)
+    __and__ = __rand__ = __iand__ = lambda x, _: _frozen_error("and", x)
+    __xor__ = __rxor__ = __ixor__ = lambda x, _: _frozen_error("xor", x)
+    __or__ = __ror__ = __ior__ = lambda x, _: _frozen_error("or", x)
+    __neg__ = __pos__ = __abs__ = __invert__ = lambda x: _frozen_error("unary op", x)
+    __call__ = lambda x, *_, **__: _frozen_error("call", x)
 
 
 jtu.register_pytree_node(
