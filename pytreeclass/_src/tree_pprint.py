@@ -872,44 +872,40 @@ def tree_repr_with_trace(
         ...    b:float = 2.0
 
         >>> tree = Test()
-        >>> print(pytc.tree_repr_with_trace(Test()))  # doctest: +SKIP
+        >>> print(pytc.tree_repr_with_trace(Test()))  # doctest: +NORMALIZE_WHITESPACE
         Test(
           a=
-            ┌──────────┬───┐
-            │Value     │1  │
-            ├──────────┼───┤
-            │Name path │a  │
-            ├──────────┼───┤
-            │Type path │int│
-            ├──────────┼───┤
-            │Index path│0  │
-            └──────────┴───┘,
+            ┌─────────┬───┐
+            │Value    │1  │
+            ├─────────┼───┤
+            │Name path│.a │
+            ├─────────┼───┤
+            │Type path│int│
+            └─────────┴───┘,
           b=
-            ┌──────────┬─────┐
-            │Value     │2.0  │
-            ├──────────┼─────┤
-            │Name path │b    │
-            ├──────────┼─────┤
-            │Type path │float│
-            ├──────────┼─────┤
-            │Index path│1    │
-            └──────────┴─────┘
+            ┌─────────┬─────┐
+            │Value    │2.0  │
+            ├─────────┼─────┤
+            │Name path│.b   │
+            ├─────────┼─────┤
+            │Type path│float│
+            └─────────┴─────┘
         )
 
-        >>> print(pytc.tree_repr_with_trace(Test(), transpose=True))  # doctest: +SKIP
+        >>> print(pytc.tree_repr_with_trace(Test(), transpose=True)) # doctest: +NORMALIZE_WHITESPACE
         Test(
-        a=
-            ┌─────┬─────────┬─────────┬──────────┐
-            │Value│Name path│Type path│Index path│
-            ├─────┼─────────┼─────────┼──────────┤
-            │1    │a        │int      │0         │
-            └─────┴─────────┴─────────┴──────────┘,
-        b=
-            ┌─────┬─────────┬─────────┬──────────┐
-            │Value│Name path│Type path│Index path│
-            ├─────┼─────────┼─────────┼──────────┤
-            │2.0  │b        │float    │1         │
-            └─────┴─────────┴─────────┴──────────┘
+          a=
+            ┌─────┬─────────┬─────────┐
+            │Value│Name path│Type path│
+            ├─────┼─────────┼─────────┤
+            │1    │.a       │int      │
+            └─────┴─────────┴─────────┘,
+          b=
+            ┌─────┬─────────┬─────────┐
+            │Value│Name path│Type path│
+            ├─────┼─────────┼─────────┤
+            │2.0  │.b       │float    │
+            └─────┴─────────┴─────────┘
         )
 
     Note:

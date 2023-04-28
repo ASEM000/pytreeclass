@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses as dc
-from typing import Any, Callable, Hashable, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar
 
 import jax.tree_util as jtu
 from jax._src.tree_util import _registry, _registry_with_keypaths
@@ -189,6 +189,10 @@ class Node:
             child.parent = self
             self.children[child.key] = child
 
+    def __iter__(self) -> Iterator[Node]:
+        # iterate over children nodes
+        return iter(self.children.values())
+
     def __repr__(self) -> str:
         return f"Node(key={self.key}, type={self.type.__name__}, value={self.value})"
 
@@ -200,8 +204,13 @@ jtu.register_pytree_node(
 )
 
 
-def construct_tree(tree, is_leaf=None, is_trace_leaf=None) -> Node:
+def construct_tree(
+    tree: PyTree,
+    is_leaf: bool = None,
+    is_trace_leaf: bool = None,
+) -> Node:
     # construct a tree with `Node` objects using `tree_leaves_with_trace`
+    # to establish parent-child relationship between nodes and return the root node
     root = Node(None, value=tree, type=tree.__class__)
 
     traces_leaves = tree_leaves_with_trace(
@@ -219,10 +228,8 @@ def construct_tree(tree, is_leaf=None, is_trace_leaf=None) -> Node:
                 cur = cur.children[key]
             else:
                 # new path
-                if i == len(keys) - 1:
-                    child = Node(key, type, leaf)  # leaf node
-                else:
-                    child = Node(key, type)
+                value = leaf if i == len(keys) - 1 else None
+                child = Node(key=key, type=type, value=value)
                 cur.add_child(child)
                 cur = child
     return root

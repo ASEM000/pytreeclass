@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import abc
 import functools as ft
 import sys
-from abc import ABCMeta
 from collections.abc import MutableMapping, MutableSequence
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, Hashable, NamedTuple, Sequence, TypeVar
@@ -353,7 +353,7 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     return klass
 
 
-class TreeClassMeta(ABCMeta):
+class TreeClassMeta(abc.ABCMeta):
     def __call__(klass: type[T], *a, **k) -> T:
         self = getattr(klass, "__new__")(klass, *a, **k)
 
@@ -450,5 +450,6 @@ class TreeClass(metaclass=TreeClassMeta):
         klass = _treeclass_transform(klass)
 
     @property
+    @abc.abstractmethod
     def at(self) -> AtIndexer:
         ...
