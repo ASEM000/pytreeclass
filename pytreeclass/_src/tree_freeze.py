@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Sequence
+from typing import Any
 
 import jax
 import jax.tree_util as jtu
 import numpy as np
-
-_WRAPPED = "__wrapped__"
 
 PyTree = Any
 
@@ -30,12 +28,13 @@ def tree_hash(*trees: PyTree) -> int:
 
 
 class _ImmutableWrapper:
+    __slot__ = ("__wrapped__", "__weakref__")
+
     def __init__(self, x: Any) -> None:
-        # disable composition of Wrappers
-        vars(self)[_WRAPPED] = x.unwrap() if isinstance(x, _ImmutableWrapper) else x
+        object.__setattr__(self, "__wrapped__", getattr(x, "__wrapped__", x))
 
     def unwrap(self) -> Any:
-        return getattr(self, _WRAPPED)
+        return getattr(self, "__wrapped__")
 
     def __setattr__(self, _, __) -> None:
         raise AttributeError("Cannot assign to frozen instance.")
@@ -45,9 +44,6 @@ class _ImmutableWrapper:
 
 
 class _HashableWrapper(_ImmutableWrapper):
-    # used to wrap metadata to make it hashable
-    # this is intended to wrap frozen values to avoid error when comparing
-    # the metadata.
     def __eq__(self, rhs: Any) -> bool:
         if not isinstance(rhs, _HashableWrapper):
             return False
@@ -55,6 +51,21 @@ class _HashableWrapper(_ImmutableWrapper):
 
     def __hash__(self) -> int:
         return tree_hash(self.unwrap())
+
+
+def error_func(opname: str, tree):
+    raise NotImplementedError(
+        f"Cannot apply `{opname}` operation a frozen object `{tree!r}`.\n"
+        "Unfreeze the object first to apply operations to it\n"
+        "Example:\n"
+        ">>> import jax\n"
+        ">>> import pytreeclass as pytc\n"
+        ">>> tree = jax.tree_map(pytc.unfreeze, tree, is_leaf=pytc.is_frozen)"
+    )
+
+
+def _raise_frozen_error(opname: str):
+    return lambda self, *_, **__: error_func(opname, self)
 
 
 class _FrozenWrapper(_ImmutableWrapper):
@@ -69,16 +80,33 @@ class _FrozenWrapper(_ImmutableWrapper):
     def __hash__(self) -> int:
         return tree_hash(self.unwrap())
 
+    # raise helpful error message when trying
+    # to interact with frozen object
+    __add__ = __radd__ = __iadd__ = _raise_frozen_error("+")
+    __sub__ = __rsub__ = __isub__ = _raise_frozen_error("-")
+    __mul__ = __rmul__ = __imul__ = _raise_frozen_error("*")
+    __matmul__ = __rmatmul__ = __imatmul__ = _raise_frozen_error("@")
+    __truediv__ = __rtruediv__ = __itruediv__ = _raise_frozen_error("/")
+    __floordiv__ = __rfloordiv__ = __ifloordiv__ = _raise_frozen_error("//")
+    __mod__ = __rmod__ = __imod__ = _raise_frozen_error("%")
+    __pow__ = __rpow__ = __ipow__ = _raise_frozen_error("**")
+    __lshift__ = __rlshift__ = __ilshift__ = _raise_frozen_error("<<")
+    __rshift__ = __rrshift__ = __irshift__ = _raise_frozen_error(">>")
+    __and__ = __rand__ = __iand__ = _raise_frozen_error("and")
+    __xor__ = __rxor__ = __ixor__ = _raise_frozen_error("xor")
+    __or__ = __ror__ = __ior__ = _raise_frozen_error("or")
+    __neg__ = __pos__ = __abs__ = __invert__ = _raise_frozen_error("unary operator")
+    __lt__ = __le__ = __gt__ = __ge__ = _raise_frozen_error("comparison")
+    __getitem__ = __setitem__ = __delitem__ = _raise_frozen_error("")
+    __iter__ = __next__ = __len__ = _raise_frozen_error("iteration")
+    __call__ = _raise_frozen_error("call")
 
-def _flatten(tree: Any) -> tuple[tuple, Any]:
-    return (None,), _HashableWrapper(tree.unwrap())
 
-
-def _unflatten(treedef: Any, _: Sequence[Any]) -> PyTree:
-    return _FrozenWrapper(treedef.unwrap())
-
-
-jtu.register_pytree_node(_FrozenWrapper, _flatten, _unflatten)
+jtu.register_pytree_node(
+    nodetype=_FrozenWrapper,
+    flatten_func=lambda tree: ((None,), _HashableWrapper(tree.unwrap())),
+    unflatten_func=lambda treedef, _: _FrozenWrapper(treedef.unwrap()),
+)
 
 
 def freeze(wrapped: Any) -> _FrozenWrapper:

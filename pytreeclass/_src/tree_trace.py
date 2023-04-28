@@ -165,7 +165,7 @@ def tree_map_with_trace(
 
 
 class Node:
-    __slots__ = ("key", "type", "value", "parent", "children")
+    __slots__ = ("key", "type", "value", "parent", "children", "__weakref__")
 
     def __init__(
         self,
@@ -197,8 +197,10 @@ class Node:
         return f"Node(key={self.key}, type={self.type.__name__}, value={self.value})"
 
 
+# disallow traversal to avoid infinite recursion
+# in case of circular references
 jtu.register_pytree_node(
-    Node,
+    nodetype=Node,
     flatten_func=lambda tree: ((), tree),
     unflatten_func=lambda treedef, _: treedef[0],
 )
@@ -224,7 +226,7 @@ def construct_tree(
         cur = root
         for i, (key, type) in enumerate(zip(keys, types)):
             if key in cur.children:
-                # common path
+                # common parent node
                 cur = cur.children[key]
             else:
                 # new path

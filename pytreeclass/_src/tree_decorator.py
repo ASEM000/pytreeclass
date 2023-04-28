@@ -32,7 +32,6 @@ T = TypeVar("T", bound=Hashable)
 PyTree = Any
 
 _NOT_SET = NOT_SET()
-_POST_INIT = "__post_init__"
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 
 
@@ -360,7 +359,7 @@ class TreeClassMeta(abc.ABCMeta):
         with _mutable_context(self):
             getattr(klass, "__init__")(self, *a, **k)
 
-            if post_init_func := getattr(klass, _POST_INIT, None):
+            if post_init_func := getattr(klass, "__post_init__", None):
                 # to simplify the logic, we call the post init method
                 # even if the init method is not code-generated.
                 post_init_func(self)
