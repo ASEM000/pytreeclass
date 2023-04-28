@@ -4,7 +4,6 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import math
-from collections import defaultdict
 from itertools import chain
 from types import FunctionType
 from typing import Any, Callable, Literal
@@ -17,13 +16,16 @@ from jax.util import unzip2
 from jaxlib.xla_extension import PjitFunction
 
 import pytreeclass as pytc
+from pytreeclass._src.tree_trace import Node, construct_tree
 
 PyTree = Any
 PrintKind = Literal["repr", "str"]
+from_iterable = chain.from_iterable
 
 
 def _node_pprint(
     node: Any,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
@@ -31,57 +33,67 @@ def _node_pprint(
 ) -> str:
     if depth < 0:
         return "..."
+
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+
     if isinstance(node, ft.partial):
-        return f"Partial({_func_pprint(node.func, indent,kind,width,depth)})"
-    if isinstance(node, (FunctionType, custom_jvp)):
-        return _func_pprint(node, indent, kind, width, depth)
-    if isinstance(node, PjitFunction):
-        return f"jit({_func_pprint(node, indent, kind, width,depth)})"
-    if isinstance(node, (np.ndarray, jax.Array)):
-        return _numpy_pprint(node, indent, kind, width, depth)
-    if isinstance(node, jax.ShapeDtypeStruct):
-        return _shape_dtype_pprint(node, indent, kind, width, depth)
-    if isinstance(node, tuple) and hasattr(node, "_fields"):
-        return _namedtuple_pprint(node, indent, kind, width, depth)
-    if isinstance(node, list):
-        return _list_pprint(node, indent, kind, width, depth)
-    if isinstance(node, tuple):
-        return _tuple_pprint(node, indent, kind, width, depth)
-    if isinstance(node, set):
-        return _set_pprint(node, indent, kind, width, depth)
-    if isinstance(node, dict):
-        return _dict_pprint(node, indent, kind, width, depth)
-    if dc.is_dataclass(node):
-        return _dataclass_pprint(node, indent, kind, width, depth)
-    if isinstance(node, pytc.TreeClass):
-        return _treeclass_pprint(node, indent, kind, width, depth)
-    return _general_pprint(node, indent, kind, width, depth)
+        text = f"Partial({_func_pprint(node.func, **spec)})"
+    elif isinstance(node, (FunctionType, custom_jvp)):
+        text = _func_pprint(node, **spec)
+    elif isinstance(node, PjitFunction):
+        text = f"jit({_func_pprint(node, **spec)})"
+    elif isinstance(node, jax.ShapeDtypeStruct):
+        text = _shape_dtype_pprint(node, **spec)
+    elif isinstance(node, tuple) and hasattr(node, "_fields"):
+        text = _namedtuple_pprint(node, **spec)
+    elif isinstance(node, list):
+        text = _list_pprint(node, **spec)
+    elif isinstance(node, tuple):
+        text = _tuple_pprint(node, **spec)
+    elif isinstance(node, set):
+        text = _set_pprint(node, **spec)
+    elif isinstance(node, dict):
+        text = _dict_pprint(node, **spec)
+    elif dc.is_dataclass(node):
+        text = _dataclass_pprint(node, **spec)
+    elif isinstance(node, pytc.TreeClass):
+        text = _treeclass_pprint(node, **spec)
+    elif isinstance(node, (np.ndarray, jax.Array)) and kind == "repr":
+        text = _numpy_pprint(node, **spec)
+    else:
+        text = _general_pprint(node, **spec)
+
+    return _format_width(text, width)
 
 
 def _general_pprint(
     node: Any,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
     depth: int,
 ) -> str:
-    del depth
+    del depth, width
 
-    fmt = f"{node!r}" if kind == "repr" else f"{node!s}"
-    is_mutltiline = "\n" in fmt
-
-    # multiline repr/str case, increase indent and indent
+    text = f"{node!r}" if kind == "repr" else f"{node!s}"
+    is_mutltiline = "\n" in text
     indent = (indent + 1) if is_mutltiline else indent
-    fmt = ("\n" + "\t" * indent).join(fmt.split("\n"))
-    fmt = ("\n" + "\t" * (indent) + fmt) if is_mutltiline else fmt
-    return _format_width(fmt, width)
+    text = ("\n" + "\t" * indent).join(text.split("\n"))
+    text = ("\n" + "\t" * (indent) + text) if is_mutltiline else text
+    return text
 
 
 def _shape_dtype_pprint(
-    node: Any, indent: int, kind: PrintKind, width: int, depth: int
+    node: Any,
+    *,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
 ) -> str:
     """Pretty print a node with dtype and shape"""
-    del indent, kind, depth
+    del indent, kind, depth, width
 
     shape = f"{node.shape}".replace(",", "")
     shape = shape.replace("(", "[")
@@ -90,24 +102,24 @@ def _shape_dtype_pprint(
     dtype = f"{node.dtype}".replace("int", "i")
     dtype = dtype.replace("float", "f")
     dtype = dtype.replace("complex", "c")
-    return _format_width(dtype + shape, width)
+    return dtype + shape
 
 
 def _numpy_pprint(
     node: np.ndarray | jax.Array,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
     depth: int,
 ) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape"""
-    if kind == "str":
-        return _general_pprint(node, indent, "str", width, depth)
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
 
-    base = _shape_dtype_pprint(node, indent, kind, width, depth)
+    base = _shape_dtype_pprint(node, **spec)
 
     if not issubclass(node.dtype.type, (np.integer, np.floating)) or node.size == 0:
-        return _format_width(base, width)
+        return base
 
     # Extended repr for numpy array, with extended information
     # this part of the function is inspired by
@@ -124,12 +136,13 @@ def _numpy_pprint(
     # handle mean and std
     mean, std = f"{np.mean(node):.2f}", f"{np.std(node):.2f}"
 
-    return _format_width(f"{base}(μ={mean}, σ={std}, ∈{interval})", width)
+    return f"{base}(μ={mean}, σ={std}, ∈{interval})"
 
 
 @ft.lru_cache
 def _func_pprint(
     func: Callable,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
@@ -141,106 +154,113 @@ def _func_pprint(
     #         ...
     #     >>> _func_pprint(example)
     #     "example(a, b, *c, d, e, **f)"
-    del indent, kind, depth
-
+    del indent, kind, depth, width
     args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(func)
     args = (", ".join(args)) if len(args) > 0 else ""
     varargs = ("*" + varargs) if varargs is not None else ""
     kwonlyargs = (", ".join(kwonlyargs)) if len(kwonlyargs) > 0 else ""
     varkw = ("**" + varkw) if varkw is not None else ""
     name = "Lambda" if (func.__name__ == "<lambda>") else func.__name__
-    fmt = f"{name}("
-    fmt += ", ".join(item for item in [args, varargs, kwonlyargs, varkw] if item != "")
-    fmt += ")"
-    return _format_width(fmt, width)
+    text = f"{name}("
+    text += ", ".join(item for item in [args, varargs, kwonlyargs, varkw] if item != "")
+    text += ")"
+    return text
 
 
 def _list_pprint(
     node: list,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
     depth: int,
 ) -> str:
     if depth == 0:
-        fmt = "..."
-    else:
-        fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
-        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
-
-    fmt = "[\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "]"
-    return _format_width(fmt, width)
+        return "[...]"
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    text = (f"{(_node_pprint(v,**spec))}" for v in node)
+    text = (", \n" + "\t" * (indent + 1)).join(text)
+    text = "[\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + "]"
+    return text
 
 
 def _tuple_pprint(
     node: tuple,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
     depth: int,
 ) -> str:
     if depth == 0:
-        fmt = "..."
-    else:
-        fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
-        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
-    fmt = "(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
-    return _format_width(fmt, width)
+        return "(...)"
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    text = (f"{(_node_pprint(v,**spec))}" for v in node)
+    text = (", \n" + "\t" * (indent + 1)).join(text)
+    text = "(\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + ")"
+    return text
 
 
 def _set_pprint(
     node: set,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
     depth: int,
 ) -> str:
     if depth == 0:
-        fmt = "..."
-    else:
-        fmt = (f"{(_node_pprint(v,indent+1,kind,width,depth-1))}" for v in node)
-        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
-    fmt = "{\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "}"
-    return _format_width(fmt, width)
+        return "{...}"
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    text = (f"{(_node_pprint(v,**spec))}" for v in node)
+    text = (", \n" + "\t" * (indent + 1)).join(text)
+    text = "{\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + "}"
+    return text
 
 
 def _dict_pprint(
     node: dict,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
     depth: int,
 ) -> str:
     if depth == 0:
-        fmt = "..."
-    else:
-        kvs = node.items()
-        fmt = (f"{k}:{_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
-        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
-    fmt = "{\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + "}"
-    return _format_width(fmt, width)
+        return "{...}"
+    kvs = node.items()
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    text = (f"{k}:{_node_pprint(v,**spec)}" for k, v in kvs)
+    text = (", \n" + "\t" * (indent + 1)).join(text)
+    text = "{\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + "}"
+    return text
 
 
 def _namedtuple_pprint(
     node: Any,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
     depth: int,
 ) -> str:
-    if depth == 0:
-        fmt = "..."
-    else:
-        kvs = node._asdict().items()
-        fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
-        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
     name = type(node).__name__
-    fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
-    return _format_width(fmt, width)
+
+    if depth == 0:
+        return f"{name}(...)"
+
+    kvs = node._asdict().items()
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    text = (f"{k}={_node_pprint(v,**spec)}" for k, v in kvs)
+    text = (", \n" + "\t" * (indent + 1)).join(text)
+    name = type(node).__name__
+    text = f"{name}(\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + ")"
+    return text
 
 
 def _dataclass_pprint(
     node: Any,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
@@ -249,18 +269,19 @@ def _dataclass_pprint(
     name = type(node).__name__
 
     if depth == 0:
-        fmt = "..."
-    else:
-        kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
-        fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
-        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
+        return f"{name}(...)"
 
-    fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
-    return _format_width(fmt, width)
+    kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    text = (f"{k}={_node_pprint(v,**spec)}" for k, v in kvs)
+    text = (", \n" + "\t" * (indent + 1)).join(text)
+    text = f"{name}(\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + ")"
+    return text
 
 
 def _treeclass_pprint(
     node: Any,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
@@ -268,19 +289,20 @@ def _treeclass_pprint(
 ) -> str:
     name = type(node).__name__
     if depth == 0:
-        fmt = "..."
+        return f"{name}(...)"
 
-    else:
-        skip = [f.name for f in pytc.fields(node) if not f.repr]
-        kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
-        fmt = (f"{k}={_node_pprint(v,indent+1,kind,width,depth-1)}" for k, v in kvs)
-        fmt = (", \n" + "\t" * (indent + 1)).join(fmt)
-    fmt = f"{name}(\n" + "\t" * (indent + 1) + (fmt) + "\n" + "\t" * (indent) + ")"
-    return _format_width(fmt, width)
+    skip = [f.name for f in pytc.fields(node) if not f.repr]
+    kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    text = (f"{k}={_node_pprint(v,**spec)}" for k, v in kvs)
+    text = (", \n" + "\t" * (indent + 1)).join(text)
+    text = f"{name}(\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + ")"
+    return text
 
 
 def _node_type_pprint(
     node: jax.Array | np.ndarray,
+    *,
     indent: int,
     kind: PrintKind,
     width: int,
@@ -288,10 +310,11 @@ def _node_type_pprint(
 ) -> str:
     if isinstance(node, (jax.Array, np.ndarray)):
         shape_dype = node.shape, node.dtype
-        fmt = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), indent, kind, width, depth)  # fmt: skip
+        spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+        text = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), **spec)
     else:
-        fmt = f"{type(node).__name__}"
-    return _format_width(fmt, width)
+        text = f"{type(node).__name__}"
+    return text
 
 
 def tree_repr(
@@ -323,7 +346,13 @@ def tree_repr(
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
     """
-    return _node_pprint(tree, 0, "repr", width, depth).expandtabs(tabwidth)
+    return _node_pprint(
+        tree,
+        indent=0,
+        kind="repr",
+        width=width,
+        depth=depth,
+    ).expandtabs(tabwidth)
 
 
 def tree_str(
@@ -351,7 +380,13 @@ def tree_str(
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
     """
-    return _node_pprint(tree, 0, "str", width, depth).expandtabs(tabwidth)
+    return _node_pprint(
+        tree,
+        indent=0,
+        kind="str",
+        width=width,
+        depth=depth,
+    ).expandtabs(tabwidth)
 
 
 def _is_trace_leaf_depth_factory(depth: int | float):
@@ -398,105 +433,33 @@ def tree_indent(
                     [1]=6
 
     """
-    fmt = f"{type(tree).__name__}"
-    seen = set()
-    width = 60
-
-    for trace, leaf in pytc.tree_leaves_with_trace(
-        tree=tree,
-        is_leaf=is_leaf,
-        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
-    ):
-        keys, types = trace
-
-        for j, (key, type_) in enumerate(zip(keys, types)):
-            if (cur := (keys[: j + 1], types[: j + 1])) in seen:
-                # skip printing the common parent node twice
-                continue
-            seen.add(cur)
-
-            name = str(key)
-            fmt += "\n" + "\t" * (j + 1)
-            fmt += f"{_node_pprint(name,0,'str',width, 0)}"
-            fmt += (
-                f"={_node_pprint(leaf,indent=j+1,kind='repr',width=width, depth=0)}"
-                if j == len(keys) - 1
-                else f":{type_.__name__}"
-            )
-    return fmt if tabwidth is None else fmt.expandtabs(tabwidth)
-
-
-def _group_by_depth(input: str) -> dict[int, list[list[int]]]:
-    # >>> out = """L2
-    # 	e=4
-    # 	f:L1
-    # 		c:L0
-    # 			a=1
-    # 			b=2
-    # 		d=3
-    # 	g:L0
-    # 		a=1
-    # 		b=2
-    # 	h=5"""
-    #
-    # >>> print(_group_by_depth(out))
-    # {
-    #   3:[[4, 5]],
-    #   2:[[3, 6], [8, 9]],
-    #   0:[[0]],
-    #   1:[[1, 2, 7, 10]]
-    # }
-    # in essence, the map key is the depth of the node, and the value is a list of line indices
-    # each list of line indices is a parent node with line indices of its children
-    depth_line_index_map = defaultdict(list)
-    stack_map = defaultdict(list)
-    prev_depth = 0
-    lines = input.splitlines()
-
-    for line_index, line in enumerate(lines):
-        cur_depth = len(line) - len(line.lstrip("\t"))
-        stack_map[cur_depth] += [line_index]
-        if cur_depth < prev_depth and prev_depth in stack_map:
-            depth_line_index_map[prev_depth] += [stack_map.pop(prev_depth)]
-        prev_depth = cur_depth
-
-    for key in stack_map:
-        depth_line_index_map[key] += [stack_map[key]]
-    del stack_map
-
-    return dict(depth_line_index_map)
-
-
-def _indent_to_diagram(input: str, tabwidth: int = 4) -> str:
-    # input is a string of tab \t indented text
-    # conversion alphabet
-    vmark = ("│\t")[:tabwidth]  # vertical mark
-    lmark = ("└" + "─" * (tabwidth - 2) + (" \t"))[:tabwidth]  # last mark
-    cmark = ("├" + "─" * (tabwidth - 2) + (" \t"))[:tabwidth]  # connector mark
     smark = (" \t")[:tabwidth]  # space mark
 
-    depth_line_index_map = _group_by_depth(input)
-    lines = input.splitlines()
+    def step(node: Node, depth: int = 0) -> str:
+        indent = smark * depth
 
-    for depth in depth_line_index_map:
-        # iterate over groups of line indices at this depth
-        for parent_lines_indices in depth_line_index_map[depth]:
-            # iterate over line indices groups
-            for i, line_index in enumerate(parent_lines_indices):
-                # iterate over line indices at a group at this depth
-                is_last = i == len(parent_lines_indices) - 1
+        if (len(node.children)) == 0:
+            ppspec = dict(indent=0, kind="repr", width=80, depth=0)
+            text = f"{indent}"
+            text += f"{node.key}=" if node.key is not None else ""
+            text += _node_pprint(node.value, **ppspec)
+            return text + "\n"
 
-                marker = ""
-                for j in range(1, depth):
-                    max_line_index = depth_line_index_map.get(j, [[-1]])[-1][-1]
-                    marker += vmark if max_line_index > line_index else smark
+        text = f"{indent}"
+        text += f"{node.key}:" if node.key is not None else ""
+        text += f"{node.type.__name__}\n"
 
-                if depth > 0:
-                    marker += lmark if is_last else cmark
+        for i, child in enumerate(node.children.values()):
+            text += step(child, depth=depth + 1)
+        return text
 
-                lines[line_index] = marker + lines[line_index].lstrip("\t")
-
-    return "\n".join(lines).expandtabs(tabwidth)
+    root = construct_tree(
+        tree,
+        is_leaf=is_leaf,
+        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+    )
+    text = step(root)
+    return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
 
 
 def tree_diagram(
@@ -525,7 +488,7 @@ def tree_diagram(
         ...     b: tuple = (20,30, A())
 
         >>> print(pytc.tree_diagram(B(), depth=0))
-        B
+        B(...)
 
         >>> print(pytc.tree_diagram(B(), depth=1))
         B
@@ -541,46 +504,54 @@ def tree_diagram(
             ├── [1]=30
             └── [2]=A(...)
     """
-    indent_repr = tree_indent(
+    vmark = ("│\t")[:tabwidth]  # vertical mark
+    lmark = ("└" + "─" * (tabwidth - 2) + (" \t"))[:tabwidth]  # last mark
+    cmark = ("├" + "─" * (tabwidth - 2) + (" \t"))[:tabwidth]  # connector mark
+    smark = (" \t")[:tabwidth]  # space mark
+
+    def step(
+        node: Node,
+        depth: int = 0,
+        is_last_sibling: bool = False,
+        is_lasts: tuple[bool, ...] = (),
+    ) -> str:
+        indent = "".join(smark if is_last else vmark for is_last in is_lasts[:-1])
+        branch = (lmark if is_last_sibling else cmark) if depth > 0 else ""
+
+        if (child_count := len(node.children)) == 0:
+            ppspec = dict(indent=0, kind="repr", width=80, depth=0)
+            text = f"{indent}"
+            text += f"{branch}{node.key}=" if node.key is not None else ""
+            text += _node_pprint(node.value, **ppspec)
+            return text + "\n"
+
+        text = f"{indent}{branch}"
+        text += f"{node.key}:" if node.key is not None else ""
+        text += f"{node.type.__name__}\n"
+
+        for i, child in enumerate(node.children.values()):
+            text += step(
+                child,
+                depth=depth + 1,
+                is_last_sibling=(i == child_count - 1),
+                is_lasts=is_lasts + (i == child_count - 1,),
+            )
+        return text
+
+    root = construct_tree(
         tree,
-        depth=depth,
         is_leaf=is_leaf,
-        tabwidth=None,
+        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
     )
-
-    return _indent_to_diagram(indent_repr, tabwidth=tabwidth)
-
-
-def _indent_to_mermaid(input: str, tabwidth: int) -> str:
-    # input is a string of tab \t indented text
-
-    depth_line_index_map = _group_by_depth(input)
-    lines = input.splitlines()
-
-    output = "flowchart LR\n"
-
-    for depth in depth_line_index_map:
-        # iterate over groups of line indices at this depth
-        for parent_lines_indices in depth_line_index_map[depth]:
-            # iterate over line indices groups
-            for line_index in parent_lines_indices:
-                if depth == 0:
-                    line = "<b>" + lines[line_index].lstrip("\t") + "</b>"
-                    output += f"\tid{line_index}({line})\n"
-
-                else:
-                    # get the line indices of the previous depth (parent nodes)
-                    parent_lines = chain.from_iterable(depth_line_index_map[depth - 1])
-                    parent_line_index = [x for x in parent_lines if x < line_index][-1]
-                    line = "</b>" + lines[line_index].lstrip("\t") + "</b>"
-                    output += f'\tid{parent_line_index} --- id{line_index}("{line}")\n'
-    return output.expandtabs(tabwidth)
+    text = step(root, is_last_sibling=len(root.children) == 1)
+    return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
 
 
 def tree_mermaid(
     tree: PyTree,
     depth: int | float = float("inf"),
     is_leaf: Callable[[Any], bool] | None = None,
+    tabwidth: int | None = 4,
 ) -> str:
     # def _generate_mermaid_link(mermaid_string: str) -> str:
     #     """generate a one-time link mermaid diagram"""
@@ -597,32 +568,37 @@ def tree_mermaid(
         tree: PyTree
         depth: depth of the tree to print. default is max depth
         is_leaf: function to determine if a node is a leaf. default is None
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> tree = [1, [2, 3], [4, [5, 6]]]
-        >>> print(pytc.tree_mermaid(tree, depth=1))  # doctest: +SKIP
-        flowchart LR
-            id2 --- id3("</b>[0]=2</b>")
-            id2 --- id4("</b>[1]=3</b>")
-            id5 --- id6("</b>[0]=4</b>")
-            id5 --- id7("</b>[1]:list</b>")
-            id0(<b>list</b>)
-            id0 --- id1("</b>[0]=1</b>")
-            id0 --- id2("</b>[1]:list</b>")
-            id0 --- id5("</b>[2]:list</b>")
-            id7 --- id8("</b>[0]=5</b>")
-            id7 --- id9("</b>[1]=6</b>")
     """
 
-    indent_repr = tree_indent(
-        tree,
-        depth=depth,
-        is_leaf=is_leaf,
-        tabwidth=None,
-    )
+    def step(node: Node, depth: int = 0) -> str:
+        if len(node.children) == 0:
+            ppspec = dict(indent=0, kind="repr", width=80, depth=0)
+            text = f"{node.key}=" if node.key is not None else ""
+            text += _node_pprint(node.value, **ppspec)
+            text = "<b>" + text + "</b>"
+            return f'\tid{id(node.parent)} --- id{id(node)}("{text}")\n'
 
-    return _indent_to_mermaid(indent_repr, tabwidth=4)
+        text = f"{node.key}:" if node.key is not None else ""
+        text += f"{node.type.__name__}"
+        text = "<b>" + text + "</b>"
+
+        if node.parent is None:
+            text = f'\tid{id(node)}("{text}")\n'
+        else:
+            text = f'\tid{id(node.parent)} --- id{id(node)}("{text}")\n'
+
+        for child in node.children.values():
+            text += step(child, depth=depth + 1)
+        return text
+
+    root = construct_tree(
+        tree,
+        is_leaf=is_leaf,
+        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+    )
+    text = "flowchart LR\n" + step(root)
+
+    return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
 
 
 def _format_width(string, width=60):
@@ -676,26 +652,32 @@ def _vbox(*text) -> str:
     #     │a  │
     #     └───┘
 
-    max_width = (max(chain.from_iterable([[len(t) for t in item.split("\n")] for item in text])) + 0)  # fmt: skip
+    max_width = (
+        max(from_iterable([[len(t) for t in item.split("\n")] for item in text])) + 0
+    )
 
     top = f"┌{'─'*max_width}┐"
     line = f"├{'─'*max_width}┤"
-    side = ["\n".join([f"│{t}{' '*(max_width-len(t))}│" for t in item.split("\n")]) for item in text]  # fmt: skip
+    side = [
+        "\n".join([f"│{t}{' '*(max_width-len(t))}│" for t in item.split("\n")])
+        for item in text
+    ]
+
     btm = f"└{'─'*max_width}┘"
 
-    fmt = ""
+    text = ""
 
     for i, s in enumerate(side):
         if i == 0:
-            fmt += f"{top}\n{s}\n{line if len(side)>1 else btm}"
+            text += f"{top}\n{s}\n{line if len(side)>1 else btm}"
 
         elif i == len(side) - 1:
-            fmt += f"\n{s}\n{btm}"
+            text += f"\n{s}\n{btm}"
 
         else:
-            fmt += f"\n{s}\n{line}"
+            text += f"\n{s}\n{line}"
 
-    return fmt
+    return text
 
 
 def _hstack(*boxes):

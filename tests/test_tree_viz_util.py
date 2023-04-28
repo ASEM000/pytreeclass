@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import jax
+import jax.nn.initializers as ji
 import jax.tree_util as jtu
 
 from pytreeclass._src.tree_pprint import (
@@ -40,20 +41,32 @@ def test_func_pprint():
     def example(a: int, b=1, *c, d, e=2, **f) -> str:
         ...  # fmt: skip
 
-    assert _func_pprint(example, 0, "str", 60, 0) == "example(a, b, *c, d, e, **f)"
-    assert _func_pprint(lambda x: x, 0, "str", 60, 0) == "Lambda(x)"
-    assert _func_pprint(jax.nn.relu, 0, "str", 60, 0) == "relu(*args, **kwargs)"
     assert (
-        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60, 0)
+        _func_pprint(example, indent=0, kind="str", width=60, depth=0)
+        == "example(a, b, *c, d, e, **f)"
+    )
+    assert (
+        _func_pprint(lambda x: x, indent=0, kind="str", width=60, depth=0)
+        == "Lambda(x)"
+    )
+    assert (
+        _func_pprint(jax.nn.relu, indent=0, kind="str", width=60, depth=0)
+        == "relu(*args, **kwargs)"
+    )
+    assert (
+        _node_pprint(jtu.Partial(jax.nn.relu), indent=0, kind="str", width=60, depth=0)
         == "Partial(relu(*args, **kwargs))"
     )
     assert (
-        _node_pprint(jtu.Partial(jax.nn.relu), 0, "str", 60, 0)
+        _node_pprint(jtu.Partial(jax.nn.relu), indent=0, kind="str", width=60, depth=0)
         == "Partial(relu(*args, **kwargs))"
     )
     assert (
-        _func_pprint(jax.nn.initializers.he_normal, 0, "str", 60, 0)
+        _func_pprint(ji.he_normal, indent=0, kind="str", width=60, depth=0)
         == "he_normal(in_axis, out_axis, batch_axis, dtype)"
     )
 
-    assert _node_pprint(jax.jit(lambda x: x), 0, "repr", 60, 0) == "jit(Lambda(x))"
+    assert (
+        _node_pprint(jax.jit(lambda x: x), indent=0, kind="repr", width=60, depth=0)
+        == "jit(Lambda(x))"
+    )

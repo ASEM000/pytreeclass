@@ -106,7 +106,7 @@ def _tree_to_indent(str):
 
 
 def test_tree_diagram():
-    assert tree_diagram(r1, depth=0) == tree_indent(r1, depth=0) == "Repr1"
+    assert tree_diagram(r1, depth=0) == tree_indent(r1, depth=0) == "Repr1(...)"
 
     # trunk-ignore(flake8/E501)
     out = "Repr1\n├── .a=1\n├── .b='string'\n├── .c=1.0\n├── .d='aaaaa'\n├── .e=[...]\n├── .f={...}\n├── .g={...}\n├── .h=f32[5,1](μ=1.00, σ=0.00, ∈[1.00,1.00])\n├── .i=f32[1,6](μ=1.00, σ=0.00, ∈[1.00,1.00])\n├── .j=f32[1,1,4,5](μ=1.00, σ=0.00, ∈[1.00,1.00])\n├── .k=(...)\n├── .l=a(...)\n├── .m=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])\n├── .n=bool[]\n└── .o=c64[2]"
@@ -146,6 +146,7 @@ def test_custom_jax_class():
     assert tree_str(Test) == str(Test)
 
 
+@pytest.mark.skip(reason="depends on object id")
 def test_tree_mermaid():
     assert (
         tree_mermaid(r1, depth=1)

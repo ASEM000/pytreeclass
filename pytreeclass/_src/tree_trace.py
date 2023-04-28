@@ -112,8 +112,8 @@ def tree_flatten_with_trace(
         treedef is a PyTreeDef object that can be used to reconstruct the tree.
     """
     treedef = jtu.tree_structure(tree, is_leaf=is_leaf)
-    paths_leaves = tree_leaves_with_trace(tree, is_leaf=is_leaf)
-    return paths_leaves, treedef
+    traces_leaves = tree_leaves_with_trace(tree, is_leaf=is_leaf)
+    return traces_leaves, treedef
 
 
 def tree_map_with_trace(
@@ -158,7 +158,71 @@ def tree_map_with_trace(
         >>> pytc.tree_map_with_trace(map_func, tree)
         {'a': [101, 102], 'b': 4, 'c': [105, 106]}
     """
-    paths_leaves, treedef = tree_flatten_with_trace(tree, is_leaf=is_leaf)
-    paths_leaves = list(zip(*paths_leaves))
-    paths_leaves += [treedef.flatten_up_to(r) for r in rest]
-    return treedef.unflatten(func(*xs) for xs in zip(*paths_leaves))
+    traces_leaves, treedef = tree_flatten_with_trace(tree, is_leaf=is_leaf)
+    traces_leaves = list(zip(*traces_leaves))
+    traces_leaves += [treedef.flatten_up_to(r) for r in rest]
+    return treedef.unflatten(func(*xs) for xs in zip(*traces_leaves))
+
+
+class Node:
+    __slots__ = ("key", "type", "value", "parent", "children")
+
+    def __init__(
+        self,
+        key: Any,
+        type: type = None,
+        value: Any = None,
+    ):
+        self.key = key
+        self.type = type
+        self.value = value
+        self.parent = None
+        self.children = {}
+
+    def add_child(self, child: Node) -> None:
+        # add child node to this node and set
+        # this node as the parent of the child
+        if not isinstance(child, Node):
+            msg = f"`child` must be a `Node`, got {type(child)}"
+            raise TypeError(msg)
+        if child.key not in self.children:
+            child.parent = self
+            self.children[child.key] = child
+
+    def __repr__(self) -> str:
+        return f"Node(key={self.key}, type={self.type.__name__}, value={self.value})"
+
+
+jtu.register_pytree_node(
+    Node,
+    flatten_func=lambda tree: ((), tree),
+    unflatten_func=lambda treedef, _: treedef[0],
+)
+
+
+def construct_tree(tree, is_leaf=None, is_trace_leaf=None) -> Node:
+    # construct a tree with `Node` objects using `tree_leaves_with_trace`
+    root = Node(None, value=tree, type=tree.__class__)
+
+    traces_leaves = tree_leaves_with_trace(
+        tree,
+        is_leaf=is_leaf,
+        is_trace_leaf=is_trace_leaf,
+    )
+
+    for trace, leaf in traces_leaves:
+        keys, types = trace
+        cur = root
+        for i, (key, type) in enumerate(zip(keys, types)):
+            if key in cur.children:
+                # common path
+                cur = cur.children[key]
+            else:
+                # new path
+                if i == len(keys) - 1:
+                    child = Node(key, type, leaf)  # leaf node
+                else:
+                    child = Node(key, type)
+                cur.add_child(child)
+                cur = child
+    return root
