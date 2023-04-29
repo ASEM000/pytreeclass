@@ -226,6 +226,24 @@ class AtIndexer(NamedTuple):
         )
 
     def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
+        """Get the leaf values at the specified location.
+
+        Args:
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            A PyTree of leaf values at the specified location, with the non-selected
+            leaf values set to None if the leaf is not an array.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            >>> tree = Tree(a=1, b=2)
+            >>> tree.at['a'].get()
+            Tree(a=1, b=None)
+        """
         where = _resolve_where(self.tree, self.where, is_leaf)
         return _get_at_mask(self.tree, where, is_leaf)
 
@@ -235,6 +253,24 @@ class AtIndexer(NamedTuple):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> PyTree:
+        """Set the leaf values at the specified location.
+
+        Args:
+            set_value: the value to set at the specified location.
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            A PyTree with the leaf values at the specified location set to `set_value`.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            >>> tree = Tree(a=1, b=2)
+            >>> tree.at['a'].set(100)
+            Tree(a=100, b=2)
+        """
         where = _resolve_where(self.tree, self.where, is_leaf)
         return _set_at_mask(self.tree, where, set_value, is_leaf)
 
@@ -244,6 +280,25 @@ class AtIndexer(NamedTuple):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> PyTree:
+        """Apply a function to the leaf values at the specified location.
+
+        Args:
+            func: the function to apply to the leaf values.
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            A PyTree with the leaf values at the specified location set to the result
+            of applying `func` to the leaf values.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            >>> tree = Tree(a=1, b=2)
+            >>> tree.at['a'].apply(lambda _: 100)
+            Tree(a=100, b=2)
+        """
         where = _resolve_where(self.tree, self.where, is_leaf)
         return _apply_at_mask(self.tree, where, func, is_leaf)
 
@@ -254,10 +309,30 @@ class AtIndexer(NamedTuple):
         initializer: Any = _no_initializer,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> Any:
+        """Reduce the leaf values at the specified location.
+
+        Args:
+            func: the function to reduce the leaf values.
+            initializer: the initializer value for the reduction.
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            The result of reducing the leaf values at the specified location.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            >>> tree = Tree(a=1, b=2)
+            >>> tree.at[...].reduce(lambda a, b: a + b, initializer=0)
+            3
+        """
         where = _resolve_where(self.tree, self.where, is_leaf)
         return _reduce_at_mask(self.tree, where, func, initializer, is_leaf)
 
     def __getattr__(self, name: str) -> AtIndexer:
+        """Support nested indexing with `.at`"""
         # support nested `.at``
         # for example `.at[A].at[B]` represents model.A.B
         if name == "at":
@@ -269,6 +344,13 @@ class AtIndexer(NamedTuple):
         raise AttributeError(msg)
 
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
+        """
+        Call the function at the specified location and return a **copy** of the tree.
+        with the result of the function call.
+
+        Returns:
+            A tuple of the result of the function call and a copy of the tree.
+        """
         with _mutable_context(self.tree, kopy=True) as tree:
             value = _recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
         return value, tree

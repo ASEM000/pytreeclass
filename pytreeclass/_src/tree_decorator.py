@@ -35,7 +35,7 @@ _NOT_SET = NOT_SET()
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 
 
-"""Define a class decorator that is compatible with JAX's transformation."""
+"""Define a class that convert a class to a JAX compatible tree structure"""
 
 
 class Field(NamedTuple):
@@ -304,20 +304,6 @@ def _treeclass_transform(klass: type[T]) -> type[T]:
     if "__init__" not in vars(klass):
         setattr(klass, "__init__", _generate_init_method(klass))
 
-    # basic optional methods
-    for key, method in (
-        ("__repr__", tree_repr),
-        ("__str__", tree_str),
-        ("__copy__", tree_copy),
-        ("__hash__", tree_hash),
-        ("__eq__", is_tree_equal),
-        ("at", property(tree_indexer)),
-    ):
-        if key not in vars(klass):
-            # keep the original method if it is defined by the user
-            # this behavior similar is to `dataclasses.dataclass`
-            setattr(klass, key, method)
-
     return klass
 
 
@@ -376,7 +362,6 @@ class TreeClass(metaclass=TreeClassMeta):
     """Convert a class to a JAX compatible tree structure.
 
     Example:
-        >>> import functools as ft
         >>> import jax
         >>> import pytreeclass as pytc
 
@@ -449,6 +434,20 @@ class TreeClass(metaclass=TreeClassMeta):
         klass = _treeclass_transform(klass)
 
     @property
-    @abc.abstractmethod
     def at(self) -> AtIndexer:
-        ...
+        return tree_indexer(self)
+
+    def __repr__(self) -> str:
+        return tree_repr(self)
+
+    def __str__(self) -> str:
+        return tree_str(self)
+
+    def __copy__(self) -> T:
+        return tree_copy(self)
+
+    def __hash__(self) -> int:
+        return tree_hash(self)
+
+    def __eq__(self, other: Any) -> bool:
+        return is_tree_equal(self, other)
