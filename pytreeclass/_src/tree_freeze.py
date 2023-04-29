@@ -28,7 +28,7 @@ def tree_hash(*trees: PyTree) -> int:
 
 
 class _ImmutableWrapper:
-    __slot__ = ("__wrapped__", "__weakref__")
+    __slots__ = ("__wrapped__", "__weakref__")
 
     def __init__(self, x: Any) -> None:
         object.__setattr__(self, "__wrapped__", getattr(x, "__wrapped__", x))
@@ -96,7 +96,7 @@ class _FrozenWrapper(_ImmutableWrapper):
 
 jtu.register_pytree_node(
     nodetype=_FrozenWrapper,
-    flatten_func=lambda tree: ((None,), _HashableWrapper(tree.unwrap())),
+    flatten_func=lambda tree: ((), _HashableWrapper(tree.unwrap())),
     unflatten_func=lambda treedef, _: _FrozenWrapper(treedef.unwrap()),
 )
 

@@ -165,17 +165,10 @@ def tree_map_with_trace(
 
 
 class Node:
-    __slots__ = ("key", "type", "value", "parent", "children", "__weakref__")
+    __slots__ = ("data", "parent", "children", "__weakref__")
 
-    def __init__(
-        self,
-        key: Any,
-        type: type = None,
-        value: Any = None,
-    ):
-        self.key = key
-        self.type = type
-        self.value = value
+    def __init__(self, data: tuple[Hashable, type, Any]):
+        self.data = data
         self.parent = None
         self.children = {}
 
@@ -185,16 +178,18 @@ class Node:
         if not isinstance(child, Node):
             msg = f"`child` must be a `Node`, got {type(child)}"
             raise TypeError(msg)
-        if child.key not in self.children:
+        key, _, __ = child.data
+        if key not in self.children:
+            # establish parent-child relationship
             child.parent = self
-            self.children[child.key] = child
+            self.children[key] = child
 
     def __iter__(self) -> Iterator[Node]:
         # iterate over children nodes
         return iter(self.children.values())
 
     def __repr__(self) -> str:
-        return f"Node(key={self.key}, type={self.type.__name__}, value={self.value})"
+        return f"Node(data={self.data})"
 
 
 # disallow traversal to avoid infinite recursion
@@ -213,13 +208,15 @@ def construct_tree(
 ) -> Node:
     # construct a tree with `Node` objects using `tree_leaves_with_trace`
     # to establish parent-child relationship between nodes and return the root node
-    root = Node(None, value=tree, type=tree.__class__)
 
     traces_leaves = tree_leaves_with_trace(
         tree,
         is_leaf=is_leaf,
         is_trace_leaf=is_trace_leaf,
     )
+
+    value = tree if len(traces_leaves) == 1 else None
+    root = Node(data=(None, tree.__class__, value))
 
     for trace, leaf in traces_leaves:
         keys, types = trace
@@ -231,7 +228,7 @@ def construct_tree(
             else:
                 # new path
                 value = leaf if i == len(keys) - 1 else None
-                child = Node(key=key, type=type, value=value)
+                child = Node(data=(key, type, value))
                 cur.add_child(child)
                 cur = child
     return root

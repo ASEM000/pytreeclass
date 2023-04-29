@@ -441,15 +441,17 @@ def tree_indent(
         if (len(node.children)) == 0:
             ppspec = dict(indent=0, kind="repr", width=80, depth=0)
             text = f"{indent}"
-            text += f"{node.key}=" if node.key is not None else ""
-            text += _node_pprint(node.value, **ppspec)
+            key, _, value = node.data
+            text += f"{key}=" if key is not None else ""
+            text += _node_pprint(value, **ppspec)
             return text + "\n"
 
+        key, type, _ = node.data
         text = f"{indent}"
-        text += f"{node.key}:" if node.key is not None else ""
-        text += f"{node.type.__name__}\n"
+        text += f"{key}:" if key is not None else ""
+        text += f"{type.__name__}\n"
 
-        for i, child in enumerate(node.children.values()):
+        for child in node:
             text += step(child, depth=depth + 1)
         return text
 
@@ -512,28 +514,31 @@ def tree_diagram(
     def step(
         node: Node,
         depth: int = 0,
-        is_last_sibling: bool = False,
+        is_last: bool = False,
         is_lasts: tuple[bool, ...] = (),
     ) -> str:
         indent = "".join(smark if is_last else vmark for is_last in is_lasts[:-1])
-        branch = (lmark if is_last_sibling else cmark) if depth > 0 else ""
+        branch = (lmark if is_last else cmark) if depth > 0 else ""
 
         if (child_count := len(node.children)) == 0:
             ppspec = dict(indent=0, kind="repr", width=80, depth=0)
+            key, _, value = node.data
             text = f"{indent}"
-            text += f"{branch}{node.key}=" if node.key is not None else ""
-            text += _node_pprint(node.value, **ppspec)
+            text += f"{branch}{key}=" if key is not None else ""
+            text += _node_pprint(value, **ppspec)
             return text + "\n"
 
+        key, type, _ = node.data
+
         text = f"{indent}{branch}"
-        text += f"{node.key}:" if node.key is not None else ""
-        text += f"{node.type.__name__}\n"
+        text += f"{key}:" if key is not None else ""
+        text += f"{type.__name__}\n"
 
         for i, child in enumerate(node.children.values()):
             text += step(
                 child,
                 depth=depth + 1,
-                is_last_sibling=(i == child_count - 1),
+                is_last=(i == child_count - 1),
                 is_lasts=is_lasts + (i == child_count - 1,),
             )
         return text
@@ -543,7 +548,7 @@ def tree_diagram(
         is_leaf=is_leaf,
         is_trace_leaf=_is_trace_leaf_depth_factory(depth),
     )
-    text = step(root, is_last_sibling=len(root.children) == 1)
+    text = step(root, is_last=len(root.children) == 1)
     return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
 
 
@@ -573,13 +578,15 @@ def tree_mermaid(
     def step(node: Node, depth: int = 0) -> str:
         if len(node.children) == 0:
             ppspec = dict(indent=0, kind="repr", width=80, depth=0)
-            text = f"{node.key}=" if node.key is not None else ""
-            text += _node_pprint(node.value, **ppspec)
+            key, _, value = node.data
+            text = f"{key}=" if key is not None else ""
+            text += _node_pprint(value, **ppspec)
             text = "<b>" + text + "</b>"
             return f'\tid{id(node.parent)} --- id{id(node)}("{text}")\n'
 
-        text = f"{node.key}:" if node.key is not None else ""
-        text += f"{node.type.__name__}"
+        key, type, _ = node.data
+        text = f"{key}:" if key is not None else ""
+        text += f"{type.__name__}"
         text = "<b>" + text + "</b>"
 
         if node.parent is None:
