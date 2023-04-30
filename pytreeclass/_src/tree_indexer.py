@@ -349,7 +349,23 @@ class AtIndexer(NamedTuple):
         with the result of the function call.
 
         Returns:
-            A tuple of the result of the function call and a copy of the tree.
+            A tuple of the result of the function call and a copy of the a new instance of
+            the tree with the modified values.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     def add(self, b):
+            ...         self.a += b
+            ...         return self.a
+            >>> tree = Tree(a=1)
+            >>> tree.at['add'](2)
+            (3, Tree(a=3))
+
+        Note:
+            If the function mutates the instance, `AttributeError` will be raised.
+            Use .at["method_name"](args, kwargs) to call a method that mutates the instance.
         """
         with _mutable_context(self.tree, kopy=True) as tree:
             value = _recursive_getattr(tree, self.where)(*a, **k)  # type: ignore

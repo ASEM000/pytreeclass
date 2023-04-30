@@ -55,7 +55,7 @@ class _HashableWrapper(_ImmutableWrapper):
 
 def _frozen_error(opname: str, tree):
     raise NotImplementedError(
-        f"Cannot apply `{opname}` operation a frozen object `{tree!r}`.\n"
+        f"Cannot apply `{opname}` operation to a frozen object `{tree!r}`.\n"
         "Unfreeze the object first to apply operations to it\n"
         "Example:\n"
         ">>> import jax\n"
