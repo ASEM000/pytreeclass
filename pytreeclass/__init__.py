@@ -1,6 +1,6 @@
 from pytreeclass._src.tree_decorator import TreeClass, field, fields
 from pytreeclass._src.tree_freeze import freeze, is_frozen, is_nondiff, unfreeze
-from pytreeclass._src.tree_indexer import bcmap, is_tree_equal, tree_indexer
+from pytreeclass._src.tree_indexer import AtIndexer, bcmap, is_tree_equal
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_indent,
@@ -37,7 +37,7 @@ __all__ = (
     "unfreeze",
     # masking and indexing utils
     "bcmap",
-    "tree_indexer",
+    "AtIndexer",
     "tree_map_with_trace",
     "tree_leaves_with_trace",
     "tree_flatten_with_trace",

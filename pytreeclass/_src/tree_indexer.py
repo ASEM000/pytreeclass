@@ -203,7 +203,31 @@ def _recursive_getattr(tree: Any, where: tuple[str, ...]):
 
 
 class AtIndexer(NamedTuple):
-    # base class for indexing with `.at`
+    """Adds `.at` indexing abilities to a PyTree.
+
+    Example:
+        >>> import jax.tree_util as jtu
+        >>> import pytreeclass as pytc
+        >>> @jax.tree_util.register_pytree_with_keys_class
+        ... class Tree:
+        ...    def __init__(self, a, b):
+        ...        self.a = a
+        ...        self.b = b
+        ...    def tree_flatten_with_keys(self):
+        ...        return ((jtu.GetAttrKey("a"), self.a), (jtu.GetAttrKey("b"), self.b)), None
+        ...    @classmethod
+        ...    def tree_unflatten(cls, aux_data, children):
+        ...        return cls(*children)
+        ...    @property
+        ...    def at(self):
+        ...        return pytc.AtIndexer(self, where=())
+        ...    def __repr__(self) -> str:
+        ...        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
+
+        >>> Tree(1, 2).at["a"].get()
+        Tree(a=1, b=None)
+    """
+
     tree: PyTree
     where: tuple[str | int] | PyTree
 
@@ -370,34 +394,6 @@ class AtIndexer(NamedTuple):
         with _mutable_context(self.tree, kopy=True) as tree:
             value = _recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
         return value, tree
-
-
-def tree_indexer(tree: PyTree) -> AtIndexer:
-    """Adds `.at` indexing abilities to a PyTree.
-
-    Example:
-        >>> import jax.tree_util as jtu
-        >>> import pytreeclass as pytc
-        >>> @jax.tree_util.register_pytree_with_keys_class
-        ... class Tree:
-        ...    def __init__(self, a, b):
-        ...        self.a = a
-        ...        self.b = b
-        ...    def tree_flatten_with_keys(self):
-        ...        return ((jtu.GetAttrKey("a"), self.a), (jtu.GetAttrKey("b"), self.b)), None
-        ...    @classmethod
-        ...    def tree_unflatten(cls, aux_data, children):
-        ...        return cls(*children)
-        ...    @property
-        ...    def at(self):
-        ...        return pytc.tree_indexer(self)
-        ...    def __repr__(self) -> str:
-        ...        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
-
-        >>> Tree(1, 2).at["a"].get()
-        Tree(a=1, b=None)
-    """
-    return AtIndexer(tree=tree, where=())
 
 
 class BroadcastablePartial(ft.partial):

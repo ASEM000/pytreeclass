@@ -20,7 +20,7 @@ Public API
     is_frozen
     unfreeze
     bcmap
-    tree_indexer
+    AtIndexer
     tree_map_with_trace
     tree_leaves_with_trace
     tree_flatten_with_trace
@@ -65,7 +65,7 @@ Advanced API
 .. currentmodule:: pytreeclass
 
 .. autofunction:: bcmap
-.. autofunction:: tree_indexer
+.. autoclass:: AtIndexer
 .. autofunction:: tree_map_with_trace
 .. autofunction:: tree_leaves_with_trace
 .. autofunction:: tree_flatten_with_trace

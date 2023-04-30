@@ -7,6 +7,7 @@ from collections.abc import MutableMapping, MutableSequence
 from types import FunctionType, MappingProxyType
 from typing import Any, Callable, Hashable, NamedTuple, Sequence, TypeVar
 
+import jax
 import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
@@ -18,7 +19,6 @@ from pytreeclass._src.tree_indexer import (
     _mutable_instance_registry,
     is_tree_equal,
     tree_copy,
-    tree_indexer,
 )
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_trace import NamedSequenceKey
@@ -262,7 +262,7 @@ def _generate_init_method(klass: type) -> FunctionType:
     return method
 
 
-def _setattr(tree: PyTree, key: str, value: Any) -> None:
+def tree_setattr(tree: PyTree, key: str, value: Any) -> None:
     if id(tree) not in _mutable_instance_registry:
         msg = f"Cannot set attribute `{key}` = {value!r} on immutable instance of "
         msg += f"`{type(tree).__name__}`.\nUse `.at[`{key}`].set({value!r})` instead."
@@ -281,7 +281,7 @@ def _setattr(tree: PyTree, key: str, value: Any) -> None:
     vars(tree)[key] = value  # type: ignore
 
 
-def _delattr(tree, key: str) -> None:
+def tree_delattr(tree, key: str) -> None:
     # delete the attribute under `_mutable_context` context
     # otherwise raise an error
     if id(tree) not in _mutable_instance_registry:
@@ -290,21 +290,6 @@ def _delattr(tree, key: str) -> None:
         raise AttributeError(msg)
 
     del vars(tree)[key]
-
-
-def _treeclass_transform(klass: type[T]) -> type[T]:
-    for key, method in (("__setattr__", _setattr), ("__delattr__", _delattr)):
-        if key in vars(klass):
-            # the user defined a method that conflicts with the reserved method
-            msg = f"Unable to transform the class `{klass.__name__}` "
-            msg += f"with resereved `{key}` method defined on the class."
-            raise TypeError(msg)
-        setattr(klass, key, method)
-
-    if "__init__" not in vars(klass):
-        setattr(klass, "__init__", _generate_init_method(klass))
-
-    return klass
 
 
 def _register_treeclass(klass: type[T]) -> type[T]:
@@ -352,7 +337,8 @@ class TreeClassMeta(abc.ABCMeta):
 
         # handle non-initialized fields
         if len(keys := set(build_field_map(klass)) - set(vars(self))) > 0:
-            msg = f"Uninitialized fields: ({', '.join(keys)}) in the instance of `{type(self).__name__}`"
+            msg = f"Uninitialized fields: ({', '.join(keys)}) in the "
+            msg += f"instance of `{type(self).__name__}`"
             raise AttributeError(msg)
         return self
 
@@ -429,13 +415,23 @@ class TreeClass(metaclass=TreeClassMeta):
 
     def __init_subclass__(klass: type[T], *a, leafwise: bool = False, **k) -> None:
         super().__init_subclass__(*a, **k)
+
+        if "__setattr__" in vars(klass) or "__delattr__" in vars(klass):
+            # the user defined a method that conflicts with the reserved method
+            msg = f"Unable to transform the class `{klass.__name__}` "
+            msg += "with resereved methods: `__setattr__` or `__delattr__` defined."
+            raise TypeError(msg)
+
+        if "__init__" not in vars(klass):
+            # generate the init method if not defined similar to dataclass
+            setattr(klass, "__init__", _generate_init_method(klass))
+
         klass = _register_treeclass(klass)
         klass = _leafwise_transform(klass) if leafwise else klass
-        klass = _treeclass_transform(klass)
 
     @property
     def at(self) -> AtIndexer:
-        return tree_indexer(self)
+        return AtIndexer(self, where=())
 
     def __repr__(self) -> str:
         return tree_repr(self)
@@ -449,5 +445,11 @@ class TreeClass(metaclass=TreeClassMeta):
     def __hash__(self) -> int:
         return tree_hash(self)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: Any) -> bool | jax.Array:
         return is_tree_equal(self, other)
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        return tree_setattr(self, key, value)
+
+    def __delattr__(self, key: str) -> None:
+        return tree_delattr(self, key)
