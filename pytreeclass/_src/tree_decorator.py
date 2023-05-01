@@ -221,7 +221,7 @@ def fields(tree: Any) -> Sequence[Field]:
     return tuple(build_field_map(klass).values())
 
 
-@ft.lru_cache
+@ft.lru_cache(maxsize=128)
 def _generate_init_code(fields: Sequence[Field]) -> str:
     head = body = ""
 
@@ -260,36 +260,6 @@ def _generate_init_method(klass: type) -> FunctionType:
     method = local_namespace["closure"](field_map)
     method.__qualname__ = f"{klass.__qualname__}.__init__"
     return method
-
-
-def tree_setattr(tree: PyTree, key: str, value: Any) -> None:
-    if id(tree) not in _mutable_instance_registry:
-        msg = f"Cannot set attribute `{key}` = {value!r} on immutable instance of "
-        msg += f"`{type(tree).__name__}`.\nUse `.at[`{key}`].set({value!r})` instead."
-        raise AttributeError(msg)
-
-    if key in (field_map := build_field_map(type(tree))):
-        for callback in field_map[key].callbacks:
-            try:
-                # callback is a function that takes the value of the field
-                # and returns a modified value
-                value = callback(value)
-            except Exception as e:
-                msg = f"Error for field=`{key}`:\n{e}"
-                raise type(e)(msg)
-
-    vars(tree)[key] = value  # type: ignore
-
-
-def tree_delattr(tree, key: str) -> None:
-    # delete the attribute under `_mutable_context` context
-    # otherwise raise an error
-    if id(tree) not in _mutable_instance_registry:
-        msg = f"Cannot delete attribute `{key}` on immutable instance of "
-        msg += f"`{type(tree).__name__}`.\n"
-        raise AttributeError(msg)
-
-    del vars(tree)[key]
 
 
 def _register_treeclass(klass: type[T]) -> type[T]:
@@ -426,8 +396,37 @@ class TreeClass(metaclass=TreeClassMeta):
             # generate the init method if not defined similar to dataclass
             setattr(klass, "__init__", _generate_init_method(klass))
 
+        if leafwise:
+            # transform the class to support leafwise operations
+            # useful to use with `bcmap` and creating masks by comparisons.
+            klass = _leafwise_transform(klass)
+
         klass = _register_treeclass(klass)
-        klass = _leafwise_transform(klass) if leafwise else klass
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        if id(self) not in _mutable_instance_registry:
+            msg = f"Cannot set attribute `{key}` = {value!r} "
+            msg += f"on immutable instance of `{type(self).__name__}`.\n"
+            msg += f"Use `.at[`{key}`].set({value!r})` instead."
+            raise AttributeError(msg)
+
+        if key in (field_map := build_field_map(type(self))):
+            for callback in field_map[key].callbacks:
+                try:
+                    value = callback(value)
+                except Exception as e:
+                    msg = f"Error for field=`{key}`:\n{e}"
+                    raise type(e)(msg)
+
+        getattr(object, "__setattr__")(self, key, value)
+
+    def __delattr__(self, key: str) -> None:
+        if id(self) not in _mutable_instance_registry:
+            msg = f"Cannot delete attribute `{key}` on immutable instance of "
+            msg += f"`{type(self).__name__}`.\n"
+            raise AttributeError(msg)
+
+        getattr(object, "__delattr__")(self, key)
 
     @property
     def at(self) -> AtIndexer:
@@ -447,9 +446,3 @@ class TreeClass(metaclass=TreeClassMeta):
 
     def __eq__(self, other: Any) -> bool | jax.Array:
         return is_tree_equal(self, other)
-
-    def __setattr__(self, key: str, value: Any) -> None:
-        return tree_setattr(self, key, value)
-
-    def __delattr__(self, key: str) -> None:
-        return tree_delattr(self, key)
