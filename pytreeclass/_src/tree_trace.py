@@ -176,8 +176,7 @@ class Node:
         # add child node to this node and set
         # this node as the parent of the child
         if not isinstance(child, Node):
-            msg = f"`child` must be a `Node`, got {type(child)}"
-            raise TypeError(msg)
+            raise TypeError(f"`child` must be a `Node`, got {type(child)}")
         key, _, __ = child.data
         if key not in self.children:
             # establish parent-child relationship

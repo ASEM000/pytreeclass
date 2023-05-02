@@ -149,11 +149,11 @@ def _generate_path_mask(
     mask = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
 
     if not match:
-        fmt = "/".join(map(str, where))
-        msg = f"No leaf match is found for path={fmt} for tree with trace:\n"
-        msg += f"{tree_repr_with_trace(tree)}\n"
-        msg += f"with mask={mask}"
-        raise LookupError(msg)
+        raise LookupError(
+            f"No leaf match is found for path={'/'.join(map(str, where))}"
+            f"for tree with trace:\n{tree_repr_with_trace(tree)}\n"
+            f"with mask={mask}"
+        )
 
     return mask
 
@@ -168,8 +168,10 @@ def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
         verdict = True
         for leaf in leaves:
             if not is_bool_leaf(leaf):
-                msg = f"Expected boolean, got {leaf=}, of type {type(leaf).__name__}."
-                raise TypeError(msg)
+                raise TypeError(
+                    f"Expected boolean, got {leaf=}, of type {type(leaf).__name__}.\n"
+                    "mask arguments in indexing with `at` must be of boolean type."
+                )
             verdict &= leaf
         return verdict
 
@@ -363,9 +365,10 @@ class AtIndexer(NamedTuple):
             # pass the current tree and the current path to the next `.at`
             return AtIndexer(tree=self.tree, where=self.where)
 
-        msg = f"{name} is not a valid attribute of {self}\n"
-        msg += f"Did you mean to use .at[{name!r}]?"
-        raise AttributeError(msg)
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}\n"
+            f"Did you mean to use .at[{name!r}]?"
+        )
 
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         """

@@ -346,13 +346,8 @@ def tree_repr(
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
     """
-    return _node_pprint(
-        tree,
-        indent=0,
-        kind="repr",
-        width=width,
-        depth=depth,
-    ).expandtabs(tabwidth)
+    text = _node_pprint(tree, indent=0, kind="repr", width=width, depth=depth)
+    return text.expandtabs(tabwidth)
 
 
 def tree_str(
@@ -380,13 +375,8 @@ def tree_str(
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
     """
-    return _node_pprint(
-        tree,
-        indent=0,
-        kind="str",
-        width=width,
-        depth=depth,
-    ).expandtabs(tabwidth)
+    text = _node_pprint(tree, indent=0, kind="str", width=width, depth=depth)
+    return text.expandtabs(tabwidth)
 
 
 def _is_trace_leaf_depth_factory(depth: int | float):
@@ -701,14 +691,14 @@ def _hstack(*boxes):
     max_col_height = max([len(b) for b in boxes])
     # expand height of each col before merging
     boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
-    FMT = ""
+    text = ""
 
     _cells = tuple(zip(*boxes))
 
     for i, line in enumerate(_cells):
-        FMT += _resolve_line(line) + ("\n" if i != (len(_cells) - 1) else "")
+        text += _resolve_line(line) + ("\n" if i != (len(_cells) - 1) else "")
 
-    return FMT
+    return text
 
 
 def _resolve_line(cols: list[str]) -> str:

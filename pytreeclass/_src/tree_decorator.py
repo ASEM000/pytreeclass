@@ -25,7 +25,8 @@ from pytreeclass._src.tree_trace import NamedSequenceKey
 
 
 class NOT_SET:
-    __repr__ = lambda _: "?"
+    def __repr__(self) -> str:
+        return "NOT_SET"
 
 
 T = TypeVar("T", bound=Hashable)
@@ -119,34 +120,51 @@ def field(
         >>> assert tree._id == 1  # this is the private attribute
     """
     if not isinstance(alias, (str, type(None))):
-        msg = "`alias` must be a string or None, "
-        msg += f"got type=`{type(alias).__name__}` instead."
-        raise TypeError(msg)
+        raise TypeError(
+            "`alias` must be a string describing the alias name of the field"
+            "in the constructor or `None` if no alias is provided, "
+            f"got type=`{type(alias).__name__}` instead."
+        )
 
     if default is not _NOT_SET and factory is not None:
-        msg = "`default` and `factory` are mutually exclusive arguments."
-        msg += f"got {default=} and {factory=}"
-        raise ValueError(msg)
+        raise ValueError(
+            "`default` and `factory` are mutually exclusive arguments."
+            "Use `default` if the value is immutable or a zero-argument function "
+            "returning a mutable value in `factory` otherwise.\n"
+            f"got {default=} and {factory=}"
+        )
 
     if kw_only is True and pos_only is True:
-        msg = "`kw_only` and `pos_only` are mutually exclusive arguments."
-        msg += f"got {kw_only=} and {pos_only=}"
-        raise ValueError(msg)
+        raise ValueError(
+            "`kw_only` and `pos_only` are mutually exclusive arguments."
+            "Use `kw_only` if the field is a keyword-only argument in the constructor"
+            " and `pos_only` if the field is positional only, "
+            f"got {kw_only=} and {pos_only=}"
+        )
 
     if isinstance(metadata, dict):
         metadata = MappingProxyType(metadata)  # type: ignore
     elif metadata is not None:
-        raise TypeError("`metadata` must be a Mapping or None")
+        raise TypeError(
+            "`metadata` must be a dictionary describing the metadata of the field"
+            "or `None` if no metadata is provided, "
+            f"got type=`{type(metadata).__name__}` instead."
+        )
 
     if not isinstance(callbacks, Sequence):
-        msg = f"`callbacks` must be a Sequence of functions, got {type(callbacks)}"
-        raise TypeError(msg)
+        raise TypeError(
+            f"`callbacks` must be a Sequence of one-argument functions "
+            "operating on the field value, and returning a modified value, "
+            f"got type `{type(callbacks).__name__}` instead."
+        )
 
     for index, callback in enumerate(callbacks):
         if not isinstance(callback, Callable):  # type: ignore
-            msg = "`callbacks` must be a Sequence of zero argument functions, "
-            msg += f"got `{type(callbacks).__name__}` at index={index}"
-            raise TypeError(msg)
+            raise TypeError(
+                f"`callback` must be a one-argument function "
+                "operating on the field value, and returning a modified value, "
+                f"got type `{type(callback).__name__}` at {index=} instead."
+            )
 
     return Field(
         name=None,
@@ -190,19 +208,22 @@ def build_field_map(klass: type) -> MappingProxyType[str, Field]:
             # case: `x: Any = field(default=1)`
             if isinstance(value.default, _MUTABLE_TYPES):
                 # example case: `x: Any = field(default=[1, 2, 3])`
-                msg = f"Mutable default value of field `{name}` is not allowed, use "
-                msg += f"`factory=lambda: {value.default}` instead."
-                raise TypeError(msg)
+                raise TypeError(
+                    f"Mutable default value= {value.default} is not allowed"
+                    f" for field `{name}` in class `{klass.__name__}`.\n"
+                    f" use `field(... ,factory=lambda:{value.default})` instead"
+                )
 
             field_map[name] = value._replace(name=name, type=type)
 
         elif isinstance(value, _MUTABLE_TYPES):
             # https://github.com/ericvsmith/dataclasses/issues/3
             # example case: `x: Any = [1, 2, 3]`
-            msg = f"Mutable value= {(value)} is not allowed"
-            msg += f" for field `{name}` in class `{klass.__name__}`.\n"
-            msg += f" use `field(... ,factory=lambda:{value})` instead"
-            raise TypeError(msg)
+            raise TypeError(
+                f"Mutable value= {(value)} is not allowed"
+                f" for field `{name}` in class `{klass.__name__}`.\n"
+                f" use `field(... ,factory=lambda:{value})` instead"
+            )
 
         elif value is _NOT_SET:
             # case: `x: Any`
@@ -307,9 +328,17 @@ class TreeClassMeta(abc.ABCMeta):
 
         # handle non-initialized fields
         if len(keys := set(build_field_map(klass)) - set(vars(self))) > 0:
-            msg = f"Uninitialized fields: ({', '.join(keys)}) in the "
-            msg += f"instance of `{type(self).__name__}`"
-            raise AttributeError(msg)
+            raise AttributeError(
+                f"Found uninitialized fields=({', '.join(keys)}) in class `{klass.__name__}`"
+                f"after calling the defined `__init__` method."
+                f"Initialize the fields defined in `{klass.__name__}` in the `__init__` method."
+                f"Example:\n"
+                f">>> class {klass.__name__}(...):\n"
+                f"...   field1: int = 1\n"
+                f"...   def __init__(self, field1):\n"
+                f"...       self.field1 = field1\n"
+                "...       ..."
+            )
         return self
 
 
@@ -388,9 +417,12 @@ class TreeClass(metaclass=TreeClassMeta):
 
         if "__setattr__" in vars(klass) or "__delattr__" in vars(klass):
             # the user defined a method that conflicts with the reserved method
-            msg = f"Unable to transform the class `{klass.__name__}` "
-            msg += "with resereved methods: `__setattr__` or `__delattr__` defined."
-            raise TypeError(msg)
+            raise TypeError(
+                f"Unable to transform the class `{klass.__name__}` "
+                "with resereved methods: `__setattr__` or `__delattr__` defined.\n"
+                "Reserved `setters` and `deleters` implements the immutable functionality."
+                "and cannot be overriden."
+            )
 
         if "__init__" not in vars(klass):
             # generate the init method if not defined similar to dataclass
@@ -405,26 +437,28 @@ class TreeClass(metaclass=TreeClassMeta):
 
     def __setattr__(self, key: str, value: Any) -> None:
         if id(self) not in _mutable_instance_registry:
-            msg = f"Cannot set attribute `{key}` = {value!r} "
-            msg += f"on immutable instance of `{type(self).__name__}`.\n"
-            msg += f"Use `.at[`{key}`].set({value!r})` instead."
-            raise AttributeError(msg)
+            raise AttributeError(
+                f"Cannot set attribute `{key}` = {value!r} "
+                f"on immutable instance of `{type(self).__name__}`.\n"
+                f"Use `.at[`{key}`].set({value!r})` instead."
+            )
 
         if key in (field_map := build_field_map(type(self))):
             for callback in field_map[key].callbacks:
                 try:
                     value = callback(value)
                 except Exception as e:
-                    msg = f"Error for field=`{key}`:\n{e}"
-                    raise type(e)(msg)
+                    raise type(e)(f"Error for field=`{key}`:\n{e}")
 
         getattr(object, "__setattr__")(self, key, value)
 
     def __delattr__(self, key: str) -> None:
         if id(self) not in _mutable_instance_registry:
-            msg = f"Cannot delete attribute `{key}` on immutable instance of "
-            msg += f"`{type(self).__name__}`.\n"
-            raise AttributeError(msg)
+            raise AttributeError(
+                f"Cannot delete attribute `{key}` "
+                f"on immutable instance of `{type(self).__name__}`.\n"
+                f"Use `.at[`{key}`].set(None)` instead."
+            )
 
         getattr(object, "__delattr__")(self, key)
 
