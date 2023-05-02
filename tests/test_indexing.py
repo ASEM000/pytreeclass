@@ -11,8 +11,8 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass import TreeClass
-from pytreeclass._src.tree_indexer import _mutable_context
-from pytreeclass._src.tree_trace import construct_tree
+from pytreeclass._src.tree_decorator import _mutable_context
+from pytreeclass._src.tree_util import construct_tree
 
 
 class Tree(TreeClass, leafwise=True):

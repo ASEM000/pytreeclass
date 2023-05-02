@@ -3,40 +3,51 @@ from __future__ import annotations
 import abc
 import functools as ft
 import sys
-from collections.abc import MutableMapping, MutableSequence
+from collections.abc import Callable, MutableMapping, MutableSequence
+from contextlib import contextmanager
 from types import FunctionType, MappingProxyType
-from typing import Any, Callable, Hashable, NamedTuple, Sequence, TypeVar
+from typing import Any, NamedTuple, Sequence, TypeVar
 
 import jax
+import jax.numpy as jnp
 import jax.tree_util as jtu
+import numpy as np
 from typing_extensions import dataclass_transform
 
-from pytreeclass._src.tree_freeze import tree_hash
-from pytreeclass._src.tree_indexer import (
-    AtIndexer,
+from pytreeclass._src.tree_pprint import tree_repr, tree_repr_with_trace, tree_str
+from pytreeclass._src.tree_util import (
+    NamedSequenceKey,
+    TraceType,
     _leafwise_transform,
-    _mutable_context,
-    _mutable_instance_registry,
     is_tree_equal,
     tree_copy,
+    tree_hash,
+    tree_map_with_trace,
 )
-from pytreeclass._src.tree_pprint import tree_repr, tree_str
-from pytreeclass._src.tree_trace import NamedSequenceKey
-
-
-class NOT_SET:
-    def __repr__(self) -> str:
-        return "NOT_SET"
-
-
-T = TypeVar("T", bound=Hashable)
-PyTree = Any
-
-_NOT_SET = NOT_SET()
-_MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
-
 
 """Define a class that convert a class to a JAX compatible tree structure"""
+
+
+T = TypeVar("T", bound="TreeClass")
+PyTree = Any
+EllipsisType = type(Ellipsis)
+_no_initializer = object()
+_NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "NOT_SET"})()
+_MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
+
+# allow methods in mutable context to be called without raising `AttributeError`
+# the instances are registered  during initialization and using `at` property with `__call__
+# this is done by registering the instance id in a set before entering the
+# mutable context and removing it after exiting the context
+_mutable_instance_registry: set[int] = set()
+
+
+@contextmanager
+def _mutable_context(tree, *, kopy: bool = False):
+    tree = tree_copy(tree) if kopy else tree
+    _mutable_instance_registry.add(id(tree))
+    yield tree
+    _mutable_instance_registry.discard(id(tree))
 
 
 class Field(NamedTuple):
@@ -279,7 +290,7 @@ def _generate_init_method(klass: type) -> FunctionType:
     init_code = _generate_init_code(tuple(field_map.values()))
     exec(init_code, vars(sys.modules[klass.__module__]), local_namespace := dict())  # type: ignore
     method = local_namespace["closure"](field_map)
-    method.__qualname__ = f"{klass.__qualname__}.__init__"
+    setattr(method, "__qualname__", f"{klass.__qualname__}.__init__")
     return method
 
 
@@ -314,6 +325,336 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     return klass
 
 
+def _generate_path_mask(
+    tree: PyTree,
+    where: tuple[int | str, ...],
+    is_leaf: Callable[[Any], bool] | None = None,
+) -> PyTree:
+    # generate a mask for `where` path in `tree`
+    # where path is a tuple of indices or keys, for example
+    # where=("a",) wil set all leaves of `tree` with key "a" to True and
+    # all other leaves to False
+    match = False
+
+    def _unpack_entry(entry) -> tuple[Any, ...]:
+        # define rule for indexing matching through `at` property
+        # for example `jax` internals uses `jtu.GetAttrKey` to index an attribute, however
+        # its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]` to index an attribute
+        # instead `tree.at['attr']` is more ergonomic
+        if isinstance(entry, jtu.GetAttrKey):
+            return (entry.name,)
+        if isinstance(entry, jtu.SequenceKey):
+            return (entry.idx,)
+        if isinstance(entry, (jtu.DictKey, jtu.FlattenedIndexKey)):
+            return (entry.key,)
+        if isinstance(entry, NamedSequenceKey):
+            return (entry.idx, entry.key)
+        return (entry,)
+
+    def map_func(path: TraceType, _: Any):
+        keys, _ = path
+
+        if len(where) > len(keys):
+            # path is shorter than `where` path. for example
+            # where=("a", "b") and the current path is ("a",) then
+            # the current path is not a match
+            return False
+
+        for wi, key in zip(where, keys):
+            if wi not in (..., *_unpack_entry(key)):
+                return False
+
+        nonlocal match
+
+        return (match := True)
+
+    mask = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
+
+    if not match:
+        raise LookupError(
+            f"No leaf match is found for path={'/'.join(map(str, where))}"
+            f"for tree with trace:\n{tree_repr_with_trace(tree)}\n"
+            f"with mask={mask}"
+        )
+
+    return mask
+
+
+def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
+    # combine boolean masks with `&` operator if all masks are boolean
+    # otherwise raise an error
+    def check_and_return_bool_leaf(leaf: Any) -> bool:
+        if hasattr(leaf, "dtype"):
+            if leaf.dtype == "bool":
+                return leaf
+            raise TypeError(f"Expected boolean array mask, got {leaf=}")
+
+        if isinstance(leaf, bool):
+            return leaf
+        raise TypeError(f"Expected boolean mask, got {leaf=}")
+
+    def map_func(*leaves):
+        verdict = True
+        for leaf in leaves:
+            verdict &= check_and_return_bool_leaf(leaf)
+        return verdict
+
+    return jtu.tree_map(map_func, *masks)
+
+
+def _resolve_where(
+    tree: PyTree,
+    where: tuple[int | str | PyTree | EllipsisType, ...],
+    is_leaf: Callable[[Any], bool] | None = None,
+):
+    mask = None
+
+    if path := [i for i in where if isinstance(i, (int, str, type(...)))]:
+        mask = _generate_path_mask(tree, path, is_leaf=is_leaf)
+
+    if maybe_bool_masks := [i for i in where if isinstance(i, type(tree))]:
+        all_masks = [mask, *maybe_bool_masks] if mask else maybe_bool_masks
+        mask = _combine_maybe_bool_masks(*all_masks)
+
+    return mask
+
+
+def _recursive_getattr(tree: Any, where: tuple[str, ...]):
+    def step(tree: Any, where: tuple[str, ...]):
+        if len(where) == 1:
+            return getattr(tree, where[0])
+        return step(getattr(tree, where[0]), where[1:])
+
+    return step(tree, where)
+
+
+class AtIndexer(NamedTuple):
+    """Adds `.at` indexing abilities to a PyTree.
+
+    Example:
+        >>> import jax.tree_util as jtu
+        >>> import pytreeclass as pytc
+        >>> @jax.tree_util.register_pytree_with_keys_class
+        ... class Tree:
+        ...    def __init__(self, a, b):
+        ...        self.a = a
+        ...        self.b = b
+        ...    def tree_flatten_with_keys(self):
+        ...        return ((jtu.GetAttrKey("a"), self.a), (jtu.GetAttrKey("b"), self.b)), None
+        ...    @classmethod
+        ...    def tree_unflatten(cls, aux_data, children):
+        ...        return cls(*children)
+        ...    @property
+        ...    def at(self):
+        ...        return pytc.AtIndexer(self, where=())
+        ...    def __repr__(self) -> str:
+        ...        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
+
+        >>> Tree(1, 2).at["a"].get()
+        Tree(a=1, b=None)
+    """
+
+    tree: PyTree
+    where: tuple[str | int] | PyTree
+
+    def __getitem__(self, where: str | int | PyTree | EllipsisType) -> AtIndexer:
+        if isinstance(where, (type(self.tree), str, int, EllipsisType)):
+            return AtIndexer(self.tree, (*self.where, where))
+
+        raise NotImplementedError(
+            f"Indexing with {type(where).__name__} is not implemented.\n"
+            "Example of supported indexing:\n\n"
+            f"class {type(self.tree).__name__}:(pytc.TreeClass)\n"
+            "    ...\n\n"
+            f">>> tree = {type(self.tree).__name__}(...)\n"
+            ">>> # indexing by boolean pytree\n"
+            ">>> tree.at[tree > 0].get()\n\n"
+            ">>> # indexing by attribute name\n"
+            ">>> tree.at[`attribute_name`].get()\n\n"
+            ">>> # indexing by attribute index\n"
+            ">>> tree.at[`attribute_index`].get()"
+        )
+
+    def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
+        """Get the leaf values at the specified location.
+
+        Args:
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            A PyTree of leaf values at the specified location, with the non-selected
+            leaf values set to None if the leaf is not an array.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            >>> tree = Tree(a=1, b=2)
+            >>> tree.at['a'].get()
+            Tree(a=1, b=None)
+        """
+        where = _resolve_where(self.tree, self.where, is_leaf)
+
+        def leaf_get(leaf: Any, where: Any):
+            if isinstance(where, (jax.Array, np.ndarray)) and where.ndim != 0:
+                return leaf[jnp.where(where)]
+            return leaf if where else None
+
+        return jtu.tree_map(leaf_get, self.tree, where, is_leaf=is_leaf)
+
+    def set(
+        self,
+        set_value: Any,
+        *,
+        is_leaf: Callable[[Any], bool] | None = None,
+    ) -> PyTree:
+        """Set the leaf values at the specified location.
+
+        Args:
+            set_value: the value to set at the specified location.
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            A PyTree with the leaf values at the specified location set to `set_value`.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            >>> tree = Tree(a=1, b=2)
+            >>> tree.at['a'].set(100)
+            Tree(a=100, b=2)
+        """
+        where = _resolve_where(self.tree, self.where, is_leaf)
+
+        def leaf_set(leaf: Any, where: Any, set_value: Any):
+            if isinstance(where, (jax.Array, np.ndarray)):
+                return jnp.where(where, set_value, leaf)
+            return set_value if where else leaf
+
+        if jtu.tree_structure(self.tree) == jtu.tree_structure(set_value):
+            # do not broadcast set_value if it is a pytree of same structure
+            # for example tree.at[where].set(tree2) will set all tree leaves to tree2 leaves
+            # if tree2 is a pytree of same structure as tree
+            # instead of making each leaf of tree a copy of tree2
+            # is design is similar to `numpy` design `Array.at[...].set(Array)`
+            return jtu.tree_map(leaf_set, self.tree, where, set_value, is_leaf=is_leaf)
+
+        # set_value is broadcasted to tree leaves
+        # for example tree.at[where].set(1) will set all tree leaves to 1
+        partial_leaf_set = lambda leaf, where: leaf_set(leaf, where, set_value)
+        return jtu.tree_map(partial_leaf_set, self.tree, where, is_leaf=is_leaf)
+
+    def apply(
+        self,
+        func: Callable[[Any], Any],
+        *,
+        is_leaf: Callable[[Any], bool] | None = None,
+    ) -> PyTree:
+        """Apply a function to the leaf values at the specified location.
+
+        Args:
+            func: the function to apply to the leaf values.
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            A PyTree with the leaf values at the specified location set to the result
+            of applying `func` to the leaf values.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            >>> tree = Tree(a=1, b=2)
+            >>> tree.at['a'].apply(lambda _: 100)
+            Tree(a=100, b=2)
+        """
+        where = _resolve_where(self.tree, self.where, is_leaf)
+
+        def leaf_apply(leaf: Any, where: bool):
+            if isinstance(where, (jax.Array, np.ndarray)):
+                return jnp.where(where, func(leaf), leaf)
+            return func(leaf) if where else leaf
+
+        return jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+
+    def reduce(
+        self,
+        func: Callable[[Any, Any], Any],
+        *,
+        initializer: Any = _no_initializer,
+        is_leaf: Callable[[Any], bool] | None = None,
+    ) -> Any:
+        """Reduce the leaf values at the specified location.
+
+        Args:
+            func: the function to reduce the leaf values.
+            initializer: the initializer value for the reduction.
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            The result of reducing the leaf values at the specified location.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            >>> tree = Tree(a=1, b=2)
+            >>> tree.at[...].reduce(lambda a, b: a + b, initializer=0)
+            3
+        """
+        where = _resolve_where(self.tree, self.where, is_leaf)
+        tree = self.tree.at[where].get(is_leaf=is_leaf)  # type: ignore
+        if initializer is _no_initializer:
+            return jtu.tree_reduce(func, tree)
+        return jtu.tree_reduce(func, tree, initializer)
+
+    def __getattr__(self, name: str) -> AtIndexer:
+        """Support nested indexing with `.at`"""
+        # support nested `.at``
+        # for example `.at[A].at[B]` represents model.A.B
+        if name == "at":
+            # pass the current tree and the current path to the next `.at`
+            return AtIndexer(tree=self.tree, where=self.where)
+
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}\n"
+            f"Did you mean to use .at[{name!r}]?"
+        )
+
+    def __call__(self, *a, **k) -> tuple[Any, PyTree]:
+        """
+        Call the function at the specified location and return a **copy** of the tree.
+        with the result of the function call.
+
+        Returns:
+            A tuple of the result of the function call and a copy of the a new instance of
+            the tree with the modified values.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     def add(self, b):
+            ...         self.a += b
+            ...         return self.a
+            >>> tree = Tree(a=1)
+            >>> tree.at['add'](2)
+            (3, Tree(a=3))
+
+        Note:
+            If the function mutates the instance, `AttributeError` will be raised.
+            Use .at["method_name"](args, kwargs) to call a method that mutates the instance.
+        """
+        with _mutable_context(self.tree, kopy=True) as tree:
+            value = _recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
+        return value, tree
+
+
 class TreeClassMeta(abc.ABCMeta):
     def __call__(klass: type[T], *a, **k) -> T:
         self = getattr(klass, "__new__")(klass, *a, **k)
@@ -342,7 +683,7 @@ class TreeClassMeta(abc.ABCMeta):
         return self
 
 
-@dataclass_transform(field_specifiers=(field, Field), frozen_default=True)
+@dataclass_transform(field_specifiers=(field, Field))
 class TreeClass(metaclass=TreeClassMeta):
     """Convert a class to a JAX compatible tree structure.
 
@@ -472,7 +813,7 @@ class TreeClass(metaclass=TreeClassMeta):
     def __str__(self) -> str:
         return tree_str(self)
 
-    def __copy__(self) -> T:
+    def __copy__(self):
         return tree_copy(self)
 
     def __hash__(self) -> int:

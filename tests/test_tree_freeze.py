@@ -6,7 +6,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_freeze import _HashableWrapper, tree_hash
+from pytreeclass._src.tree_util import _HashableWrapper, tree_hash
 
 
 def test_freeze_unfreeze():

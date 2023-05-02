@@ -16,7 +16,7 @@ from jax.util import unzip2
 from jaxlib.xla_extension import PjitFunction
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_trace import Node, construct_tree
+from pytreeclass._src.tree_util import Node, construct_tree
 
 PyTree = Any
 PrintKind = Literal["repr", "str"]

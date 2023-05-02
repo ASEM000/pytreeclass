@@ -7,8 +7,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_freeze import _hash_node
-from pytreeclass._src.tree_indexer import bcmap
+from pytreeclass._src.tree_util import _hash_node, bcmap
 
 
 def test_bcmap():
