@@ -14,15 +14,15 @@ import jax.tree_util as jtu
 import numpy as np
 from typing_extensions import dataclass_transform
 
-from pytreeclass._src.tree_pprint import tree_repr, tree_repr_with_trace, tree_str
+from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_util import (
+    IsLeafType,
     NamedSequenceKey,
-    TraceType,
     _leafwise_transform,
+    _resolve_where,
     is_tree_equal,
     tree_copy,
     tree_hash,
-    tree_map_with_trace,
 )
 
 """Define a class that convert a class to a JAX compatible tree structure"""
@@ -192,7 +192,7 @@ def field(
     )
 
 
-@ft.lru_cache
+@ft.lru_cache(maxsize=128)
 def build_field_map(klass: type) -> MappingProxyType[str, Field]:
     field_map = dict()  # type: dict[str, Field]
 
@@ -325,109 +325,6 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     return klass
 
 
-def _generate_path_mask(
-    tree: PyTree,
-    where: tuple[int | str, ...],
-    is_leaf: Callable[[Any], bool] | None = None,
-) -> PyTree:
-    # generate a mask for `where` path in `tree`
-    # where path is a tuple of indices or keys, for example
-    # where=("a",) wil set all leaves of `tree` with key "a" to True and
-    # all other leaves to False
-    match = False
-
-    def _unpack_entry(entry) -> tuple[Any, ...]:
-        # define rule for indexing matching through `at` property
-        # for example `jax` internals uses `jtu.GetAttrKey` to index an attribute, however
-        # its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]` to index an attribute
-        # instead `tree.at['attr']` is more ergonomic
-        if isinstance(entry, jtu.GetAttrKey):
-            return (entry.name,)
-        if isinstance(entry, jtu.SequenceKey):
-            return (entry.idx,)
-        if isinstance(entry, (jtu.DictKey, jtu.FlattenedIndexKey)):
-            return (entry.key,)
-        if isinstance(entry, NamedSequenceKey):
-            return (entry.idx, entry.key)
-        return (entry,)
-
-    def map_func(path: TraceType, _: Any):
-        keys, _ = path
-
-        if len(where) > len(keys):
-            # path is shorter than `where` path. for example
-            # where=("a", "b") and the current path is ("a",) then
-            # the current path is not a match
-            return False
-
-        for wi, key in zip(where, keys):
-            if wi not in (..., *_unpack_entry(key)):
-                return False
-
-        nonlocal match
-
-        return (match := True)
-
-    mask = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
-
-    if not match:
-        raise LookupError(
-            f"No leaf match is found for path={'/'.join(map(str, where))}"
-            f"for tree with trace:\n{tree_repr_with_trace(tree)}\n"
-            f"with mask={mask}"
-        )
-
-    return mask
-
-
-def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
-    # combine boolean masks with `&` operator if all masks are boolean
-    # otherwise raise an error
-    def check_and_return_bool_leaf(leaf: Any) -> bool:
-        if hasattr(leaf, "dtype"):
-            if leaf.dtype == "bool":
-                return leaf
-            raise TypeError(f"Expected boolean array mask, got {leaf=}")
-
-        if isinstance(leaf, bool):
-            return leaf
-        raise TypeError(f"Expected boolean mask, got {leaf=}")
-
-    def map_func(*leaves):
-        verdict = True
-        for leaf in leaves:
-            verdict &= check_and_return_bool_leaf(leaf)
-        return verdict
-
-    return jtu.tree_map(map_func, *masks)
-
-
-def _resolve_where(
-    tree: PyTree,
-    where: tuple[int | str | PyTree | EllipsisType, ...],
-    is_leaf: Callable[[Any], bool] | None = None,
-):
-    mask = None
-
-    if path := [i for i in where if isinstance(i, (int, str, type(...)))]:
-        mask = _generate_path_mask(tree, path, is_leaf=is_leaf)
-
-    if maybe_bool_masks := [i for i in where if isinstance(i, type(tree))]:
-        all_masks = [mask, *maybe_bool_masks] if mask else maybe_bool_masks
-        mask = _combine_maybe_bool_masks(*all_masks)
-
-    return mask
-
-
-def _recursive_getattr(tree: Any, where: tuple[str, ...]):
-    def step(tree: Any, where: tuple[str, ...]):
-        if len(where) == 1:
-            return getattr(tree, where[0])
-        return step(getattr(tree, where[0]), where[1:])
-
-    return step(tree, where)
-
-
 class AtIndexer(NamedTuple):
     """Adds `.at` indexing abilities to a PyTree.
 
@@ -464,18 +361,21 @@ class AtIndexer(NamedTuple):
         raise NotImplementedError(
             f"Indexing with {type(where).__name__} is not implemented.\n"
             "Example of supported indexing:\n\n"
+            ">>> import jax\n"
+            ">>> import pytreeclass as pytc\n"
             f"class {type(self.tree).__name__}:(pytc.TreeClass)\n"
             "    ...\n\n"
             f">>> tree = {type(self.tree).__name__}(...)\n"
             ">>> # indexing by boolean pytree\n"
-            ">>> tree.at[tree > 0].get()\n\n"
+            ">>> mask = jax.tree_map(lambda x: x > 0, tree)\n"
+            ">>> tree.at[mask].get()\n\n"
             ">>> # indexing by attribute name\n"
             ">>> tree.at[`attribute_name`].get()\n\n"
-            ">>> # indexing by attribute index\n"
-            ">>> tree.at[`attribute_index`].get()"
+            ">>> # indexing by leaf index\n"
+            ">>> tree.at[index].get()"
         )
 
-    def get(self, *, is_leaf: Callable[[Any], bool] | None = None) -> PyTree:
+    def get(self, *, is_leaf: IsLeafType = None) -> PyTree:
         """Get the leaf values at the specified location.
 
         Args:
@@ -491,6 +391,8 @@ class AtIndexer(NamedTuple):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
+            >>> # get `a` and return a new instance
+            >>> # with `None` for all other leaves
             >>> tree.at['a'].get()
             Tree(a=1, b=None)
         """
@@ -503,12 +405,7 @@ class AtIndexer(NamedTuple):
 
         return jtu.tree_map(leaf_get, self.tree, where, is_leaf=is_leaf)
 
-    def set(
-        self,
-        set_value: Any,
-        *,
-        is_leaf: Callable[[Any], bool] | None = None,
-    ) -> PyTree:
+    def set(self, set_value: Any, *, is_leaf: IsLeafType = None):
         """Set the leaf values at the specified location.
 
         Args:
@@ -524,6 +421,8 @@ class AtIndexer(NamedTuple):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
+            >>> # set `a` and return a new instance
+            >>> # with all other leaves unchanged
             >>> tree.at['a'].set(100)
             Tree(a=100, b=2)
         """
@@ -547,12 +446,7 @@ class AtIndexer(NamedTuple):
         partial_leaf_set = lambda leaf, where: leaf_set(leaf, where, set_value)
         return jtu.tree_map(partial_leaf_set, self.tree, where, is_leaf=is_leaf)
 
-    def apply(
-        self,
-        func: Callable[[Any], Any],
-        *,
-        is_leaf: Callable[[Any], bool] | None = None,
-    ) -> PyTree:
+    def apply(self, func: Callable[[Any], Any], *, is_leaf: IsLeafType = None):
         """Apply a function to the leaf values at the specified location.
 
         Args:
@@ -569,6 +463,8 @@ class AtIndexer(NamedTuple):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
+            >>> # apply to `a` and return a new instance
+            >>> # with all other leaves unchanged
             >>> tree.at['a'].apply(lambda _: 100)
             Tree(a=100, b=2)
         """
@@ -586,7 +482,7 @@ class AtIndexer(NamedTuple):
         func: Callable[[Any, Any], Any],
         *,
         initializer: Any = _no_initializer,
-        is_leaf: Callable[[Any], bool] | None = None,
+        is_leaf: IsLeafType = None,
     ) -> Any:
         """Reduce the leaf values at the specified location.
 
@@ -614,17 +510,12 @@ class AtIndexer(NamedTuple):
         return jtu.tree_reduce(func, tree, initializer)
 
     def __getattr__(self, name: str) -> AtIndexer:
-        """Support nested indexing with `.at`"""
-        # support nested `.at``
-        # for example `.at[A].at[B]` represents model.A.B
+        """Support nested indexing"""
         if name == "at":
             # pass the current tree and the current path to the next `.at`
             return AtIndexer(tree=self.tree, where=self.where)
 
-        raise AttributeError(
-            f"{type(self).__name__!r} object has no attribute {name!r}\n"
-            f"Did you mean to use .at[{name!r}]?"
-        )
+        raise AttributeError(f"`{type(self).__name__!r}` has no attribute {name!r}.")
 
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         """
@@ -639,19 +530,27 @@ class AtIndexer(NamedTuple):
             >>> import pytreeclass as pytc
             >>> class Tree(pytc.TreeClass):
             ...     a: int
-            ...     def add(self, b):
-            ...         self.a += b
+            ...     def add(self, x:int) -> int:
+            ...         self.a += x
             ...         return self.a
             >>> tree = Tree(a=1)
-            >>> tree.at['add'](2)
-            (3, Tree(a=3))
+            >>> # call `add` and return a tuple of
+            >>> # (return value, new instance)
+            >>> tree.at['add'](99)
+            (100, Tree(a=100))
 
         Note:
             If the function mutates the instance, `AttributeError` will be raised.
             Use .at["method_name"](args, kwargs) to call a method that mutates the instance.
         """
+
+        def recursive_getattr(tree: Any, where: tuple[str, ...]):
+            if len(where) == 1:
+                return getattr(tree, where[0])
+            return recursive_getattr(getattr(tree, where[0]), where[1:])
+
         with _mutable_context(self.tree, kopy=True) as tree:
-            value = _recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
+            value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
         return value, tree
 
 
@@ -667,19 +566,9 @@ class TreeClassMeta(abc.ABCMeta):
                 # even if the init method is not code-generated.
                 post_init_func(self)
 
-        # handle non-initialized fields
-        if len(keys := set(build_field_map(klass)) - set(vars(self))) > 0:
-            raise AttributeError(
-                f"Found uninitialized fields=({', '.join(keys)}) in class `{klass.__name__}`"
-                f"after calling the defined `__init__` method."
-                f"Initialize the fields defined in `{klass.__name__}` in the `__init__` method."
-                f"Example:\n"
-                f">>> class {klass.__name__}(...):\n"
-                f"...   field1: int = 1\n"
-                f"...   def __init__(self, field1):\n"
-                f"...       self.field1 = field1\n"
-                "...       ..."
-            )
+        if len(keys := set(build_field_map(klass)) - set(vars(self))):
+            # handle non-initialized fields
+            raise AttributeError(f"Found uninitialized fields {keys}.")
         return self
 
 
@@ -757,16 +646,16 @@ class TreeClass(metaclass=TreeClassMeta):
         super().__init_subclass__(*a, **k)
 
         if "__setattr__" in vars(klass) or "__delattr__" in vars(klass):
-            # the user defined a method that conflicts with the reserved method
+            # conflicting methods with the immutable functionality
             raise TypeError(
                 f"Unable to transform the class `{klass.__name__}` "
                 "with resereved methods: `__setattr__` or `__delattr__` defined.\n"
-                "Reserved `setters` and `deleters` implements the immutable functionality."
-                "and cannot be overriden."
+                "Reserved `setters` and `deleters` implements "
+                "the immutable functionality and cannot be overriden."
             )
 
         if "__init__" not in vars(klass):
-            # generate the init method if not defined similar to dataclass
+            # generate the init method if not defined similar to `dataclasses.dataclass`
             setattr(klass, "__init__", _generate_init_method(klass))
 
         if leafwise:
@@ -780,8 +669,13 @@ class TreeClass(metaclass=TreeClassMeta):
         if id(self) not in _mutable_instance_registry:
             raise AttributeError(
                 f"Cannot set attribute `{key}` = {value!r} "
-                f"on immutable instance of `{type(self).__name__}`.\n"
-                f"Use `.at[`{key}`].set({value!r})` instead."
+                f"on an immutable instance of `{type(self).__name__}`.\n"
+                f"Use `.at[`{key}`].set({value!r})` "
+                "to set the value immutably.\nExample:\n"
+                f">>> tree1 = {type(self).__name__}(...)\n"
+                f">>> tree2 = tree1.at['{key}'].set({value!r})\n"
+                ">>> assert not tree1 is tree2\n"
+                f">>> tree2.{key}\n{value!r}"
             )
 
         if key in (field_map := build_field_map(type(self))):
@@ -805,6 +699,43 @@ class TreeClass(metaclass=TreeClassMeta):
 
     @property
     def at(self) -> AtIndexer:
+        """Immutable out-of-place indexing
+
+        `.at[***].get()`: Return a new instance with the value at the index otherwise None.
+        `.at[***].set(value)`: Set the `value` and return a new instance with the updated value.
+        `.at[***].apply(func)`: Apply a `func` and return a new instance with the updated value.
+        `.at['method'](*a, **k)`: Call a `method` and return a (return value, new instance) tuple.
+
+        `***` acceptable index types are `str` for mapping keys or class attributes, `int`
+        for positional indexing, `...` for all leaves, and a boolean mask of the
+        same structure as the tree.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> class Tree(pytc.TreeClass):
+            ...     a:int = 1
+            ...     b:float = 2.0
+            ...     def add(self, x:int) -> int:
+            ...         self.a += x
+            ...         return self.a
+            >>> tree = Tree()
+            >>> # get `a` and return a new instance
+            >>> # with `None` for all other leaves
+            >>> tree.at["a"].get()
+            Tree(a=1, b=None)
+            >>> # set `a` and return a new instance
+            >>> # with all other leaves unchanged
+            >>> tree.at["a"].set(100)
+            Tree(a=100, b=2.0)
+            >>> # apply to `a` and return a new instance
+            >>> # with all other leaves unchanged
+            >>> tree.at["a"].apply(lambda x: 100)
+            Tree(a=100, b=2.0)
+            >>> # call `add` and return a tuple of
+            >>> # (return value, new instance)
+            >>> tree.at["add"](99)
+            (100, Tree(a=100, b=2.0))
+        """
         return AtIndexer(self, where=())
 
     def __repr__(self) -> str:

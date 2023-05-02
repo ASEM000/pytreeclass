@@ -6,7 +6,7 @@ import hashlib
 import operator as op
 from collections.abc import Callable
 from math import ceil, floor, trunc
-from typing import Any, Hashable, Iterator, Sequence, Tuple, TypeVar
+from typing import Any, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
@@ -25,6 +25,7 @@ TraceEntry = Tuple[KeyEntry, TypeEntry]
 KeyPath = Tuple[KeyEntry, ...]
 TypePath = Tuple[TypeEntry, ...]
 TraceType = Tuple[KeyPath, TypePath]
+IsLeafType = Union[type(None), Callable[[Any], bool]]
 
 
 def _hash_node(node: Any) -> int:
@@ -241,7 +242,7 @@ class BroadcastablePartial(ft.partial):
 def bcmap(
     func: Callable[..., Any],
     *,
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
 ) -> Callable:
     """(map)s a function over pytrees leaves with automatic (b)road(c)asting for scalar arguments
 
@@ -463,10 +464,100 @@ class NamedSequenceKey:
         return f".{self.key}"
 
 
+def _generate_path_mask(
+    tree: PyTree,
+    where: tuple[int | str, ...],
+    is_leaf: IsLeafType = None,
+) -> PyTree:
+    # generate a mask for `where` path in `tree`
+    # where path is a tuple of indices or keys, for example
+    # where=("a",) wil set all leaves of `tree` with key "a" to True and
+    # all other leaves to False
+    match = False
+
+    def _unpack_entry(entry) -> tuple[Any, ...]:
+        # define rule for indexing matching through `at` property
+        # for example `jax` internals uses `jtu.GetAttrKey` to index an attribute, however
+        # its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]` to index an attribute
+        # instead `tree.at['attr']` is more ergonomic
+        if isinstance(entry, jtu.GetAttrKey):
+            return (entry.name,)
+        if isinstance(entry, jtu.SequenceKey):
+            return (entry.idx,)
+        if isinstance(entry, (jtu.DictKey, jtu.FlattenedIndexKey)):
+            return (entry.key,)
+        if isinstance(entry, NamedSequenceKey):
+            return (entry.idx, entry.key)
+        return (entry,)
+
+    def map_func(path: TraceType, _: Any):
+        keys, _ = path
+
+        if len(where) > len(keys):
+            # path is shorter than `where` path. for example
+            # where=("a", "b") and the current path is ("a",) then
+            # the current path is not a match
+            return False
+
+        for wi, key in zip(where, keys):
+            if wi not in (..., *_unpack_entry(key)):
+                return False
+
+        nonlocal match
+
+        return (match := True)
+
+    mask = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
+
+    if not match:
+        raise LookupError(f"No leaf match is found for {where=} and {mask=}")
+
+    return mask
+
+
+def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
+    # combine boolean masks with `&` operator if all masks are boolean
+    # otherwise raise an error
+    def check_and_return_bool_leaf(leaf: Any) -> bool:
+        if hasattr(leaf, "dtype"):
+            if leaf.dtype == "bool":
+                return leaf
+            raise TypeError(f"Expected boolean array mask, got {leaf=}")
+
+        if isinstance(leaf, bool):
+            return leaf
+        raise TypeError(f"Expected boolean mask, got {leaf=}")
+
+    def map_func(*leaves):
+        verdict = True
+        for leaf in leaves:
+            verdict &= check_and_return_bool_leaf(leaf)
+        return verdict
+
+    return jtu.tree_map(map_func, *masks)
+
+
+def _resolve_where(
+    tree: PyTree,
+    where: tuple[int | str | PyTree | EllipsisType, ...],
+    is_leaf: IsLeafType = None,
+):
+    mask = None
+
+    if path := [i for i in where if isinstance(i, (int, str, type(...)))]:
+        mask = _generate_path_mask(tree, path, is_leaf=is_leaf)
+
+    if maybe_bool_masks := [i for i in where if isinstance(i, type(tree))]:
+        all_masks = [mask, *maybe_bool_masks] if mask else maybe_bool_masks
+        mask = _combine_maybe_bool_masks(*all_masks)
+
+    return mask
+
+
 def flatten_one_trace_level(
     trace: TraceType,
     tree: PyTree,
-    is_leaf: Callable[[Any], bool] | None,
+    is_leaf: IsLeafType,
     is_trace_leaf: Callable[[TraceType], bool] | None,
 ):
     # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
@@ -509,7 +600,7 @@ def flatten_one_trace_level(
 def tree_leaves_with_trace(
     tree: PyTree,
     *,
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
     is_trace_leaf: Callable[[TraceEntry], bool] | None = None,
 ) -> Sequence[tuple[TraceType, Any]]:
     r"""Similar to jax.tree_util.tree_leaves` but returns  object, leaf pairs.
@@ -533,7 +624,7 @@ def tree_leaves_with_trace(
 def tree_flatten_with_trace(
     tree: PyTree,
     *,
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
 ) -> tuple[Sequence[tuple[TraceType, Any]], jtu.PyTreeDef]:
     """Similar to jax.tree_util.tree_flatten` but returns key path, type path pairs.
 
@@ -554,7 +645,7 @@ def tree_map_with_trace(
     func: Callable[..., Any],
     tree: Any,
     *rest: Any,
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
 ) -> Any:
     # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
     # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
@@ -638,8 +729,8 @@ jtu.register_pytree_node(
 
 def construct_tree(
     tree: PyTree,
-    is_leaf: bool = None,
-    is_trace_leaf: bool = None,
+    is_leaf: IsLeafType = None,
+    is_trace_leaf: IsLeafType = None,
 ) -> Node:
     # construct a tree with `Node` objects using `tree_leaves_with_trace`
     # to establish parent-child relationship between nodes and return the root node
