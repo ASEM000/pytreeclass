@@ -4,9 +4,8 @@ import dataclasses as dc
 import functools as ft
 import hashlib
 import operator as op
-from collections.abc import Callable
 from math import ceil, floor, trunc
-from typing import Any, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
+from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
