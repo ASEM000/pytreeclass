@@ -1,4 +1,5 @@
-from pytreeclass._src.tree_decorator import AtIndexer, TreeClass, field, fields
+from pytreeclass._src.code_build import field, fields
+from pytreeclass._src.tree_base import AtIndexer, TreeClass
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_indent,
