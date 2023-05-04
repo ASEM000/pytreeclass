@@ -792,13 +792,14 @@ def tree_summary(
 
     Returns:
         String summary of the tree structure
-        - First column: is the path to the node
-        - Second column: is the type of the node
-        - Third column: is the number of leaves in the node (1 for non-array leaves and array size for array leaves)
+        - First column: path to the node
+        - Second column: type of the node
+        - Third column: number of leaves in the node
         - Last row: type of parent, number of leaves and size of parent
 
     Note:
-        Array elements are considered as leaves, for example `jnp.array([1,2,3])` has 3 leaves
+        Array elements are considered as leaves, for example:
+        `jnp.array([1,2,3])` has 3 leaves
 
     Example:
         >>> import pytreeclass as pytc
@@ -855,7 +856,9 @@ def tree_repr_with_trace(
     is_leaf: Callable[[Any], bool] | None = None,
     transpose: bool = False,
 ) -> PyTree:
-    """Return a PyTree with the same structure, but with the leaves replaced by a summary of the trace.
+    """
+    Return a PyTree with the same structure, but with the leaves replaced
+    by a summary of the trace.
 
     Args:
         tree: pytree to summarize.

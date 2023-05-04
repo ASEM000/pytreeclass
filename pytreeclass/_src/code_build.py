@@ -44,13 +44,17 @@ def field(
     """
     Args:
         default: The default value of the field. Mutually exclusive with `factory`.
-        factory: A 0-argument function called to initialize field value. Mutually exclusive with `default`.
+        factory: A 0-argument function called to initialize field value.
+            Mutually exclusive with `default`.
         init: Whether the field is included in the object's __init__ function.
         repr: Whether the field is included in the object's __repr__ function.
-        kw_only: Whether the field is keyword-only. Mutually exclusive with `pos_only`.
-        pos_only: Whether the field is positional-only. Mutually exclusive with `kw_only`.
+        kw_only: Whether the field is keyword-only. Mutually exclusive
+            with `pos_only`, effectively placing `/` in the constructor.
+        pos_only: Whether the field is positional-only. Mutually exclusive
+            with `kw_only`, effectively placing `*` in the constructor.
         metadata: A mapping of user-defined data for the field.
-        callbacks: A sequence of functions to called on `setattr` during initialization to modify the field value.
+        callbacks: A sequence of functions to called on `setattr` during
+            initialization to modify the field value.
         alias: An a alias for the field name in the constructor.
 
     Example:
@@ -60,7 +64,6 @@ def field(
         ...        assert isinstance(x, klass)
         ...        return x
         ...    return wrapper
-
 
         >>> def positive_check_callback(x):
         ...    assert x > 0
@@ -72,8 +75,8 @@ def field(
         ...    # use callback compostion to assert employee `age` is int and positive
         ...    age: int = pytc.field(callbacks=[instance_cb_factory(int), positive_check_callback])
         ...    # use `id` in the constructor for `_id` attribute
-        ...    # this is useful for private attributes that are not supposed to be accessed directly
-        ...    # and hide it from the repr
+        ...    # this is useful for private attributes that are not supposed
+        ...    # to be accessed directly and hide it from the repr
         ...    _id: int = pytc.field(alias="id", repr=False)
 
         >>> tree = Employee(name="Asem", age=10, id=1)
@@ -91,16 +94,16 @@ def field(
     if default is not _NOT_SET and factory is not None:
         raise ValueError(
             "`default` and `factory` are mutually exclusive arguments."
-            "Use `default` if the value is immutable or a zero-argument function "
-            "returning a mutable value in `factory` otherwise.\n"
+            "Use `default` if the value is immutable or a zero-argument "
+            "function returning a mutable value in `factory` otherwise.\n"
             f"got {default=} and {factory=}"
         )
 
     if kw_only is True and pos_only is True:
         raise ValueError(
             "`kw_only` and `pos_only` are mutually exclusive arguments."
-            "Use `kw_only` if the field is a keyword-only argument in the constructor"
-            " and `pos_only` if the field is positional only, "
+            "Use `kw_only` if the field is a keyword-only argument in "
+            "the constructor and `pos_only` if the field is positional only, "
             f"got {kw_only=} and {pos_only=}"
         )
 
@@ -108,8 +111,8 @@ def field(
         metadata = MappingProxyType(metadata)  # type: ignore
     elif metadata is not None:
         raise TypeError(
-            "`metadata` must be a dictionary describing the metadata of the field"
-            "or `None` if no metadata is provided, "
+            "`metadata` must be a dictionary describing the metadata of "
+            "the field or `None` if no metadata is provided, "
             f"got type=`{type(metadata).__name__}` instead."
         )
 
@@ -153,7 +156,7 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
     for base in reversed(klass.__mro__[1:]):
         field_map.update(_build_field_map(base))
 
-    # TODO: use inspect to get annotations, once we are on minimum python version >3.9
+    # TODO: use inspect to get annotations, once min python version >3.9
     if "__annotations__" not in vars(klass):
         return MappingProxyType(field_map)
 
@@ -210,11 +213,13 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
         if field.default is not _NOT_SET:
             vref = f"field_map['{name}'].default"
             head += f"{alias}={vref}, " if field.init else ""
-            body += f"\t\tself.{name}=" + (f"{alias}\n " if field.init else f"{vref}\n")
+            body += f"\t\tself.{name}="
+            body += f"{alias}\n " if field.init else f"{vref}\n"
         elif field.factory is not None:
             vref = f"field_map['{name}'].factory()"
             head += f"{alias}={vref}, " if field.init else ""
-            body += f"\t\tself.{name}=" + (f"{alias}\n" if field.init else f"{vref}\n")
+            body += f"\t\tself.{name}="
+            body += f"{alias}\n" if field.init else f"{vref}\n"
         else:
             head += f"{alias}, " if field.init else ""
             body += f"\t\tself.{name}={alias}\n " if field.init else ""
@@ -222,7 +227,7 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
         if field.pos_only and field.init:
             head = head.replace("/,", "") + "/, "
 
-    body += "\t\tpass"  # add pass to avoid syntax error if all fieds are ignored
+    body += "\t\tpass"  # add pass if all fields `init=False`
     body = "\tdef __init__(self, " + head[:-2] + "):\n" + body
     body = f"def closure(field_map):\n{body}\n\treturn __init__"
     return body.expandtabs(4)
@@ -233,8 +238,10 @@ def _generate_init_method(klass: type) -> FunctionType:
     field_map = _build_field_map(klass)
     # genrate init code string
     init_code = _generate_init_code(tuple(field_map.values()))
-    # execute the code in a new namespace using the class module namespace as global
-    exec(init_code, vars(sys.modules[klass.__module__]), local_namespace := dict())  # type: ignore
+    # execute the code in a new namespace using the class module namespace
+    global_namespace = vars(sys.modules[klass.__module__])
+    local_namespace = dict()
+    exec(init_code, global_namespace, local_namespace)  # type: ignore
     # call the closure to get the init method with the field map as closure
     # to avoid hardcoding the field map in the generated code
     method = local_namespace["closure"](field_map)

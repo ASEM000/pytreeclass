@@ -37,9 +37,9 @@ EllipsisType = type(Ellipsis)
 _no_initializer = object()
 
 # allow methods in mutable context to be called without raising `AttributeError`
-# the instances are registered  during initialization and using `at` property with `__call__
-# this is done by registering the instance id in a set before entering the
-# mutable context and removing it after exiting the context
+# the instances are registered  during initialization and using `at`  property
+# with `__call__ this is done by registering the instance id in a set before
+# entering the mutable context and removing it after exiting the context
 _mutable_instance_registry: set[int] = set()
 
 
@@ -55,18 +55,18 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     # handle all registration logic for `treeclass`
 
     def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
-        # unflatten rule for `treeclass` to use with `jax.tree_unflatten`
+        # unflatten rule to use with `jax.tree_unflatten`
         tree = getattr(object, "__new__")(klass)
         vars(tree).update(zip(keys, leaves))
         return tree
 
     def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
-        # flatten rule for `treeclass` to use with `jax.tree_flatten`
+        # flatten rule to use with `jax.tree_flatten`
         dynamic = vars(tree)
         return tuple(dynamic.values()), tuple(dynamic.keys())
 
     def tree_flatten_with_keys(tree: T):
-        # flatten rule for `treeclass` to use with `jax.tree_util.tree_flatten_with_path`
+        # flatten rule to use with `jax.tree_util.tree_flatten_with_path`
         dynamic = dict(vars(tree))
         for idx, key in enumerate(vars(tree)):
             entry = NamedSequenceKey(idx, key)
@@ -94,7 +94,9 @@ class AtIndexer(NamedTuple):
         ...        self.a = a
         ...        self.b = b
         ...    def tree_flatten_with_keys(self):
-        ...        return ((jtu.GetAttrKey("a"), self.a), (jtu.GetAttrKey("b"), self.b)), None
+        ...        kva = (jtu.GetAttrKey("a"), self.a)
+        ...        kvb = (jtu.GetAttrKey("b"), self.b)
+        ...        return (kva, kvb), None
         ...    @classmethod
         ...    def tree_unflatten(cls, aux_data, children):
         ...        return cls(*children)
@@ -139,8 +141,8 @@ class AtIndexer(NamedTuple):
             is_leaf: a predicate function to determine if a value is a leaf.
 
         Returns:
-            A PyTree of leaf values at the specified location, with the non-selected
-            leaf values set to None if the leaf is not an array.
+            A PyTree of leaf values at the specified location, with the
+            non-selected leaf values set to None if the leaf is not an array.
 
         Example:
             >>> import pytreeclass as pytc
@@ -170,7 +172,8 @@ class AtIndexer(NamedTuple):
             is_leaf: a predicate function to determine if a value is a leaf.
 
         Returns:
-            A PyTree with the leaf values at the specified location set to `set_value`.
+            A PyTree with the leaf values at the specified location
+            set to `set_value`.
 
         Example:
             >>> import pytreeclass as pytc
@@ -192,8 +195,8 @@ class AtIndexer(NamedTuple):
 
         if jtu.tree_structure(self.tree) == jtu.tree_structure(set_value):
             # do not broadcast set_value if it is a pytree of same structure
-            # for example tree.at[where].set(tree2) will set all tree leaves to tree2 leaves
-            # if tree2 is a pytree of same structure as tree
+            # for example tree.at[where].set(tree2) will set all tree leaves
+            # to tree2 leaves if tree2 is a pytree of same structure as tree
             # instead of making each leaf of tree a copy of tree2
             # is design is similar to `numpy` design `Array.at[...].set(Array)`
             return jtu.tree_map(leaf_set, self.tree, where, set_value, is_leaf=is_leaf)
@@ -211,8 +214,8 @@ class AtIndexer(NamedTuple):
             is_leaf: a predicate function to determine if a value is a leaf.
 
         Returns:
-            A PyTree with the leaf values at the specified location set to the result
-            of applying `func` to the leaf values.
+            A PyTree with the leaf values at the specified location set to
+            the result of applying `func` to the leaf values.
 
         Example:
             >>> import pytreeclass as pytc
@@ -276,12 +279,12 @@ class AtIndexer(NamedTuple):
 
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         """
-        Call the function at the specified location and return a **copy** of the tree.
-        with the result of the function call.
+        Call the function at the specified location and return a **copy**
+        of the tree. with the result of the function call.
 
         Returns:
-            A tuple of the result of the function call and a copy of the a new instance of
-            the tree with the modified values.
+            A tuple of the result of the function call and a copy of the a
+            new instance of the tree with the modified values.
 
         Example:
             >>> import pytreeclass as pytc
@@ -297,8 +300,8 @@ class AtIndexer(NamedTuple):
             (100, Tree(a=100))
 
         Note:
-            If the function mutates the instance, `AttributeError` will be raised.
-            Use .at["method_name"](args, kwargs) to call a method that mutates the instance.
+            - `AttributeError` is raised, If the function mutates the instance.
+            - Use .at["method_name"](*, **) to call a method that mutates the instance.
         """
 
         def recursive_getattr(tree: Any, where: tuple[str, ...]):
@@ -406,13 +409,13 @@ class TreeClass(metaclass=TreeClassMeta):
             # conflicting methods with the immutable functionality
             raise TypeError(
                 f"Unable to transform the class `{klass.__name__}` "
-                "with resereved methods: `__setattr__` or `__delattr__` defined.\n"
-                "Reserved `setters` and `deleters` implements "
+                "with resereved methods: `__setattr__` or `__delattr__` "
+                "defined.\nReserved `setters` and `deleters` implements "
                 "the immutable functionality and cannot be overriden."
             )
 
         if "__init__" not in vars(klass):
-            # generate the init method if not defined similar to `dataclasses.dataclass`
+            # generate the init method if not defined similar to `dataclass`
             setattr(klass, "__init__", _generate_init_method(klass))
 
         if leafwise:
@@ -458,14 +461,18 @@ class TreeClass(metaclass=TreeClassMeta):
     def at(self) -> AtIndexer:
         """Immutable out-of-place indexing
 
-        `.at[***].get()`: Return a new instance with the value at the index otherwise None.
-        `.at[***].set(value)`: Set the `value` and return a new instance with the updated value.
-        `.at[***].apply(func)`: Apply a `func` and return a new instance with the updated value.
-        `.at['method'](*a, **k)`: Call a `method` and return a (return value, new instance) tuple.
+        - `.at[***].get()`:
+            Return a new instance with the value at the index otherwise None.
+        - `.at[***].set(value)`:
+            Set the `value` and return a new instance with the updated value.
+        - `.at[***].apply(func)`:
+            Apply a `func` and return a new instance with the updated value.
+        - `.at['method'](*a, **k)`:
+            Call a `method` and return a (return value, new instance) tuple.
 
-        `***` acceptable index types are `str` for mapping keys or class attributes, `int`
-        for positional indexing, `...` for all leaves, and a boolean mask of the
-        same structure as the tree.
+        `***` acceptable index types are `str` for mapping keys or
+        class attributes, `int` for positional indexing, `...` for all leaves,
+        and a boolean mask of the same structure as the tree.
 
         Example:
             >>> import pytreeclass as pytc

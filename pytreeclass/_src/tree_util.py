@@ -64,7 +64,7 @@ class _HashableWrapper(_ImmutableWrapper):
     def __eq__(self, rhs: Any) -> bool:
         if not isinstance(rhs, _HashableWrapper):
             return False
-        return _hash_node(self.unwrap()) == _hash_node(rhs.unwrap())
+        return tree_hash(self.unwrap()) == tree_hash(rhs.unwrap())
 
     def __hash__(self) -> int:
         return tree_hash(self.unwrap())
@@ -561,7 +561,8 @@ def flatten_one_trace_level(
 ):
     # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
     # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
-    # similar to jax corresponding key path API but adds `is_trace_leaf` predicate and type path
+    # similar to jax corresponding key path API but adds `is_trace_leaf`
+    # predicate and type path
     if (is_leaf and is_leaf(tree)) or (is_trace_leaf and is_trace_leaf(trace)):
         # is_leaf is a predicate function that determines whether a value is a leaf
         # is_trace_leaf is a predicate function that determines whether a trace is a leaf
@@ -649,8 +650,8 @@ def tree_map_with_trace(
     # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
     # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
     r"""
-    Similar to `jax.tree_util.tree_map_with_path` that accept a function that takes a two-item tuple
-    for key path and type path.
+    Similar to `jax.tree_util.tree_map_with_path` that accept a function
+    that takes a two-item tuple for key path and type path.
 
     Args:
         func: A function that takes a trace and a leaf and returns a new leaf.
