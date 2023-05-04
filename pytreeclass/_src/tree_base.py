@@ -425,14 +425,14 @@ class TreeClass(metaclass=TreeClassMeta):
     def __setattr__(self, key: str, value: Any) -> None:
         if id(self) not in _mutable_instance_registry:
             raise AttributeError(
-                f"Cannot set attribute `{key}` = {value!r} "
+                f"Cannot set attribute {value=} to `{key=}`  "
                 f"on an immutable instance of `{type(self).__name__}`.\n"
-                f"Use `.at[`{key}`].set({value!r})` "
+                f"Use `.at['{key}'].set({value})` "
                 "to set the value immutably.\nExample:\n"
                 f">>> tree1 = {type(self).__name__}(...)\n"
                 f">>> tree2 = tree1.at['{key}'].set({value!r})\n"
                 ">>> assert not tree1 is tree2\n"
-                f">>> tree2.{key}\n{value!r}"
+                f">>> tree2.{key}\n{value}"
             )
 
         if key in (field_map := _build_field_map(type(self))):
@@ -449,7 +449,7 @@ class TreeClass(metaclass=TreeClassMeta):
             raise AttributeError(
                 f"Cannot delete attribute `{key}` "
                 f"on immutable instance of `{type(self).__name__}`.\n"
-                f"Use `.at[`{key}`].set(None)` instead."
+                f"Use `.at['{key}'].set(None)` instead."
             )
 
         getattr(object, "__delattr__")(self, key)

@@ -109,12 +109,6 @@ def test_field_alias():
         pytc.field(alias=1)
 
 
-def test_field_hash():
-    f1 = pytc.field(default=1.0, callbacks=[lambda x: x])
-    f2 = pytc.field(default=1.0)
-    hash(f1) == hash(f2)
-
-
 def test_field_nondiff():
     class Test(pytc.TreeClass):
         a: jax.Array

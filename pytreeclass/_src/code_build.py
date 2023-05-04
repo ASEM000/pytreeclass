@@ -6,18 +6,13 @@ from collections.abc import Callable, MutableMapping, MutableSequence
 from types import FunctionType, MappingProxyType
 from typing import Any, NamedTuple, Sequence
 
-from pytreeclass._src.tree_util import tree_hash
-
 """Constructor code generation from type annotations."""
-# few differences from dataclasses: (1) only frozen, (2) field is immutable `NamedTuple`
-# (3) adds `pos_only`, `alias`, and `callbacks` arguments to `field` function
-# https://github.com/google/jax/issues/14295
-
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "NOT_SET"})()
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
+# https://github.com/google/jax/issues/14295
 
 
 class Field(NamedTuple):
@@ -32,20 +27,6 @@ class Field(NamedTuple):
     metadata: MappingProxyType[str, Any] | None = None
     callbacks: Sequence[Any] = ()
     alias: str | None = None
-
-    def __eq__(self, other: Any) -> bool:
-        return hash(self) == hash(other)
-
-    def __hash__(self) -> int:
-        return tree_hash(
-            self.name,
-            self.default,
-            self.factory,
-            self.init,
-            self.kw_only,
-            self.pos_only,
-            self.alias,
-        )
 
 
 def field(
@@ -134,7 +115,7 @@ def field(
 
     if not isinstance(callbacks, Sequence):
         raise TypeError(
-            f"`callbacks` must be a Sequence of one-argument functions "
+            f"`callbacks` must be a Sequence of one-argument function(s) "
             "operating on the field value, and returning a modified value, "
             f"got type `{type(callbacks).__name__}` instead."
         )
@@ -186,7 +167,6 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
             raise ValueError("Field name cannot be `self`.")
 
         if isinstance(value, Field):
-            # case: `x: Any = field(default=1)`
             if isinstance(value.default, _MUTABLE_TYPES):
                 # example case: `x: Any = field(default=[1, 2, 3])`
                 raise TypeError(
@@ -194,36 +174,29 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
                     f" for field `{name}` in class `{klass.__name__}`.\n"
                     f" use `field(... ,factory=lambda:{value.default})` instead"
                 )
-
+            # case: `x: Any = field(default=1)`
             field_map[name] = value._replace(name=name, type=type)
-
-        elif isinstance(value, _MUTABLE_TYPES):
-            # https://github.com/ericvsmith/dataclasses/issues/3
-            # example case: `x: Any = [1, 2, 3]`
-            raise TypeError(
-                f"Mutable value= {(value)} is not allowed"
-                f" for field `{name}` in class `{klass.__name__}`.\n"
-                f" use `field(... ,factory=lambda:{value})` instead"
-            )
-
-        elif value is _NOT_SET:
-            # case: `x: Any`
-            field_map[name] = Field(name=name, type=type)
-
         else:
-            # case: `x: int = 1`
+            if isinstance(value, _MUTABLE_TYPES):
+                # https://github.com/ericvsmith/dataclasses/issues/3
+                # example case: `x: Any = [1, 2, 3]`
+                raise TypeError(
+                    f"Mutable value= {(value)} is not allowed"
+                    f" for field `{name}` in class `{klass.__name__}`.\n"
+                    f" use `field(... ,factory=lambda:{value})` instead"
+                )
+            # case: `x: int = 1` or `x: Any`
             field_map[name] = Field(name=name, type=type, default=value)
-
     return MappingProxyType(field_map)
 
 
-def fields(tree: Any) -> Sequence[Field]:
+def fields(value: Any) -> Sequence[Field]:
     """Returns a tuple of `Field` objects for the given instance or class."""
-    klass = tree if isinstance(tree, type) else type(tree)
-    return tuple(_build_field_map(klass).values())
+    if isinstance(value, type):
+        return tuple(_build_field_map(value).values())
+    return tuple(_build_field_map(type(value)).values())
 
 
-@ft.lru_cache(maxsize=128)
 def _generate_init_code(fields: Sequence[Field]) -> str:
     head = body = ""
 

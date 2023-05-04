@@ -11,7 +11,7 @@ from typing import Any, Callable, Literal
 import jax
 import jax.tree_util as jtu
 import numpy as np
-from jax._src.custom_derivatives import custom_jvp
+from jax import custom_jvp
 from jax.util import unzip2
 from jaxlib.xla_extension import PjitFunction
 
