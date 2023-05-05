@@ -200,10 +200,11 @@ def fields(value: Any) -> Sequence[Field]:
     return tuple(_build_field_map(type(value)).values())
 
 
-def _generate_init_code(fields: Sequence[Field]) -> str:
-    head = body = ""
+def _build_init_method(klass: type) -> FunctionType:
+    head = "\tdef __init__(self, "
+    body = ""
 
-    for field in fields:
+    for field in (field_map := _build_field_map(klass)).values():
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
 
@@ -227,24 +228,14 @@ def _generate_init_code(fields: Sequence[Field]) -> str:
         if field.pos_only and field.init:
             head = head.replace("/,", "") + "/, "
 
-    body += "\t\tpass"  # add pass if all fields `init=False`
-    body = "\tdef __init__(self, " + head[:-2] + "):\n" + body
-    body = f"def closure(field_map):\n{body}\n\treturn __init__"
-    return body.expandtabs(4)
+    body += "\t\tpass"
+    head += "):"
 
+    code = "def closure(field_map):"
+    code += f"\n{head}\n{body}"
+    code += f"\n\t__init__.__qualname__ = '{klass.__qualname__}'"
+    code += "\n\treturn __init__"
+    code = code.expandtabs(4)
 
-def _generate_init_method(klass: type) -> FunctionType:
-    # get the field map for the class  MappingProxyType[str, Field]
-    field_map = _build_field_map(klass)
-    # genrate init code string
-    init_code = _generate_init_code(tuple(field_map.values()))
-    # execute the code in a new namespace using the class module namespace
-    global_namespace = vars(sys.modules[klass.__module__])
-    local_namespace = dict()
-    exec(init_code, global_namespace, local_namespace)  # type: ignore
-    # call the closure to get the init method with the field map as closure
-    # to avoid hardcoding the field map in the generated code
-    method = local_namespace["closure"](field_map)
-    # set the qualname to the class name
-    setattr(method, "__qualname__", f"{klass.__qualname__}.__init__")
-    return method
+    exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
+    return namespace["closure"](field_map)

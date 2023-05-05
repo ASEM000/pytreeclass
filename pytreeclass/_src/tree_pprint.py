@@ -16,7 +16,13 @@ from jax.util import unzip2
 from jaxlib.xla_extension import PjitFunction
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import Node, construct_tree
+from pytreeclass._src.tree_util import (
+    IsLeafType,
+    Node,
+    construct_tree,
+    tree_leaves_with_trace,
+    tree_map_with_trace,
+)
 
 PyTree = Any
 PrintKind = Literal["repr", "str"]
@@ -396,7 +402,7 @@ def tree_indent(
     tree: Any,
     *,
     depth: int | float = float("inf"),
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
     tabwidth: int | None = 4,
 ):
     """Returns a string representation of the tree with indentation.
@@ -458,7 +464,7 @@ def tree_diagram(
     tree: Any,
     *,
     depth: int | float = float("inf"),
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
     tabwidth: int = 4,
 ):
     """Pretty print arbitrary PyTrees tree with tree structure diagram.
@@ -545,19 +551,10 @@ def tree_diagram(
 def tree_mermaid(
     tree: PyTree,
     depth: int | float = float("inf"),
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
     tabwidth: int | None = 4,
 ) -> str:
-    # def _generate_mermaid_link(mermaid_string: str) -> str:
-    #     """generate a one-time link mermaid diagram"""
-    #     url_val = "https://pytreeclass.herokuapp.com/generateTemp"
-    #     request = requests.post(url_val, json={"description": mermaid_string})
-    #     generated_id = request.json()["id"]
-    #     generated_html = f"https://pytreeclass.herokuapp.com/temp/?id={generated_id}"
-    #     return f"Open URL in browser: {generated_html}"
-
     """generate a mermaid diagram syntax for arbitrary PyTrees.
-
 
     Args:
         tree: PyTree
@@ -781,13 +778,13 @@ def tree_summary(
     tree: PyTree,
     *,
     depth: int | float = float("inf"),
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
 ) -> str:
     """Print a summary of an arbitrary PyTree.
 
     Args:
-        tree: pytree to summarize (ex. list, tuple, dict, dataclass, jax.numpy.ndarray)
-        depth: max depth to traverse the tree. defaults to maximum depth = float("inf")
+        tree: a jax registered pytree to summarize.
+        depth: max depth to traverse the tree. defaults to maximum depth.
         is_leaf: function to determine if a node is a leaf. defaults to None
 
     Returns:
@@ -822,7 +819,7 @@ def tree_summary(
     # use `unzip2` from `jax.util` to avoid [] leaves
     # based on this issue:
     traces, leaves = unzip2(
-        pytc.tree_leaves_with_trace(
+        tree_leaves_with_trace(
             tree,
             is_leaf=is_leaf,
             is_trace_leaf=_is_trace_leaf_depth_factory(depth),
@@ -853,7 +850,7 @@ def tree_summary(
 
 def tree_repr_with_trace(
     tree: PyTree,
-    is_leaf: Callable[[Any], bool] | None = None,
+    is_leaf: IsLeafType = None,
     transpose: bool = False,
 ) -> PyTree:
     """
@@ -926,4 +923,4 @@ def tree_repr_with_trace(
         # make a pretty table for each leaf
         return _table(ROWS, transpose=transpose)
 
-    return pytc.tree_map_with_trace(leaf_trace_summary, tree, is_leaf=is_leaf)
+    return tree_map_with_trace(leaf_trace_summary, tree, is_leaf=is_leaf)

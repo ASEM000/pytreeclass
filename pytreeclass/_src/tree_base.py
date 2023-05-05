@@ -14,7 +14,7 @@ from typing_extensions import dataclass_transform
 from pytreeclass._src.code_build import (
     Field,
     _build_field_map,
-    _generate_init_method,
+    _build_init_method,
     field,
 )
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
@@ -319,15 +319,18 @@ class TreeClassMeta(abc.ABCMeta):
         self = getattr(klass, "__new__")(klass, *a, **k)
 
         with _mutable_context(self):
+            # initialize the instance under the mutable context
+            # to allow setting instance attributes without
+            # throwing an `AttributeError`
             getattr(klass, "__init__")(self, *a, **k)
 
             if post_init_func := getattr(klass, "__post_init__", None):
-                # to simplify the logic, we call the post init method
-                # even if the init method is not code-generated.
+                # to simplify the logic, `__post_init__` is called
+                # if it exists, regardless the `__init__` method
+                # is code-generated or not.
                 post_init_func(self)
 
         if len(keys := set(_build_field_map(klass)) - set(vars(self))):
-            # handle non-initialized fields
             raise AttributeError(f"Found uninitialized fields {keys}.")
         return self
 
@@ -402,11 +405,13 @@ class TreeClass(metaclass=TreeClassMeta):
 
     """
 
-    def __init_subclass__(klass: type[T], *a, leafwise: bool = False, **k) -> None:
-        super().__init_subclass__(*a, **k)
-
+    def __init_subclass__(
+        klass: type[T],
+        *a,
+        leafwise: bool = False,
+        **k,
+    ) -> None:
         if "__setattr__" in vars(klass) or "__delattr__" in vars(klass):
-            # conflicting methods with the immutable functionality
             raise TypeError(
                 f"Unable to transform the class `{klass.__name__}` "
                 "with resereved methods: `__setattr__` or `__delattr__` "
@@ -414,9 +419,11 @@ class TreeClass(metaclass=TreeClassMeta):
                 "the immutable functionality and cannot be overriden."
             )
 
+        super().__init_subclass__(*a, **k)
+
         if "__init__" not in vars(klass):
             # generate the init method if not defined similar to `dataclass`
-            setattr(klass, "__init__", _generate_init_method(klass))
+            setattr(klass, "__init__", _build_init_method(klass))
 
         if leafwise:
             # transform the class to support leafwise operations
