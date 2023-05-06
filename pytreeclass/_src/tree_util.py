@@ -287,7 +287,7 @@ class Partial:
         return self.func(*args, *iargs, **{**self.kwargs, **kwargs})
 
     def __repr__(self) -> str:
-        return f"Partial({self.func.__name__}, {self.args}, {self.kwargs})"
+        return f"Partial({self.func}, {self.args}, {self.kwargs})"
 
     def __hash__(self) -> int:
         return tree_hash(self)
