@@ -20,6 +20,7 @@ Public API
     is_frozen
     unfreeze
     bcmap
+    Partial
     AtIndexer
     tree_map_with_trace
     tree_leaves_with_trace
@@ -32,6 +33,7 @@ core API
 .. currentmodule:: pytreeclass 
 
 .. autoclass:: TreeClass 
+    :members: at
 .. autofunction:: is_tree_equal 
 .. autofunction:: field
 .. autofunction:: fields
@@ -65,7 +67,13 @@ Advanced API
 .. currentmodule:: pytreeclass
 
 .. autofunction:: bcmap
+.. autoclass:: Partial
 .. autoclass:: AtIndexer
+    :members:
+        get,
+        set,
+        apply,
+        __call__,
 .. autofunction:: tree_map_with_trace
 .. autofunction:: tree_leaves_with_trace
 .. autofunction:: tree_flatten_with_trace

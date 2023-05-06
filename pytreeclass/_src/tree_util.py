@@ -15,7 +15,6 @@ from jax._src.tree_util import _registry, _registry_with_keypaths
 from jax.util import unzip2
 
 T = TypeVar("T")
-_non_partial = object()
 PyTree = Any
 EllipsisType = type(Ellipsis)
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
@@ -233,15 +232,6 @@ def tree_copy(tree: T) -> T:
     return jtu.tree_unflatten(treedef, leaves)
 
 
-class BroadcastablePartial(ft.partial):
-    def __call__(self, *args, **keywords) -> Callable:
-        # https://stackoverflow.com/a/7811270
-        keywords = {**self.keywords, **keywords}
-        iargs = iter(args)
-        args = (next(iargs) if arg is _non_partial else arg for arg in self.args)  # type: ignore
-        return self.func(*args, *iargs, **keywords)
-
-
 def bcmap(
     func: Callable[..., Any],
     *,
@@ -300,14 +290,14 @@ def bcmap(
             # positional arguments are passed the argument to be compare
             # the tree structure with is the first argument
             leaves0, treedef0 = jtu.tree_flatten(args[0], is_leaf=is_leaf)
-            masked_args = [_non_partial]
+            masked_args = [...]
             masked_kwargs = {}
             leaves = [leaves0]
             leaves_keys = []
 
             for arg in args[1:]:
                 if treedef0 == jtu.tree_structure(arg):
-                    masked_args += [_non_partial]
+                    masked_args += [...]
                     leaves += [treedef0.flatten_up_to(arg)]
                 else:
                     masked_args += [arg]
@@ -317,19 +307,22 @@ def bcmap(
             key0 = next(iter(kwargs))
             leaves0, treedef0 = jtu.tree_flatten(kwargs.pop(key0), is_leaf=is_leaf)
             masked_args = []
-            masked_kwargs = {key0: _non_partial}
+            masked_kwargs = {key0: ...}
             leaves = [leaves0]
             leaves_keys = [key0]
 
         for key in kwargs:
             if treedef0 == jtu.tree_structure(kwargs[key]):
-                masked_kwargs[key] = _non_partial
+                masked_kwargs[key] = ...
                 leaves += [treedef0.flatten_up_to(kwargs[key])]
                 leaves_keys += [key]
             else:
                 masked_kwargs[key] = kwargs[key]
 
-        bfunc = BroadcastablePartial(func, *masked_args, **masked_kwargs)
+        # avoid circular import by importing Partial here
+        from pytreeclass import Partial
+
+        bfunc = Partial(func, *masked_args, **masked_kwargs)
 
         if len(leaves_keys) == 0:
             # no kwargs leaves are present, so we can immediately zip

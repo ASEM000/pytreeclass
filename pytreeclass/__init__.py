@@ -1,5 +1,5 @@
 from pytreeclass._src.code_build import field, fields
-from pytreeclass._src.tree_base import AtIndexer, TreeClass
+from pytreeclass._src.tree_base import AtIndexer, Partial, TreeClass
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_indent,
@@ -46,6 +46,7 @@ __all__ = (
     "tree_leaves_with_trace",
     "tree_flatten_with_trace",
     "tree_repr_with_trace",
+    "Partial",
 )
 
 __version__ = "0.3.4"

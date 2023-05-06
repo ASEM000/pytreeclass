@@ -15,7 +15,6 @@ from jax import custom_jvp
 from jax.util import unzip2
 from jaxlib.xla_extension import PjitFunction
 
-import pytreeclass as pytc
 from pytreeclass._src.tree_util import (
     IsLeafType,
     Node,
@@ -40,6 +39,9 @@ def _node_pprint(
     if depth < 0:
         return "..."
 
+    # avoid circular import by importing Partial here
+    from pytreeclass import TreeClass
+
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
 
     if isinstance(node, ft.partial):
@@ -62,7 +64,7 @@ def _node_pprint(
         text = _dict_pprint(node, **spec)
     elif dc.is_dataclass(node):
         text = _dataclass_pprint(node, **spec)
-    elif isinstance(node, pytc.TreeClass):
+    elif isinstance(node, TreeClass):
         text = _treeclass_pprint(node, **spec)
     elif isinstance(node, (np.ndarray, jax.Array)) and kind == "repr":
         text = _numpy_pprint(node, **spec)
@@ -297,7 +299,10 @@ def _treeclass_pprint(
     if depth == 0:
         return f"{name}(...)"
 
-    skip = [f.name for f in pytc.fields(node) if not f.repr]
+    # avoid circular import by importing Partial here
+    from pytreeclass import fields
+
+    skip = [f.name for f in fields(node) if not f.repr]
     kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
     spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
     text = (f"{k}={_node_pprint(v,**spec)}" for k, v in kvs)
