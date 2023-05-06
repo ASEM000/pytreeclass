@@ -672,7 +672,7 @@ def tree_leaves_with_trace(
     tree: PyTree,
     *,
     is_leaf: IsLeafType = None,
-    is_trace_leaf: Callable[[TraceEntry], bool] | None = None,
+    is_trace_leaf: Callable[[TraceType], bool] | None = None,
 ) -> Sequence[tuple[TraceType, Any]]:
     r"""Similar to jax.tree_util.tree_leaves` but returns  object, leaf pairs.
 
@@ -765,21 +765,25 @@ def tree_map_with_trace(
 class Node:
     __slots__ = ("data", "parent", "children", "__weakref__")
 
-    def __init__(self, data: tuple[Hashable, type, Any]):
+    def __init__(
+        self,
+        data: tuple[TraceEntry, Any],
+        parent: Node | None = None,
+    ):
         self.data = data
-        self.parent = None
-        self.children = {}
+        self.parent = parent
+        self.children: dict[TraceEntry, Node] = {}
 
     def add_child(self, child: Node) -> None:
         # add child node to this node and set
         # this node as the parent of the child
         if not isinstance(child, Node):
             raise TypeError(f"`child` must be a `Node`, got {type(child)}")
-        key, _, __ = child.data
-        if key not in self.children:
+        ti, __ = child.data
+        if ti not in self.children:
             # establish parent-child relationship
             child.parent = self
-            self.children[key] = child
+            self.children[ti] = child
 
     def __iter__(self) -> Iterator[Node]:
         # iterate over children nodes
@@ -787,6 +791,9 @@ class Node:
 
     def __repr__(self) -> str:
         return f"Node(data={self.data})"
+
+    def __contains__(self, key: TraceEntry) -> bool:
+        return key in self.children
 
 
 # disallow traversal to avoid infinite recursion
@@ -812,20 +819,21 @@ def construct_tree(
         is_trace_leaf=is_trace_leaf,
     )
 
-    value = tree if len(traces_leaves) == 1 else None
-    root = Node(data=(None, tree.__class__, value))
+    ti = (None, type(tree))
+    vi = tree if len(traces_leaves) == 1 else None
+    root = Node(data=(ti, vi))
 
     for trace, leaf in traces_leaves:
         keys, types = trace
         cur = root
-        for i, (key, type) in enumerate(zip(keys, types)):
-            if key in cur.children:
+        for i, ti in enumerate(zip(keys, types)):
+            if ti in cur:
                 # common parent node
-                cur = cur.children[key]
+                cur = cur.children[ti]
             else:
                 # new path
-                value = leaf if i == len(keys) - 1 else None
-                child = Node(data=(key, type, value))
+                vi = leaf if i == len(keys) - 1 else None
+                child = Node(data=(ti, vi))
                 cur.add_child(child)
                 cur = child
     return root

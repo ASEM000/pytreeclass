@@ -442,12 +442,12 @@ def tree_indent(
         if (len(node.children)) == 0:
             ppspec = dict(indent=0, kind="repr", width=80, depth=0)
             text = f"{indent}"
-            key, _, value = node.data
+            (key, _), value = node.data
             text += f"{key}=" if key is not None else ""
             text += _node_pprint(value, **ppspec)
             return text + "\n"
 
-        key, type, _ = node.data
+        (key, type), _ = node.data
         text = f"{indent}"
         text += f"{key}:" if key is not None else ""
         text += f"{type.__name__}\n"
@@ -523,13 +523,13 @@ def tree_diagram(
 
         if (child_count := len(node.children)) == 0:
             ppspec = dict(indent=0, kind="repr", width=80, depth=0)
-            key, _, value = node.data
+            (key, _), value = node.data
             text = f"{indent}"
             text += f"{branch}{key}=" if key is not None else ""
             text += _node_pprint(value, **ppspec)
             return text + "\n"
 
-        key, type, _ = node.data
+        (key, type), _ = node.data
 
         text = f"{indent}{branch}"
         text += f"{key}:" if key is not None else ""
