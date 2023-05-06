@@ -232,6 +232,77 @@ def tree_copy(tree: T) -> T:
     return jtu.tree_unflatten(treedef, leaves)
 
 
+class Partial:
+    """
+    jaxable Partial function with support for positional partial application.
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> def f(a, b, c):
+        ...     print(f"a: {a}, b: {b}, c: {c}")
+        ...     return a + b + c
+
+        >>> # positional arguments using `...` placeholder
+        >>> f_a = pytc.Partial(f, ..., 2, 3)
+        >>> f_a(1)
+        a: 1, b: 2, c: 3
+        6
+
+        >>> # keyword arguments
+        >>> f_b = pytc.Partial(f, b=2, c=3)
+        >>> f_a(1)
+        a: 1, b: 2, c: 3
+        6
+
+    Note:
+        - The `...` is used to indicate a placeholder for positional arguments.
+        - See: https://stackoverflow.com/a/7811270
+        - `Partial` is used internally by `bcmap` which maps a function over pytrees
+            leaves with automatic broadcasting for scalar arguments.
+    """
+
+    __slots__ = ("func", "args", "kwargs", "__weakref__")  # type: ignore
+
+    def __init__(
+        self,
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ):
+        """Initialize a `Partial` function.
+
+        Args:
+            func: The function to be partially applied.
+            args: Positional arguments to be partially applied. use `...` as a
+                placeholder for positional arguments.
+            kwargs: Keyword arguments to be partially applied.
+        """
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        iargs = iter(args)
+        args = (next(iargs) if arg is ... else arg for arg in self.args)  # type: ignore
+        return self.func(*args, *iargs, **{**self.kwargs, **kwargs})
+
+    def __repr__(self) -> str:
+        return f"Partial({self.func.__name__}, {self.args}, {self.kwargs})"
+
+    def __hash__(self) -> int:
+        return tree_hash(self)
+
+    def __eq__(self, other: Any) -> bool:
+        return is_tree_equal(self, other)
+
+
+jtu.register_pytree_node(
+    nodetype=Partial,
+    flatten_func=lambda x: ((x.func, x.args, x.kwargs), None),
+    unflatten_func=lambda _, xs: Partial(*xs),
+)
+
+
 def bcmap(
     func: Callable[..., Any],
     *,

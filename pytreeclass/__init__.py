@@ -1,5 +1,5 @@
 from pytreeclass._src.code_build import field, fields
-from pytreeclass._src.tree_base import AtIndexer, Partial, TreeClass
+from pytreeclass._src.tree_base import AtIndexer, TreeClass
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_indent,
@@ -10,6 +10,7 @@ from pytreeclass._src.tree_pprint import (
     tree_summary,
 )
 from pytreeclass._src.tree_util import (
+    Partial,
     bcmap,
     freeze,
     is_frozen,
