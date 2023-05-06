@@ -324,12 +324,6 @@ class TreeClassMeta(abc.ABCMeta):
             # throwing an `AttributeError`
             getattr(klass, "__init__")(self, *a, **k)
 
-            if post_init_func := getattr(klass, "__post_init__", None):
-                # to simplify the logic, `__post_init__` is called
-                # if it exists, regardless the `__init__` method
-                # is code-generated or not.
-                post_init_func(self)
-
         if len(keys := set(_build_field_map(klass)) - set(vars(self))):
             raise AttributeError(f"Found uninitialized fields {keys}.")
         return self

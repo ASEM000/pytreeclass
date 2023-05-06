@@ -211,41 +211,38 @@ def fields(x: Any) -> Sequence[Field]:
 def _build_init_method(klass: type) -> FunctionType:
     # generate a code object for the __init__ method and compile it
     # for the given class and return the function object
-    head = "\tdef __init__(self, "
-    body = ""
+    head, body = ["self"], []
 
     for field in (field_map := _build_field_map(klass)).values():
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
 
         if field.kw_only and "*" not in head and field.init:
-            head += "*, "
+            head += ["*"]
 
         if field.default is not _NOT_SET:
             vref = f"field_map['{name}'].default"
-            head += f"{alias}={vref}, " if field.init else ""
-            body += f"\t\tself.{name}="
-            body += f"{alias}\n " if field.init else f"{vref}\n"
+            head += [f"{alias}={vref}"] if field.init else []
+            body += [f"self.{name}=" + (f"{alias}" if field.init else f"{vref}")]
         elif field.factory is not None:
             vref = f"field_map['{name}'].factory()"
-            head += f"{alias}={vref}, " if field.init else ""
-            body += f"\t\tself.{name}="
-            body += f"{alias}\n" if field.init else f"{vref}\n"
+            head += [f"{alias}={vref}"] if field.init else []
+            body += [f"self.{name}=" + (f"{alias}" if field.init else f"{vref}")]
         else:
-            head += f"{alias}, " if field.init else ""
-            body += f"\t\tself.{name}={alias}\n " if field.init else ""
+            head += [f"{alias}"] if field.init else []
+            body += [f"self.{name}={alias}"] if field.init else []
 
         if field.pos_only and field.init:
-            head = head.replace("/,", "") + "/, "
+            if "/" in head:
+                head.remove("/")
+            head += ["/"]
 
-    body += "\t\tpass"
-    head += "):"
-
-    code = "def closure(field_map):"
-    code += f"\n{head}\n{body}"
-    code += f"\n\t__init__.__qualname__ = '{klass.__qualname__}'"
+    body += ["getattr(type(self), '__post_init__', lambda _: None)(self)"]
+    code = "def closure(field_map):\n"
+    code += f"\tdef __init__({','.join(head)}):"
+    code += f"\n\t\t{';'.join(body)}"
+    code += f"\n\t__init__.__qualname__ = '{klass.__qualname__}.__init__'"
     code += "\n\treturn __init__"
-    code = code.expandtabs(4)
 
     exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
     return namespace["closure"](field_map)
