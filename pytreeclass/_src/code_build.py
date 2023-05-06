@@ -193,14 +193,24 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
     return MappingProxyType(field_map)
 
 
-def fields(value: Any) -> Sequence[Field]:
-    """Returns a tuple of `Field` objects for the given instance or class."""
-    if isinstance(value, type):
-        return tuple(_build_field_map(value).values())
-    return tuple(_build_field_map(type(value)).values())
+def fields(x: Any) -> Sequence[Field]:
+    """Returns a tuple of `Field` objects for the given instance or class.
+
+    `Field` objects are generated from the class type hints and contains
+    the information about the field `name`, `type`, `default` value, and other
+    information (`factory`, `init`, `repr`, `kw_only`, `pos_only`, `metadata`,
+    `callbacks`, `alias`) if the user uses the `pytreeclass.field`to annotate.
+
+    Note:
+        - If the class is not annotated, an empty tuple is returned.
+        - The `Field` generation is cached for class and its bases.
+    """
+    return tuple(_build_field_map(x if isinstance(x, type) else type(x)).values())
 
 
 def _build_init_method(klass: type) -> FunctionType:
+    # generate a code object for the __init__ method and compile it
+    # for the given class and return the function object
     head = "\tdef __init__(self, "
     body = ""
 

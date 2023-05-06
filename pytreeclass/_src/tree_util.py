@@ -145,7 +145,7 @@ def freeze(wrapped: Any) -> _FrozenWrapper:
         ...     @jax.value_and_grad
         ...     def __call__(self, x):
         ...         # unfreeze `a` to update it
-        ...         self = jax.tree_util.tree_map(pytc.unfreeze, self, is_leaf=pytc.is_frozen)
+        ...         self = jax.tree_map(pytc.unfreeze, self, is_leaf=pytc.is_frozen)
         ...         return x ** self.a
 
         >>> # without `freeze` wrapping `a`, `a` will be updated
@@ -174,17 +174,17 @@ def freeze(wrapped: Any) -> _FrozenWrapper:
 def unfreeze(x: Any) -> Any:
     """Unfreeze `frozen` value, otherwise return the value itself.
 
-    - use `is_leaf=pytc.is_frozen` with `jax.tree_util.tree_map` to unfreeze a tree.**
+    - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
 
     Example:
         >>> import pytreeclass as pytc
-        >>> import jax.tree_util as jtu
+        >>> import jax
         >>> frozen_value = pytc.freeze(1)
         >>> pytc.unfreeze(frozen_value)
         1
         >>> # usage with `jax.tree_map`
-        >>> frozen_tree = jtu.tree_map(pytc.freeze, {"a": 1, "b": 2})
-        >>> unfrozen_tree = jtu.tree_map(pytc.unfreeze, frozen_tree, is_leaf=pytc.is_frozen)
+        >>> frozen_tree = jax.tree_map(pytc.freeze, {"a": 1, "b": 2})
+        >>> unfrozen_tree = jax.tree_map(pytc.unfreeze, frozen_tree, is_leaf=pytc.is_frozen)
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
@@ -197,7 +197,10 @@ def is_frozen(wrapped: Any) -> bool:
 
 
 def is_nondiff(x: Any) -> bool:
-    """Returns False if the node is a float, complex number, or a numpy array of floats or complex numbers.
+    """
+    Returns True if the node is a non-differentiable node, and False for if the
+    node is of type float, complex number, or a numpy array of floats or
+    complex numbers.
 
     Example:
         >>> import pytreeclass as pytc
@@ -212,9 +215,10 @@ def is_nondiff(x: Any) -> bool:
         False
 
     Note:
-        This function is meant to be used with `jax.tree_util.tree_map` to create a mask
-        for non-differentiable nodes in a tree, that can be used to freeze the non-differentiable nodes
-        in a tree.
+        This function is meant to be used with `jax.tree_map` to
+        create a mask for non-differentiable nodes in a tree, that can be used
+        to freeze the non-differentiable nodes before passing the tree to a
+        `jax` transformation.
     """
     if hasattr(x, "dtype") and np.issubdtype(x.dtype, np.inexact):
         return False
@@ -243,11 +247,13 @@ def bcmap(
     *,
     is_leaf: IsLeafType = None,
 ) -> Callable:
-    """(map)s a function over pytrees leaves with automatic (b)road(c)asting for scalar arguments
+    """
+    (map)s a function over pytrees leaves with automatic (b)road(c)asting
+    for scalar arguments
 
     Args:
         func: the function to be mapped over the pytree
-        is_leaf: a function that returns True if the argument is a leaf of the pytree
+        is_leaf: a predicate function that returns True if the node is a leaf
 
     Example:
         >>> import jax
@@ -439,7 +445,7 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
         method `__eq__` is used.
 
     Note:
-        Under `jit` the return type is boolean `jax.Array` instead of python `bool`.
+        Under `jit` the return type is boolean `jax.Array` instead of `bool`.
     """
 
     tree0, *rest = trees
@@ -476,9 +482,9 @@ def _generate_path_mask(
 
     def _unpack_entry(entry) -> tuple[Any, ...]:
         # define rule for indexing matching through `at` property
-        # for example `jax` internals uses `jtu.GetAttrKey` to index an attribute, however
-        # its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]` to index an attribute
-        # instead `tree.at['attr']` is more ergonomic
+        # in `jax` internals uses `jtu.GetAttrKey` to index an attribute,
+        # however its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]`
+        # to index an attribute instead `tree.at['attr']` is more ergonomic
         if isinstance(entry, jtu.GetAttrKey):
             return (entry.name,)
         if isinstance(entry, jtu.SequenceKey):
@@ -564,8 +570,9 @@ def flatten_one_trace_level(
     # similar to jax corresponding key path API but adds `is_trace_leaf`
     # predicate and type path
     if (is_leaf and is_leaf(tree)) or (is_trace_leaf and is_trace_leaf(trace)):
-        # is_leaf is a predicate function that determines whether a value is a leaf
-        # is_trace_leaf is a predicate function that determines whether a trace is a leaf
+        # is_leaf is a predicate function that determines whether a value
+        # is a leaf is_trace_leaf is a predicate function that determines
+        # whether a trace is a leaf
         yield trace, tree
         return
 
@@ -733,7 +740,7 @@ def construct_tree(
     is_trace_leaf: IsLeafType = None,
 ) -> Node:
     # construct a tree with `Node` objects using `tree_leaves_with_trace`
-    # to establish parent-child relationship between nodes and return the root node
+    # to establish parent-child relationship between nodes
 
     traces_leaves = tree_leaves_with_trace(
         tree,
