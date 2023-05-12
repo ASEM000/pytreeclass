@@ -885,5 +885,6 @@ flax_tree.at["a"].set(10)
 ## 📙 Acknowledgements<a id="acknowledgements"></a>
 
 - [Farid Talibli (for visualization link generation backend)](https://www.linkedin.com/in/frdt98)
+- [Lenses](https://hackage.haskell.org/package/lens)
 - [Treex](https://github.com/cgarciae/treex), [Equinox](https://github.com/patrick-kidger/equinox), [tree-math](https://github.com/google/tree-math), [Flax](https://github.com/google/flax), [TensorFlow](https://www.tensorflow.org), [PyTorch](https://pytorch.org)
 - [Lovely JAX](https://github.com/xl0/lovely-jax)
