@@ -516,35 +516,46 @@ print(counter.calls) # 10
 
 ## ➕ More<a id="more"></a>
 
-<details> <summary>Validate or convert inputs using callbacks</summary>
+<details> <summary>Validate or convert inputs using type hints</summary>
 
-`PyTreeClass` includes `callbacks` in the `field` to apply a sequence of functions on input at setting the attribute stage. The callback is quite useful in several cases, for instance, to ensure a certain input type within a valid range. See example:
+`PyTreeClass` executes functions defined inside `typing.Annotated` on field values before assigning it to the instance.
+The functionality can be quite useful in several cases, for instance, to ensure a certain input type within a valid range. See example:
 
 ```python
 import jax
 import pytreeclass as pytc
+# python 3.9+
+from typing import Annotated
 
-def positive_int_callback(value):
-    if not isinstance(value, int):
-        raise TypeError("Value must be an integer")
-    if value <= 0:
-        raise ValueError("Value must be positive")
-    return value
+class PositiveInt:
+    def __call__(self,value):
+        if not isinstance(value, int):
+            raise TypeError("Value must be an integer")
+        if value <= 0:
+            raise ValueError("Value must be positive")
+        return value
 
 
 class Tree(pytc.TreeClass):
-    in_features:int = pytc.field(callbacks=[positive_int_callback])
+    in_features:Annotated[int, PositiveInt()]
+    # in_features:int = pytc.field(callbacks=[positive_int_callback])
 
 
 tree = Tree(1)
 # no error
 
-tree = Tree(0)
-# ValueError: Error for field=`in_features`:
+try:
+    tree = Tree(0)
+except ValueError as e:
+    print(e)
+# Error for field=`in_features`:
 # Value must be positive
 
-tree = Tree(1.0)
-# TypeError: Error for field=`in_features`:
+try:
+    tree = Tree(1.0)
+except TypeError as e:
+    print(e)
+# Error for field=`in_features`:
 # Value must be an integer
 ```
 
