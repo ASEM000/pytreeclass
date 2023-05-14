@@ -20,10 +20,13 @@ from collections.abc import Callable, MutableMapping, MutableSequence
 from types import FunctionType, MappingProxyType
 from typing import Any, NamedTuple, Sequence
 
+from typing_extensions import Annotated
+
 """Constructor code generation from type annotations."""
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
+AnnotatedType = type(Annotated[int, 1])
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "NOT_SET"})()
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 # https://github.com/google/jax/issues/14295
@@ -52,7 +55,6 @@ def field(
     kw_only: bool = False,
     pos_only: bool = False,
     metadata: dict[str, Any] | None = None,  # type: ignore
-    callbacks: Sequence[Any] = (),
     alias: str | None = None,
 ) -> Field:
     """
@@ -67,27 +69,36 @@ def field(
         pos_only: Whether the field is positional-only. Mutually exclusive
             with `kw_only`, effectively placing `*` in the constructor.
         metadata: A mapping of user-defined data for the field.
-        callbacks: A sequence of functions to called on `setattr` during
-            initialization to modify the field value.
         alias: An a alias for the field name in the constructor.
+
+    Note:
+        Use functions in `typing.Annotated` metadata to allow for functions
+        to be called on the field value before it is assigned. check the
+        PEP 593, and the example below for more details.
 
     Example:
         >>> import pytreeclass as pytc
-        >>> def instance_cb_factory(klass):
-        ...    def wrapper(x):
-        ...        assert isinstance(x, klass)
-        ...        return x
-        ...    return wrapper
+        >>> from typing_extensions import Annotated # if python < 3.9
 
-        >>> def positive_check_callback(x):
-        ...    assert x > 0
-        ...    return x
+        >>> class IsInstance:
+        ...    def __init__(self, type_):
+        ...        self.type_ = type_
+        ...    def __call__(self, x):
+        ...        assert isinstance(x, self.type_)
+        ...        return x
+
+        >>> class GreaterThan:
+        ...    def __init__(self, value):
+        ...        self.value = value
+        ...    def __call__(self, x):
+        ...        assert x > self.value
+        ...        return x
 
         >>> class Employee(pytc.TreeClass):
         ...    # assert employee `name` is str
-        ...    name: str = pytc.field(callbacks=[instance_cb_factory(str)])
+        ...    name: Annotated[str, IsInstance(str)]
         ...    # use callback compostion to assert employee `age` is int and positive
-        ...    age: int = pytc.field(callbacks=[instance_cb_factory(int), positive_check_callback])
+        ...    age: Annotated[int, IsInstance(int), GreaterThan(0)]
         ...    # use `id` in the constructor for `_id` attribute
         ...    # this is useful for private attributes that are not supposed
         ...    # to be accessed directly and hide it from the repr
@@ -130,21 +141,6 @@ def field(
             f"got type=`{type(metadata).__name__}` instead."
         )
 
-    if not isinstance(callbacks, Sequence):
-        raise TypeError(
-            f"`callbacks` must be a Sequence of one-argument function(s) "
-            "operating on the field value, and returning a modified value, "
-            f"got type `{type(callbacks).__name__}` instead."
-        )
-
-    for index, callback in enumerate(callbacks):
-        if not isinstance(callback, Callable):  # type: ignore
-            raise TypeError(
-                f"`callback` must be a one-argument function "
-                "operating on the field value, and returning a modified value, "
-                f"got type `{type(callback).__name__}` at {index=} instead."
-            )
-
     return Field(
         name=None,
         type=None,
@@ -155,7 +151,6 @@ def field(
         kw_only=kw_only,
         pos_only=pos_only,
         metadata=metadata,  # type: ignore
-        callbacks=callbacks,
         alias=alias,
     )
 
@@ -176,7 +171,7 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
 
     for name in (annotation_map := vars(klass)["__annotations__"]):
         value = vars(klass).get(name, _NOT_SET)
-        type = annotation_map[name]
+        hint = annotation_map[name]
 
         if name == "self":
             # while `dataclasses` allows `self` as a field name, its confusing
@@ -192,7 +187,7 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
                     f" use `field(... ,factory=lambda:{value.default})` instead"
                 )
             # case: `x: Any = field(default=1)`
-            field_map[name] = value._replace(name=name, type=type)
+            field_map[name] = value._replace(name=name, type=hint)
         else:
             if isinstance(value, _MUTABLE_TYPES):
                 # https://github.com/ericvsmith/dataclasses/issues/3
@@ -203,7 +198,14 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
                     f" use `field(... ,factory=lambda:{value})` instead"
                 )
             # case: `x: int = 1` or `x: Any`
-            field_map[name] = Field(name=name, type=type, default=value)
+            field_map[name] = Field(name=name, type=hint, default=value)
+
+        if isinstance(hint, AnnotatedType):
+            # case: 'x: Annotated[int, Range(0, 10)]'
+            # follows PEP 593 https://peps.python.org/pep-0593/
+            if callbacks := tuple(x for x in hint.__metadata__ if callable(x)):
+                field_map[name] = field_map[name]._replace(callbacks=callbacks)
+
     return MappingProxyType(field_map)
 
 
