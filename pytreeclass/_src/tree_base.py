@@ -69,7 +69,7 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
     def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
         # unflatten rule to use with `jax.tree_unflatten`
-        tree = getattr(object, "__new__")(klass)
+        tree = object.__new__(klass)
         vars(tree).update(zip(keys, leaves))
         return tree
 
@@ -329,13 +329,13 @@ class AtIndexer(NamedTuple):
 
 class TreeClassMeta(abc.ABCMeta):
     def __call__(klass: type[T], *a, **k) -> T:
-        self = getattr(klass, "__new__")(klass, *a, **k)
+        self = klass.__new__(klass, *a, **k)
 
         with _mutable_context(self):
             # initialize the instance under the mutable context
             # to allow setting instance attributes without
             # throwing an `AttributeError`
-            getattr(klass, "__init__")(self, *a, **k)
+            klass.__init__(self, *a, **k)
 
         if keys := set(_build_field_map(klass)) - set(vars(self)):
             raise AttributeError(f"Found uninitialized fields {keys}.")
@@ -459,7 +459,7 @@ class TreeClass(metaclass=TreeClassMeta):
                 except Exception as e:
                     raise type(e)(f"Error for field=`{key}`:\n{e}")
 
-        getattr(object, "__setattr__")(self, key, value)
+        object.__setattr__(self, key, value)
 
     def __delattr__(self, key: str) -> None:
         if id(self) not in _mutable_instance_registry:
@@ -469,7 +469,7 @@ class TreeClass(metaclass=TreeClassMeta):
                 f"Use `.at['{key}'].set(None)` instead."
             )
 
-        getattr(object, "__delattr__")(self, key)
+        object.__delattr__(self, key)
 
     @property
     def at(self) -> AtIndexer:

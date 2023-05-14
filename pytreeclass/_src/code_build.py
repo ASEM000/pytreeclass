@@ -205,7 +205,7 @@ def fields(x: Any) -> Sequence[Field]:
     `Field` objects are generated from the class type hints and contains
     the information about the field `name`, `type`, `default` value, and other
     information (`factory`, `init`, `repr`, `kw_only`, `pos_only`, `metadata`,
-    `callbacks`, `alias`) if the user uses the `pytreeclass.field`to annotate.
+    `alias`) if the user uses the `pytreeclass.field`to annotate.
 
     Note:
         - If the class is not annotated, an empty tuple is returned.
@@ -256,20 +256,19 @@ def _build_init_method(klass: type) -> FunctionType:
 
     body += ["getattr(type(self), '__post_init__', lambda _: None)(self)"]
     code = "def closure(field_map):\n"
-    code += f"\tdef init({','.join(head)}):"
+    code += f"\tdef init({', '.join(head)}):"
     code += f"\n\t\t{';'.join(body)}"
     code += "\n\treturn init"
 
     exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
     init = namespace["closure"](field_map)
-    setattr(init, "__qualname__", f"{klass.__qualname__}.__init__")
-    setattr(init, "__annotations__", {k: v.type for k, v in field_map.items()})
+    init.__qualname__ = f"{klass.__qualname__}.__init__"
+    init.__annotations__ = {k: v.type for k, v in field_map.items()}
     return init
 
 
-def _process_init_method(klass: T) -> T:
+def _process_init_method(klass: type[T]) -> type[T]:
     init = vars(klass).get("__init__", _build_init_method(klass))
-    annotations = _resolve_annotations(init.__annotations__, init.__globals__)
-    setattr(init, "__annotations__", annotations)
-    setattr(klass, "__init__", init)
+    init.__annotations__ = _resolve_annotations(init.__annotations__, init.__globals__)
+    klass.__init__ = init
     return klass

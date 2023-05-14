@@ -516,36 +516,57 @@ print(counter.calls) # 10
 
 ## ➕ More<a id="more"></a>
 
-<details> <summary>Validate or convert inputs using callbacks</summary>
+<details> <summary>Validate or convert inputs using `typing.Annotated`</summary>
 
-`PyTreeClass` includes `callbacks` in the `field` to apply a sequence of functions on input at setting the attribute stage. The callback is quite useful in several cases, for instance, to ensure a certain input type within a valid range. See example:
+`PyTreeClass` executes callables defined inside `typing.Annotead`, this can be useful in case
+of type validation/conversion. This usage is motivated by [PEP 593](https://peps.python.org/pep-0593/)
+Example:
 
 ```python
-import jax
-import pytreeclass as pytc
 
-def positive_int_callback(value):
-    if not isinstance(value, int):
-        raise TypeError("Value must be an integer")
-    if value <= 0:
-        raise ValueError("Value must be positive")
-    return value
+import pytreeclass as pytc
+from typing_extensions import Annotated
+
+class Range(pytc.TreeClass):
+    min: float | int = -float("inf")
+    max: float | int = float("inf")
+
+    def __call__(self, x):
+        if self.min <= x <= self.max:
+            return x
+        raise ValueError(f"Value {x} not in range [{self.min}, {self.max}]")
+
+
+class Instance(pytc.TreeClass):
+    klass: type | tuple[type, ...]
+
+    def __call__(self, x):
+        if isinstance(x, self.klass):
+            return x
+        raise TypeError(f"Value {x} not of type {self.klass}")
 
 
 class Tree(pytc.TreeClass):
-    in_features:int = pytc.field(callbacks=[positive_int_callback])
+    # require positive integer input
+    in_features: Annotated[int, Instance(int), Range(1)]
 
 
 tree = Tree(1)
 # no error
 
-tree = Tree(0)
-# ValueError: Error for field=`in_features`:
-# Value must be positive
+try:
+    tree = Tree(0)
+except Exception as e:
+    print(e)
+    # Error for field=`in_features`:
+    # Value 0 not in range [1, 10]
 
-tree = Tree(1.0)
-# TypeError: Error for field=`in_features`:
-# Value must be an integer
+try:
+    tree = Tree(1.0)
+except Exception as e:
+    print(e)
+    # Error for field=`in_features`:
+    # Value 1.0 not of type <class 'int'>
 ```
 
 </details>
