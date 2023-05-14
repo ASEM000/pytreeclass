@@ -7,6 +7,7 @@ import jax.tree_util as jtu
 import numpy.testing as npt
 import pytest
 from jax import numpy as jnp
+from typing_extensions import Annotated
 
 import pytreeclass as pytc
 
@@ -369,7 +370,7 @@ def test_callbacks():
         return _range_validator
 
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[instance_validator(int)])
+        a: Annotated[int, instance_validator(int)]
 
     with pytest.raises(AssertionError):
         Test(a="a")
@@ -377,7 +378,7 @@ def test_callbacks():
     assert Test(a=1).a == 1
 
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[instance_validator((int, float))])
+        a: Annotated[int, instance_validator((int, float))]
 
     assert Test(a=1).a == 1
     assert Test(a=1.0).a == 1.0
@@ -386,7 +387,7 @@ def test_callbacks():
         Test(a="a")
 
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[range_validator(0, 10)])
+        a: Annotated[int, range_validator(0, 10)]
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -397,7 +398,7 @@ def test_callbacks():
         Test(a=11)
 
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[range_validator(0, 10), instance_validator(int)])
+        a: Annotated[int, range_validator(0, 10), instance_validator(int)]
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -405,27 +406,10 @@ def test_callbacks():
     with pytest.raises(AssertionError):
         Test(a=11)
 
-    with pytest.raises(TypeError):
-
-        class Test(pytc.TreeClass):
-            a: int = pytc.field(callbacks=1)
-
-    with pytest.raises(TypeError):
-
-        class Test(pytc.TreeClass):
-            a: int = pytc.field(callbacks=[1])
-
-    with pytest.raises(TypeError):
-
-        class Test(pytc.TreeClass):
-            a: int = pytc.field(callbacks=[lambda: True])
-
-        Test(a=1)
-
 
 def test_treeclass_frozen_field():
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[pytc.freeze])
+        a: Annotated[int, pytc.freeze]
 
     t = Test(1)
 

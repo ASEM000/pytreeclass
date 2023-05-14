@@ -11,19 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Constructor code generation from type annotations."""
 
 from __future__ import annotations
 
 import functools as ft
 import sys
 from collections.abc import Callable, MutableMapping, MutableSequence
+from contextlib import suppress
 from types import FunctionType, MappingProxyType
-from typing import Any, NamedTuple, Sequence
+from typing import Any, NamedTuple, Sequence, TypeVar
 
-"""Constructor code generation from type annotations."""
+from typing_extensions import Annotated
 
 PyTree = Any
 EllipsisType = type(Ellipsis)
+AnnotedType = type(Annotated[Any, Any])
+T = TypeVar("T")
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "NOT_SET"})()
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 # https://github.com/google/jax/issues/14295
@@ -39,7 +43,6 @@ class Field(NamedTuple):
     kw_only: bool = False
     pos_only: bool = False
     metadata: MappingProxyType[str, Any] | None = None
-    callbacks: Sequence[Any] = ()
     alias: str | None = None
 
 
@@ -52,7 +55,6 @@ def field(
     kw_only: bool = False,
     pos_only: bool = False,
     metadata: dict[str, Any] | None = None,  # type: ignore
-    callbacks: Sequence[Any] = (),
     alias: str | None = None,
 ) -> Field:
     """
@@ -67,27 +69,33 @@ def field(
         pos_only: Whether the field is positional-only. Mutually exclusive
             with `kw_only`, effectively placing `*` in the constructor.
         metadata: A mapping of user-defined data for the field.
-        callbacks: A sequence of functions to called on `setattr` during
-            initialization to modify the field value.
         alias: An a alias for the field name in the constructor.
+
+    Notes:
+        Use one-argument functions inside `typing.Annotead` as callbacks to
+        modify/validation the field value before assigning it to the field.
+        The callback function must return the modified value or raise an
+        exception if the value is invalid.
 
     Example:
         >>> import pytreeclass as pytc
-        >>> def instance_cb_factory(klass):
-        ...    def wrapper(x):
-        ...        assert isinstance(x, klass)
+        >>> from typing_extensions import Annotated
+        >>> class IsInstance(pytc.TreeClass):
+        ...    klass: type
+        ...    def __call__(self, x):
+        ...        assert isinstance(x, self.klass)
         ...        return x
-        ...    return wrapper
-
-        >>> def positive_check_callback(x):
-        ...    assert x > 0
-        ...    return x
-
+        >>> class Range(pytc.TreeClass):
+        ...    start: int|float = -float('inf')
+        ...    stop: int|float = float('inf')
+        ...    def __call__(self, x):
+        ...        assert self.start <= x <= self.stop
+        ...        return x
         >>> class Employee(pytc.TreeClass):
         ...    # assert employee `name` is str
-        ...    name: str = pytc.field(callbacks=[instance_cb_factory(str)])
+        ...    name: Annotated[str ,IsInstance(str)]
         ...    # use callback compostion to assert employee `age` is int and positive
-        ...    age: int = pytc.field(callbacks=[instance_cb_factory(int), positive_check_callback])
+        ...    age: Annotated[int, IsInstance(int), Range(1)]
         ...    # use `id` in the constructor for `_id` attribute
         ...    # this is useful for private attributes that are not supposed
         ...    # to be accessed directly and hide it from the repr
@@ -130,24 +138,7 @@ def field(
             f"got type=`{type(metadata).__name__}` instead."
         )
 
-    if not isinstance(callbacks, Sequence):
-        raise TypeError(
-            f"`callbacks` must be a Sequence of one-argument function(s) "
-            "operating on the field value, and returning a modified value, "
-            f"got type `{type(callbacks).__name__}` instead."
-        )
-
-    for index, callback in enumerate(callbacks):
-        if not isinstance(callback, Callable):  # type: ignore
-            raise TypeError(
-                f"`callback` must be a one-argument function "
-                "operating on the field value, and returning a modified value, "
-                f"got type `{type(callback).__name__}` at {index=} instead."
-            )
-
     return Field(
-        name=None,
-        type=None,
         default=default,
         factory=factory,
         init=init,
@@ -155,7 +146,6 @@ def field(
         kw_only=kw_only,
         pos_only=pos_only,
         metadata=metadata,  # type: ignore
-        callbacks=callbacks,
         alias=alias,
     )
 
@@ -193,6 +183,7 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
                 )
             # case: `x: Any = field(default=1)`
             field_map[name] = value._replace(name=name, type=hint)
+
         else:
             if isinstance(value, _MUTABLE_TYPES):
                 # https://github.com/ericvsmith/dataclasses/issues/3
@@ -204,6 +195,7 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
                 )
             # case: `x: int = 1` or `x: Any`
             field_map[name] = Field(name=name, type=hint, default=value)
+
     return MappingProxyType(field_map)
 
 
@@ -222,9 +214,20 @@ def fields(x: Any) -> Sequence[Field]:
     return tuple(_build_field_map(x if isinstance(x, type) else type(x)).values())
 
 
+def _resolve_annotations(
+    annotations: dict[str, Any],
+    global_namespace: dict[str, Any],
+) -> dict[str, Any]:
+    # try to evaluate the type hints to concrete types.
+    for key, hint in annotations.items():
+        if isinstance(hint, str):
+            with suppress(Exception):
+                annotations[key] = eval(hint, global_namespace)
+    return annotations
+
+
 def _build_init_method(klass: type) -> FunctionType:
-    # generate a code object for the __init__ method and compile it
-    # for the given class and return the function object
+    # generate init method from fields
     head, body = ["self"], []
 
     for field in (field_map := _build_field_map(klass)).values():
@@ -253,10 +256,20 @@ def _build_init_method(klass: type) -> FunctionType:
 
     body += ["getattr(type(self), '__post_init__', lambda _: None)(self)"]
     code = "def closure(field_map):\n"
-    code += f"\tdef __init__({','.join(head)}):"
+    code += f"\tdef init({','.join(head)}):"
     code += f"\n\t\t{';'.join(body)}"
-    code += f"\n\t__init__.__qualname__ = '{klass.__qualname__}.__init__'"
-    code += "\n\treturn __init__"
+    code += "\n\treturn init"
 
     exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
-    return namespace["closure"](field_map)
+    init = namespace["closure"](field_map)
+    setattr(init, "__qualname__", f"{klass.__qualname__}.__init__")
+    setattr(init, "__annotations__", {k: v.type for k, v in field_map.items()})
+    return init
+
+
+def _process_init_method(klass: T) -> T:
+    init = vars(klass).get("__init__", _build_init_method(klass))
+    annotations = _resolve_annotations(init.__annotations__, init.__globals__)
+    setattr(init, "__annotations__", annotations)
+    setattr(klass, "__init__", init)
+    return klass

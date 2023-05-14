@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Define a class that convert a class to a JAX compatible tree structure"""
 
 from __future__ import annotations
 
@@ -23,12 +24,12 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
-from typing_extensions import dataclass_transform
+from typing_extensions import Annotated, dataclass_transform
 
 from pytreeclass._src.code_build import (
     Field,
     _build_field_map,
-    _build_init_method,
+    _process_init_method,
     field,
 )
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
@@ -42,12 +43,10 @@ from pytreeclass._src.tree_util import (
     tree_hash,
 )
 
-"""Define a class that convert a class to a JAX compatible tree structure"""
-
-
 T = TypeVar("T", bound="TreeClass")
 PyTree = Any
 EllipsisType = type(Ellipsis)
+AnnotatedType = type(Annotated[Any, Any])
 _no_initializer = object()
 
 # allow methods in mutable context to be called without raising `AttributeError`
@@ -338,7 +337,7 @@ class TreeClassMeta(abc.ABCMeta):
             # throwing an `AttributeError`
             getattr(klass, "__init__")(self, *a, **k)
 
-        if len(keys := set(_build_field_map(klass)) - set(vars(self))):
+        if keys := set(_build_field_map(klass)) - set(vars(self)):
             raise AttributeError(f"Found uninitialized fields {keys}.")
         return self
 
@@ -429,15 +428,12 @@ class TreeClass(metaclass=TreeClassMeta):
 
         super().__init_subclass__(*a, **k)
 
-        if "__init__" not in vars(klass):
-            # generate the init method if not defined similar to `dataclass`
-            setattr(klass, "__init__", _build_init_method(klass))
-
-        if leafwise:
-            # transform the class to support leafwise operations
-            # useful to use with `bcmap` and creating masks by comparisons.
-            klass = _leafwise_transform(klass)
-
+        # generate the init method if not defined similar to `dataclass`
+        # and resolve types in annotations map
+        klass = _process_init_method(klass)
+        # transform the class to support leafwise operations
+        # useful to use with `bcmap` and creating masks by comparisons.
+        klass = _leafwise_transform(klass) if leafwise else klass
         klass = _register_treeclass(klass)
 
     def __setattr__(self, key: str, value: Any) -> None:
@@ -453,8 +449,11 @@ class TreeClass(metaclass=TreeClassMeta):
                 f">>> tree2.{key}\n{value}"
             )
 
-        if key in (field_map := _build_field_map(type(self))):
-            for callback in field_map[key].callbacks:
+        if isinstance(
+            hint := type(self).__init__.__annotations__.get(key, None),
+            AnnotatedType,
+        ):
+            for callback in [x for x in hint.__metadata__ if callable(x)]:
                 try:
                     value = callback(value)
                 except Exception as e:
