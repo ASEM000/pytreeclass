@@ -524,8 +524,10 @@ The functionality can be quite useful in several cases, for instance, to ensure 
 ```python
 import jax
 import pytreeclass as pytc
-# python 3.9+
+# python 3.9 and above
 from typing import Annotated
+# python 3.8
+# from typing_extensions import Annotated
 
 class PositiveInt:
     def __call__(self,value):
@@ -537,9 +539,7 @@ class PositiveInt:
 
 
 class Tree(pytc.TreeClass):
-    in_features:Annotated[int, PositiveInt()]
-    # in_features:int = pytc.field(callbacks=[positive_int_callback])
-
+    in_features: Annotated[int, PositiveInt()]
 
 tree = Tree(1)
 # no error
