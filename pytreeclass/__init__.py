@@ -1,4 +1,4 @@
-from pytreeclass._src.code_build import field, fields
+from pytreeclass._src.code_build import KW_ONLY, POS_ONLY, field, fields
 from pytreeclass._src.tree_base import AtIndexer, TreeClass
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
@@ -28,6 +28,8 @@ __all__ = (
     "is_tree_equal",
     "field",
     "fields",
+    "KW_ONLY",
+    "POS_ONLY",
     # pprint utils
     "tree_diagram",
     "tree_mermaid",

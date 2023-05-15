@@ -11,14 +11,6 @@ from jax import numpy as jnp
 import pytreeclass as pytc
 
 
-def test_field_mutually_exclusive():
-    with pytest.raises(ValueError):
-        pytc.field(default=1, factory=lambda: 1)
-
-    with pytest.raises(ValueError):
-        pytc.field(default=1, pos_only=True, kw_only=True)
-
-
 def test_fields():
     class Test(pytc.TreeClass):
         a: int = pytc.field(default=1, metadata={"meta": 1})
@@ -35,26 +27,43 @@ def test_field():
         pytc.field(metadata=1)
 
     class Test(pytc.TreeClass):
-        a: int = pytc.field(default=1, pos_only=True)
+        a: int = pytc.field(default=1)
+        _: pytc.POS_ONLY
         b: int = 2
 
     with pytest.raises(TypeError):
         # positonal only for a
         Test(a=1, b=2)
 
+    with pytest.raises(ValueError):
+
+        class Test(pytc.TreeClass):
+            a: int = pytc.field(default=1)
+            _: pytc.POS_ONLY
+            __: pytc.POS_ONLY
+
+    with pytest.raises(ValueError):
+
+        class Test(pytc.TreeClass):
+            a: int = pytc.field(default=1)
+            _: pytc.KW_ONLY
+            __: pytc.KW_ONLY
+
     assert Test(1, b=2).a == 1
     assert Test(1, 2).b == 2
 
     class Test(pytc.TreeClass):
-        a: int = pytc.field(default=1, pos_only=True)
-        b: int = pytc.field(default=2, pos_only=True)
+        a: int = pytc.field(default=1)
+        b: int = pytc.field(default=2)
+        _: pytc.POS_ONLY
 
     assert Test(1, 2).a == 1
     assert Test(1, 2).b == 2
 
     # keyword only
     class Test(pytc.TreeClass):
-        a: int = pytc.field(default=1, kw_only=True)
+        _: pytc.KW_ONLY
+        a: int = pytc.field(default=1)
         b: int = 2
 
     with pytest.raises(TypeError):
@@ -66,8 +75,10 @@ def test_field():
     assert Test(a=1, b=2).a == 1
 
     class Test(pytc.TreeClass):
-        a: int = pytc.field(default=1, pos_only=True)
-        b: int = pytc.field(default=2, kw_only=True)
+        a: int = pytc.field(default=1)
+        _: pytc.POS_ONLY
+        __: pytc.KW_ONLY
+        b: int = pytc.field(default=2)
 
     with pytest.raises(TypeError):
         Test(1, 2)
@@ -79,7 +90,8 @@ def test_field():
 
     # test when init is False
     class Test(pytc.TreeClass):
-        a: int = pytc.field(default=1, init=False, kw_only=True)
+        _: pytc.KW_ONLY
+        a: int = pytc.field(default=1, init=False)
         b: int = 2
 
     with pytest.raises(TypeError):
@@ -89,7 +101,6 @@ def test_field():
 
     class Test(pytc.TreeClass):
         a: int = pytc.field(default=1)
-        b: int = pytc.field(factory=lambda: 1)
 
         def __init__(self) -> None:
             pass
@@ -537,10 +548,3 @@ def test_instance_field_map():
 
     assert tree_with_weight.weight == Parameter(3)
     assert "weight" not in vars(tree)
-
-
-def test_field_factory():
-    class Tree(pytc.TreeClass):
-        a: int = pytc.field(factory=lambda: 1)
-
-    assert Tree().a == 1

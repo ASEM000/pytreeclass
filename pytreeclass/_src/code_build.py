@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import dataclasses as dc
 import functools as ft
 import sys
 from collections.abc import Callable, MutableMapping, MutableSequence
@@ -27,18 +28,17 @@ EllipsisType = type(Ellipsis)
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "NOT_SET"})()
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 # https://github.com/google/jax/issues/14295
+KW_ONLY = dc.KW_ONLY  # get the hint support
+POS_ONLY = type("_POS_ONLY_TYPE", (), {})()
 
 
 class Field(NamedTuple):
     name: str | None = None
     type: type | None = None
     default: Any = _NOT_SET
-    factory: Any = None
     init: bool = True
     repr: bool = True
-    kw_only: bool = False
-    pos_only: bool = False
-    metadata: MappingProxyType[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
     callbacks: Sequence[Any] = ()
     alias: str | None = None
 
@@ -46,26 +46,17 @@ class Field(NamedTuple):
 def field(
     *,
     default: Any = _NOT_SET,
-    factory: Callable | None = None,
     init: bool = True,
     repr: bool = True,
-    kw_only: bool = False,
-    pos_only: bool = False,
     metadata: dict[str, Any] | None = None,  # type: ignore
     callbacks: Sequence[Any] = (),
     alias: str | None = None,
 ) -> Field:
     """
     Args:
-        default: The default value of the field. Mutually exclusive with `factory`.
-        factory: A 0-argument function called to initialize field value.
-            Mutually exclusive with `default`.
+        default: The default value of the field.
         init: Whether the field is included in the object's __init__ function.
         repr: Whether the field is included in the object's __repr__ function.
-        kw_only: Whether the field is keyword-only. Mutually exclusive
-            with `pos_only`, effectively placing `/` in the constructor.
-        pos_only: Whether the field is positional-only. Mutually exclusive
-            with `kw_only`, effectively placing `*` in the constructor.
         metadata: A mapping of user-defined data for the field.
         callbacks: A sequence of functions to called on `setattr` during
             initialization to modify the field value.
@@ -73,26 +64,26 @@ def field(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> def instance_cb_factory(klass):
-        ...    def wrapper(x):
-        ...        assert isinstance(x, klass)
+        >>> class IsInstance(pytc.TreeClass):
+        ...    klass: type
+        ...    def __call__(self, x):
+        ...        assert isinstance(x, self.klass)
         ...        return x
-        ...    return wrapper
-
-        >>> def positive_check_callback(x):
-        ...    assert x > 0
-        ...    return x
-
+        >>> class Range(pytc.TreeClass):
+        ...    start: int|float = float('inf')
+        ...    stop: int|float = float('inf')
+        ...    def __call__(self, x):
+        ...        assert self.start <= x < self.stop
+        ...        return x
         >>> class Employee(pytc.TreeClass):
         ...    # assert employee `name` is str
-        ...    name: str = pytc.field(callbacks=[instance_cb_factory(str)])
+        ...    name: str = pytc.field(callbacks=[IsInstance(str)])
         ...    # use callback compostion to assert employee `age` is int and positive
-        ...    age: int = pytc.field(callbacks=[instance_cb_factory(int), positive_check_callback])
+        ...    age: int = pytc.field(callbacks=[IsInstance(int), Range(1)])
         ...    # use `id` in the constructor for `_id` attribute
         ...    # this is useful for private attributes that are not supposed
         ...    # to be accessed directly and hide it from the repr
         ...    _id: int = pytc.field(alias="id", repr=False)
-
         >>> tree = Employee(name="Asem", age=10, id=1)
         >>> print(tree)  # _id is not shown
         Employee(name=Asem, age=10)
@@ -105,25 +96,7 @@ def field(
             f"got type=`{type(alias).__name__}` instead."
         )
 
-    if default is not _NOT_SET and factory is not None:
-        raise ValueError(
-            "`default` and `factory` are mutually exclusive arguments."
-            "Use `default` if the value is immutable or a zero-argument "
-            "function returning a mutable value in `factory` otherwise.\n"
-            f"got {default=} and {factory=}"
-        )
-
-    if kw_only is True and pos_only is True:
-        raise ValueError(
-            "`kw_only` and `pos_only` are mutually exclusive arguments."
-            "Use `kw_only` if the field is a keyword-only argument in "
-            "the constructor and `pos_only` if the field is positional only, "
-            f"got {kw_only=} and {pos_only=}"
-        )
-
-    if isinstance(metadata, dict):
-        metadata = MappingProxyType(metadata)  # type: ignore
-    elif metadata is not None:
+    if not isinstance(metadata, (dict, type(None))):
         raise TypeError(
             "`metadata` must be a dictionary describing the metadata of "
             "the field or `None` if no metadata is provided, "
@@ -146,14 +119,9 @@ def field(
             )
 
     return Field(
-        name=None,
-        type=None,
         default=default,
-        factory=factory,
         init=init,
         repr=repr,
-        kw_only=kw_only,
-        pos_only=pos_only,
         metadata=metadata,  # type: ignore
         callbacks=callbacks,
         alias=alias,
@@ -186,22 +154,14 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
         if isinstance(value, Field):
             if isinstance(value.default, _MUTABLE_TYPES):
                 # example case: `x: Any = field(default=[1, 2, 3])`
-                raise TypeError(
-                    f"Mutable default value= {value.default} is not allowed"
-                    f" for field `{name}` in class `{klass.__name__}`.\n"
-                    f" use `field(... ,factory=lambda:{value.default})` instead"
-                )
+                raise TypeError(f"Mutable {value.default=} is not allowed.")
             # case: `x: Any = field(default=1)`
             field_map[name] = value._replace(name=name, type=hint)
         else:
             if isinstance(value, _MUTABLE_TYPES):
                 # https://github.com/ericvsmith/dataclasses/issues/3
                 # example case: `x: Any = [1, 2, 3]`
-                raise TypeError(
-                    f"Mutable value= {(value)} is not allowed"
-                    f" for field `{name}` in class `{klass.__name__}`.\n"
-                    f" use `field(... ,factory=lambda:{value})` instead"
-                )
+                raise TypeError(f"Mutable {value=} is not allowed.")
             # case: `x: int = 1` or `x: Any`
             field_map[name] = Field(name=name, type=hint, default=value)
     return MappingProxyType(field_map)
@@ -212,7 +172,7 @@ def fields(x: Any) -> Sequence[Field]:
 
     `Field` objects are generated from the class type hints and contains
     the information about the field `name`, `type`, `default` value, and other
-    information (`factory`, `init`, `repr`, `kw_only`, `pos_only`, `metadata`,
+    information (`init`, `repr`, `kw_only`, `pos_only`, `metadata`,
     `callbacks`, `alias`) if the user uses the `pytreeclass.field`to annotate.
 
     Note:
@@ -231,25 +191,25 @@ def _build_init_method(klass: type) -> FunctionType:
         name = field.name  # name in body
         alias = field.alias or name  # name in constructor
 
-        if field.kw_only and "*" not in head and field.init:
+        if field.type == KW_ONLY:
+            if "*" in head:
+                raise ValueError("Multiple `*` in the constructor.")
             head += ["*"]
+            continue
+
+        if field.type == POS_ONLY:
+            if "/" in head:
+                raise ValueError("Multiple `/` in the constructor.")
+            head += ["/"]
+            continue
 
         if field.default is not _NOT_SET:
             vref = f"field_map['{name}'].default"
             head += [f"{alias}={vref}"] if field.init else []
             body += [f"self.{name}=" + (f"{alias}" if field.init else f"{vref}")]
-        elif field.factory is not None:
-            vref = f"field_map['{name}'].factory()"
-            head += [f"{alias}={vref}"] if field.init else []
-            body += [f"self.{name}=" + (f"{alias}" if field.init else f"{vref}")]
         else:
             head += [f"{alias}"] if field.init else []
             body += [f"self.{name}={alias}"] if field.init else []
-
-        if field.pos_only and field.init:
-            if "/" in head:
-                head.remove("/")
-            head += ["/"]
 
     body += ["getattr(type(self), '__post_init__', lambda _: None)(self)"]
     code = "def closure(field_map):\n"

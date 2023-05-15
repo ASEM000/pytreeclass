@@ -26,6 +26,8 @@ import numpy as np
 from typing_extensions import dataclass_transform
 
 from pytreeclass._src.code_build import (
+    KW_ONLY,
+    POS_ONLY,
     Field,
     _build_field_map,
     _build_init_method,
@@ -338,7 +340,11 @@ class TreeClassMeta(abc.ABCMeta):
             # throwing an `AttributeError`
             getattr(klass, "__init__")(self, *a, **k)
 
-        if len(keys := set(_build_field_map(klass)) - set(vars(self))):
+        if keys := [
+            k
+            for k, f in _build_field_map(klass).items()
+            if k not in vars(self) and f.type not in (KW_ONLY, POS_ONLY)
+        ]:
             raise AttributeError(f"Found uninitialized fields {keys}.")
         return self
 
