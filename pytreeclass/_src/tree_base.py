@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Define a class that convert a class to a JAX compatible tree structure"""
 
 from __future__ import annotations
 
@@ -41,9 +42,6 @@ from pytreeclass._src.tree_util import (
     tree_copy,
     tree_hash,
 )
-
-"""Define a class that convert a class to a JAX compatible tree structure"""
-
 
 T = TypeVar("T", bound="TreeClass")
 PyTree = Any
