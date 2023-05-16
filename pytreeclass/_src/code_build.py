@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import dataclasses as dc
 import functools as ft
 import sys
 from collections.abc import Callable, MutableMapping, MutableSequence
@@ -28,8 +27,8 @@ EllipsisType = type(Ellipsis)
 _NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "NOT_SET"})()
 _MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 # https://github.com/google/jax/issues/14295
-KW_ONLY = dc.KW_ONLY  # get the hint support
-POS_ONLY = type("_POS_ONLY_TYPE", (), {})()
+KW_ONLY = type("_KW_ONLY_TYPE", (), {"__repr__": lambda _: "*"})()
+POS_ONLY = type("_POS_ONLY_TYPE", (), {"__repr__": lambda _: "/"})()
 
 
 class Field(NamedTuple):
@@ -44,8 +43,8 @@ class Field(NamedTuple):
 
 
 def field(
-    *,
     default: Any = _NOT_SET,
+    *,
     init: bool = True,
     repr: bool = True,
     metadata: dict[str, Any] | None = None,  # type: ignore
