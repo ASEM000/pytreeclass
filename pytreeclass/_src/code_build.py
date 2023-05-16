@@ -61,6 +61,30 @@ def field(
             initialization to modify the field value.
         alias: An a alias for the field name in the constructor.
 
+    Note:
+        - use `pytreeclass.POS_ONLY` and `pytreeclass.KW_ONLY` to mark
+            positional-only and keyword-only arguments in the constructor.
+            for example::
+
+                >>> import pytreeclass as pytc
+                >>> class Tree(pytc.TreeClass):
+                ...     x: int = pytc.field(default=0)
+                ...     # positional only field for all fields before it
+                ...     _: pytc.POS_ONLY
+                ...     # keyword only field for all fields after it
+                ...     __: pytc.KW_ONLY
+                ...     y: int = pytc.field(default=0)
+
+        - The `callbacks` are called in the order they are provided, and
+            each callback must be a one-argument function operating on the field
+        - The `alias` is used to rename the field in the constructor, and
+            it must be a string describing the alias name of the field in the
+        constructor or `None` if no alias is provided.
+        - The `metadata` is a dictionary describing the metadata of the field
+            or `None` if no metadata is provided.
+        - The `default` is the default value of the field, and it must be
+            non-mutable types.
+
     Example:
         >>> import pytreeclass as pytc
         >>> class IsInstance(pytc.TreeClass):
