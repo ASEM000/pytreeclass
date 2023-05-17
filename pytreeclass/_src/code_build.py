@@ -173,22 +173,22 @@ def fields(x: Any) -> Sequence[Field]:
 def _build_init_method(klass: type) -> FunctionType:
     # generate a code object for the __init__ method and compile it
     # for the given class and return the function object
-    head, body = ["self"], []
-    field_map = _build_field_map(klass)
+    body = []
     heads = dict(zip(ArgKind, ([], [], [])))
 
-    for field in _build_field_map(klass).values():
+    for field in (field_map := _build_field_map(klass)).values():
         name = field.name
         alias = field.alias or name
 
-        if field.default is not _NOT_SET:
+        if field.default is _NOT_SET:
+            heads[field.kind] += [f"{alias}"] if field.init else []
+            body += [f"self.{name}={alias}"] if field.init else []
+        else:
             vref = f"field_map['{name}'].default"
             heads[field.kind] += [f"{alias}={vref}"] if field.init else []
             body += [f"self.{name}=" + (f"{alias}" if field.init else f"{vref}")]
-        else:
-            heads[field.kind] += [f"{alias}"] if field.init else []
-            body += [f"self.{name}={alias}"] if field.init else []
 
+    head = ["self"]
     head += (heads["POS_ONLY"] + ["/"]) if heads["POS_ONLY"] else []
     head += heads["POS_OR_KW"]
     head += (["*"] + heads["KW_ONLY"]) if heads["KW_ONLY"] else []
