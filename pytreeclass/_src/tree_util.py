@@ -18,6 +18,7 @@ import dataclasses as dc
 import functools as ft
 import hashlib
 import operator as op
+from collections import defaultdict
 from math import ceil, floor, trunc
 from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
@@ -547,6 +548,19 @@ class NamedSequenceKey:
         return f".{self.key}"
 
 
+# indexing matching registry
+# define rule for indexing matching through `at` property
+# for example, `jax` internals uses `jtu.GetAttrKey` to index an attribute,
+# however its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]`
+# to index an attribute instead `tree.at['attr']` is more ergonomic
+match_registry: dict[type, Callable] = defaultdict(lambda entry: (entry,))
+match_registry[jtu.GetAttrKey] = lambda entry: (entry.name,)
+match_registry[jtu.SequenceKey] = lambda entry: (entry.idx,)
+match_registry[NamedSequenceKey] = lambda entry: (entry.idx, entry.key)
+match_registry[jtu.DictKey] = lambda entry: (entry.key,)
+match_registry[jtu.FlattenedIndexKey] = lambda entry: (entry.key,)
+
+
 def _generate_path_mask(
     tree: PyTree,
     where: tuple[int | str, ...],
@@ -558,21 +572,6 @@ def _generate_path_mask(
     # all other leaves to False
     match = False
 
-    def _unpack_entry(entry) -> tuple[Any, ...]:
-        # define rule for indexing matching through `at` property
-        # in `jax` internals uses `jtu.GetAttrKey` to index an attribute,
-        # however its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]`
-        # to index an attribute instead `tree.at['attr']` is more ergonomic
-        if isinstance(entry, jtu.GetAttrKey):
-            return (entry.name,)
-        if isinstance(entry, jtu.SequenceKey):
-            return (entry.idx,)
-        if isinstance(entry, (jtu.DictKey, jtu.FlattenedIndexKey)):
-            return (entry.key,)
-        if isinstance(entry, NamedSequenceKey):
-            return (entry.idx, entry.key)
-        return (entry,)
-
     def map_func(path: TraceType, _: Any):
         keys, _ = path
 
@@ -583,7 +582,7 @@ def _generate_path_mask(
             return False
 
         for wi, key in zip(where, keys):
-            if wi not in (..., *_unpack_entry(key)):
+            if wi not in (..., *match_registry[type(key)](key)):
                 return False
 
         nonlocal match
