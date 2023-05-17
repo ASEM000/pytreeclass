@@ -71,14 +71,12 @@ def field(
         ...    def __call__(self, x):
         ...        assert isinstance(x, self.klass)
         ...        return x
-
         >>> class Range(pytc.TreeClass):
         ...    start: int|float = float("-inf")
-        ...    stop: int|float = float("-inf")
+        ...    stop: int|float = float("inf")
         ...    def __call__(self, x):
         ...        assert self.start <= x <= self.stop
         ...        return x
-
         >>> class Employee(pytc.TreeClass):
         ...    # assert employee `name` is str
         ...    name: str = pytc.field(callbacks=[IsInstance(str)])
@@ -88,11 +86,10 @@ def field(
         ...    # this is useful for private attributes that are not supposed
         ...    # to be accessed directly and hide it from the repr
         ...    _id: int = pytc.field(alias="id", repr=False)
-
-        >>> tree = Employee(name="Asem", age=10, id=1)
-        >>> print(tree)  # _id is not shown
+        >>> employee = Employee(name="Asem", age=10, id=1)
+        >>> print(employee)  # _id is not shown
         Employee(name=Asem, age=10)
-        >>> assert tree._id == 1  # this is the private attribute
+        >>> assert employee._id == 1  # this is the private attribute
     """
     if not isinstance(alias, (str, type(None))):
         raise TypeError(f"Non-string {alias=} argument provided to `field`")
