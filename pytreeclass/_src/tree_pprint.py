@@ -27,7 +27,6 @@ import jax.tree_util as jtu
 import numpy as np
 from jax import custom_jvp
 from jax.util import unzip2
-from jaxlib.xla_extension import PjitFunction
 
 from pytreeclass._src.tree_util import (
     IsLeafType,
@@ -42,7 +41,7 @@ PrintKind = Literal["repr", "str"]
 from_iterable = chain.from_iterable
 
 
-def _node_pprint(
+def _pprint(
     node: Any,
     *,
     indent: int,
@@ -62,8 +61,6 @@ def _node_pprint(
         text = f"Partial({_func_pprint(node.func, **spec)})"
     elif isinstance(node, (FunctionType, custom_jvp)):
         text = _func_pprint(node, **spec)
-    elif isinstance(node, PjitFunction):
-        text = f"jit({_func_pprint(node, **spec)})"
     elif isinstance(node, jax.ShapeDtypeStruct):
         text = _shape_dtype_pprint(node, **spec)
     elif isinstance(node, tuple) and hasattr(node, "_fields"):
@@ -85,7 +82,63 @@ def _node_pprint(
     else:
         text = _general_pprint(node, **spec)
 
-    return _format_width(text, width)
+    return _format_width(text, width=width)
+
+
+def _kvs_pprint(
+    kvs: tuple[str, Any],
+    *,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
+    markers: tuple[str, str, str],
+) -> str:
+    lhs, sep, rhs = markers
+
+    if depth == 0:
+        return f"{lhs}...{rhs}"
+
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    line = ", \n" + "\t" * (indent + 1)
+
+    return (
+        lhs
+        + "\n"
+        + "\t" * (indent + 1)
+        + line.join(f"{k}{sep}{_pprint(v,**spec)}" for k, v in kvs)
+        + "\n"
+        + "\t" * (indent)
+        + rhs
+    )
+
+
+def _vs_pprint(
+    vs: tuple[Any],
+    *,
+    indent: int,
+    kind: PrintKind,
+    width: int,
+    depth: int,
+    markers: tuple[str, str],
+) -> str:
+    lhs, rhs = markers
+
+    if depth == 0:
+        return f"{lhs}...{rhs}"
+
+    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    line = ", \n" + "\t" * (indent + 1)
+
+    return (
+        lhs
+        + "\n"
+        + "\t" * (indent + 1)
+        + line.join(_pprint(v, **spec) for v in vs)
+        + "\n"
+        + "\t" * (indent)
+        + rhs
+    )
 
 
 def _general_pprint(
@@ -97,13 +150,13 @@ def _general_pprint(
     depth: int,
 ) -> str:
     del depth, width
-
     text = f"{node!r}" if kind == "repr" else f"{node!s}"
-    is_mutltiline = "\n" in text
-    indent = (indent + 1) if is_mutltiline else indent
-    text = ("\n" + "\t" * indent).join(text.split("\n"))
-    text = ("\n" + "\t" * (indent) + text) if is_mutltiline else text
-    return text
+
+    if "\n" not in text:
+        return text
+
+    indent += 1
+    return "\n" + "\t" * indent + ("\n" + "\t" * indent).join(text.split("\n"))
 
 
 def _shape_dtype_pprint(
@@ -181,7 +234,7 @@ def _func_pprint(
     varargs = ("*" + varargs) if varargs is not None else ""
     kwonlyargs = (", ".join(kwonlyargs)) if len(kwonlyargs) > 0 else ""
     varkw = ("**" + varkw) if varkw is not None else ""
-    name = "Lambda" if (func.__name__ == "<lambda>") else func.__name__
+    name = getattr(func, "__name__", "")
     text = f"{name}("
     text += ", ".join(item for item in [args, varargs, kwonlyargs, varkw] if item != "")
     text += ")"
@@ -196,13 +249,8 @@ def _list_pprint(
     width: int,
     depth: int,
 ) -> str:
-    if depth == 0:
-        return "[...]"
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
-    text = (f"{(_node_pprint(v,**spec))}" for v in node)
-    text = (", \n" + "\t" * (indent + 1)).join(text)
-    text = "[\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + "]"
-    return text
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+    return _vs_pprint(node, **spec, markers=["[", "]"])
 
 
 def _tuple_pprint(
@@ -213,13 +261,8 @@ def _tuple_pprint(
     width: int,
     depth: int,
 ) -> str:
-    if depth == 0:
-        return "(...)"
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
-    text = (f"{(_node_pprint(v,**spec))}" for v in node)
-    text = (", \n" + "\t" * (indent + 1)).join(text)
-    text = "(\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + ")"
-    return text
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+    return _vs_pprint(node, **spec, markers=["(", ")"])
 
 
 def _set_pprint(
@@ -230,13 +273,8 @@ def _set_pprint(
     width: int,
     depth: int,
 ) -> str:
-    if depth == 0:
-        return "{...}"
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
-    text = (f"{(_node_pprint(v,**spec))}" for v in node)
-    text = (", \n" + "\t" * (indent + 1)).join(text)
-    text = "{\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + "}"
-    return text
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+    return _vs_pprint(node, **spec, markers=["{", "}"])
 
 
 def _dict_pprint(
@@ -247,14 +285,9 @@ def _dict_pprint(
     width: int,
     depth: int,
 ) -> str:
-    if depth == 0:
-        return "{...}"
     kvs = node.items()
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
-    text = (f"{k}:{_node_pprint(v,**spec)}" for k, v in kvs)
-    text = (", \n" + "\t" * (indent + 1)).join(text)
-    text = "{\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + "}"
-    return text
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+    return _kvs_pprint(kvs, **spec, markers=("{", ":", "}"))
 
 
 def _namedtuple_pprint(
@@ -266,17 +299,9 @@ def _namedtuple_pprint(
     depth: int,
 ) -> str:
     name = type(node).__name__
-
-    if depth == 0:
-        return f"{name}(...)"
-
     kvs = node._asdict().items()
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
-    text = (f"{k}={_node_pprint(v,**spec)}" for k, v in kvs)
-    text = (", \n" + "\t" * (indent + 1)).join(text)
-    name = type(node).__name__
-    text = f"{name}(\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + ")"
-    return text
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+    return name + _kvs_pprint(kvs, **spec, markers=("(", "=", ")"))
 
 
 def _dataclass_pprint(
@@ -288,16 +313,9 @@ def _dataclass_pprint(
     depth: int,
 ) -> str:
     name = type(node).__name__
-
-    if depth == 0:
-        return f"{name}(...)"
-
     kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
-    text = (f"{k}={_node_pprint(v,**spec)}" for k, v in kvs)
-    text = (", \n" + "\t" * (indent + 1)).join(text)
-    text = f"{name}(\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + ")"
-    return text
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+    return name + _kvs_pprint(kvs, **spec, markers=("(", "=", ")"))
 
 
 def _treeclass_pprint(
@@ -308,20 +326,14 @@ def _treeclass_pprint(
     width: int,
     depth: int,
 ) -> str:
-    name = type(node).__name__
-    if depth == 0:
-        return f"{name}(...)"
-
     # avoid circular import by importing here
     from pytreeclass import fields
 
+    name = type(node).__name__
     skip = [f.name for f in fields(node) if not f.repr]
     kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
-    text = (f"{k}={_node_pprint(v,**spec)}" for k, v in kvs)
-    text = (", \n" + "\t" * (indent + 1)).join(text)
-    text = f"{name}(\n" + "\t" * (indent + 1) + (text) + "\n" + "\t" * (indent) + ")"
-    return text
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+    return name + _kvs_pprint(kvs, **spec, markers=("(", "=", ")"))
 
 
 def _node_type_pprint(
@@ -335,7 +347,7 @@ def _node_type_pprint(
     if isinstance(node, (jax.Array, np.ndarray)):
         shape_dype = node.shape, node.dtype
         spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-        text = _node_pprint(jax.ShapeDtypeStruct(*shape_dype), **spec)
+        text = _pprint(jax.ShapeDtypeStruct(*shape_dype), **spec)
     else:
         text = f"{type(node).__name__}"
     return text
@@ -370,7 +382,7 @@ def tree_repr(
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
     """
-    text = _node_pprint(tree, indent=0, kind="repr", width=width, depth=depth)
+    text = _pprint(tree, indent=0, kind="repr", width=width, depth=depth)
     return text.expandtabs(tabwidth)
 
 
@@ -399,7 +411,7 @@ def tree_str(
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
     """
-    text = _node_pprint(tree, indent=0, kind="str", width=width, depth=depth)
+    text = _pprint(tree, indent=0, kind="str", width=width, depth=depth)
     return text.expandtabs(tabwidth)
 
 
@@ -457,7 +469,7 @@ def tree_indent(
             text = f"{indent}"
             (key, _), value = node.data
             text += f"{key}=" if key is not None else ""
-            text += _node_pprint(value, **ppspec)
+            text += _pprint(value, **ppspec)
             return text + "\n"
 
         (key, type), _ = node.data
@@ -539,7 +551,7 @@ def tree_diagram(
             (key, _), value = node.data
             text = f"{indent}"
             text += f"{branch}{key}=" if key is not None else ""
-            text += _node_pprint(value, **ppspec)
+            text += _pprint(value, **ppspec)
             return text + "\n"
 
         (key, type), _ = node.data
@@ -585,7 +597,7 @@ def tree_mermaid(
             ppspec = dict(indent=0, kind="repr", width=80, depth=0)
             key, _, value = node.data
             text = f"{key}=" if key is not None else ""
-            text += _node_pprint(value, **ppspec)
+            text += _pprint(value, **ppspec)
             text = "<b>" + text + "</b>"
             return f'\tid{id(node.parent)} --- id{id(node)}("{text}")\n'
 
