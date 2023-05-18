@@ -19,6 +19,9 @@ def test_fields():
     assert len(pytc.fields(Test)) == 2
     assert pytc.fields(Test)[0].metadata == {"meta": 1}
 
+    with pytest.raises(ValueError):
+        pytc.field(kind="WRONG")
+
 
 def test_field():
     assert pytc.field(default=1).default == 1
@@ -528,3 +531,17 @@ def test_instance_field_map():
 
     assert tree_with_weight.weight == Parameter(3)
     assert "weight" not in vars(tree)
+
+
+def test_partial():
+    def f(a, b, c):
+        return a + b + c
+
+    f_a = pytc.Partial(f, ..., 2, 3)
+    assert f_a(1) == 6
+
+    f_b = pytc.Partial(f, 1, ..., 3)
+    assert f_b(2) == 6
+
+    assert f_b == f_b
+    assert hash(f_b) == hash(f_b)
