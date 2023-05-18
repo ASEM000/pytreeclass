@@ -19,22 +19,22 @@ import functools as ft
 import sys
 from collections.abc import Callable, MutableMapping, MutableSequence
 from types import FunctionType, MappingProxyType
-from typing import Any, Literal, NamedTuple, Sequence, get_args
+from typing import Any, Literal, NamedTuple, Sequence, TypeVar, get_args
 
+T = TypeVar("T")
 PyTree = Any
 EllipsisType = type(Ellipsis)
-
 ArgKindType = Literal["POS_ONLY", "POS_OR_KW", "KW_ONLY"]
 ArgKind = get_args(ArgKindType)
-_NOT_SET = type("NOT_SET", (), {"__repr__": lambda _: "NOT_SET"})()
-_MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
+NULL = type("NULL", (), {"__repr__": lambda _: "NULL"})()
+MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
 # https://github.com/google/jax/issues/14295
 
 
 class Field(NamedTuple):
     name: str | None = None
     type: type | None = None
-    default: Any = _NOT_SET
+    default: Any = NULL
     init: bool = True
     repr: bool = True
     kind: ArgKindType = "POS_OR_KW"
@@ -44,7 +44,7 @@ class Field(NamedTuple):
 
 
 def field(
-    default: Any = _NOT_SET,
+    default: Any = NULL,
     *,
     init: bool = True,
     repr: bool = True,
@@ -129,7 +129,7 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
         return MappingProxyType(field_map)
 
     for name in (annotation_map := vars(klass)["__annotations__"]):
-        value = vars(klass).get(name, _NOT_SET)
+        value = vars(klass).get(name, NULL)
         hint = annotation_map[name]
 
         if name == "self":
@@ -138,13 +138,13 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
             raise ValueError("Field name cannot be `self`.")
 
         if isinstance(value, Field):
-            if isinstance(value.default, _MUTABLE_TYPES):
+            if isinstance(value.default, MUTABLE_TYPES):
                 # example case: `x: Any = field(default=[1, 2, 3])`
                 raise TypeError(f"Mutable {value.default=} is not allowed.")
             # case: `x: Any = field(default=1)`
             field_map[name] = value._replace(name=name, type=hint)
         else:
-            if isinstance(value, _MUTABLE_TYPES):
+            if isinstance(value, MUTABLE_TYPES):
                 # example case: `x: Any = [1, 2, 3]`
                 raise TypeError(f"Mutable {value=} is not allowed")
             # case: `x: int = 1` or `x: Any`
@@ -171,26 +171,34 @@ def _build_init_method(klass: type) -> FunctionType:
     # generate a code object for the __init__ method and compile it
     # for the given class and return the function object
     body = []
+    hints = dict()
+    head = ["self"]
     heads = dict(zip(ArgKind, ([], [], [])))
+    has_post_init = "__post_init__" in vars(klass)
 
     for field in (field_map := _build_field_map(klass)).values():
         name = field.name
         alias = field.alias or name
+        vref = "" if field.default is NULL else f"=field_map['{name}'].default"
 
-        if field.default is _NOT_SET:
-            heads[field.kind] += [f"{alias}"] if field.init else []
-            body += [f"self.{name}={alias}"] if field.init else []
+        if field.init:
+            heads[field.kind] += [f"{alias}{vref}"]
+            hints[field.name] = field.type
+            body += [f"self.{name}={alias}"]
         else:
-            vref = f"field_map['{name}'].default"
-            heads[field.kind] += [f"{alias}={vref}"] if field.init else []
-            body += [f"self.{name}=" + (f"{alias}" if field.init else f"{vref}")]
+            body += [f"self.{name}{vref}"]
 
-    head = ["self"]
+    hints["return"] = None
+    # add the post init call if the class has it, otherwise add a pass
+    # in case all fields are not initialized in the __init__ method
+    body += ["self.__post_init__()"] if has_post_init else ["pass"]
+
+    # organize the arguments order (POS_ONLY, POS_OR_KW, KW_ONLY)
     head += (heads["POS_ONLY"] + ["/"]) if heads["POS_ONLY"] else []
     head += heads["POS_OR_KW"]
     head += (["*"] + heads["KW_ONLY"]) if heads["KW_ONLY"] else []
 
-    body += ["getattr(type(self), '__post_init__', lambda _: None)(self)"]
+    # generate the code for the __init__ method
     code = "def closure(field_map):\n"
     code += f"\tdef __init__({','.join(head)}):"
     code += f"\n\t\t{';'.join(body)}"
@@ -198,4 +206,5 @@ def _build_init_method(klass: type) -> FunctionType:
     code += "\n\treturn __init__"
 
     exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
-    return namespace["closure"](field_map)
+    setattr(init := namespace["closure"](field_map), "__annotations__", hints)
+    return init

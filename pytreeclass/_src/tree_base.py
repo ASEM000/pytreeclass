@@ -336,7 +336,7 @@ class TreeClassMeta(abc.ABCMeta):
             # throwing an `AttributeError`
             getattr(klass, "__init__")(self, *a, **k)
 
-        if len(keys := set(_build_field_map(klass)) - set(vars(self))):
+        if keys := set(_build_field_map(klass)) - set(vars(self)):
             raise AttributeError(f"Found uninitialized fields {keys}.")
         return self
 
