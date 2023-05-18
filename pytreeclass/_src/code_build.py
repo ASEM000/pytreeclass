@@ -48,7 +48,8 @@ class Field(NamedTuple):
             try:
                 value = callback(value)
             except Exception as e:
-                raise type(e)(f"Error for field=`{self.name}`:\n{e}")
+                cname = getattr(callback, "__name__", callback)
+                raise type(e)(f"On applying {cname} for field=`{self.name}`:\n{e}")
         return value
 
 
@@ -183,24 +184,23 @@ def _build_init_method(klass: type) -> FunctionType:
     hints = dict()
     head = ["self"]
     heads = dict(zip(ArgKind, ([], [], [])))
-    has_post_init = "__post_init__" in vars(klass)
+    has_post = "__post_init__" in vars(klass)
 
     for field in (field_map := _build_field_map(klass)).values():
-        name = field.name
-        alias = field.alias or name
-        vref = "" if field.default is NULL else f"=field_map['{name}'].default"
+        dref = "" if field.default is NULL else f"=field_map['{field.name}'].default"
 
         if field.init:
-            heads[field.kind] += [f"{alias}{vref}"]
+            alias = field.alias or field.name
             hints[field.name] = field.type
-            body += [f"self.{name}={alias}"]
+            body += [f"self.{field.name}={alias}"]
+            heads[field.kind] += [f"{alias}{dref}"]
         else:
-            body += [f"self.{name}{vref}"]
+            body += [f"self.{field.name}{dref}"]
 
     hints["return"] = None
     # add the post init call if the class has it, otherwise add a pass
     # in case all fields are not initialized in the __init__ method
-    body += ["self.__post_init__()"] if has_post_init else ["pass"]
+    body += ["self.__post_init__()"] if has_post else ["pass"]
 
     # organize the arguments order (POS_ONLY, POS_OR_KW, KW_ONLY)
     head += (heads["POS_ONLY"] + ["/"]) if heads["POS_ONLY"] else []

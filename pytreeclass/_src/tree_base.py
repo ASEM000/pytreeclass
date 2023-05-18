@@ -440,6 +440,10 @@ class TreeClass(metaclass=TreeClassMeta):
 
     def __setattr__(self, key: str, value: Any) -> None:
         if id(self) not in _mutable_instance_registry:
+            # instance is not under a mutable context
+            # mutable context is used for setting instance attributes
+            # during initialization and when using the `at` property
+            # with call method.
             raise AttributeError(
                 f"Cannot set attribute {value=} to `{key=}`  "
                 f"on an immutable instance of `{type(self).__name__}`.\n"
@@ -459,6 +463,7 @@ class TreeClass(metaclass=TreeClassMeta):
 
     def __delattr__(self, key: str) -> None:
         if id(self) not in _mutable_instance_registry:
+            # instance is not under a mutable context
             raise AttributeError(
                 f"Cannot delete attribute `{key}` "
                 f"on immutable instance of `{type(self).__name__}`.\n"
