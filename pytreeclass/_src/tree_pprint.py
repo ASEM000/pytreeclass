@@ -161,7 +161,6 @@ def _numpy_pprint(
     return f"{base}(μ={mean}, σ={std}, ∈{interval})"
 
 
-@ft.lru_cache
 def _func_pprint(
     func: Callable,
     *,
@@ -313,7 +312,7 @@ def _treeclass_pprint(
     if depth == 0:
         return f"{name}(...)"
 
-    # avoid circular import by importing Partial here
+    # avoid circular import by importing here
     from pytreeclass import fields
 
     skip = [f.name for f in fields(node) if not f.repr]

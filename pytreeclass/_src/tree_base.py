@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Define a class that convert a class to a JAX compatible tree structure"""
 
 from __future__ import annotations
 
@@ -41,9 +42,6 @@ from pytreeclass._src.tree_util import (
     tree_copy,
     tree_hash,
 )
-
-"""Define a class that convert a class to a JAX compatible tree structure"""
-
 
 T = TypeVar("T", bound="TreeClass")
 PyTree = Any
@@ -338,7 +336,7 @@ class TreeClassMeta(abc.ABCMeta):
             # throwing an `AttributeError`
             getattr(klass, "__init__")(self, *a, **k)
 
-        if len(keys := set(_build_field_map(klass)) - set(vars(self))):
+        if keys := set(_build_field_map(klass)) - set(vars(self)):
             raise AttributeError(f"Found uninitialized fields {keys}.")
         return self
 
@@ -442,6 +440,10 @@ class TreeClass(metaclass=TreeClassMeta):
 
     def __setattr__(self, key: str, value: Any) -> None:
         if id(self) not in _mutable_instance_registry:
+            # instance is not under a mutable context
+            # mutable context is used for setting instance attributes
+            # during initialization and when using the `at` property
+            # with call method.
             raise AttributeError(
                 f"Cannot set attribute {value=} to `{key=}`  "
                 f"on an immutable instance of `{type(self).__name__}`.\n"
@@ -454,16 +456,14 @@ class TreeClass(metaclass=TreeClassMeta):
             )
 
         if key in (field_map := _build_field_map(type(self))):
-            for callback in field_map[key].callbacks:
-                try:
-                    value = callback(value)
-                except Exception as e:
-                    raise type(e)(f"Error for field=`{key}`:\n{e}")
+            # apply field callbacks on the value before setting
+            value = field_map[key](value)
 
         getattr(object, "__setattr__")(self, key, value)
 
     def __delattr__(self, key: str) -> None:
         if id(self) not in _mutable_instance_registry:
+            # instance is not under a mutable context
             raise AttributeError(
                 f"Cannot delete attribute `{key}` "
                 f"on immutable instance of `{type(self).__name__}`.\n"
