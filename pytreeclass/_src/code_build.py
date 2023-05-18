@@ -42,6 +42,15 @@ class Field(NamedTuple):
     callbacks: Sequence[Any] = ()
     alias: str | None = None
 
+    def __call__(self, value: Any):
+        """Call the field's callbacks on `value`."""
+        for callback in self.callbacks:
+            try:
+                value = callback(value)
+            except Exception as e:
+                raise type(e)(f"Error for field=`{self.name}`:\n{e}")
+        return value
+
 
 def field(
     default: Any = NULL,

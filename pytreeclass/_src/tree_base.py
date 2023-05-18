@@ -452,11 +452,8 @@ class TreeClass(metaclass=TreeClassMeta):
             )
 
         if key in (field_map := _build_field_map(type(self))):
-            for callback in field_map[key].callbacks:
-                try:
-                    value = callback(value)
-                except Exception as e:
-                    raise type(e)(f"Error for field=`{key}`:\n{e}")
+            # apply field callbacks on the value before setting
+            value = field_map[key](value)
 
         getattr(object, "__setattr__")(self, key, value)
 
