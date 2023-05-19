@@ -18,10 +18,10 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import math
-from collections.abc import Callable, MutableMapping, MutableSequence
+from collections.abc import MutableMapping, MutableSequence
 from itertools import chain
 from types import FunctionType
-from typing import Any, Literal, Sequence, Union
+from typing import Any, Callable, Literal, Sequence, Union
 
 import jax
 import jax.tree_util as jtu
