@@ -54,7 +54,7 @@ def pp(
     if depth < 0:
         return "..."
 
-    # avoid circular import by importing Partial here
+    # avoid circular import by importing
     from pytreeclass import TreeClass
 
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
@@ -101,13 +101,15 @@ def pps(
 
     spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
 
-    return (
+    text = (
         "\n"
         + "\t" * (indent + 1)
         + (", \n" + "\t" * (indent + 1)).join(pp(x, **spec) for x in xs)
         + "\n"
         + "\t" * (indent)
     )
+
+    return format_width(text, width=width)
 
 
 # define how to handle container node printing
