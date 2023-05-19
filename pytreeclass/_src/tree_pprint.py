@@ -20,7 +20,7 @@ import inspect
 import math
 from itertools import chain
 from types import FunctionType
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Sequence
 
 import jax
 import jax.tree_util as jtu
@@ -85,60 +85,34 @@ def _pprint(
     return _format_width(text, width=width)
 
 
-def _kvs_pprint(
-    kvs: tuple[str, Any],
+def _container_pprint(
+    items: Sequence[Any],
     *,
     indent: int,
     kind: PrintKind,
     width: int,
     depth: int,
-    markers: tuple[str, str, str],
+    printer: Callable[[Any, int, PrintKind, int, int | float], str],
 ) -> str:
-    lhs, sep, rhs = markers
-
     if depth == 0:
-        return f"{lhs}...{rhs}"
+        return "..."
 
     spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
     line = ", \n" + "\t" * (indent + 1)
 
     return (
-        lhs
-        + "\n"
+        "\n"
         + "\t" * (indent + 1)
-        + line.join(f"{k}{sep}{_pprint(v,**spec)}" for k, v in kvs)
+        + line.join(printer(item, **spec) for item in items)
         + "\n"
         + "\t" * (indent)
-        + rhs
     )
 
 
-def _vs_pprint(
-    vs: tuple[Any],
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-    markers: tuple[str, str],
-) -> str:
-    lhs, rhs = markers
-
-    if depth == 0:
-        return f"{lhs}...{rhs}"
-
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
-    line = ", \n" + "\t" * (indent + 1)
-
-    return (
-        lhs
-        + "\n"
-        + "\t" * (indent + 1)
-        + line.join(_pprint(v, **spec) for v in vs)
-        + "\n"
-        + "\t" * (indent)
-        + rhs
-    )
+# define how to handle container node printing
+dict_printer = lambda x, **spec: f"{x[0]}:{_pprint(x[1], **spec)}"
+attr_printer = lambda x, **spec: f"{x[0]}={_pprint(x[1], **spec)}"
+vals_printer = lambda x, **spec: _pprint(x, **spec)
 
 
 def _general_pprint(
@@ -250,7 +224,7 @@ def _list_pprint(
     depth: int,
 ) -> str:
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return _vs_pprint(node, **spec, markers=["[", "]"])
+    return "[" + _container_pprint(node, printer=vals_printer, **spec) + "]"
 
 
 def _tuple_pprint(
@@ -262,7 +236,7 @@ def _tuple_pprint(
     depth: int,
 ) -> str:
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return _vs_pprint(node, **spec, markers=["(", ")"])
+    return "(" + _container_pprint(node, printer=vals_printer, **spec) + ")"
 
 
 def _set_pprint(
@@ -274,7 +248,7 @@ def _set_pprint(
     depth: int,
 ) -> str:
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return _vs_pprint(node, **spec, markers=["{", "}"])
+    return "{" + _container_pprint(node, printer=vals_printer, **spec) + "}"
 
 
 def _dict_pprint(
@@ -287,7 +261,7 @@ def _dict_pprint(
 ) -> str:
     kvs = node.items()
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return _kvs_pprint(kvs, **spec, markers=("{", ":", "}"))
+    return "{" + _container_pprint(kvs, printer=dict_printer, **spec) + "}"
 
 
 def _namedtuple_pprint(
@@ -301,7 +275,7 @@ def _namedtuple_pprint(
     name = type(node).__name__
     kvs = node._asdict().items()
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return name + _kvs_pprint(kvs, **spec, markers=("(", "=", ")"))
+    return name + "(" + _container_pprint(kvs, printer=attr_printer, **spec) + ")"
 
 
 def _dataclass_pprint(
@@ -315,7 +289,7 @@ def _dataclass_pprint(
     name = type(node).__name__
     kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return name + _kvs_pprint(kvs, **spec, markers=("(", "=", ")"))
+    return name + "(" + _container_pprint(kvs, printer=attr_printer, **spec) + ")"
 
 
 def _treeclass_pprint(
@@ -333,10 +307,10 @@ def _treeclass_pprint(
     skip = [f.name for f in fields(node) if not f.repr]
     kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return name + _kvs_pprint(kvs, **spec, markers=("(", "=", ")"))
+    return name + "(" + _container_pprint(kvs, printer=attr_printer, **spec) + ")"
 
 
-def _node_type_pprint(
+def _type_pprint(
     node: jax.Array | np.ndarray,
     *,
     indent: int,
@@ -344,13 +318,12 @@ def _node_type_pprint(
     width: int,
     depth: int,
 ) -> str:
-    if isinstance(node, (jax.Array, np.ndarray)):
-        shape_dype = node.shape, node.dtype
-        spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-        text = _pprint(jax.ShapeDtypeStruct(*shape_dype), **spec)
-    else:
-        text = f"{type(node).__name__}"
-    return text
+    if not isinstance(node, (jax.Array, np.ndarray)):
+        return f"{type(node).__name__}"
+
+    shape_dype = node.shape, node.dtype
+    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+    return _pprint(jax.ShapeDtypeStruct(*shape_dype), **spec)
 
 
 def tree_repr(
@@ -441,7 +414,8 @@ def tree_indent(
         tree: The tree to be printed.
         depth: The maximum depth of the tree to be printed.
         is_leaf: A function that takes a node and returns True if it is a leaf node.
-        tabwidth: The number of spaces per indentation level. if `None` then tabs are not expanded.
+        tabwidth: The number of spaces per indentation level. if `None`
+            then tabs are not expanded.
 
     Example:
         >>> import pytreeclass as pytc
@@ -866,12 +840,12 @@ def tree_summary(
             continue
 
         paths = jtu.keystr(trace[0])
-        types = _node_type_pprint(leaf, indent=0, kind="str", width=60, depth=depth)
+        types = _type_pprint(leaf, indent=0, kind="str", width=60, depth=depth)
         counts = f"{count:,}"
         ROWS += [[paths, types, counts]]
 
     paths = "Σ"
-    types = _node_type_pprint(tree, indent=0, kind="str", width=60, depth=depth)
+    types = _type_pprint(tree, indent=0, kind="str", width=60, depth=depth)
     counts = f"{COUNT:,}"
     ROWS += [[paths, types, counts]]
 
