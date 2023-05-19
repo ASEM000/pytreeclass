@@ -113,7 +113,6 @@ def pps(
 # define how to handle container node printing
 kvs_pp: PPType = lambda x, **spec: f"{x[0]}:{pp(x[1], **spec)}"
 avs_pp: PPType = lambda x, **spec: f"{x[0]}={pp(x[1], **spec)}"
-val_pp: PPType = lambda x, **spec: f"{pp(x, **spec)}"
 
 
 def general_pp(
@@ -225,7 +224,7 @@ def list_pp(
     depth: int,
 ) -> str:
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return "[" + pps(node, pp=val_pp, **spec) + "]"
+    return "[" + pps(node, pp=pp, **spec) + "]"
 
 
 def tuple_pp(
@@ -237,7 +236,7 @@ def tuple_pp(
     depth: int,
 ) -> str:
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return "(" + pps(node, pp=val_pp, **spec) + ")"
+    return "(" + pps(node, pp=pp, **spec) + ")"
 
 
 def set_pp(
@@ -249,7 +248,7 @@ def set_pp(
     depth: int,
 ) -> str:
     spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return "{" + pps(node, pp=val_pp, **spec) + "}"
+    return "{" + pps(node, pp=pp, **spec) + "}"
 
 
 def dict_pp(
