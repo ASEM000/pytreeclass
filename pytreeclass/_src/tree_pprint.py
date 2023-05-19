@@ -21,7 +21,7 @@ import math
 from collections.abc import Callable, MutableMapping, MutableSequence
 from itertools import chain
 from types import FunctionType
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Sequence, Union
 
 import jax
 import jax.tree_util as jtu
@@ -40,7 +40,7 @@ from pytreeclass._src.tree_util import (
 PyTree = Any
 PrintKind = Literal["repr", "str"]
 from_iterable = chain.from_iterable
-PPType = Callable[[Any, int, PrintKind, int, int | float], str]
+PPType = Callable[[Any, int, PrintKind, int, Union[int, float]], str]
 
 
 def pp(
