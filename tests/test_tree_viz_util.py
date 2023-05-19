@@ -4,14 +4,7 @@ import jax
 import jax.nn.initializers as ji
 import jax.tree_util as jtu
 
-from pytreeclass._src.tree_pprint import (
-    _func_pprint,
-    _hbox,
-    _hstack,
-    _pprint,
-    _table,
-    _vbox,
-)
+from pytreeclass._src.tree_pprint import _hbox, _hstack, _table, _vbox, func_pp, pp
 
 
 def test_vbox():
@@ -37,32 +30,32 @@ def test_hstack():
     assert _hstack(_hbox("a"), _vbox("b", "c")) == "┌─┬─┐\n│a│b│\n└─┼─┤\n  │c│\n  └─┘"
 
 
-def test_func_pprint():
+def test_func_pp():
     def example(a: int, b=1, *c, d, e=2, **f) -> str:
         ...  # fmt: skip
 
     assert (
-        _func_pprint(example, indent=0, kind="str", width=60, depth=0)
+        func_pp(example, indent=0, kind="str", width=60, depth=0)
         == "example(a, b, *c, d, e, **f)"
     )
     # assert (
-    #     _func_pprint(lambda x: x, indent=0, kind="str", width=60, depth=0)
+    #     func_pp(lambda x: x, indent=0, kind="str", width=60, depth=0)
     #     == "Lambda(x)"
     # )
     assert (
-        _func_pprint(jax.nn.relu, indent=0, kind="str", width=60, depth=0)
+        func_pp(jax.nn.relu, indent=0, kind="str", width=60, depth=0)
         == "relu(*args, **kwargs)"
     )
     assert (
-        _pprint(jtu.Partial(jax.nn.relu), indent=0, kind="str", width=60, depth=0)
+        pp(jtu.Partial(jax.nn.relu), indent=0, kind="str", width=60, depth=0)
         == "Partial(relu(*args, **kwargs))"
     )
     assert (
-        _pprint(jtu.Partial(jax.nn.relu), indent=0, kind="str", width=60, depth=0)
+        pp(jtu.Partial(jax.nn.relu), indent=0, kind="str", width=60, depth=0)
         == "Partial(relu(*args, **kwargs))"
     )
     assert (
-        _func_pprint(ji.he_normal, indent=0, kind="str", width=60, depth=0)
+        func_pp(ji.he_normal, indent=0, kind="str", width=60, depth=0)
         == "he_normal(in_axis, out_axis, batch_axis, dtype)"
     )
 
