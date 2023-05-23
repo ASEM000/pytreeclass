@@ -21,13 +21,14 @@ import math
 from collections.abc import MutableMapping, MutableSequence
 from itertools import chain
 from types import FunctionType
-from typing import Any, Callable, Literal, Sequence, Union
+from typing import Any, Callable, Iterable, Literal, Union
 
 import jax
 import jax.tree_util as jtu
 import numpy as np
 from jax import custom_jvp
 from jax.util import unzip2
+from typing_extensions import TypedDict, Unpack
 
 from pytreeclass._src.tree_util import (
     IsLeafType,
@@ -38,26 +39,25 @@ from pytreeclass._src.tree_util import (
 )
 
 PyTree = Any
-PrintKind = Literal["repr", "str"]
+PrintKind = Literal["REPR", "STR"]
+ORDER_KEY = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
 from_iterable = chain.from_iterable
 PPType = Callable[[Any, int, PrintKind, int, Union[int, float]], str]
 
 
-def pp(
-    node: Any,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int | float,
-) -> str:
-    if depth < 0:
+class PPSpec(TypedDict):
+    indent: int
+    kind: PrintKind
+    width: int
+    depth: int | float
+
+
+def pp(node: Any, **spec: Unpack[PPSpec]) -> str:
+    if spec["depth"] < 0:
         return "..."
 
     # avoid circular import by importing
     from pytreeclass import TreeClass
-
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
 
     if isinstance(node, ft.partial):
         text = f"Partial({func_pp(node.func, **spec)})"
@@ -79,73 +79,52 @@ def pp(
         text = dataclass_pp(node, **spec)
     elif isinstance(node, TreeClass):
         text = treeclass_pp(node, **spec)
-    elif isinstance(node, (np.ndarray, jax.Array)) and kind == "repr":
+    elif isinstance(node, (np.ndarray, jax.Array)) and spec["kind"] == "REPR":
         text = numpy_pp(node, **spec)
     else:
         text = general_pp(node, **spec)
 
-    return format_width(text, width=width)
+    return format_width(text, width=spec["width"])
 
 
-def pps(
-    xs: Sequence[Any],
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-    pp: PPType,
-) -> str:
-    if depth == 0:
+def pps(xs: Iterable[Any], pp: PPType, **spec: Unpack[PPSpec]) -> str:
+    if spec["depth"] == 0:
         return "..."
 
-    spec = dict(indent=indent + 1, kind=kind, width=width, depth=depth - 1)
+    spec["indent"] += 1
+    spec["depth"] -= 1
 
     text = (
         "\n"
-        + "\t" * (indent + 1)
-        + (", \n" + "\t" * (indent + 1)).join(pp(x, **spec) for x in xs)
+        + "\t" * spec["indent"]
+        + (", \n" + "\t" * spec["indent"]).join(pp(x, **spec) for x in xs)
         + "\n"
-        + "\t" * (indent)
+        + "\t" * (spec["indent"] - 1)
     )
 
-    return format_width(text, width=width)
+    return format_width(text, width=spec["width"])
 
 
-# define how to handle container node printing
-kvs_pp: PPType = lambda x, **spec: f"{x[0]}:{pp(x[1], **spec)}"
-avs_pp: PPType = lambda x, **spec: f"{x[0]}={pp(x[1], **spec)}"
+def key_value_pp(x: tuple[str, Any], **spec: Unpack[PPSpec]) -> str:
+    return f"{x[0]}:{pp(x[1], **spec)}"
 
 
-def general_pp(
-    node: Any,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
-    del depth, width
-    text = f"{node!r}" if kind == "repr" else f"{node!s}"
+def attr_value_pp(x: tuple[str, Any], **spec: Unpack[PPSpec]) -> str:
+    return f"{x[0]}={pp(x[1], **spec)}"
+
+
+def general_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
+    text = f"{node!r}" if spec["kind"] == "REPR" else f"{node!s}"
 
     if "\n" not in text:
         return text
 
-    indent += 1
+    indent = spec["indent"] + 1
     return "\n" + "\t" * indent + ("\n" + "\t" * indent).join(text.split("\n"))
 
 
-def shape_dtype_pp(
-    node: Any,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
+def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     """Pretty print a node with dtype and shape"""
-    del indent, kind, depth, width
-
     shape = f"{node.shape}".replace(",", "")
     shape = shape.replace("(", "[")
     shape = shape.replace(")", "]")
@@ -156,16 +135,8 @@ def shape_dtype_pp(
     return dtype + shape
 
 
-def numpy_pp(
-    node: np.ndarray | jax.Array,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
+def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape"""
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
 
     base = shape_dtype_pp(node, **spec)
 
@@ -183,28 +154,20 @@ def numpy_pp(
     interval += f"{low},{high}" if is_integer else f"{low:.2f},{high:.2f}"
     interval += ")" if math.isinf(high) else "]"  # resolve closed/open interval
     interval = interval.replace("inf", "∞")  # replace inf with infinity symbol
-
     # handle mean and std
     mean, std = f"{np.mean(node):.2f}", f"{np.std(node):.2f}"
 
     return f"{base}(μ={mean}, σ={std}, ∈{interval})"
 
 
-def func_pp(
-    func: Callable,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
+def func_pp(func: Callable, **spec: Unpack[PPSpec]) -> str:
     # Pretty print function
     # Example:
     #     >>> def example(a: int, b=1, *c, d, e=2, **f) -> str:
     #         ...
     #     >>> func_pp(example)
     #     "example(a, b, *c, d, e, **f)"
-    del indent, kind, depth, width
+    del spec
     args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(func)
     args = (", ".join(args)) if len(args) > 0 else ""
     varargs = ("*" + varargs) if varargs is not None else ""
@@ -217,115 +180,56 @@ def func_pp(
     return text
 
 
-def list_pp(
-    node: list,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+def list_pp(node: list, **spec: Unpack[PPSpec]) -> str:
     return "[" + pps(node, pp=pp, **spec) + "]"
 
 
-def tuple_pp(
-    node: tuple,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+def tuple_pp(node: tuple, **spec) -> str:
     return "(" + pps(node, pp=pp, **spec) + ")"
 
 
-def set_pp(
-    node: set,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
+def set_pp(node: set, **spec: Unpack[PPSpec]) -> str:
     return "{" + pps(node, pp=pp, **spec) + "}"
 
 
-def dict_pp(
-    node: dict,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
-    kvs = node.items()
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return "{" + pps(kvs, pp=kvs_pp, **spec) + "}"
+def dict_pp(node: dict, **spec: Unpack[PPSpec]) -> str:
+    return "{" + pps(node.items(), pp=key_value_pp, **spec) + "}"
 
 
-def namedtuple_pp(
-    node: Any,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
+def namedtuple_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     name = type(node).__name__
     kvs = node._asdict().items()
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return name + "(" + pps(kvs, pp=avs_pp, **spec) + ")"
+    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
 
 
-def dataclass_pp(
-    node: Any,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
+def dataclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     name = type(node).__name__
     kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return name + "(" + pps(kvs, pp=avs_pp, **spec) + ")"
+    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
 
 
-def treeclass_pp(
-    node: Any,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
+def treeclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     # avoid circular import by importing here
     from pytreeclass import fields
 
     name = type(node).__name__
     skip = [f.name for f in fields(node) if not f.repr]
     kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
-    return name + "(" + pps(kvs, pp=avs_pp, **spec) + ")"
+    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
 
 
-def type_pp(
-    node: jax.Array | np.ndarray,
-    *,
-    indent: int,
-    kind: PrintKind,
-    width: int,
-    depth: int,
-) -> str:
+def type_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     if not isinstance(node, (jax.Array, np.ndarray)):
         return f"{type(node).__name__}"
 
     shape_dype = node.shape, node.dtype
-    spec = dict(indent=indent, kind=kind, width=width, depth=depth)
     return pp(jax.ShapeDtypeStruct(*shape_dype), **spec)
+
+
+def size_pp(size: int, **spec: Unpack[PPSpec]):
+    size_order = int(math.log(size, 1024)) if size > 0 else 0
+    text = f"{(size)/(1024**size_order):.2f}{ORDER_KEY[size_order]}"
+    return pp(text, **spec)
 
 
 def tree_repr(
@@ -357,7 +261,7 @@ def tree_repr(
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
     """
-    text = pp(tree, indent=0, kind="repr", width=width, depth=depth)
+    text = pp(tree, indent=0, kind="REPR", width=width, depth=depth)
     return text.expandtabs(tabwidth)
 
 
@@ -386,7 +290,7 @@ def tree_str(
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
     """
-    text = pp(tree, indent=0, kind="str", width=width, depth=depth)
+    text = pp(tree, indent=0, kind="STR", width=width, depth=depth)
     return text.expandtabs(tabwidth)
 
 
@@ -441,7 +345,7 @@ def tree_indent(
         indent = smark * depth
 
         if (len(node.children)) == 0:
-            ppspec = dict(indent=0, kind="repr", width=80, depth=0)
+            ppspec = dict(indent=0, kind="REPR", width=80, depth=0)
             text = f"{indent}"
             (key, _), value = node.data
             text += f"{key}=" if key is not None else ""
@@ -523,7 +427,7 @@ def tree_diagram(
         branch = (lmark if is_last else cmark) if depth > 0 else ""
 
         if (child_count := len(node.children)) == 0:
-            ppspec = dict(indent=0, kind="repr", width=80, depth=0)
+            ppspec = dict(indent=0, kind="REPR", width=80, depth=0)
             (key, _), value = node.data
             text = f"{indent}"
             text += f"{branch}{key}=" if key is not None else ""
@@ -570,7 +474,7 @@ def tree_mermaid(
 
     def step(node: Node, depth: int = 0) -> str:
         if len(node.children) == 0:
-            ppspec = dict(indent=0, kind="repr", width=80, depth=0)
+            ppspec = dict(indent=0, kind="REPR", width=80, depth=0)
             key, _, value = node.data
             text = f"{key}=" if key is not None else ""
             text += pp(value, **ppspec)
@@ -842,15 +746,14 @@ def tree_summary(
             continue
 
         paths = jtu.keystr(trace[0])
-        types = type_pp(leaf, indent=0, kind="str", width=60, depth=depth)
+        types = type_pp(leaf, indent=0, kind="STR", width=60, depth=depth)
         counts = f"{count:,}"
         ROWS += [[paths, types, counts]]
 
     paths = "Σ"
-    types = type_pp(tree, indent=0, kind="str", width=60, depth=depth)
+    types = type_pp(tree, indent=0, kind="STR", width=60, depth=depth)
     counts = f"{COUNT:,}"
     ROWS += [[paths, types, counts]]
-
     return _table(ROWS)
 
 

@@ -20,7 +20,17 @@ import hashlib
 import operator as op
 from collections import defaultdict
 from math import ceil, floor, trunc
-from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Hashable,
+    Iterator,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import jax
 import jax.numpy as jnp
@@ -58,13 +68,13 @@ def tree_hash(*trees: PyTree) -> int:
     return hash((*hashed, jtu.tree_structure(trees)))
 
 
-class _ImmutableWrapper:
+class _ImmutableWrapper(Generic[T]):
     __slots__ = ("__wrapped__", "__weakref__")
 
-    def __init__(self, x: Any) -> None:
+    def __init__(self, x: T) -> None:
         object.__setattr__(self, "__wrapped__", getattr(x, "__wrapped__", x))
 
-    def unwrap(self) -> Any:
+    def unwrap(self) -> T:
         return getattr(self, "__wrapped__")
 
     def __setattr__(self, _, __) -> None:
@@ -74,7 +84,7 @@ class _ImmutableWrapper:
         raise AttributeError("Cannot delete from frozen instance.")
 
 
-class _HashableWrapper(_ImmutableWrapper):
+class _HashableWrapper(_ImmutableWrapper[T]):
     def __eq__(self, rhs: Any) -> bool:
         if not isinstance(rhs, _HashableWrapper):
             return False
@@ -95,7 +105,7 @@ def _frozen_error(opname: str, tree):
     )
 
 
-class _FrozenWrapper(_ImmutableWrapper):
+class _FrozenWrapper(_ImmutableWrapper[T]):
     def __repr__(self):
         return f"#{self.unwrap()!r}"
 
