@@ -486,8 +486,8 @@ class TreeClass(metaclass=TreeClassMeta):
             Call a `method` and return a (return value, new instance) tuple.
 
         `***` acceptable index types are `str` for mapping keys or
-        class attributes, `int` for positional indexing, `...` for all leaves,
-        and a boolean mask of the same structure as the tree.
+        class attributes, `int` for positional indexing, `...` to select all leaves,
+        , a boolean mask of the same structure as the tree, or leaf `type`.
 
         Example:
             >>> import pytreeclass as pytc

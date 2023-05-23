@@ -21,7 +21,7 @@ import math
 from collections.abc import MutableMapping, MutableSequence
 from itertools import chain
 from types import FunctionType
-from typing import Any, Callable, Iterable, Literal, Union
+from typing import Any, Callable, Iterable, Literal
 
 import jax
 import jax.tree_util as jtu
@@ -38,18 +38,18 @@ from pytreeclass._src.tree_util import (
     tree_map_with_trace,
 )
 
-PyTree = Any
-PrintKind = Literal["REPR", "STR"]
-ORDER_KEY = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-from_iterable = chain.from_iterable
-PPType = Callable[[Any, int, PrintKind, int, Union[int, float]], str]
-
 
 class PPSpec(TypedDict):
     indent: int
-    kind: PrintKind
+    kind: Literal["REPR", "STR"]
     width: int
     depth: int | float
+
+
+PyTree = Any
+PP = Callable[[Any, Unpack[PPSpec]], str]
+ORDER_KEY = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+from_iterable = chain.from_iterable
 
 
 def pp(node: Any, **spec: Unpack[PPSpec]) -> str:
@@ -87,7 +87,7 @@ def pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     return format_width(text, width=spec["width"])
 
 
-def pps(xs: Iterable[Any], pp: PPType, **spec: Unpack[PPSpec]) -> str:
+def pps(xs: Iterable[Any], pp: PP, **spec: Unpack[PPSpec]) -> str:
     if spec["depth"] == 0:
         return "..."
 

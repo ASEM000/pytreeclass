@@ -550,12 +550,12 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
 
 
 @dc.dataclass(frozen=True)
-class NamedSequenceKey:
-    idx: int
-    key: Hashable
-
+class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
+    # inherit from both `jtu.GetAttrKey` and `jtu.SequenceKey`
+    # in case the user perform isinstance check to unpack the name/index
+    # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
     def __str__(self):
-        return f".{self.key}"
+        return f".{self.name}"
 
 
 # indexing matching registry
@@ -566,7 +566,7 @@ class NamedSequenceKey:
 match_registry: dict[type, Callable] = defaultdict(lambda entry: (entry,))
 match_registry[jtu.GetAttrKey] = lambda entry: (entry.name,)
 match_registry[jtu.SequenceKey] = lambda entry: (entry.idx,)
-match_registry[NamedSequenceKey] = lambda entry: (entry.idx, entry.key)
+match_registry[NamedSequenceKey] = lambda entry: (entry.idx, entry.name)
 match_registry[jtu.DictKey] = lambda entry: (entry.key,)
 match_registry[jtu.FlattenedIndexKey] = lambda entry: (entry.key,)
 
@@ -582,27 +582,25 @@ def _generate_path_mask(
     # all other leaves to False
     match = False
 
-    def map_func(path: TraceType, _: Any):
-        keys, _ = path
-
-        if len(where) > len(keys):
+    def map_func(path, _: Any):
+        if len(where) > len(path):
             # path is shorter than `where` path. for example
             # where=("a", "b") and the current path is ("a",) then
             # the current path is not a match
             return False
 
-        for wi, key in zip(where, keys):
-            if wi not in (..., *match_registry[type(key)](key)):
+        for wi, ki in zip(where, path):
+            if wi not in (..., *match_registry[type(ki)](ki)):
                 return False
 
         nonlocal match
 
         return (match := True)
 
-    mask = tree_map_with_trace(map_func, tree, is_leaf=is_leaf)
+    mask = jtu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
 
     if not match:
-        raise LookupError(f"No leaf match is found for {where=} and {mask=}")
+        raise LookupError(f"No leaf match is found for {where=}.")
 
     return mask
 
