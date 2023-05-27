@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import dataclasses as dc
 import functools as ft
-import hashlib
 import operator as op
 from collections import defaultdict
 from math import ceil, floor, trunc
@@ -51,21 +50,9 @@ TraceType = Tuple[KeyPath, TypePath]
 IsLeafType = Union[type(None), Callable[[Any], bool]]
 
 
-def _hash_node(node: Any) -> int:
-    if isinstance(node, (jax.Array, np.ndarray)):
-        return int(hashlib.sha256(np.array(node).tobytes()).hexdigest(), 16)
-    if isinstance(node, set):
-        return hash(frozenset(node))
-    if isinstance(node, dict):
-        return hash(frozenset(node.items()))
-    if isinstance(node, list):
-        return hash(tuple(node))
-    return hash(node)
-
-
 def tree_hash(*trees: PyTree) -> int:
-    hashed = jtu.tree_map(_hash_node, jtu.tree_leaves(trees))
-    return hash((*hashed, jtu.tree_structure(trees)))
+    leaves, treedef = jtu.tree_flatten(trees)
+    return hash((*leaves, treedef))
 
 
 class _ImmutableWrapper(Generic[T]):
@@ -74,24 +61,11 @@ class _ImmutableWrapper(Generic[T]):
     def __init__(self, x: T) -> None:
         object.__setattr__(self, "__wrapped__", getattr(x, "__wrapped__", x))
 
-    def unwrap(self) -> T:
-        return getattr(self, "__wrapped__")
-
     def __setattr__(self, _, __) -> None:
         raise AttributeError("Cannot assign to frozen instance.")
 
     def __delattr__(self, _: str) -> None:
         raise AttributeError("Cannot delete from frozen instance.")
-
-
-class _HashableWrapper(_ImmutableWrapper[T]):
-    def __eq__(self, rhs: Any) -> bool:
-        if not isinstance(rhs, _HashableWrapper):
-            return False
-        return tree_hash(self.unwrap()) == tree_hash(rhs.unwrap())
-
-    def __hash__(self) -> int:
-        return tree_hash(self.unwrap())
 
 
 def _frozen_error(opname: str, tree):
@@ -107,15 +81,15 @@ def _frozen_error(opname: str, tree):
 
 class _FrozenWrapper(_ImmutableWrapper[T]):
     def __repr__(self):
-        return f"#{self.unwrap()!r}"
+        return f"#{self.__wrapped__!r}"
 
     def __eq__(self, rhs: Any) -> bool:
         if not isinstance(rhs, _FrozenWrapper):
             return False
-        return self.unwrap() == rhs.unwrap()
+        return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
 
     def __hash__(self) -> int:
-        return tree_hash(self.unwrap())
+        return tree_hash(self.__wrapped__)
 
     # raise helpful error message when trying to interact with frozen object
     __add__ = __radd__ = __iadd__ = lambda x, _: _frozen_error("+", x)
@@ -137,8 +111,8 @@ class _FrozenWrapper(_ImmutableWrapper[T]):
 
 jtu.register_pytree_node(
     nodetype=_FrozenWrapper,
-    flatten_func=lambda tree: ((), _HashableWrapper(tree.unwrap())),
-    unflatten_func=lambda treedef, _: _FrozenWrapper(treedef.unwrap()),
+    flatten_func=lambda tree: ((), tree),
+    unflatten_func=lambda treedef, _: _FrozenWrapper(treedef),
 )
 
 
@@ -212,7 +186,7 @@ def unfreeze(x: Any) -> Any:
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
-    return x.unwrap() if isinstance(x, _FrozenWrapper) else x
+    return x.__wrapped__ if isinstance(x, _FrozenWrapper) else x
 
 
 def is_frozen(wrapped: Any) -> bool:
@@ -516,9 +490,12 @@ def _leafwise_transform(klass: type[T]) -> type[T]:
 def _is_leaf_rhs_equal(leaf, rhs) -> bool | jax.Array:
     if hasattr(leaf, "shape") and hasattr(leaf, "dtype"):
         if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
-            verdict = jnp.array_equal(leaf, rhs)
+            if leaf.shape != rhs.shape:
+                return False
+            if leaf.dtype != rhs.dtype:
+                return False
             try:
-                return bool(verdict)
+                return bool(verdict := jnp.all(leaf == rhs))
             except Exception:
                 return verdict  # fail under `jit`
         return False
@@ -530,8 +507,6 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
 
     Note:
         trees are compared using their leaves and treedefs.
-        For `array` leaves `jnp.array_equal` is used, for other leaves
-        method `__eq__` is used.
 
     Note:
         Under `jit` the return type is boolean `jax.Array` instead of `bool`.
@@ -741,7 +716,7 @@ def tree_map_with_trace(
 ) -> Any:
     # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
     # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
-    r"""
+    """
     Similar to `jax.tree_util.tree_map_with_path` that accept a function
     that takes a two-item tuple for key path and type path.
 

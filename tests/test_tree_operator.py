@@ -7,7 +7,7 @@ import jax.tree_util as jtu
 import pytest
 
 import pytreeclass as pytc
-from pytreeclass._src.tree_util import _hash_node, bcmap
+from pytreeclass._src.tree_util import bcmap
 
 
 def test_bcmap():
@@ -129,8 +129,8 @@ def test_math_operations_errors():
         A == (1,)
 
 
-def test_hash_node():
-    assert _hash_node([1, 2, 3])
-    assert _hash_node(jnp.array([1, 2, 3]))
-    assert _hash_node({1, 2, 3})
-    assert _hash_node({"a": 1})
+# def test_hash_node():
+#     assert _hash_node([1, 2, 3])
+#     assert _hash_node(jnp.array([1, 2, 3]))
+#     assert _hash_node({1, 2, 3})
+#     assert _hash_node({"a": 1})

@@ -44,7 +44,7 @@ def test_getter_by_val():
     B = A.at[A > 0].get()
     C = level2(
         d=level1(a=1, b=10, c=jnp.array([1, 2, 3, 4, 5])),
-        e=level1(a=2, b=20, c=jnp.array([])),
+        e=level1(a=2, b=20, c=jnp.array([], dtype=int)),
     )
 
     assert pytc.is_tree_equal(B, C)
@@ -52,15 +52,15 @@ def test_getter_by_val():
     B = A.at[(A > 0) & (A < 5)].get()
     C = level2(
         d=level1(a=1, b=None, c=jnp.array([1, 2, 3, 4])),
-        e=level1(a=2, b=None, c=jnp.array([])),
+        e=level1(a=2, b=None, c=jnp.array([], dtype=int)),
     )
 
     assert pytc.is_tree_equal(B, C)
 
     B = A.at[A == 0].get()
     C = level2(
-        d=level1(a=None, b=None, c=jnp.array([])),
-        e=level1(a=None, b=None, c=jnp.array([])),
+        d=level1(a=None, b=None, c=jnp.array([], dtype=int)),
+        e=level1(a=None, b=None, c=jnp.array([], dtype=int)),
     )
 
     assert pytc.is_tree_equal(B, C)
@@ -588,7 +588,9 @@ def test_composed_at():
 
     t = Tree()
 
-    assert pytc.is_tree_equal(t.at[t > 0].at[t < 0].get(), Tree(jnp.array([])))
+    assert pytc.is_tree_equal(
+        t.at[t > 0].at[t < 0].get(), Tree(jnp.array([], dtype=int))
+    )
 
     with pytest.raises(AttributeError):
         t.at[t > 0].bet
