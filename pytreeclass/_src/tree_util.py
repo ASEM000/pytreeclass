@@ -55,19 +55,6 @@ def tree_hash(*trees: PyTree) -> int:
     return hash((*leaves, treedef))
 
 
-class _ImmutableWrapper(Generic[T]):
-    __slots__ = ("__wrapped__", "__weakref__")
-
-    def __init__(self, x: T) -> None:
-        object.__setattr__(self, "__wrapped__", getattr(x, "__wrapped__", x))
-
-    def __setattr__(self, _, __) -> None:
-        raise AttributeError("Cannot assign to frozen instance.")
-
-    def __delattr__(self, _: str) -> None:
-        raise AttributeError("Cannot delete from frozen instance.")
-
-
 def _frozen_error(opname: str, tree):
     raise NotImplementedError(
         f"Cannot apply `{opname}` operation to a frozen object `{tree!r}`.\n"
@@ -79,11 +66,22 @@ def _frozen_error(opname: str, tree):
     )
 
 
-class _FrozenWrapper(_ImmutableWrapper[T]):
+class _FrozenWrapper(Generic[T]):
+    __slots__ = ("__wrapped__", "__weakref__")
+
+    def __init__(self, x: T) -> None:
+        object.__setattr__(self, "__wrapped__", unfreeze(x))
+
+    def __setattr__(self, _, __) -> None:
+        raise AttributeError("Cannot assign to frozen instance.")
+
+    def __delattr__(self, _: str) -> None:
+        raise AttributeError("Cannot delete from frozen instance.")
+
     def __repr__(self):
         return f"#{self.__wrapped__!r}"
 
-    def __eq__(self, rhs: Any) -> bool:
+    def __eq__(self, rhs: Any) -> bool | jax.Array:
         if not isinstance(rhs, _FrozenWrapper):
             return False
         return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
@@ -117,7 +115,7 @@ jtu.register_pytree_node(
 
 
 def freeze(wrapped: Any) -> _FrozenWrapper:
-    r"""Freeze a value to avoid updating it by `jax` transformations.
+    """Freeze a value to avoid updating it by `jax` transformations.
 
     Example:
         >>> import jax
@@ -169,6 +167,11 @@ def freeze(wrapped: Any) -> _FrozenWrapper:
     return _FrozenWrapper(wrapped)
 
 
+def is_frozen(wrapped: Any) -> bool:
+    """Returns True if the value is a frozen wrapper."""
+    return isinstance(wrapped, _FrozenWrapper)
+
+
 def unfreeze(x: Any) -> Any:
     """Unfreeze `frozen` value, otherwise return the value itself.
 
@@ -186,12 +189,7 @@ def unfreeze(x: Any) -> Any:
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
-    return x.__wrapped__ if isinstance(x, _FrozenWrapper) else x
-
-
-def is_frozen(wrapped: Any) -> bool:
-    """Returns True if the value is a frozen wrapper."""
-    return isinstance(wrapped, _FrozenWrapper)
+    return x.__wrapped__ if is_frozen(x) else x
 
 
 def is_nondiff(x: Any) -> bool:

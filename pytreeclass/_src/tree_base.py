@@ -487,7 +487,7 @@ class TreeClass(metaclass=TreeClassMeta):
 
         `***` acceptable index types are `str` for mapping keys or
         class attributes, `int` for positional indexing, `...` to select all leaves,
-        , a boolean mask of the same structure as the tree, or leaf `type`.
+        , a boolean mask of the same structure as the tree.
 
         Example:
             >>> import pytreeclass as pytc

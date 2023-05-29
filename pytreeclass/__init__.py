@@ -50,4 +50,8 @@ __all__ = (
     "Partial",
 )
 
-__version__ = "0.3.6"
+__version__ = "0.3.7"
+
+AtIndexer.__module__ = "pytreeclass"
+TreeClass.__module__ = "pytreeclass"
+Partial.__module__ = "pytreeclass"
