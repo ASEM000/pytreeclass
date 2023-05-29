@@ -70,7 +70,7 @@ class _FrozenWrapper(Generic[T]):
     __slots__ = ("__wrapped__", "__weakref__")
 
     def __init__(self, x: T) -> None:
-        object.__setattr__(self, "__wrapped__", unfreeze(x))
+        object.__setattr__(self, "__wrapped__", x)
 
     def __setattr__(self, _, __) -> None:
         raise AttributeError("Cannot assign to frozen instance.")
@@ -110,7 +110,7 @@ class _FrozenWrapper(Generic[T]):
 jtu.register_pytree_node(
     nodetype=_FrozenWrapper,
     flatten_func=lambda tree: ((), tree),
-    unflatten_func=lambda treedef, _: _FrozenWrapper(treedef),
+    unflatten_func=lambda treedef, _: treedef,
 )
 
 
@@ -135,36 +135,8 @@ def freeze(wrapped: Any) -> _FrozenWrapper:
         >>> a[1] = pytc.freeze(a[1])
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
-
-        >>> class Test(pytc.TreeClass):
-        ...     a: float
-        ...     @jax.value_and_grad
-        ...     def __call__(self, x):
-        ...         # unfreeze `a` to update it
-        ...         self = jax.tree_map(pytc.unfreeze, self, is_leaf=pytc.is_frozen)
-        ...         return x ** self.a
-
-        >>> # without `freeze` wrapping `a`, `a` will be updated
-        >>> value, grad = Test(a = 2.)(2.)
-        >>> print(f"value: {value}\ngrad: {grad}")
-        value: 4.0
-        grad: Test(a=2.7725887)
-
-        >>> # with `freeze` wrapping `a`, `a` will NOT be updated
-        >>> value, grad = Test(a=pytc.freeze(2.))(2.)
-        >>> print(f"value: {value}\ngrad: {grad}")
-        value: 4.0
-        grad: Test(a=#2.0)
-
-        >>> # usage with `jax.tree_map` to freeze a tree
-        >>> tree = Test(a = 2.)
-        >>> frozen_tree = jax.tree_map(pytc.freeze, tree)
-        >>> value, grad = frozen_tree(2.)
-        >>> print(f"value: {value}\ngrad: {grad}")
-        value: 4.0
-        grad: Test(a=#2.0)
     """
-    return _FrozenWrapper(wrapped)
+    return wrapped if is_frozen(wrapped) else _FrozenWrapper(wrapped)
 
 
 def is_frozen(wrapped: Any) -> bool:
