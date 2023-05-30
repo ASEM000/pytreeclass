@@ -144,7 +144,7 @@ def is_frozen(wrapped: Any) -> bool:
     return isinstance(wrapped, _FrozenWrapper)
 
 
-def unfreeze(x: Any) -> Any:
+def unfreeze(wrapped: Any) -> Any:
     """Unfreeze `frozen` value, otherwise return the value itself.
 
     - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
@@ -161,10 +161,10 @@ def unfreeze(x: Any) -> Any:
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
-    return x.__wrapped__ if is_frozen(x) else x
+    return getattr(wrapped, "__wrapped__") if is_frozen(wrapped) else wrapped
 
 
-def is_nondiff(x: Any) -> bool:
+def is_nondiff(wrapped: Any) -> bool:
     """
     Returns True if the node is a non-differentiable node, and False for if the
     node is of type float, complex number, or a numpy array of floats or
@@ -188,9 +188,9 @@ def is_nondiff(x: Any) -> bool:
         to freeze the non-differentiable nodes before passing the tree to a
         `jax` transformation.
     """
-    if hasattr(x, "dtype") and np.issubdtype(x.dtype, np.inexact):
+    if hasattr(wrapped, "dtype") and np.issubdtype(wrapped.dtype, np.inexact):
         return False
-    if isinstance(x, (float, complex)):
+    if isinstance(wrapped, (float, complex)):
         return False
     return True
 

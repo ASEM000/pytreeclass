@@ -134,7 +134,7 @@ class AtIndexer(NamedTuple):
             "Example of supported indexing:\n\n"
             ">>> import jax\n"
             ">>> import pytreeclass as pytc\n"
-            f"class {type(self.tree).__name__}:(pytc.TreeClass)\n"
+            f"class {type(self.tree).__name__}(pytc.TreeClass):\n"
             "    ...\n\n"
             f">>> tree = {type(self.tree).__name__}(...)\n"
             ">>> # indexing by boolean pytree\n"
