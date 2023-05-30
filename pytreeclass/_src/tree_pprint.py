@@ -184,7 +184,7 @@ def list_pp(node: list, **spec: Unpack[PPSpec]) -> str:
     return "[" + pps(node, pp=pp, **spec) + "]"
 
 
-def tuple_pp(node: tuple, **spec) -> str:
+def tuple_pp(node: tuple, **spec: Unpack[PPSpec]) -> str:
     return "(" + pps(node, pp=pp, **spec) + ")"
 
 
