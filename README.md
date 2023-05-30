@@ -514,7 +514,7 @@ print(counter.calls) # 10
 
 </details>
 
-## ➕ More<a id="more"></a>
+## ➕ Benchmarks<a id="more"></a>
 
 <details>
 <summary>Benchmark flatten/unflatten compared to Flax and Equinox </summary>
@@ -532,6 +532,27 @@ print(counter.calls) # 10
 </tr>
 
 </table>
+
+</details>
+
+<details>
+<summary>Benchmark simple training againest Equinox </summary>
+
+<a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/benchmark_nn_training_equinox.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+Benchmarking of training a simple sequential linear layers on colab CPU.
+
+`10 layers`
+
+- `PyTreeClass`: 34.4 ms ± 867 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+- `Equinox`: 230 ms ± 93.5 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+- `Eqx/PyTc`: 6.671167451529536 for 10 layers
+
+`100 layers`:
+
+- `PyTreeClass`: 659 ms ± 19.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+- `Equinox` : 1.79 s ± 272 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+- `Eqx/PyTc`: 2.714461166827432 for 100 layers
 
 </details>
 
