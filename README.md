@@ -536,23 +536,31 @@ print(counter.calls) # 10
 </details>
 
 <details>
-<summary>Benchmark simple training againest Equinox </summary>
+<summary>Benchmark simple training against `flax` and `equinox` </summary>
 
-<a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/benchmark_nn_training_equinox.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Training simple sequential linear benchmark against `flax` and `equinox`
 
-Benchmarking of training a simple sequential linear layers on colab CPU.
+<table>
 
-`10 layers`
+<tr>
+<td align="center">Num of layers</td>
+<td align="center">Flax/PyTC time<br><a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/benchmark_nn_training_flax.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
+<td align="center">Equinox/PyTC time<br> <a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/benchmark_nn_training_equinox.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
+</tr>
 
-- `PyTreeClass`: 34.4 ms ± 867 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
-- `Equinox`: 230 ms ± 93.5 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
-- `Eqx/PyTc`: 6.671167451529536 for 10 layers
+<tr>
+<td align="center">10</td>
+<td align="center">1.427</td>
+<td align="center">6.671</td>
+</tr>
 
-`100 layers`:
+<tr>
+<td align="center">100</td>
+<td align="center">1.1130</td>
+<td align="center">2.714</td>
+</tr>
 
-- `PyTreeClass`: 659 ms ± 19.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-- `Equinox` : 1.79 s ± 272 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-- `Eqx/PyTc`: 2.714461166827432 for 100 layers
+</table>
 
 </details>
 
