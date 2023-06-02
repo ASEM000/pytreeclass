@@ -119,8 +119,7 @@ def general_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     if "\n" not in text:
         return text
 
-    indent = spec["indent"] + 1
-    return "\n" + "\t" * indent + ("\n" + "\t" * indent).join(text.split("\n"))
+    return ("\n" + "\t" * (spec["indent"])).join(text.split("\n"))
 
 
 def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
@@ -830,6 +829,6 @@ def tree_repr_with_trace(
         ROWS += [["Type path", types]]
 
         # make a pretty table for each leaf
-        return _table(ROWS, transpose=transpose)
+        return "\n\t" + ("\n\t").join(_table(ROWS, transpose=transpose).split("\n"))
 
     return tree_map_with_trace(leaf_trace_summary, tree, is_leaf=is_leaf)
