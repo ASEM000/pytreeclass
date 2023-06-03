@@ -121,7 +121,7 @@ tree = tree.at[mask].apply(pytc.freeze)
 @jax.grad
 def sum_tree(tree:Tree, x):
     # unfreeze before calling tree
-    tree = tree.at[...].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+    tree = jax.tree_map(pytc.unfreeze, tree, is_leaf=pytc.is_frozen)
     return sum(tree(x))
 
 print(sum_tree(tree, 1.0))
