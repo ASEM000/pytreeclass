@@ -20,6 +20,7 @@ Install from pip::
    notebooks/stateful_computations
    notebooks/freezing
    notebooks/common_recipes
+   notebooks/build_simple_neural_network
 
 .. toctree::
     :caption: API Documentation
