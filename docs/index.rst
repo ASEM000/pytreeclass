@@ -17,6 +17,7 @@ Install from pip::
    :maxdepth: 1
 
    notebooks/getting_started
+   notebooks/pytrees
    notebooks/stateful_computations
    notebooks/freezing
    notebooks/common_recipes
