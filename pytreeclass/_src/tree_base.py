@@ -18,7 +18,7 @@ from __future__ import annotations
 import abc
 from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -43,7 +43,7 @@ from pytreeclass._src.tree_util import (
     tree_hash,
 )
 
-T = TypeVar("T", bound="TreeClass")
+T = TypeVar("T")
 PyTree = Any
 EllipsisType = type(Ellipsis)
 _no_initializer = object()
@@ -531,3 +531,149 @@ class TreeClass(metaclass=TreeClassMeta):
 
     def __eq__(self, other: Any) -> bool | jax.Array:
         return is_tree_equal(self, other)
+
+
+def _frozen_error(opname: str, tree):
+    raise NotImplementedError(
+        f"Cannot apply `{opname}` operation to a frozen object `{tree!r}`.\n"
+        "Unfreeze the object first to apply operations to it\n"
+        "Example:\n"
+        ">>> import jax\n"
+        ">>> import pytreeclass as pytc\n"
+        ">>> tree = jax.tree_map(pytc.unfreeze, tree, is_leaf=pytc.is_frozen)"
+    )
+
+
+class _Frozen(Generic[T]):
+    __slots__ = ("__wrapped__", "__weakref__")
+
+    def __init__(self, x: T) -> None:
+        object.__setattr__(self, "__wrapped__", x)
+
+    def __setattr__(self, _, __) -> None:
+        raise AttributeError("Cannot assign to frozen instance.")
+
+    def __delattr__(self, _: str) -> None:
+        raise AttributeError("Cannot delete from frozen instance.")
+
+    def __repr__(self) -> str:
+        return "#" + tree_repr(self.__wrapped__)
+
+    def __str__(self) -> str:
+        return "#" + tree_str(self.__wrapped__)
+
+    def __copy__(self) -> _Frozen[T]:
+        return _Frozen(tree_copy(self.__wrapped__))
+
+    def __eq__(self, rhs: Any) -> bool | jax.Array:
+        if not isinstance(rhs, _Frozen):
+            return False
+        return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
+
+    def __hash__(self) -> int:
+        return tree_hash(self.__wrapped__)
+
+    # raise helpful error message when trying to interact with frozen object
+    __add__ = __radd__ = __iadd__ = lambda x, _: _frozen_error("+", x)
+    __sub__ = __rsub__ = __isub__ = lambda x, _: _frozen_error("-", x)
+    __mul__ = __rmul__ = __imul__ = lambda x, _: _frozen_error("*", x)
+    __matmul__ = __rmatmul__ = __imatmul__ = lambda x, _: _frozen_error("@", x)
+    __truediv__ = __rtruediv__ = __itruediv__ = lambda x, _: _frozen_error("/", x)
+    __floordiv__ = __rfloordiv__ = __ifloordiv__ = lambda x, _: _frozen_error("//", x)
+    __mod__ = __rmod__ = __imod__ = lambda x, _: _frozen_error("%", x)
+    __pow__ = __rpow__ = __ipow__ = lambda x, _: _frozen_error("**", x)
+    __lshift__ = __rlshift__ = __ilshift__ = lambda x, _: _frozen_error("<<", x)
+    __rshift__ = __rrshift__ = __irshift__ = lambda x, _: _frozen_error(">>", x)
+    __and__ = __rand__ = __iand__ = lambda x, _: _frozen_error("and", x)
+    __xor__ = __rxor__ = __ixor__ = lambda x, _: _frozen_error("xor", x)
+    __or__ = __ror__ = __ior__ = lambda x, _: _frozen_error("or", x)
+    __neg__ = __pos__ = __abs__ = __invert__ = lambda x: _frozen_error("unary op", x)
+    __call__ = lambda x, *_, **__: _frozen_error("call", x)
+
+
+jtu.register_pytree_node(
+    nodetype=_Frozen,
+    flatten_func=lambda tree: ((), tree),
+    unflatten_func=lambda treedef, _: treedef,
+)
+
+
+def freeze(wrapped: _Frozen[T] | T) -> _Frozen[T]:
+    """Freeze a value to avoid updating it by `jax` transformations.
+
+    Example:
+        >>> import jax
+        >>> import pytreeclass as pytc
+        >>> import jax.tree_util as jtu
+        >>> # Usage with `jax.tree_util.tree_leaves`
+        >>> # no leaves for a wrapped value
+        >>> jtu.tree_leaves(pytc.freeze(2.))
+        []
+
+        >>> # retrieve the frozen wrapper value using `is_leaf=pytc.is_frozen`
+        >>> jtu.tree_leaves(pytc.freeze(2.), is_leaf=pytc.is_frozen)
+        [#2.0]
+
+        >>> # Usage with `jax.tree_util.tree_map`
+        >>> a= [1,2,3]
+        >>> a[1] = pytc.freeze(a[1])
+        >>> jtu.tree_map(lambda x:x+100, a)
+        [101, #2, 103]
+    """
+    return wrapped if is_frozen(wrapped) else _Frozen(wrapped)
+
+
+def is_frozen(wrapped: Any) -> bool:
+    """Returns True if the value is a frozen wrapper."""
+    return isinstance(wrapped, _Frozen)
+
+
+def unfreeze(wrapped: _Frozen[T] | T) -> T:
+    """Unfreeze `frozen` value, otherwise return the value itself.
+
+    - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> import jax
+        >>> frozen_value = pytc.freeze(1)
+        >>> pytc.unfreeze(frozen_value)
+        1
+        >>> # usage with `jax.tree_map`
+        >>> frozen_tree = jax.tree_map(pytc.freeze, {"a": 1, "b": 2})
+        >>> unfrozen_tree = jax.tree_map(pytc.unfreeze, frozen_tree, is_leaf=pytc.is_frozen)
+        >>> unfrozen_tree
+        {'a': 1, 'b': 2}
+    """
+    return getattr(wrapped, "__wrapped__") if is_frozen(wrapped) else wrapped
+
+
+def is_nondiff(wrapped: Any) -> bool:
+    """
+    Returns True if the node is a non-differentiable node, and False for if the
+    node is of type float, complex number, or a numpy array of floats or
+    complex numbers.
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> import jax.numpy as jnp
+        >>> pytc.is_nondiff(jnp.array(1))  # int array is non-diff type
+        True
+        >>> pytc.is_nondiff(jnp.array(1.))  # float array is diff type
+        False
+        >>> pytc.is_nondiff(1)  # int is non-diff type
+        True
+        >>> pytc.is_nondiff(1.)  # float is diff type
+        False
+
+    Note:
+        This function is meant to be used with `jax.tree_map` to
+        create a mask for non-differentiable nodes in a tree, that can be used
+        to freeze the non-differentiable nodes before passing the tree to a
+        `jax` transformation.
+    """
+    if hasattr(wrapped, "dtype") and np.issubdtype(wrapped.dtype, np.inexact):
+        return False
+    if isinstance(wrapped, (float, complex)):
+        return False
+    return True

@@ -1,5 +1,12 @@
 from pytreeclass._src.code_build import field, fields
-from pytreeclass._src.tree_base import AtIndexer, TreeClass
+from pytreeclass._src.tree_base import (
+    AtIndexer,
+    TreeClass,
+    freeze,
+    is_frozen,
+    is_nondiff,
+    unfreeze,
+)
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
     tree_indent,
@@ -12,14 +19,10 @@ from pytreeclass._src.tree_pprint import (
 from pytreeclass._src.tree_util import (
     Partial,
     bcmap,
-    freeze,
-    is_frozen,
-    is_nondiff,
     is_tree_equal,
     tree_flatten_with_trace,
     tree_leaves_with_trace,
     tree_map_with_trace,
-    unfreeze,
 )
 
 __all__ = (
