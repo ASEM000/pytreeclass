@@ -261,7 +261,9 @@ def bcmap(
             all_leaves += [bfunc(*xs_args, **dict(zip(leaves_keys, xs_kwargs)))]
         return jtu.tree_unflatten(treedef0, all_leaves)
 
-    docs = f"Broadcasted version of {func.__name__}\n{func.__doc__}"
+    name = getattr(func, "__name__", func)
+
+    docs = f"Broadcasted version of {name}\n{func.__doc__}"
     wrapper.__doc__ = docs
     return wrapper
 
