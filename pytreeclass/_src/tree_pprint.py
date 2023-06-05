@@ -701,7 +701,7 @@ def tree_summary(
         - First column: path to the node
         - Second column: type of the node
         - Third column: number of leaves in the node
-        - Last row: type of parent, number of leaves and size of parent
+        - Last row: type of parent, number of leaves of the parent
 
     Note:
         Array elements are considered as leaves, for example:

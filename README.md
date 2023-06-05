@@ -25,8 +25,6 @@
 
 </h5>
 
-**For previous `PyTreeClass` use v0.1 branch**
-
 ## 🛠️ Installation<a id="installation"></a>
 
 ```python
