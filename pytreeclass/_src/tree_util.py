@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Utility functions for pytrees."""
 
 from __future__ import annotations
 
@@ -579,6 +580,7 @@ def tree_map_with_trace(
 
 
 class Node:
+    # mainly used for visualization
     __slots__ = ("data", "parent", "children", "__weakref__")
 
     def __init__(
@@ -610,15 +612,6 @@ class Node:
 
     def __contains__(self, key: TraceEntry) -> bool:
         return key in self.children
-
-
-# disallow traversal to avoid infinite recursion
-# in case of circular references
-jtu.register_pytree_node(
-    nodetype=Node,
-    flatten_func=lambda tree: ((), tree),
-    unflatten_func=lambda treedef, _: treedef[0],
-)
 
 
 def construct_tree(
