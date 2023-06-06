@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import functools as ft
 import sys
-from collections.abc import Callable, MutableMapping, MutableSequence
+from collections.abc import Callable, MutableMapping, MutableSequence, MutableSet
 from types import FunctionType, MappingProxyType
 from typing import Any, Literal, NamedTuple, Sequence, TypeVar, get_args
 
@@ -27,7 +27,7 @@ EllipsisType = type(Ellipsis)
 ArgKindType = Literal["POS_ONLY", "POS_OR_KW", "KW_ONLY"]
 ArgKind = get_args(ArgKindType)
 NULL = type("NULL", (), {"__repr__": lambda _: "NULL"})()
-MUTABLE_TYPES = (MutableSequence, MutableMapping, set)
+MUTABLE_TYPES = (MutableSequence, MutableMapping, MutableSet)
 # https://github.com/google/jax/issues/14295
 
 
