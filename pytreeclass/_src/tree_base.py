@@ -36,6 +36,8 @@ from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_util import (
     IsLeafType,
     NamedSequenceKey,
+    WhereAtomType,
+    WhereType,
     _leafwise_transform,
     _resolve_where,
     is_tree_equal,
@@ -125,8 +127,8 @@ class AtIndexer(NamedTuple):
     tree: PyTree
     where: tuple[str | int] | PyTree = ()
 
-    def __getitem__(self, where: str | int | PyTree | EllipsisType) -> AtIndexer:
-        if isinstance(where, (type(self.tree), str, int, EllipsisType)):
+    def __getitem__(self, where: WhereType) -> AtIndexer:
+        if isinstance(where, (type(self.tree), *WhereAtomType)):
             return AtIndexer(self.tree, (*self.where, where))
 
         raise NotImplementedError(
@@ -143,7 +145,9 @@ class AtIndexer(NamedTuple):
             ">>> # indexing by attribute name\n"
             ">>> tree.at[`attribute_name`].get()\n\n"
             ">>> # indexing by leaf index\n"
-            ">>> tree.at[index].get()"
+            ">>> tree.at[index].get()\n"
+            ">>> # indexing by regex pattern\n"
+            ">>> tree.at[pytc.RegexKey(`pattern`)].get()\n"
         )
 
     def get(self, *, is_leaf: IsLeafType = None) -> PyTree:

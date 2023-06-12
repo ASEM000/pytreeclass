@@ -18,6 +18,7 @@ from pytreeclass._src.tree_pprint import (
 )
 from pytreeclass._src.tree_util import (
     Partial,
+    RegexKey,
     bcmap,
     is_tree_equal,
     tree_flatten_with_trace,
@@ -51,9 +52,10 @@ __all__ = (
     "tree_flatten_with_trace",
     "tree_repr_with_trace",
     "Partial",
+    "RegexKey",
 )
 
-__version__ = "0.3.7"
+__version__ = "0.3.8"
 
 AtIndexer.__module__ = "pytreeclass"
 TreeClass.__module__ = "pytreeclass"
