@@ -702,7 +702,7 @@ def test_regexkey():
 
     tree = Tree()
 
-    tree = tree.at[pytc.RegexKey(r"weight_*.")].set(100.0)
+    tree = tree.at[pytc.RegexKey(r"weight_.*")].set(100.0)
     # Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     assert jtu.tree_leaves(tree) == [100.0, 100.0, 100.0, 0.0]
 

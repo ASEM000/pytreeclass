@@ -67,7 +67,7 @@ class RegexKey(NamedTuple):
         ...     weight_3: float = 3.0
         ...     bias: float = 0.0
         >>> tree = Tree()
-        >>> tree.at[pytc.RegexKey(r"weight_*.")].set(100.0)  # set all weights to 100.0
+        >>> tree.at[pytc.RegexKey(r"weight_.*")].set(100.0)  # set all weights to 100.0
         Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     """
 
