@@ -34,10 +34,12 @@ from pytreeclass._src.code_build import (
 )
 from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_util import (
+    BaseMatchKey,
+    IntMatchKey,
     IsLeafType,
     NamedSequenceKey,
-    WhereAtomType,
-    WhereType,
+    NameMatchKey,
+    TotalMatchKey,
     _leafwise_transform,
     _resolve_where,
     is_tree_equal,
@@ -125,10 +127,16 @@ class AtIndexer(NamedTuple):
     """
 
     tree: PyTree
-    where: tuple[str | int] | PyTree = ()
+    where: tuple[BaseMatchKey | PyTree] | tuple[()] = ()
 
-    def __getitem__(self, where: WhereType) -> AtIndexer:
-        if isinstance(where, (type(self.tree), *WhereAtomType)):
+    def __getitem__(self, where: Any) -> AtIndexer:
+        if isinstance(where, str):
+            return AtIndexer(self.tree, (*self.where, NameMatchKey(where)))
+        if isinstance(where, int):
+            return AtIndexer(self.tree, (*self.where, IntMatchKey(where)))
+        if where is ...:
+            return AtIndexer(self.tree, (*self.where, TotalMatchKey()))
+        if isinstance(where, (type(self.tree), BaseMatchKey)):
             return AtIndexer(self.tree, (*self.where, where))
 
         raise NotImplementedError(
@@ -146,8 +154,6 @@ class AtIndexer(NamedTuple):
             ">>> tree.at[`attribute_name`].get()\n\n"
             ">>> # indexing by leaf index\n"
             ">>> tree.at[index].get()\n"
-            ">>> # indexing by regex pattern\n"
-            ">>> tree.at[pytc.RegexKey(`pattern`)].get()\n"
         )
 
     def get(self, *, is_leaf: IsLeafType = None) -> PyTree:
@@ -320,10 +326,12 @@ class AtIndexer(NamedTuple):
             - Use .at["method_name"](*, **) to call a method that mutates the instance.
         """
 
-        def recursive_getattr(tree: Any, where: tuple[str, ...]):
+        def recursive_getattr(tree: Any, where: tuple[NameMatchKey, ...]):
+            if not isinstance(where[0], NameMatchKey):
+                raise TypeError(f"Expected `NameMatchKey` got {type(where[0])!r}.")
             if len(where) == 1:
-                return getattr(tree, where[0])
-            return recursive_getattr(getattr(tree, where[0]), where[1:])
+                return getattr(tree, where[0].name)
+            return recursive_getattr(getattr(tree, where[0].name), where[1:])
 
         with _mutable_context(self.tree, kopy=True) as tree:
             value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore

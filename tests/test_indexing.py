@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Any
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -606,9 +606,15 @@ def test_repr_str():
 
     t = Tree()
 
-    assert repr(t.at["a"]) == "AtIndexer(tree=Tree(a=1, b=2), where=('a',))"
-    assert str(t.at["a"]) == "AtIndexer(tree=Tree(a=1, b=2), where=('a',))"
-    assert repr(t.at[...]) == "AtIndexer(tree=Tree(a=1, b=2), where=(Ellipsis,))"
+    assert (
+        repr(t.at["a"])
+        == "AtIndexer(tree=Tree(a=1, b=2), where=(NameMatchKey(name=a),))"
+    )
+    assert (
+        str(t.at["a"])
+        == "AtIndexer(tree=Tree(a=1, b=2), where=(NameMatchKey(name=a),))"
+    )
+    assert repr(t.at[...]) == "AtIndexer(tree=Tree(a=1, b=2), where=(TotalMatchKey(),))"
 
 
 def test_not_equal():
@@ -702,9 +708,48 @@ def test_regexkey():
 
     tree = Tree()
 
-    tree = tree.at[pytc.RegexKey(r"weight_.*")].set(100.0)
+    tree = tree.at[pytc.RegexMatchKey(r"weight_.*")].set(100.0)
     # Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     assert jtu.tree_leaves(tree) == [100.0, 100.0, 100.0, 0.0]
 
-    assert pytc.RegexKey(r"w.*") == "woof"
-    assert pytc.RegexKey(r"w.*") != "meow"
+    assert pytc.RegexMatchKey(r"w.*") == "woof"
+    assert pytc.RegexMatchKey(r"w.*") != "meow"
+
+
+def test_custom_key():
+    class NameTypeContainer(NamedTuple):
+        name: str
+        type: type
+
+    @jax.tree_util.register_pytree_with_keys_class
+    class Tree:
+        def __init__(self, a, b) -> None:
+            self.a = a
+            self.b = b
+
+        def tree_flatten_with_keys(self):
+            ak = (NameTypeContainer("a", type(self.a)), self.a)
+            bk = (NameTypeContainer("b", type(self.b)), self.b)
+            return (ak, bk), None
+
+        @classmethod
+        def tree_unflatten(cls, aux_data, children):
+            return cls(*children)
+
+        @property
+        def at(self):
+            return pytc.AtIndexer(self)
+
+    tree = Tree(1, 2)
+
+    class MatchNameType(pytc.BaseMatchKey):
+        def __init__(self, name, type):
+            self.name = name
+            self.type = type
+
+        def __eq__(self, other):
+            if isinstance(other, NameTypeContainer):
+                return other == (self.name, self.type)
+            return False
+
+    assert jax.tree_util.tree_leaves(tree.at[MatchNameType("a", int)].get()) == [1]

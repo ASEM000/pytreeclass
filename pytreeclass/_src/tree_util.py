@@ -15,23 +15,13 @@
 
 from __future__ import annotations
 
+import abc
 import dataclasses as dc
 import functools as ft
 import operator as op
 import re
-from collections import defaultdict
 from math import ceil, floor, trunc
-from typing import (
-    Any,
-    Callable,
-    Hashable,
-    Iterator,
-    NamedTuple,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
@@ -52,7 +42,57 @@ TraceType = Tuple[KeyPath, TypePath]
 IsLeafType = Union[None, Callable[[Any], bool]]
 
 
-class RegexKey(NamedTuple):
+class BaseMatchKey(abc.ABC):
+    """Parent class for all match classes.
+
+    Note:
+        subclass this class to create custom match keys by implementing
+        the __eq__ method. The __eq__ method should return True if the
+        key matches the given path entry and False otherwise.
+
+    Example:
+        >>> # define an match strategy to match a leaf with a given name and type
+        >>> import pytreeclass as pytc
+        >>> from typing import NamedTuple
+        >>> class NameTypeContainer(NamedTuple):
+        ...     name: str
+        ...     type: type
+        >>> import jax
+        >>> @jax.tree_util.register_pytree_with_keys_class
+        ... class Tree:
+        ...    def __init__(self, a, b) -> None:
+        ...        self.a = a
+        ...        self.b = b
+        ...    def tree_flatten_with_keys(self):
+        ...        ak = (NameTypeContainer("a", type(self.a)), self.a)
+        ...        bk = (NameTypeContainer("b", type(self.b)), self.b)
+        ...        return (ak, bk), None
+        ...    @classmethod
+        ...    def tree_unflatten(cls, aux_data, children):
+        ...        return cls(*children)
+        ...    @property
+        ...    def at(self):
+        ...        return pytc.AtIndexer(self)
+
+        >>> tree = Tree(1, 2)
+
+        >>> class MatchNameType(pytc.BaseMatchKey):
+        ...    def __init__(self, name, type):
+        ...        self.name = name
+        ...        self.type = type
+        ...    def __eq__(self, other):
+        ...        if isinstance(other, NameTypeContainer) :
+        ...            return other == (self.name, self.type)
+        ...        return False
+        >>> assert jax.tree_util.tree_leaves(tree.at[MatchNameType("a", int)].get()) == [1]
+    """
+
+    @abc.abstractmethod
+    def __eq__(self, entry: KeyEntry) -> bool:
+        pass
+
+
+class RegexMatchKey(BaseMatchKey):
     """Match a leaf with a regex pattern inside 'at' property.
 
     Args:
@@ -67,21 +107,146 @@ class RegexKey(NamedTuple):
         ...     weight_3: float = 3.0
         ...     bias: float = 0.0
         >>> tree = Tree()
-        >>> tree.at[pytc.RegexKey(r"weight_.*")].set(100.0)  # set all weights to 100.0
+        >>> tree.at[pytc.RegexMatchKey(r"weight_.*")].set(100.0)  # set all weights to 100.0
         Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     """
 
-    pattern: str
+    def __init__(self, pattern: str) -> None:
+        self.pattern = pattern
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(pattern={self.pattern})"
 
     def __eq__(self, other: Any) -> bool:
         """Return True if other fully matches the regex pattern."""
-        if not isinstance(other, str):
+        if isinstance(other, str):
+            return re.fullmatch(self.pattern, other) is not None
+        if isinstance(other, (jtu.GetAttrKey, NamedSequenceKey)):
+            return re.fullmatch(self.pattern, other.name) is not None
+        if isinstance(other, jtu.DictKey):
+            return re.fullmatch(self.pattern, other.key) is not None
+        return False
+
+
+class IntMatchKey(BaseMatchKey):
+    def __init__(self, idx: int) -> None:
+        self.idx = idx
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(idx={self.idx})"
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, int):
+            return self.idx == other
+        if isinstance(other, (jtu.SequenceKey, NamedSequenceKey)):
+            return self.idx == other.idx
+        return False
+
+
+class NameMatchKey(BaseMatchKey):
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(name={self.name})"
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, str):
+            return self.name == other
+        if isinstance(other, (jtu.GetAttrKey, NamedSequenceKey)):
+            return self.name == other.name
+        if isinstance(other, jtu.DictKey):
+            return self.name == other.key
+        return False
+
+
+class TotalMatchKey(BaseMatchKey):
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
+    def __eq__(self, _: Any) -> bool:
+        return True
+
+
+@dc.dataclass(frozen=True)
+class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
+    # inherit from both `jtu.GetAttrKey` and `jtu.SequenceKey`
+    # in case the user perform isinstance check to unpack the name/index
+    # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
+    def __str__(self):
+        return f".{self.name}"
+
+
+def _generate_path_mask(
+    tree: PyTree,
+    where: tuple[BaseMatchKey, ...],
+    is_leaf: IsLeafType = None,
+) -> PyTree:
+    # generate a mask for `where` path in `tree`
+    # where path is a tuple of indices or keys, for example
+    # where=("a",) wil set all leaves of `tree` with key "a" to True and
+    # all other leaves to False
+    match = False
+
+    def map_func(path, _: Any):
+        if len(where) > len(path):
+            # path is shorter than `where` path. for example
+            # where=("a", "b") and the current path is ("a",) then
+            # the current path is not a match
             return False
-        return re.fullmatch(self.pattern, other) is not None
+        for wi, ki in zip(where, path):
+            if not (wi == ki):
+                return False
+
+        nonlocal match
+
+        return (match := True)
+
+    mask = jtu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
+
+    if not match:
+        raise LookupError(f"No leaf match is found for {where=}.")
+
+    return mask
 
 
-WhereAtomType = (int, str, type(...), RegexKey)
-WhereType = Union[int, str, RegexKey, PyTree, EllipsisType]
+def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
+    # combine boolean masks with `&` operator if all masks are boolean
+    # otherwise raise an error
+    def check_and_return_bool_leaf(leaf: Any) -> bool:
+        if hasattr(leaf, "dtype"):
+            if leaf.dtype == "bool":
+                return leaf
+            raise TypeError(f"Expected boolean array mask, got {leaf=}")
+
+        if isinstance(leaf, bool):
+            return leaf
+        raise TypeError(f"Expected boolean mask, got {leaf=}")
+
+    def map_func(*leaves):
+        verdict = True
+        for leaf in leaves:
+            verdict &= check_and_return_bool_leaf(leaf)
+        return verdict
+
+    return jtu.tree_map(map_func, *masks)
+
+
+def _resolve_where(
+    tree: PyTree,
+    where: tuple[BaseMatchKey | PyTree, ...],  # type: ignore
+    is_leaf: IsLeafType = None,
+):
+    mask = None
+
+    if path := tuple(item for item in where if isinstance(item, BaseMatchKey)):
+        mask = _generate_path_mask(tree, path, is_leaf=is_leaf)
+
+    if bool_masks := tuple(item for item in where if isinstance(item, type(tree))):
+        all_masks = (mask, *bool_masks) if mask else bool_masks
+        mask = _combine_maybe_bool_masks(*all_masks)
+
+    return mask
 
 
 def tree_hash(*trees: PyTree) -> int:
@@ -384,102 +549,6 @@ def _leafwise_transform(klass: type[T]) -> type[T]:
             # this behavior similar is to `dataclasses.dataclass`
             setattr(klass, key, method)
     return klass
-
-
-@dc.dataclass(frozen=True)
-class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
-    # inherit from both `jtu.GetAttrKey` and `jtu.SequenceKey`
-    # in case the user perform isinstance check to unpack the name/index
-    # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
-    def __str__(self):
-        return f".{self.name}"
-
-
-# indexing matching registry
-# define rule for indexing matching through `at` property
-# for example, `jax` internals uses `jtu.GetAttrKey` to index an attribute,
-# however its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]`
-# to index an attribute instead `tree.at['attr']` is more ergonomic
-match_registry: dict[type, Callable] = defaultdict(lambda entry: (entry,))  # type: ignore
-match_registry[jtu.GetAttrKey] = lambda entry: (entry.name,)
-match_registry[jtu.SequenceKey] = lambda entry: (entry.idx,)
-match_registry[NamedSequenceKey] = lambda entry: (entry.idx, entry.name)
-match_registry[jtu.DictKey] = lambda entry: (entry.key,)
-match_registry[jtu.FlattenedIndexKey] = lambda entry: (entry.key,)
-
-
-def _generate_path_mask(
-    tree: PyTree,
-    where: tuple[WhereType, ...],
-    is_leaf: IsLeafType = None,
-) -> PyTree:
-    # generate a mask for `where` path in `tree`
-    # where path is a tuple of indices or keys, for example
-    # where=("a",) wil set all leaves of `tree` with key "a" to True and
-    # all other leaves to False
-    match = False
-
-    def map_func(path, _: Any):
-        if len(where) > len(path):
-            # path is shorter than `where` path. for example
-            # where=("a", "b") and the current path is ("a",) then
-            # the current path is not a match
-            return False
-        for wi, ki in zip(where, path):
-            if not any(wi == ei for ei in (..., *match_registry[type(ki)](ki))):
-                # use equality instead of `in` to trigger regex matching
-                # for the overloaded `RegexKey` __eq__ method.
-                return False
-
-        nonlocal match
-
-        return (match := True)
-
-    mask = jtu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
-
-    if not match:
-        raise LookupError(f"No leaf match is found for {where=}.")
-
-    return mask
-
-
-def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
-    # combine boolean masks with `&` operator if all masks are boolean
-    # otherwise raise an error
-    def check_and_return_bool_leaf(leaf: Any) -> bool:
-        if hasattr(leaf, "dtype"):
-            if leaf.dtype == "bool":
-                return leaf
-            raise TypeError(f"Expected boolean array mask, got {leaf=}")
-
-        if isinstance(leaf, bool):
-            return leaf
-        raise TypeError(f"Expected boolean mask, got {leaf=}")
-
-    def map_func(*leaves):
-        verdict = True
-        for leaf in leaves:
-            verdict &= check_and_return_bool_leaf(leaf)
-        return verdict
-
-    return jtu.tree_map(map_func, *masks)
-
-
-def _resolve_where(
-    tree: PyTree,
-    where: tuple[WhereType, ...],  # type: ignore
-    is_leaf: IsLeafType = None,
-):
-    mask = None
-
-    if path := tuple(i for i in where if isinstance(i, WhereAtomType)):
-        mask = _generate_path_mask(tree, path, is_leaf=is_leaf)
-
-    if maybe_bool_masks := tuple(i for i in where if isinstance(i, type(tree))):
-        all_masks = (mask, *maybe_bool_masks) if mask else maybe_bool_masks
-        mask = _combine_maybe_bool_masks(*all_masks)
-
-    return mask
 
 
 def flatten_one_trace_level(

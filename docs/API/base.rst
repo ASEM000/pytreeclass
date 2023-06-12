@@ -22,7 +22,7 @@ Public API
     bcmap
     Partial
     AtIndexer
-    RegexKey
+    RegexMatchKey
     tree_map_with_trace
     tree_leaves_with_trace
     tree_flatten_with_trace
@@ -75,7 +75,7 @@ Advanced API
         set,
         apply,
         __call__,
-.. autoclass:: RegexKey
+.. autoclass:: RegexMatchKey
     :members:
         __eq__
 .. autofunction:: tree_map_with_trace
