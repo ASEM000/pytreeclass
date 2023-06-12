@@ -74,6 +74,7 @@ class RegexKey(NamedTuple):
     pattern: str
 
     def __eq__(self, other: Any) -> bool:
+        """Return True if other fully matches the regex pattern."""
         if not isinstance(other, str):
             return False
         return re.fullmatch(self.pattern, other) is not None
