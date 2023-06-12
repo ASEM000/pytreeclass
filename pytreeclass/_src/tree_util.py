@@ -37,7 +37,7 @@ TraceEntry = Tuple[KeyEntry, TypeEntry]
 KeyPath = Tuple[KeyEntry, ...]
 TypePath = Tuple[TypeEntry, ...]
 TraceType = Tuple[KeyPath, TypePath]
-IsLeafType = Union[type(None), Callable[[Any], bool]]
+IsLeafType = Union[None, Callable[[Any], bool]]
 
 
 def tree_hash(*trees: PyTree) -> int:

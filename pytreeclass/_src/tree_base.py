@@ -18,7 +18,7 @@ from __future__ import annotations
 import abc
 from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, Hashable, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -43,7 +43,7 @@ from pytreeclass._src.tree_util import (
     tree_hash,
 )
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Hashable)
 PyTree = Any
 EllipsisType = type(Ellipsis)
 _no_initializer = object()
@@ -123,7 +123,7 @@ class AtIndexer(NamedTuple):
     """
 
     tree: PyTree
-    where: tuple[str | int] | PyTree
+    where: tuple[str | int] | PyTree = ()
 
     def __getitem__(self, where: str | int | PyTree | EllipsisType) -> AtIndexer:
         if isinstance(where, (type(self.tree), str, int, EllipsisType)):
@@ -515,7 +515,7 @@ class TreeClass(metaclass=TreeClassMeta):
             >>> tree.at["add"](99)
             (100, Tree(a=100, b=2.0))
         """
-        return AtIndexer(self, where=())
+        return AtIndexer(self)
 
     def __repr__(self) -> str:
         return tree_repr(self)
@@ -546,6 +546,7 @@ def _frozen_error(opname: str, tree):
 
 class _Frozen(Generic[T]):
     __slots__ = ("__wrapped__", "__weakref__")
+    __wrapped__: T
 
     def __init__(self, x: T) -> None:
         object.__setattr__(self, "__wrapped__", x)
@@ -620,7 +621,7 @@ def freeze(wrapped: _Frozen[T] | T) -> _Frozen[T]:
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
     """
-    return wrapped if is_frozen(wrapped) else _Frozen(wrapped)
+    return wrapped if is_frozen(wrapped) else _Frozen(wrapped)  # type: ignore
 
 
 def is_frozen(wrapped: Any) -> bool:
