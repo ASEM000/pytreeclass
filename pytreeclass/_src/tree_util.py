@@ -18,9 +18,20 @@ from __future__ import annotations
 import dataclasses as dc
 import functools as ft
 import operator as op
+import re
 from collections import defaultdict
 from math import ceil, floor, trunc
-from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Hashable,
+    Iterator,
+    NamedTuple,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import jax
 import jax.numpy as jnp
@@ -30,7 +41,8 @@ from jax.util import unzip2
 
 T = TypeVar("T")
 PyTree = Any
-EllipsisType = type(Ellipsis)
+# TODO: swich to type(Ellipsis) for python 3.10
+EllipsisType = TypeVar("EllipsisType")
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
 TypeEntry = TypeVar("TypeEntry", bound=type)
 TraceEntry = Tuple[KeyEntry, TypeEntry]
@@ -38,6 +50,37 @@ KeyPath = Tuple[KeyEntry, ...]
 TypePath = Tuple[TypeEntry, ...]
 TraceType = Tuple[KeyPath, TypePath]
 IsLeafType = Union[None, Callable[[Any], bool]]
+
+
+class RegexKey(NamedTuple):
+    """Match a leaf with a regex pattern inside 'at' property.
+
+    Args:
+        pattern: regex pattern to match.
+
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> class Tree(pytc.TreeClass):
+        ...     weight_1: float = 1.0
+        ...     weight_2: float = 2.0
+        ...     weight_3: float = 3.0
+        ...     bias: float = 0.0
+        >>> tree = Tree()
+        >>> tree.at[pytc.RegexKey(r"weight_*.")].set(100.0)  # set all weights to 100.0
+        Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
+    """
+
+    pattern: str
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, str):
+            return False
+        return re.fullmatch(self.pattern, other) is not None
+
+
+WhereAtomType = (int, str, type(...), RegexKey)
+WhereType = Union[int, str, RegexKey, PyTree, EllipsisType]
 
 
 def tree_hash(*trees: PyTree) -> int:
@@ -159,7 +202,7 @@ jtu.register_pytree_node(
 
 
 def bcmap(
-    func: Callable[..., Any],
+    func: Callable,
     *,
     is_leaf: IsLeafType = None,
 ) -> Callable:
@@ -244,9 +287,6 @@ def bcmap(
                 leaves_keys += [key]
             else:
                 masked_kwargs[key] = kwargs[key]
-
-        # avoid circular import by importing Partial here
-        from pytreeclass import Partial
 
         bfunc = Partial(func, *masked_args, **masked_kwargs)
 
@@ -359,7 +399,7 @@ class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
 # for example, `jax` internals uses `jtu.GetAttrKey` to index an attribute,
 # however its not ergonomic to use `tree.at[jtu.GetAttrKey("attr")]`
 # to index an attribute instead `tree.at['attr']` is more ergonomic
-match_registry: dict[type, Callable] = defaultdict(lambda entry: (entry,))
+match_registry: dict[type, Callable] = defaultdict(lambda entry: (entry,))  # type: ignore
 match_registry[jtu.GetAttrKey] = lambda entry: (entry.name,)
 match_registry[jtu.SequenceKey] = lambda entry: (entry.idx,)
 match_registry[NamedSequenceKey] = lambda entry: (entry.idx, entry.name)
@@ -369,7 +409,7 @@ match_registry[jtu.FlattenedIndexKey] = lambda entry: (entry.key,)
 
 def _generate_path_mask(
     tree: PyTree,
-    where: tuple[int | str, ...],
+    where: tuple[WhereType, ...],
     is_leaf: IsLeafType = None,
 ) -> PyTree:
     # generate a mask for `where` path in `tree`
@@ -384,9 +424,10 @@ def _generate_path_mask(
             # where=("a", "b") and the current path is ("a",) then
             # the current path is not a match
             return False
-
         for wi, ki in zip(where, path):
-            if wi not in (..., *match_registry[type(ki)](ki)):
+            if not any(wi == ei for ei in (..., *match_registry[type(ki)](ki))):
+                # use equality instead of `in` to trigger regex matching
+                # for the overloaded `RegexKey` __eq__ method.
                 return False
 
         nonlocal match
@@ -425,16 +466,16 @@ def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
 
 def _resolve_where(
     tree: PyTree,
-    where: tuple[int | str | PyTree | EllipsisType, ...],
+    where: tuple[WhereType, ...],  # type: ignore
     is_leaf: IsLeafType = None,
 ):
     mask = None
 
-    if path := [i for i in where if isinstance(i, (int, str, type(...)))]:
+    if path := tuple(i for i in where if isinstance(i, WhereAtomType)):
         mask = _generate_path_mask(tree, path, is_leaf=is_leaf)
 
-    if maybe_bool_masks := [i for i in where if isinstance(i, type(tree))]:
-        all_masks = [mask, *maybe_bool_masks] if mask else maybe_bool_masks
+    if maybe_bool_masks := tuple(i for i in where if isinstance(i, type(tree))):
+        all_masks = (mask, *maybe_bool_masks) if mask else maybe_bool_masks
         mask = _combine_maybe_bool_masks(*all_masks)
 
     return mask

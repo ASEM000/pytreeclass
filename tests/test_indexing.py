@@ -691,3 +691,20 @@ def test_construct_tree():
 
     with pytest.raises(TypeError):
         tree.add_child("a")
+
+
+def test_regexkey():
+    class Tree(pytc.TreeClass):
+        weight_1: float = 1.0
+        weight_2: float = 2.0
+        weight_3: float = 3.0
+        bias: float = 0.0
+
+    tree = Tree()
+
+    tree = tree.at[pytc.RegexKey(r"weight_*.")].set(100.0)
+    # Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
+    assert jtu.tree_leaves(tree) == [100.0, 100.0, 100.0, 0.0]
+
+    assert pytc.RegexKey(r"w.*") == "woof"
+    assert pytc.RegexKey(r"w.*") != "meow"
