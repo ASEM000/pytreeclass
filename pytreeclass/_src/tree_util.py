@@ -31,7 +31,7 @@ from jax.util import unzip2
 
 T = TypeVar("T")
 PyTree = Any
-# TODO: swich to type(Ellipsis) for python 3.10
+# TODO: swich to EllipsisType for python 3.10
 EllipsisType = TypeVar("EllipsisType")
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
 TypeEntry = TypeVar("TypeEntry", bound=type)
@@ -48,16 +48,18 @@ class BaseMatchKey(abc.ABC):
     Note:
         subclass this class to create custom match keys by implementing
         the __eq__ method. The __eq__ method should return True if the
-        key matches the given path entry and False otherwise.
+        key matches the given path entry and False otherwise. The path entry
+        refers to the entry defined in the `tree_flatten_with_keys` method of
+        the pytree class.
 
     Example:
         >>> # define an match strategy to match a leaf with a given name and type
         >>> import pytreeclass as pytc
         >>> from typing import NamedTuple
+        >>> import jax
         >>> class NameTypeContainer(NamedTuple):
         ...     name: str
         ...     type: type
-        >>> import jax
         >>> @jax.tree_util.register_pytree_with_keys_class
         ... class Tree:
         ...    def __init__(self, a, b) -> None:
@@ -73,9 +75,7 @@ class BaseMatchKey(abc.ABC):
         ...    @property
         ...    def at(self):
         ...        return pytc.AtIndexer(self)
-
         >>> tree = Tree(1, 2)
-
         >>> class MatchNameType(pytc.BaseMatchKey):
         ...    def __init__(self, name, type):
         ...        self.name = name
@@ -84,7 +84,8 @@ class BaseMatchKey(abc.ABC):
         ...        if isinstance(other, NameTypeContainer) :
         ...            return other == (self.name, self.type)
         ...        return False
-        >>> assert jax.tree_util.tree_leaves(tree.at[MatchNameType("a", int)].get()) == [1]
+        >>> tree = tree.at[MatchNameType("a", int)].get()
+        >>> assert jax.tree_util.tree_leaves(tree) == [1]
     """
 
     @abc.abstractmethod
@@ -124,7 +125,7 @@ class NameMatchKey(BaseMatchKey):
         return False
 
 
-class TotalMatchKey(BaseMatchKey):
+class EllipsisMatchKey(BaseMatchKey):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
 
@@ -325,7 +326,7 @@ class Partial:
             leaves with automatic broadcasting for scalar arguments.
     """
 
-    __slots__ = ("func", "args", "kwargs", "__weakref__")  # type: ignore
+    __slots__ = ["func", "args", "kwargs", "__weakref__"]  # type: ignore
 
     def __init__(
         self,
@@ -692,7 +693,7 @@ def tree_map_with_trace(
 
 class Node:
     # mainly used for visualization
-    __slots__ = ("data", "parent", "children", "__weakref__")
+    __slots__ = ["data", "parent", "children", "__weakref__"]
 
     def __init__(
         self,

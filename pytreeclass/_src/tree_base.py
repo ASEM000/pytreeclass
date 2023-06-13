@@ -24,22 +24,30 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
-from typing_extensions import dataclass_transform
+from typing_extensions import Unpack, dataclass_transform
 
 from pytreeclass._src.code_build import (
     Field,
     _build_field_map,
     _build_init_method,
     field,
+    fields,
 )
-from pytreeclass._src.tree_pprint import tree_repr, tree_str
+from pytreeclass._src.tree_pprint import (
+    PPSpec,
+    attr_value_pp,
+    pp_dispatcher,
+    pps,
+    tree_repr,
+    tree_str,
+)
 from pytreeclass._src.tree_util import (
     BaseMatchKey,
+    EllipsisMatchKey,
     IntMatchKey,
     IsLeafType,
     NamedSequenceKey,
     NameMatchKey,
-    TotalMatchKey,
     _leafwise_transform,
     _resolve_where,
     is_tree_equal,
@@ -118,10 +126,9 @@ class AtIndexer(NamedTuple):
         ...        return cls(*children)
         ...    @property
         ...    def at(self):
-        ...        return pytc.AtIndexer(self, where=())
+        ...        return pytc.AtIndexer(self)
         ...    def __repr__(self) -> str:
         ...        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
-
         >>> Tree(1, 2).at["a"].get()
         Tree(a=1, b=None)
     """
@@ -135,7 +142,7 @@ class AtIndexer(NamedTuple):
         if isinstance(where, int):
             return AtIndexer(self.tree, (*self.where, IntMatchKey(where)))
         if isinstance(where, type(...)):
-            return AtIndexer(self.tree, (*self.where, TotalMatchKey()))
+            return AtIndexer(self.tree, (*self.where, EllipsisMatchKey()))
         if isinstance(where, (type(self.tree), BaseMatchKey)):
             return AtIndexer(self.tree, (*self.where, where))
 
@@ -557,7 +564,7 @@ def _frozen_error(opname: str, tree):
 
 
 class _Frozen(Generic[T]):
-    __slots__ = ("__wrapped__", "__weakref__")
+    __slots__ = ["__wrapped__", "__weakref__"]
     __wrapped__: T
 
     def __init__(self, x: T) -> None:
@@ -690,3 +697,11 @@ def is_nondiff(wrapped: Any) -> bool:
     if isinstance(wrapped, (float, complex)):
         return False
     return True
+
+
+@pp_dispatcher.register(TreeClass)
+def treeclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
+    name = type(node).__name__
+    skip = [f.name for f in fields(node) if not f.repr]
+    kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
+    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"

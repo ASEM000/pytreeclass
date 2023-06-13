@@ -614,7 +614,9 @@ def test_repr_str():
         str(t.at["a"])
         == "AtIndexer(tree=Tree(a=1, b=2), where=(NameMatchKey(name=a),))"
     )
-    assert repr(t.at[...]) == "AtIndexer(tree=Tree(a=1, b=2), where=(TotalMatchKey(),))"
+    assert (
+        repr(t.at[...]) == "AtIndexer(tree=Tree(a=1, b=2), where=(EllipsisMatchKey(),))"
+    )
 
 
 def test_not_equal():

@@ -18,7 +18,7 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import math
-from collections.abc import MutableMapping, MutableSequence
+from collections.abc import MutableMapping, MutableSequence, MutableSet
 from itertools import chain
 from types import FunctionType
 from typing import Any, Callable, Iterable, Literal
@@ -52,39 +52,37 @@ ORDER_KEY = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
 from_iterable = chain.from_iterable
 
 
+@ft.singledispatch
+def pp_dispatcher(node: Any, **spec: Unpack[PPSpec]) -> str:
+    return fallback_pp(node, **spec)
+
+
+def dataclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
+    name = type(node).__name__
+
+    kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
+    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
+
+
+def fallback_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
+    # ducktyping and other fallbacks that are not covered by singledispatch
+
+    if dc.is_dataclass(node):
+        return dataclass_pp(node, **spec)
+
+    text = f"{node!r}" if spec["kind"] == "REPR" else f"{node!s}"
+
+    if "\n" not in text:
+        return text
+
+    return ("\n" + "\t" * (spec["indent"])).join(text.split("\n"))
+
+
 def pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     if spec["depth"] < 0:
         return "..."
 
-    # avoid circular import by importing
-    from pytreeclass import TreeClass
-
-    if isinstance(node, ft.partial):
-        text = f"Partial({func_pp(node.func, **spec)})"
-    elif isinstance(node, (FunctionType, custom_jvp)):
-        text = func_pp(node, **spec)
-    elif isinstance(node, jax.ShapeDtypeStruct):
-        text = shape_dtype_pp(node, **spec)
-    elif isinstance(node, tuple) and hasattr(node, "_fields"):
-        text = namedtuple_pp(node, **spec)
-    elif isinstance(node, MutableSequence):
-        text = list_pp(node, **spec)
-    elif isinstance(node, tuple):
-        text = tuple_pp(node, **spec)
-    elif isinstance(node, set):
-        text = set_pp(node, **spec)
-    elif isinstance(node, MutableMapping):
-        text = dict_pp(node, **spec)
-    elif dc.is_dataclass(node):
-        text = dataclass_pp(node, **spec)
-    elif isinstance(node, TreeClass):
-        text = treeclass_pp(node, **spec)
-    elif isinstance(node, (np.ndarray, jax.Array)) and spec["kind"] == "REPR":
-        text = numpy_pp(node, **spec)
-    else:
-        text = general_pp(node, **spec)
-
-    return format_width(text, width=spec["width"])
+    return format_width(pp_dispatcher(node, **spec), width=spec["width"])
 
 
 def pps(xs: Iterable[Any], pp: PP, **spec: Unpack[PPSpec]) -> str:
@@ -113,15 +111,7 @@ def attr_value_pp(x: tuple[str, Any], **spec: Unpack[PPSpec]) -> str:
     return f"{x[0]}={pp(x[1], **spec)}"
 
 
-def general_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
-    text = f"{node!r}" if spec["kind"] == "REPR" else f"{node!s}"
-
-    if "\n" not in text:
-        return text
-
-    return ("\n" + "\t" * (spec["indent"])).join(text.split("\n"))
-
-
+@pp_dispatcher.register(jax.ShapeDtypeStruct)
 def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     """Pretty print a node with dtype and shape"""
     shape = f"{node.shape}".replace(",", "")
@@ -134,8 +124,12 @@ def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     return dtype + shape
 
 
+@pp_dispatcher.register(np.ndarray)
+@pp_dispatcher.register(jax.Array)
 def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape"""
+    if spec["kind"] == "STR":
+        return fallback_pp(node, **spec)
 
     base = shape_dtype_pp(node, **spec)
 
@@ -159,6 +153,8 @@ def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
     return f"{base}(μ={mean}, σ={std}, ∈{interval})"
 
 
+@pp_dispatcher.register(FunctionType)
+@pp_dispatcher.register(custom_jvp)
 def func_pp(func: Callable, **spec: Unpack[PPSpec]) -> str:
     # Pretty print function
     # Example:
@@ -179,42 +175,33 @@ def func_pp(func: Callable, **spec: Unpack[PPSpec]) -> str:
     return text
 
 
+@pp_dispatcher.register(ft.partial)
+def partial_pp(node: ft.partial, **spec: Unpack[PPSpec]) -> str:
+    return f"Partial({func_pp(node.func, **spec)})"
+
+
+@pp_dispatcher.register(MutableSequence)
 def list_pp(node: list, **spec: Unpack[PPSpec]) -> str:
     return "[" + pps(node, pp=pp, **spec) + "]"
 
 
+@pp_dispatcher.register(tuple)
 def tuple_pp(node: tuple, **spec: Unpack[PPSpec]) -> str:
-    return "(" + pps(node, pp=pp, **spec) + ")"
-
-
-def set_pp(node: set, **spec: Unpack[PPSpec]) -> str:
-    return "{" + pps(node, pp=pp, **spec) + "}"
-
-
-def dict_pp(node: dict, **spec: Unpack[PPSpec]) -> str:
-    return "{" + pps(node.items(), pp=key_value_pp, **spec) + "}"
-
-
-def namedtuple_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
+    if not hasattr(node, "_fields"):
+        return "(" + pps(node, pp=pp, **spec) + ")"
     name = type(node).__name__
     kvs = node._asdict().items()
     return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
 
 
-def dataclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
-    name = type(node).__name__
-    kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
-    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
+@pp_dispatcher.register(MutableSet)
+def set_pp(node: set, **spec: Unpack[PPSpec]) -> str:
+    return "{" + pps(node, pp=pp, **spec) + "}"
 
 
-def treeclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
-    # avoid circular import by importing here
-    from pytreeclass import fields
-
-    name = type(node).__name__
-    skip = [f.name for f in fields(node) if not f.repr]
-    kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
-    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
+@pp_dispatcher.register(MutableMapping)
+def dict_pp(node: dict, **spec: Unpack[PPSpec]) -> str:
+    return "{" + pps(node.items(), pp=key_value_pp, **spec) + "}"
 
 
 def type_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
