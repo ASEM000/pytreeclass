@@ -92,6 +92,46 @@ class BaseMatchKey(abc.ABC):
         pass
 
 
+class IntMatchKey(BaseMatchKey):
+    def __init__(self, idx: int) -> None:
+        self.idx = idx
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(idx={self.idx})"
+
+    def __eq__(self, other: KeyEntry) -> bool:
+        if isinstance(other, int):
+            return self.idx == other
+        if isinstance(other, (jtu.SequenceKey, NamedSequenceKey)):
+            return self.idx == other.idx
+        return False
+
+
+class NameMatchKey(BaseMatchKey):
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(name={self.name})"
+
+    def __eq__(self, other: KeyEntry) -> bool:
+        if isinstance(other, str):
+            return self.name == other
+        if isinstance(other, (jtu.GetAttrKey, NamedSequenceKey)):
+            return self.name == other.name
+        if isinstance(other, jtu.DictKey):
+            return self.name == other.key
+        return False
+
+
+class TotalMatchKey(BaseMatchKey):
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
+    def __eq__(self, _: KeyEntry) -> bool:
+        return True
+
+
 class RegexMatchKey(BaseMatchKey):
     """Match a leaf with a regex pattern inside 'at' property.
 
@@ -117,7 +157,7 @@ class RegexMatchKey(BaseMatchKey):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(pattern={self.pattern})"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: KeyEntry) -> bool:
         """Return True if other fully matches the regex pattern."""
         if isinstance(other, str):
             return re.fullmatch(self.pattern, other) is not None
@@ -126,55 +166,6 @@ class RegexMatchKey(BaseMatchKey):
         if isinstance(other, jtu.DictKey):
             return re.fullmatch(self.pattern, other.key) is not None
         return False
-
-
-class IntMatchKey(BaseMatchKey):
-    def __init__(self, idx: int) -> None:
-        self.idx = idx
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(idx={self.idx})"
-
-    def __eq__(self, other: Any) -> bool:
-        if isinstance(other, int):
-            return self.idx == other
-        if isinstance(other, (jtu.SequenceKey, NamedSequenceKey)):
-            return self.idx == other.idx
-        return False
-
-
-class NameMatchKey(BaseMatchKey):
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name})"
-
-    def __eq__(self, other: Any) -> bool:
-        if isinstance(other, str):
-            return self.name == other
-        if isinstance(other, (jtu.GetAttrKey, NamedSequenceKey)):
-            return self.name == other.name
-        if isinstance(other, jtu.DictKey):
-            return self.name == other.key
-        return False
-
-
-class TotalMatchKey(BaseMatchKey):
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
-
-    def __eq__(self, _: Any) -> bool:
-        return True
-
-
-@dc.dataclass(frozen=True)
-class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
-    # inherit from both `jtu.GetAttrKey` and `jtu.SequenceKey`
-    # in case the user perform isinstance check to unpack the name/index
-    # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
-    def __str__(self):
-        return f".{self.name}"
 
 
 def _generate_path_mask(
@@ -247,6 +238,15 @@ def _resolve_where(
         mask = _combine_maybe_bool_masks(*all_masks)
 
     return mask
+
+
+@dc.dataclass(frozen=True)
+class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
+    # inherit from both `jtu.GetAttrKey` and `jtu.SequenceKey`
+    # in case the user perform isinstance check to unpack the name/index
+    # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
+    def __str__(self):
+        return f".{self.name}"
 
 
 def tree_hash(*trees: PyTree) -> int:

@@ -134,13 +134,13 @@ class AtIndexer(NamedTuple):
             return AtIndexer(self.tree, (*self.where, NameMatchKey(where)))
         if isinstance(where, int):
             return AtIndexer(self.tree, (*self.where, IntMatchKey(where)))
-        if where is ...:
+        if isinstance(where, type(...)):
             return AtIndexer(self.tree, (*self.where, TotalMatchKey()))
         if isinstance(where, (type(self.tree), BaseMatchKey)):
             return AtIndexer(self.tree, (*self.where, where))
 
         raise NotImplementedError(
-            f"Indexing with {type(where).__name__} is not implemented.\n"
+            f"Indexing with {type(where)} is not implemented.\n"
             "Example of supported indexing:\n\n"
             ">>> import jax\n"
             ">>> import pytreeclass as pytc\n"
