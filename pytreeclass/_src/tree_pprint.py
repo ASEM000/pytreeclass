@@ -54,7 +54,32 @@ from_iterable = chain.from_iterable
 
 @ft.singledispatch
 def pp_dispatcher(node: Any, **spec: Unpack[PPSpec]) -> str:
-    return fallback_pp(node, **spec)
+    """Register a new or override an existing pretty printer by type using
+    `pp_dispatcher.register` to be used by `tree_repr` and `tree_str`.
+
+    Args:
+        node: The node to be pretty printed.
+        **spec: The pretty print specification
+        - indent: The current indentation level
+        - kind: The kind of pretty print, either "REPR" or "STR"
+        - width: The maximum width of the pretty printed string
+        - depth: The maximum depth of the pretty printed string
+
+    Returns:
+        The pretty printed string.
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> class MyType:
+        ...     def __init__(self, x):
+        ...         self.x = x
+        >>> @pytc.pp_dispatcher.register(MyType)
+        ... def my_pp(node, **spec) -> str:
+        ...     return "MyType pp"
+        >>> pytc.tree_repr(MyType(1))
+        'MyType pp'
+    """
+    return general_pp(node, **spec)
 
 
 def dataclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
@@ -64,7 +89,7 @@ def dataclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
 
 
-def fallback_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
+def general_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     # ducktyping and other fallbacks that are not covered by singledispatch
 
     if dc.is_dataclass(node):
@@ -129,7 +154,7 @@ def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
 def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape"""
     if spec["kind"] == "STR":
-        return fallback_pp(node, **spec)
+        return general_pp(node, **spec)
 
     base = shape_dtype_pp(node, **spec)
 

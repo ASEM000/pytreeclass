@@ -8,6 +8,7 @@ from pytreeclass._src.tree_base import (
     unfreeze,
 )
 from pytreeclass._src.tree_pprint import (
+    pp_dispatcher,
     tree_diagram,
     tree_indent,
     tree_mermaid,
@@ -40,6 +41,7 @@ __all__ = (
     "tree_str",
     "tree_indent",
     "tree_summary",
+    "pp_dispatcher",
     # freeze/unfreeze utils
     "is_nondiff",
     "is_frozen",

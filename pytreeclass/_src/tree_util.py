@@ -139,7 +139,6 @@ class RegexMatchKey(BaseMatchKey):
     Args:
         pattern: regex pattern to match.
 
-
     Example:
         >>> import pytreeclass as pytc
         >>> class Tree(pytc.TreeClass):
