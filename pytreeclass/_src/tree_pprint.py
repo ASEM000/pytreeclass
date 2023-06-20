@@ -18,7 +18,6 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import math
-from collections.abc import MutableMapping, MutableSequence, MutableSet
 from itertools import chain
 from types import FunctionType
 from typing import Any, Callable, Iterable, Literal
@@ -205,7 +204,7 @@ def partial_pp(node: ft.partial, **spec: Unpack[PPSpec]) -> str:
     return f"Partial({func_pp(node.func, **spec)})"
 
 
-@pp_dispatcher.register(MutableSequence)
+@pp_dispatcher.register(list)
 def list_pp(node: list, **spec: Unpack[PPSpec]) -> str:
     return "[" + pps(node, pp=pp, **spec) + "]"
 
@@ -219,12 +218,12 @@ def tuple_pp(node: tuple, **spec: Unpack[PPSpec]) -> str:
     return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
 
 
-@pp_dispatcher.register(MutableSet)
+@pp_dispatcher.register(set)
 def set_pp(node: set, **spec: Unpack[PPSpec]) -> str:
     return "{" + pps(node, pp=pp, **spec) + "}"
 
 
-@pp_dispatcher.register(MutableMapping)
+@pp_dispatcher.register(dict)
 def dict_pp(node: dict, **spec: Unpack[PPSpec]) -> str:
     return "{" + pps(node.items(), pp=key_value_pp, **spec) + "}"
 

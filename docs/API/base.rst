@@ -16,13 +16,15 @@ Public API
     tree_str
     tree_summary
     tree_repr_with_trace
+    pp_dispatcher
     is_nondiff
     is_frozen
     unfreeze
     bcmap
     Partial
     AtIndexer
-    RegexMatchKey
+    RegexKey
+    BaseKey
     tree_map_with_trace
     tree_leaves_with_trace
     tree_flatten_with_trace
@@ -51,6 +53,7 @@ Pretty Printing API
 .. autofunction:: tree_str
 .. autofunction:: tree_summary
 .. autofunction:: tree_repr_with_trace
+.. autofunction:: pp_dispatcher
 
 Wrapping and freezing API
 -------------------------
@@ -75,7 +78,11 @@ Advanced API
         set,
         apply,
         __call__,
-.. autoclass:: RegexMatchKey
+        __getitem__
+.. autoclass:: RegexKey
+    :members:
+        __eq__
+.. autoclass:: BaseKey
     :members:
         __eq__
 .. autofunction:: tree_map_with_trace

@@ -42,7 +42,16 @@ TraceType = Tuple[KeyPath, TypePath]
 IsLeafType = Union[None, Callable[[Any], bool]]
 
 
-class BaseMatchKey(abc.ABC):
+@dc.dataclass(frozen=True)
+class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
+    # inherit from both `jtu.GetAttrKey` and `jtu.SequenceKey`
+    # in case the user perform isinstance check to unpack the name/index
+    # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
+    def __str__(self):
+        return f".{self.name}"
+
+
+class BaseKey(abc.ABC):
     """Parent class for all match classes.
 
     Note:
@@ -76,7 +85,7 @@ class BaseMatchKey(abc.ABC):
         ...    def at(self):
         ...        return pytc.AtIndexer(self)
         >>> tree = Tree(1, 2)
-        >>> class MatchNameType(pytc.BaseMatchKey):
+        >>> class MatchNameType(pytc.BaseKey):
         ...    def __init__(self, name, type):
         ...        self.name = name
         ...        self.type = type
@@ -93,39 +102,53 @@ class BaseMatchKey(abc.ABC):
         pass
 
 
-class IntMatchKey(BaseMatchKey):
+class IntKey(BaseKey):
     def __init__(self, idx: int) -> None:
         self.idx = idx
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(idx={self.idx})"
 
-    def __eq__(self, other: KeyEntry) -> bool:
-        if isinstance(other, int):
-            return self.idx == other
-        if isinstance(other, (jtu.SequenceKey, NamedSequenceKey)):
-            return self.idx == other.idx
+    @ft.singledispatchmethod
+    def __eq__(self, _: KeyEntry) -> bool:
         return False
 
+    @__eq__.register(int)
+    def _(self, other: int) -> bool:
+        return self.idx == other
 
-class NameMatchKey(BaseMatchKey):
+    @__eq__.register(jtu.SequenceKey)
+    @__eq__.register(NamedSequenceKey)
+    def _(self, other) -> bool:
+        return self.idx == other.idx
+
+
+class NameKey(BaseKey):
     def __init__(self, name: str) -> None:
         self.name = name
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"
 
-    def __eq__(self, other: KeyEntry) -> bool:
-        if isinstance(other, str):
-            return self.name == other
-        if isinstance(other, (jtu.GetAttrKey, NamedSequenceKey)):
-            return self.name == other.name
-        if isinstance(other, jtu.DictKey):
-            return self.name == other.key
+    @ft.singledispatchmethod
+    def __eq__(self, _: KeyEntry) -> bool:
         return False
 
+    @__eq__.register(str)
+    def _(self, other: str) -> bool:
+        return self.name == other
 
-class EllipsisMatchKey(BaseMatchKey):
+    @__eq__.register(jtu.GetAttrKey)
+    @__eq__.register(NamedSequenceKey)
+    def _(self, other) -> bool:
+        return self.name == other.name
+
+    @__eq__.register(jtu.DictKey)
+    def _(self, other) -> bool:
+        return self.name == other.key
+
+
+class EllipsisKey(BaseKey):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
 
@@ -133,7 +156,7 @@ class EllipsisMatchKey(BaseMatchKey):
         return True
 
 
-class RegexMatchKey(BaseMatchKey):
+class RegexKey(BaseKey):
     """Match a leaf with a regex pattern inside 'at' property.
 
     Args:
@@ -147,7 +170,7 @@ class RegexMatchKey(BaseMatchKey):
         ...     weight_3: float = 3.0
         ...     bias: float = 0.0
         >>> tree = Tree()
-        >>> tree.at[pytc.RegexMatchKey(r"weight_.*")].set(100.0)  # set all weights to 100.0
+        >>> tree.at[pytc.RegexKey(r"weight_.*")].set(100.0)  # set all weights to 100.0
         Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     """
 
@@ -157,20 +180,27 @@ class RegexMatchKey(BaseMatchKey):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(pattern={self.pattern})"
 
-    def __eq__(self, other: KeyEntry) -> bool:
-        """Return True if other fully matches the regex pattern."""
-        if isinstance(other, str):
-            return re.fullmatch(self.pattern, other) is not None
-        if isinstance(other, (jtu.GetAttrKey, NamedSequenceKey)):
-            return re.fullmatch(self.pattern, other.name) is not None
-        if isinstance(other, jtu.DictKey):
-            return re.fullmatch(self.pattern, other.key) is not None
+    @ft.singledispatchmethod
+    def __eq__(self, _: KeyEntry) -> bool:
         return False
+
+    @__eq__.register(str)
+    def _(self, other: str) -> bool:
+        return re.fullmatch(self.pattern, other) is not None
+
+    @__eq__.register(jtu.GetAttrKey)
+    @__eq__.register(NamedSequenceKey)
+    def _(self, other) -> bool:
+        return re.fullmatch(self.pattern, other.name) is not None
+
+    @__eq__.register(jtu.DictKey)
+    def _(self, other) -> bool:
+        return re.fullmatch(self.pattern, other.key) is not None
 
 
 def _generate_path_mask(
     tree: PyTree,
-    where: tuple[BaseMatchKey, ...],
+    where: tuple[BaseKey, ...],
     is_leaf: IsLeafType = None,
 ) -> PyTree:
     # generate a mask for `where` path in `tree`
@@ -225,28 +255,47 @@ def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
 
 def _resolve_where(
     tree: PyTree,
-    where: tuple[BaseMatchKey | PyTree, ...],  # type: ignore
+    where: tuple[BaseKey | PyTree, ...],  # type: ignore
     is_leaf: IsLeafType = None,
 ):
     mask = None
+    path_masks, bool_masks = [], []
+    treedef = jtu.tree_structure(tree, is_leaf=is_leaf)
 
-    if path := tuple(item for item in where if isinstance(item, BaseMatchKey)):
-        mask = _generate_path_mask(tree, path, is_leaf=is_leaf)
+    for item in where:
+        if isinstance(item, BaseKey):
+            # the mask is an integer, string, ellipsis or any user-defined
+            # `BaseKey` instance
+            path_masks += [item]
+        elif jtu.tree_structure(item, is_leaf=is_leaf) == treedef:
+            # the mask is a pytree with the same structure as `tree`
+            bool_masks += [item]
+        else:
+            raise NotImplementedError(
+                f"Indexing with {type(item)} is not implemented.\n"
+                "Example of supported indexing:\n\n"
+                ">>> import jax\n"
+                ">>> import pytreeclass as pytc\n"
+                f"class {type(tree).__name__}(pytc.TreeClass):\n"
+                "    ...\n\n"
+                f">>> tree = {type(tree).__name__}(...)\n"
+                ">>> # indexing by boolean pytree\n"
+                ">>> mask = jax.tree_map(lambda x: x > 0, tree)\n"
+                ">>> tree.at[mask].get()\n\n"
+                ">>> # indexing by attribute name\n"
+                ">>> tree.at[`attribute_name`].get()\n\n"
+                ">>> # indexing by leaf index\n"
+                ">>> tree.at[index].get()\n"
+            )
 
-    if bool_masks := tuple(item for item in where if isinstance(item, type(tree))):
-        all_masks = (mask, *bool_masks) if mask else bool_masks
+    if path_masks:
+        mask = _generate_path_mask(tree, path_masks, is_leaf=is_leaf)
+
+    if bool_masks:
+        all_masks = [mask, *bool_masks] if mask else bool_masks
         mask = _combine_maybe_bool_masks(*all_masks)
 
     return mask
-
-
-@dc.dataclass(frozen=True)
-class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
-    # inherit from both `jtu.GetAttrKey` and `jtu.SequenceKey`
-    # in case the user perform isinstance check to unpack the name/index
-    # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
-    def __str__(self):
-        return f".{self.name}"
 
 
 def tree_hash(*trees: PyTree) -> int:
@@ -327,12 +376,7 @@ class Partial:
 
     __slots__ = ["func", "args", "kwargs", "__weakref__"]  # type: ignore
 
-    def __init__(
-        self,
-        func: Callable[..., Any],
-        *args: Any,
-        **kwargs: Any,
-    ):
+    def __init__(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
         """Initialize a `Partial` function.
 
         Args:
@@ -367,11 +411,7 @@ jtu.register_pytree_node(
 )
 
 
-def bcmap(
-    func: Callable,
-    *,
-    is_leaf: IsLeafType = None,
-) -> Callable:
+def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
     """
     (map)s a function over pytrees leaves with automatic (b)road(c)asting
     for scalar arguments

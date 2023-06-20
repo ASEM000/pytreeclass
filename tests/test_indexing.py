@@ -606,17 +606,9 @@ def test_repr_str():
 
     t = Tree()
 
-    assert (
-        repr(t.at["a"])
-        == "AtIndexer(tree=Tree(a=1, b=2), where=(NameMatchKey(name=a),))"
-    )
-    assert (
-        str(t.at["a"])
-        == "AtIndexer(tree=Tree(a=1, b=2), where=(NameMatchKey(name=a),))"
-    )
-    assert (
-        repr(t.at[...]) == "AtIndexer(tree=Tree(a=1, b=2), where=(EllipsisMatchKey(),))"
-    )
+    assert repr(t.at["a"]) == "AtIndexer(tree=Tree(a=1, b=2), where=(NameKey(name=a),))"
+    assert str(t.at["a"]) == "AtIndexer(tree=Tree(a=1, b=2), where=(NameKey(name=a),))"
+    assert repr(t.at[...]) == "AtIndexer(tree=Tree(a=1, b=2), where=(EllipsisKey(),))"
 
 
 def test_not_equal():
@@ -710,12 +702,12 @@ def test_regexkey():
 
     tree = Tree()
 
-    tree = tree.at[pytc.RegexMatchKey(r"weight_.*")].set(100.0)
+    tree = tree.at[pytc.RegexKey(r"weight_.*")].set(100.0)
     # Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     assert jtu.tree_leaves(tree) == [100.0, 100.0, 100.0, 0.0]
 
-    assert pytc.RegexMatchKey(r"w.*") == "woof"
-    assert pytc.RegexMatchKey(r"w.*") != "meow"
+    assert pytc.RegexKey(r"w.*") == "woof"
+    assert pytc.RegexKey(r"w.*") != "meow"
 
 
 def test_custom_key():
@@ -744,7 +736,7 @@ def test_custom_key():
 
     tree = Tree(1, 2)
 
-    class MatchNameType(pytc.BaseMatchKey):
+    class MatchNameType(pytc.BaseKey):
         def __init__(self, name, type):
             self.name = name
             self.type = type

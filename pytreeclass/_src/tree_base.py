@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import abc
+import functools as ft
 from collections.abc import Callable
 from contextlib import contextmanager
 from typing import Any, Generic, Hashable, NamedTuple, TypeVar
@@ -42,12 +43,12 @@ from pytreeclass._src.tree_pprint import (
     tree_str,
 )
 from pytreeclass._src.tree_util import (
-    BaseMatchKey,
-    EllipsisMatchKey,
-    IntMatchKey,
+    BaseKey,
+    EllipsisKey,
+    IntKey,
     IsLeafType,
     NamedSequenceKey,
-    NameMatchKey,
+    NameKey,
     _leafwise_transform,
     _resolve_where,
     is_tree_equal,
@@ -134,34 +135,40 @@ class AtIndexer(NamedTuple):
     """
 
     tree: PyTree
-    where: tuple[BaseMatchKey | PyTree] | tuple[()] = ()
+    where: tuple[BaseKey | PyTree] | tuple[()] = ()
 
+    @ft.singledispatchmethod
     def __getitem__(self, where: Any) -> AtIndexer:
-        if isinstance(where, str):
-            return AtIndexer(self.tree, (*self.where, NameMatchKey(where)))
-        if isinstance(where, int):
-            return AtIndexer(self.tree, (*self.where, IntMatchKey(where)))
-        if isinstance(where, type(...)):
-            return AtIndexer(self.tree, (*self.where, EllipsisMatchKey()))
-        if isinstance(where, (type(self.tree), BaseMatchKey)):
-            return AtIndexer(self.tree, (*self.where, where))
+        """Index the tree at the specified location.
 
-        raise NotImplementedError(
-            f"Indexing with {type(where)} is not implemented.\n"
-            "Example of supported indexing:\n\n"
-            ">>> import jax\n"
-            ">>> import pytreeclass as pytc\n"
-            f"class {type(self.tree).__name__}(pytc.TreeClass):\n"
-            "    ...\n\n"
-            f">>> tree = {type(self.tree).__name__}(...)\n"
-            ">>> # indexing by boolean pytree\n"
-            ">>> mask = jax.tree_map(lambda x: x > 0, tree)\n"
-            ">>> tree.at[mask].get()\n\n"
-            ">>> # indexing by attribute name\n"
-            ">>> tree.at[`attribute_name`].get()\n\n"
-            ">>> # indexing by leaf index\n"
-            ">>> tree.at[index].get()\n"
-        )
+        Args:
+            where: a key or a tree of keys to index the tree.
+
+        Returns:
+            A new AtIndexer instance with the specified location.
+
+        Note:
+            Use `__getitem__.register` to add conversion logic for custom keys.
+            for example, the following code adds support for indexing with
+            `str` keys that gets converted to `NameKey`:
+
+                >>> @__getitem__.register(str)
+                ... def _(self, where: str) -> AtIndexer:
+                ...    return AtIndexer(self.tree, (*self.where, NameKey(where)))
+        """
+        return AtIndexer(self.tree, (*self.where, where))
+
+    @__getitem__.register(str)
+    def _(self, where: str) -> AtIndexer:
+        return AtIndexer(self.tree, (*self.where, NameKey(where)))
+
+    @__getitem__.register(int)
+    def _(self, where: int) -> AtIndexer:
+        return AtIndexer(self.tree, (*self.where, IntKey(where)))
+
+    @__getitem__.register(type(...))
+    def _(self, _: EllipsisType) -> AtIndexer:
+        return AtIndexer(self.tree, (*self.where, EllipsisKey()))
 
     def get(self, *, is_leaf: IsLeafType = None) -> PyTree:
         """Get the leaf values at the specified location.
@@ -333,9 +340,9 @@ class AtIndexer(NamedTuple):
             - Use .at["method_name"](*, **) to call a method that mutates the instance.
         """
 
-        def recursive_getattr(tree: Any, where: tuple[NameMatchKey, ...]):
-            if not isinstance(where[0], NameMatchKey):
-                raise TypeError(f"Expected `NameMatchKey` got {type(where[0])!r}.")
+        def recursive_getattr(tree: Any, where: tuple[NameKey, ...]):
+            if not isinstance(where[0], NameKey):
+                raise TypeError(f"Expected `NameKey` got {type(where[0])!r}.")
             if len(where) == 1:
                 return getattr(tree, where[0].name)
             return recursive_getattr(getattr(tree, where[0].name), where[1:])

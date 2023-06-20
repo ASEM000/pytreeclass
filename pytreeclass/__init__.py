@@ -18,9 +18,9 @@ from pytreeclass._src.tree_pprint import (
     tree_summary,
 )
 from pytreeclass._src.tree_util import (
-    BaseMatchKey,
+    BaseKey,
     Partial,
-    RegexMatchKey,
+    RegexKey,
     bcmap,
     is_tree_equal,
     tree_flatten_with_trace,
@@ -55,8 +55,8 @@ __all__ = (
     "tree_flatten_with_trace",
     "tree_repr_with_trace",
     "Partial",
-    "RegexMatchKey",
-    "BaseMatchKey",
+    "RegexKey",
+    "BaseKey",
 )
 
 __version__ = "0.3.9"
