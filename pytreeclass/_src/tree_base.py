@@ -151,8 +151,8 @@ class AtIndexer(NamedTuple):
             Use `__getitem__.register` to add conversion logic for custom keys.
             for example, the following code adds support for indexing with
             `str` keys that gets converted to `NameKey`:
-
-                >>> @__getitem__.register(str)
+                >>> import pytreeclass as pytc
+                >>> @pytc.AtIndexer.__getitem__.register(str)
                 ... def _(self, where: str) -> AtIndexer:
                 ...    return AtIndexer(self.tree, (*self.where, NameKey(where)))
         """
