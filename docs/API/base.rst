@@ -78,7 +78,6 @@ Advanced API
         set,
         apply,
         __call__,
-        __getitem__
 .. autoclass:: RegexKey
     :members:
         __eq__
