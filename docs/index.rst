@@ -22,6 +22,7 @@ Install from pip::
    notebooks/freezing
    notebooks/common_recipes
    notebooks/build_simple_neural_network
+   notebooks/build_mini_optimizer_library
 
 .. toctree::
     :caption: API Documentation
