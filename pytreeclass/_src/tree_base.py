@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import abc
-import functools as ft
 from collections.abc import Callable
 from contextlib import contextmanager
 from typing import Any, Generic, Hashable, NamedTuple, TypeVar
@@ -44,13 +43,12 @@ from pytreeclass._src.tree_pprint import (
 )
 from pytreeclass._src.tree_util import (
     BaseKey,
-    EllipsisKey,
-    IntKey,
     IsLeafType,
     NamedSequenceKey,
     NameKey,
     _leafwise_transform,
     _resolve_where,
+    indexer_dispatcher,
     is_tree_equal,
     tree_copy,
     tree_hash,
@@ -137,38 +135,8 @@ class AtIndexer(NamedTuple):
     tree: PyTree
     where: tuple[BaseKey | PyTree] | tuple[()] = ()
 
-    @ft.singledispatchmethod
     def __getitem__(self, where: Any) -> AtIndexer:
-        """Index the tree at the specified location.
-
-        Args:
-            where: a key or a tree of keys to index the tree.
-
-        Returns:
-            A new AtIndexer instance with the specified location.
-
-        Note:
-            Use `__getitem__.register` to add conversion logic for custom keys.
-            for example, the following code adds support for indexing with
-            `str` keys that gets converted to `NameKey`:
-                >>> import pytreeclass as pytc
-                >>> @pytc.AtIndexer.__getitem__.register(str)
-                ... def _(self, where: str) -> AtIndexer:
-                ...    return AtIndexer(self.tree, (*self.where, NameKey(where)))
-        """
-        return AtIndexer(self.tree, (*self.where, where))
-
-    @__getitem__.register(str)
-    def _(self, where: str) -> AtIndexer:
-        return AtIndexer(self.tree, (*self.where, NameKey(where)))
-
-    @__getitem__.register(int)
-    def _(self, where: int) -> AtIndexer:
-        return AtIndexer(self.tree, (*self.where, IntKey(where)))
-
-    @__getitem__.register(type(...))
-    def _(self, _: EllipsisType) -> AtIndexer:
-        return AtIndexer(self.tree, (*self.where, EllipsisKey()))
+        return AtIndexer(self.tree, (*self.where, indexer_dispatcher(where)))
 
     def get(self, *, is_leaf: IsLeafType = None) -> PyTree:
         """Get the leaf values at the specified location.
