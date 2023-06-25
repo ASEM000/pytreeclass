@@ -156,6 +156,19 @@ class EllipsisKey(BaseKey):
         return True
 
 
+class MultiKey(BaseKey):
+    """Match a leaf with multiple keys at the same level."""
+
+    def __init__(self, *keys):
+        self.keys = tuple(map(indexer_dispatcher, keys))
+
+    def __eq__(self, entry) -> bool:
+        return any(entry == key for key in self.keys)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(keys={self.keys})"
+
+
 class RegexKey(BaseKey):
     """Match a leaf with a regex pattern inside 'at' property.
 
@@ -196,6 +209,15 @@ class RegexKey(BaseKey):
     @__eq__.register(jtu.DictKey)
     def _(self, other) -> bool:
         return re.fullmatch(self.pattern, other.key) is not None
+
+
+# dispatch on type of indexer to convert input item to at indexer
+# `__getitem__` to the appropriate key
+indexer_dispatcher = ft.singledispatch(lambda x: x)
+indexer_dispatcher.register(type(...), lambda _: EllipsisKey())
+indexer_dispatcher.register(int, lambda x: IntKey(x))
+indexer_dispatcher.register(str, lambda x: NameKey(x))
+indexer_dispatcher.register(tuple, lambda x: MultiKey(*x))
 
 
 def _generate_path_mask(

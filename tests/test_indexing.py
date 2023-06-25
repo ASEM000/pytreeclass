@@ -747,3 +747,16 @@ def test_custom_key():
             return False
 
     assert jax.tree_util.tree_leaves(tree.at[MatchNameType("a", int)].get()) == [1]
+
+
+def test_multi_key():
+    class Tree(pytc.TreeClass):
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    tree = Tree()
+    assert pytc.is_tree_equal(
+        tree.at["a"].set(100).at["b"].set(100),
+        tree.at["a", "b"].set(100),
+    )
