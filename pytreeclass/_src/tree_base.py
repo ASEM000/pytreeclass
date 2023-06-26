@@ -55,9 +55,11 @@ from pytreeclass._src.tree_util import (
 )
 
 T = TypeVar("T", bound=Hashable)
+S = TypeVar("S")
 PyTree = Any
 EllipsisType = type(Ellipsis)
 _no_initializer = object()
+
 
 # allow methods in mutable context to be called without raising `AttributeError`
 # the instances are registered  during initialization and using `at`  property
@@ -240,6 +242,63 @@ class AtIndexer(NamedTuple):
             return func(leaf) if where else leaf
 
         return jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+
+    def scan(
+        self,
+        func: Callable[[Any, S], tuple[Any, S]],
+        state: S,
+        *,
+        is_leaf: IsLeafType = None,
+    ) -> tuple[PyTree, S]:
+        """Apply a function to the leaf values at the specified location defined
+        by the mask while carrying a state.
+
+        Args:
+            func: the function to apply to the leaf values. the function accepts
+                a leaf value and a state and returns a tuple of the new leaf
+                value and updated state.
+            is_leaf: a predicate function to determine if a value is a leaf.
+
+        Returns:
+            A tuple of a PyTree with the leaf values at the specified location
+            set to the result of applying `func` to the leaf values and the
+            new state.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> from typing import NamedTuple
+            >>> class State(NamedTuple):
+            ...     func_evals: int = 0
+            >>> class Tree(pytc.TreeClass):
+            ...     a: int
+            ...     b: int
+            ...     c: int
+            >>> tree = Tree(a=1, b=2, c=3)
+            >>> def scan_func(leaf, state: State):
+            ...     state = State(state.func_evals + 1)
+            ...     return leaf + 1, state
+            >>> # apply to `a` and `b` and return a new instance with all other
+            >>> # leaves unchanged and the new state that counts the number of
+
+            >>> tree.at['a','b'].scan(scan_func, state=State())
+            (Tree(a=2, b=3, c=3), State(func_evals=2))
+        """
+        where = _resolve_where(self.tree, self.where, is_leaf)
+
+        running_state = state
+
+        def stateless_func(leaf):
+            nonlocal running_state
+            leaf, running_state = func(leaf, running_state)
+            return leaf
+
+        def leaf_apply(leaf: Any, where: bool):
+            if isinstance(where, (jax.Array, np.ndarray)):
+                return jnp.where(where, stateless_func(leaf), leaf)
+            return stateless_func(leaf) if where else leaf
+
+        out = jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+        return out, running_state
 
     def reduce(
         self,
@@ -508,6 +567,10 @@ class TreeClass(metaclass=TreeClassMeta):
             >>> # (return value, new instance)
             >>> tree.at["add"](99)
             (100, Tree(a=100, b=2.0))
+
+        Note:
+            - `pytree.at[*].at[**]` is equivalent to selecting pytree.*.**
+            - `pytree.at[*, **]` is equivalent selecting pytree.* and pytree.**
         """
         return AtIndexer(self)
 
@@ -675,7 +738,7 @@ def is_nondiff(wrapped: Any) -> bool:
 
 
 @pp_dispatcher.register(TreeClass)
-def treeclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
+def treeclass_pp(node: TreeClass, **spec: Unpack[PPSpec]) -> str:
     name = type(node).__name__
     skip = [f.name for f in fields(node) if not f.repr]
     kvs = ((k, v) for k, v in vars(node).items() if k not in skip)

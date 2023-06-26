@@ -118,7 +118,6 @@ class IntKey(BaseKey):
         return self.idx == other
 
     @__eq__.register(jtu.SequenceKey)
-    @__eq__.register(NamedSequenceKey)
     def _(self, other) -> bool:
         return self.idx == other.idx
 
@@ -139,7 +138,6 @@ class NameKey(BaseKey):
         return self.name == other
 
     @__eq__.register(jtu.GetAttrKey)
-    @__eq__.register(NamedSequenceKey)
     def _(self, other) -> bool:
         return self.name == other.name
 
@@ -202,7 +200,6 @@ class RegexKey(BaseKey):
         return re.fullmatch(self.pattern, other) is not None
 
     @__eq__.register(jtu.GetAttrKey)
-    @__eq__.register(NamedSequenceKey)
     def _(self, other) -> bool:
         return re.fullmatch(self.pattern, other.name) is not None
 
