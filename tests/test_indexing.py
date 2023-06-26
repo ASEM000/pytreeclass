@@ -760,3 +760,20 @@ def test_multi_key():
         tree.at["a"].set(100).at["b"].set(100),
         tree.at["a", "b"].set(100),
     )
+
+
+def test_scan():
+    class Tree(pytc.TreeClass):
+        a: int = 1
+        b: int = 2
+        c: int = 3
+
+    tree = Tree()
+
+    def func_with_state(x, state):
+        return x + 1, state + 1
+
+    tree, state = tree.at["a", "b"].scan(func_with_state, state=1)
+
+    assert pytc.is_tree_equal(tree, Tree(a=2, b=3, c=3))
+    assert state == 3

@@ -77,6 +77,7 @@ Advanced API
         get,
         set,
         apply,
+        scan,
         __call__,
 .. autoclass:: RegexKey
     :members:
