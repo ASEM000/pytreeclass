@@ -257,7 +257,10 @@ class AtIndexer(NamedTuple):
             func: the function to apply to the leaf values. the function accepts
                 a leaf value and a state and returns a tuple of the new leaf
                 value and updated state.
-            is_leaf: a predicate function to determine if a value is a leaf.
+            state: the initial state to carry.
+            is_leaf: a predicate function to determine if a value is a leaf. for
+                example, `lambda x: isinstance(x, list)` will treat all lists
+                as leaves and will not recurse into list items.
 
         Returns:
             A tuple of a PyTree with the leaf values at the specified location
