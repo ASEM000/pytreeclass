@@ -111,6 +111,21 @@ class AtIndexer(NamedTuple):
     """Adds `.at` indexing abilities to a PyTree.
 
     Example:
+        >>> # use `AtIndexer` on a pytree (e.g. dict,list,tuple,etc.)
+        >>> import pytreeclass as pytc
+        >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
+        >>> pytc.AtIndexer(tree)["level1_0"]["level2_0"].get()
+        {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
+        >>> # get multiple keys at once at the same level
+        >>> pytc.AtIndexer(tree)["level1_0"][{"level2_0", "level2_1"}].get()
+        {'level1_0': {'level2_0': 100, 'level2_1': 200}, 'level1_1': None}
+        >>> # get with a mask
+        >>> mask = {"level1_0": {"level2_0": True, "level2_1": False}, "level1_1": True}
+        >>> pytc.AtIndexer(tree)[mask].get()
+        {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': 300}
+
+    Example:
+        >>> # use `AtIndexer` in a class
         >>> import jax.tree_util as jtu
         >>> import pytreeclass as pytc
         >>> @jax.tree_util.register_pytree_with_keys_class
@@ -152,6 +167,12 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as pytc
+            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
+            >>> pytc.AtIndexer(tree)["level1_0"]["level2_0"].get()
+            {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
+
+        Example:
+            >>> import pytreeclass as pytc
             >>> class Tree(pytc.TreeClass):
             ...     a: int
             ...     b: int
@@ -180,6 +201,12 @@ class AtIndexer(NamedTuple):
         Returns:
             A PyTree with the leaf values at the specified location
             set to `set_value`.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
+            >>> pytc.AtIndexer(tree)["level1_0"]["level2_0"].set('SET')
+            {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
             >>> import pytreeclass as pytc
@@ -222,6 +249,12 @@ class AtIndexer(NamedTuple):
         Returns:
             A PyTree with the leaf values at the specified location set to
             the result of applying `func` to the leaf values.
+
+        Example:
+            >>> import pytreeclass as pytc
+            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
+            >>> pytc.AtIndexer(tree)["level1_0"]["level2_0"].apply(lambda _: 'SET')
+            {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
             >>> import pytreeclass as pytc
@@ -269,6 +302,15 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as pytc
+            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
+            >>> def scan_func(leaf, state):
+            ...     return 'SET', state + 1
+            >>> init_state = 0
+            >>> pytc.AtIndexer(tree).at["level1_0"]["level2_0"].scan(scan_func, state=init_state)
+            ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
+
+        Example:
+            >>> import pytreeclass as pytc
             >>> from typing import NamedTuple
             >>> class State(NamedTuple):
             ...     func_evals: int = 0
@@ -282,8 +324,8 @@ class AtIndexer(NamedTuple):
             ...     return leaf + 1, state
             >>> # apply to `a` and `b` and return a new instance with all other
             >>> # leaves unchanged and the new state that counts the number of
-
-            >>> tree.at['a','b'].scan(scan_func, state=State())
+            >>> # function evaluations
+            >>> tree.at[{'a','b'}].scan(scan_func, state=State())
             (Tree(a=2, b=3, c=3), State(func_evals=2))
         """
         where = _resolve_where(self.tree, self.where, is_leaf)

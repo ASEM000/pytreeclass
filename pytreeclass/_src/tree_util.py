@@ -214,7 +214,7 @@ indexer_dispatcher = ft.singledispatch(lambda x: x)
 indexer_dispatcher.register(type(...), lambda _: EllipsisKey())
 indexer_dispatcher.register(int, lambda x: IntKey(x))
 indexer_dispatcher.register(str, lambda x: NameKey(x))
-indexer_dispatcher.register(tuple, lambda x: MultiKey(*x))
+indexer_dispatcher.register(set, lambda x: MultiKey(*x))
 
 
 def _generate_path_mask(
@@ -305,6 +305,8 @@ def _resolve_where(
                 ">>> tree.at[`attribute_name`].get()\n\n"
                 ">>> # indexing by leaf index\n"
                 ">>> tree.at[index].get()\n"
+                ">>> # indexing with multiple keys\n"
+                ">>> tree.at[{0,'attribute_name'}].get()"
             )
 
     if path_masks:
