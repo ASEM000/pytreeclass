@@ -48,7 +48,6 @@ from pytreeclass._src.tree_util import (
     NameKey,
     _leafwise_transform,
     _resolve_where,
-    indexer_dispatcher,
     is_tree_equal,
     tree_copy,
     tree_hash,
@@ -108,20 +107,31 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
 
 class AtIndexer(NamedTuple):
-    """Adds `.at` indexing abilities to a PyTree.
+    """Index a pytree at a given path using a path or mask.
+
+    Args:
+        tree: pytree to index
+        where: one of the following:
+            - `str` for mapping keys or class attributes.
+            - `int` for positional indexing for sequences.
+            - `...` to select all leaves.
+            - a boolean mask of the same structure as the tree
+            - `re.Pattern` to index all keys matching a regex pattern.
+            - an instance of `BaseKey` with custom logic to index a pytree.
+            - a tuple of the above to index multiple keys at the same level.
 
     Example:
         >>> # use `AtIndexer` on a pytree (e.g. dict,list,tuple,etc.)
         >>> import pytreeclass as pytc
         >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-        >>> pytc.AtIndexer(tree)["level1_0"]["level2_0"].get()
+        >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
         >>> # get multiple keys at once at the same level
-        >>> pytc.AtIndexer(tree)["level1_0"][{"level2_0", "level2_1"}].get()
+        >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0", "level2_1"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': 200}, 'level1_1': None}
         >>> # get with a mask
         >>> mask = {"level1_0": {"level2_0": True, "level2_1": False}, "level1_1": True}
-        >>> pytc.AtIndexer(tree)[mask].get()
+        >>> pytc.AtIndexer(tree).at[mask].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': 300}
 
     Example:
@@ -153,7 +163,15 @@ class AtIndexer(NamedTuple):
     where: tuple[BaseKey | PyTree] | tuple[()] = ()
 
     def __getitem__(self, where: Any) -> AtIndexer:
-        return AtIndexer(self.tree, (*self.where, indexer_dispatcher(where)))
+        return AtIndexer(self.tree, (*self.where, where))
+
+    def __getattr__(self, name: str) -> AtIndexer:
+        """Support nested indexing"""
+        if name == "at":
+            # pass the current tree and the current path to the next `.at`
+            return AtIndexer(tree=self.tree, where=self.where)
+
+        raise AttributeError(f"`{self!r}` has no attribute {name!r}.")
 
     def get(self, *, is_leaf: IsLeafType = None) -> PyTree:
         """Get the leaf values at the specified location.
@@ -162,13 +180,13 @@ class AtIndexer(NamedTuple):
             is_leaf: a predicate function to determine if a value is a leaf.
 
         Returns:
-            A PyTree of leaf values at the specified location, with the
+            A _new_ pytree of leaf values at the specified location, with the
             non-selected leaf values set to None if the leaf is not an array.
 
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree)["level1_0"]["level2_0"].get()
+            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].get()
             {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
 
         Example:
@@ -199,13 +217,13 @@ class AtIndexer(NamedTuple):
             is_leaf: a predicate function to determine if a value is a leaf.
 
         Returns:
-            A PyTree with the leaf values at the specified location
+            A pytree with the leaf values at the specified location
             set to `set_value`.
 
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree)["level1_0"]["level2_0"].set('SET')
+            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].set('SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
@@ -247,13 +265,13 @@ class AtIndexer(NamedTuple):
             is_leaf: a predicate function to determine if a value is a leaf.
 
         Returns:
-            A PyTree with the leaf values at the specified location set to
+            A pytree with the leaf values at the specified location set to
             the result of applying `func` to the leaf values.
 
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree)["level1_0"]["level2_0"].apply(lambda _: 'SET')
+            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].apply(lambda _: 'SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
@@ -296,7 +314,7 @@ class AtIndexer(NamedTuple):
                 as leaves and will not recurse into list items.
 
         Returns:
-            A tuple of a PyTree with the leaf values at the specified location
+            A tuple of a pytree with the leaf values at the specified location
             set to the result of applying `func` to the leaf values and the
             new state.
 
@@ -306,7 +324,7 @@ class AtIndexer(NamedTuple):
             >>> def scan_func(leaf, state):
             ...     return 'SET', state + 1
             >>> init_state = 0
-            >>> pytc.AtIndexer(tree).at["level1_0"]["level2_0"].scan(scan_func, state=init_state)
+            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].scan(scan_func, state=init_state)
             ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
 
         Example:
@@ -325,8 +343,15 @@ class AtIndexer(NamedTuple):
             >>> # apply to `a` and `b` and return a new instance with all other
             >>> # leaves unchanged and the new state that counts the number of
             >>> # function evaluations
-            >>> tree.at[{'a','b'}].scan(scan_func, state=State())
+            >>> tree.at['a','b'].scan(scan_func, state=State())
             (Tree(a=2, b=3, c=3), State(func_evals=2))
+
+        Note:
+            - `scan` applies a binary `func` to the leaf values while carrying
+                a state and returning a final state and tree leaves with the
+                the `func` applied to them. While `reduce` applies a binary
+                `func` to the leaf values while carrying a state and returning
+                a single value.
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
 
@@ -362,6 +387,14 @@ class AtIndexer(NamedTuple):
         Returns:
             The result of reducing the leaf values at the specified location.
 
+        Note:
+            - If `initializer` is not specified, the first leaf value is used as
+                the initializer.
+            - `reduce` applies a binary `func` to each leaf values while accumulating
+                a state a returns the final result. while `scan` applies `func` to each
+                leaf value while carrying a state and returns the final state and
+                the leaves of the tree with the result of applying `func` to each leaf.
+
         Example:
             >>> import pytreeclass as pytc
             >>> class Tree(pytc.TreeClass):
@@ -376,14 +409,6 @@ class AtIndexer(NamedTuple):
         if initializer is _no_initializer:
             return jtu.tree_reduce(func, tree)
         return jtu.tree_reduce(func, tree, initializer)
-
-    def __getattr__(self, name: str) -> AtIndexer:
-        """Support nested indexing"""
-        if name == "at":
-            # pass the current tree and the current path to the next `.at`
-            return AtIndexer(tree=self.tree, where=self.where)
-
-        raise AttributeError(f"`{type(self).__name__!r}` has no attribute {name!r}.")
 
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         """
@@ -413,11 +438,11 @@ class AtIndexer(NamedTuple):
         """
 
         def recursive_getattr(tree: Any, where: tuple[NameKey, ...]):
-            if not isinstance(where[0], NameKey):
-                raise TypeError(f"Expected `NameKey` got {type(where[0])!r}.")
+            if not isinstance(where[0], str):
+                raise TypeError(f"Expected string, got {type(where[0])!r}.")
             if len(where) == 1:
-                return getattr(tree, where[0].name)
-            return recursive_getattr(getattr(tree, where[0].name), where[1:])
+                return getattr(tree, where[0])
+            return recursive_getattr(getattr(tree, where[0]), where[1:])
 
         with _mutable_context(self.tree, kopy=True) as tree:
             value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
@@ -583,9 +608,14 @@ class TreeClass(metaclass=TreeClassMeta):
         - `.at['method'](*a, **k)`:
             Call a `method` and return a (return value, new instance) tuple.
 
-        `***` acceptable index types are `str` for mapping keys or
-        class attributes, `int` for positional indexing, `...` to select all leaves,
-        , a boolean mask of the same structure as the tree.
+        `***` acceptable indexing types are:
+            - `str` for mapping keys or class attributes.
+            - `int` for positional indexing for sequences.
+            - `...` to select all leaves.
+            - a boolean mask of the same structure as the tree
+            - `re.Pattern` to index all keys matching a regex pattern.
+            - an instance of `BaseKey` with custom logic to index a pytree.
+            - a tuple of the above types to index multiple keys at same level.
 
         Example:
             >>> import pytreeclass as pytc

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import namedtuple
 from typing import Any, NamedTuple
 
@@ -65,7 +66,7 @@ def test_getter_by_val():
 
     assert pytc.is_tree_equal(B, C)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(NotImplementedError):
         B = A.at[A].get()
 
     # with pytest.raises(NotImplementedError):
@@ -124,7 +125,7 @@ def test_setter_by_val():
 
     A = Tree(10, 20, 30, jnp.array([1, 2, 3, 4, 5]), ("A"))
 
-    with pytest.raises(TypeError):
+    with pytest.raises(NotImplementedError):
         B = A.at[A].set(0)
 
     # with pytest.raises(NotImplementedError):
@@ -187,7 +188,7 @@ def test_apply_and_its_derivatives():
     rhs = init.at[...].apply(lambda x: (x + 1) * 10)
     assert pytc.is_tree_equal(lhs, rhs)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(NotImplementedError):
         init.at[init].apply(lambda x: (x + 1) * 10)
 
     class L0(TreeClass, leafwise=True):
@@ -295,7 +296,7 @@ def test_reduce():
     rhs = init.at[init > 1].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
     assert lhs == rhs
 
-    with pytest.raises(TypeError):
+    with pytest.raises(NotImplementedError):
         init.at[init].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
 
     class Tree(TreeClass, leafwise=True):
@@ -346,7 +347,7 @@ def test_reduce_and_its_derivatives():
         tree.at[tree > 0].reduce(lambda x, y: x + jnp.sum(y), initializer=0), 10.6970625
     )
     npt.assert_allclose(
-        tree.at[tree > 0].reduce(lambda x, y: x * jnp.product(y), initializer=1),
+        tree.at[tree > 0].reduce(lambda x, y: x * jnp.prod(y), initializer=1),
         1.8088213,
     )
 
@@ -606,9 +607,9 @@ def test_repr_str():
 
     t = Tree()
 
-    assert repr(t.at["a"]) == "AtIndexer(tree=Tree(a=1, b=2), where=(NameKey(name=a),))"
-    assert str(t.at["a"]) == "AtIndexer(tree=Tree(a=1, b=2), where=(NameKey(name=a),))"
-    assert repr(t.at[...]) == "AtIndexer(tree=Tree(a=1, b=2), where=(EllipsisKey(),))"
+    assert repr(t.at["a"]) == "AtIndexer(tree=Tree(a=1, b=2), where=('a',))"
+    assert str(t.at["a"]) == "AtIndexer(tree=Tree(a=1, b=2), where=('a',))"
+    assert repr(t.at[...]) == "AtIndexer(tree=Tree(a=1, b=2), where=(Ellipsis,))"
 
 
 def test_not_equal():
@@ -702,12 +703,9 @@ def test_regexkey():
 
     tree = Tree()
 
-    tree = tree.at[pytc.RegexKey(r"weight_.*")].set(100.0)
+    tree = tree.at[re.compile(r"weight_.*")].set(100.0)
     # Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     assert jtu.tree_leaves(tree) == [100.0, 100.0, 100.0, 0.0]
-
-    assert pytc.RegexKey(r"w.*") == "woof"
-    assert pytc.RegexKey(r"w.*") != "meow"
 
 
 def test_custom_key():
@@ -758,7 +756,7 @@ def test_multi_key():
     tree = Tree()
     assert pytc.is_tree_equal(
         tree.at["a"].set(100).at["b"].set(100),
-        tree.at[{"a", "b"}].set(100),
+        tree.at["a", "b"].set(100),
     )
 
 
@@ -773,7 +771,7 @@ def test_scan():
     def func_with_state(x, state):
         return x + 1, state + 1
 
-    tree, state = tree.at[{"a", "b"}].scan(func_with_state, state=1)
+    tree, state = tree.at["a", "b"].scan(func_with_state, state=1)
 
     assert pytc.is_tree_equal(tree, Tree(a=2, b=3, c=3))
     assert state == 3

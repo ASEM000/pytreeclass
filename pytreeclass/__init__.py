@@ -20,7 +20,6 @@ from pytreeclass._src.tree_pprint import (
 from pytreeclass._src.tree_util import (
     BaseKey,
     Partial,
-    RegexKey,
     bcmap,
     is_tree_equal,
     tree_flatten_with_trace,
@@ -55,7 +54,6 @@ __all__ = (
     "tree_flatten_with_trace",
     "tree_repr_with_trace",
     "Partial",
-    "RegexKey",
     "BaseKey",
 )
 

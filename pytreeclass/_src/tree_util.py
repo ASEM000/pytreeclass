@@ -157,8 +157,8 @@ class EllipsisKey(BaseKey):
 class MultiKey(BaseKey):
     """Match a leaf with multiple keys at the same level."""
 
-    def __init__(self, *keys):
-        self.keys = tuple(map(indexer_dispatcher, keys))
+    def __init__(self, *keys: tuple[BaseKey, ...]):
+        self.keys = tuple(keys)
 
     def __eq__(self, entry) -> bool:
         return any(entry == key for key in self.keys)
@@ -175,13 +175,14 @@ class RegexKey(BaseKey):
 
     Example:
         >>> import pytreeclass as pytc
+        >>> import re
         >>> class Tree(pytc.TreeClass):
         ...     weight_1: float = 1.0
         ...     weight_2: float = 2.0
         ...     weight_3: float = 3.0
         ...     bias: float = 0.0
         >>> tree = Tree()
-        >>> tree.at[pytc.RegexKey(r"weight_.*")].set(100.0)  # set all weights to 100.0
+        >>> tree.at[re.compile(r"weight_.*")].set(100.0)  # set all weights to 100.0
         Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     """
 
@@ -210,11 +211,23 @@ class RegexKey(BaseKey):
 
 # dispatch on type of indexer to convert input item to at indexer
 # `__getitem__` to the appropriate key
+# avoid using container pytree types to avoid conflict between
+# matching as a mask or as an instance of `BaseKey`
 indexer_dispatcher = ft.singledispatch(lambda x: x)
 indexer_dispatcher.register(type(...), lambda _: EllipsisKey())
 indexer_dispatcher.register(int, lambda x: IntKey(x))
 indexer_dispatcher.register(str, lambda x: NameKey(x))
-indexer_dispatcher.register(set, lambda x: MultiKey(*x))
+indexer_dispatcher.register(re.Pattern, lambda x: RegexKey(x))
+
+_NOT_IMPLEMENTED_INDEXING = """Indexing with {} is not implemented, supported indexing types are:
+- `str` for mapping keys or class attributes.
+- `int` for positional indexing for sequences.
+- `...` to select all leaves.
+- Boolean mask of the same structure as the tree
+- `re.Pattern` to index all keys matching a regex pattern.
+- Instance of `BaseKey` with custom logic to index a pytree.
+- `set` of (set,int,...,re.Pattern,instance of `BaseKey`) to index multiple keys at once.
+"""
 
 
 def _generate_path_mask(
@@ -222,7 +235,7 @@ def _generate_path_mask(
     where: tuple[BaseKey, ...],
     is_leaf: IsLeafType = None,
 ) -> PyTree:
-    # generate a mask for `where` path in `tree`
+    # generate a boolean mask for `where` path in `tree`
     # where path is a tuple of indices or keys, for example
     # where=("a",) wil set all leaves of `tree` with key "a" to True and
     # all other leaves to False
@@ -250,71 +263,78 @@ def _generate_path_mask(
     return mask
 
 
-def _combine_maybe_bool_masks(*masks: PyTree) -> PyTree:
-    # combine boolean masks with `&` operator if all masks are boolean
-    # otherwise raise an error
-    def check_and_return_bool_leaf(leaf: Any) -> bool:
-        if hasattr(leaf, "dtype"):
-            if leaf.dtype == "bool":
-                return leaf
-            raise TypeError(f"Expected boolean array mask, got {leaf=}")
+def _combine_bool_leaves(*leaves):
+    verdict = True
+    for leaf in leaves:
+        verdict &= leaf
+    return verdict
 
-        if isinstance(leaf, bool):
-            return leaf
-        raise TypeError(f"Expected boolean mask, got {leaf=}")
 
-    def map_func(*leaves):
-        verdict = True
-        for leaf in leaves:
-            verdict &= check_and_return_bool_leaf(leaf)
-        return verdict
+def _is_bool_leaf(leaf: Any) -> bool:
+    if hasattr(leaf, "dtype"):
+        return leaf.dtype == "bool"
+    return isinstance(leaf, bool)
 
-    return jtu.tree_map(map_func, *masks)
+
+def _non_tree_leaves(x, treedef: jtu.PyTreeDef):
+    # return leaves of an arbitrary pytree with
+    # pytrees item of same structure as `treedef` treated as a single leaf
+    return jtu.tree_leaves(x, is_leaf=lambda x: jtu.tree_structure(x) == treedef)
 
 
 def _resolve_where(
-    tree: PyTree,
-    where: tuple[BaseKey | PyTree, ...],  # type: ignore
+    tree: T,
+    where: tuple[Any, ...],  # type: ignore
     is_leaf: IsLeafType = None,
-):
+) -> T | None:
     mask = None
-    path_masks, bool_masks = [], []
-    treedef = jtu.tree_structure(tree, is_leaf=is_leaf)
+    bool_masks: list[T] = []
+    path_masks: list[BaseKey] = []
+    treedef0 = jtu.tree_structure(tree, is_leaf=is_leaf)
 
-    for item in where:
-        if isinstance(item, BaseKey):
-            # the mask is an integer, string, ellipsis or any user-defined
-            # `BaseKey` instance
-            path_masks += [item]
-        elif jtu.tree_structure(item, is_leaf=is_leaf) == treedef:
-            # the mask is a pytree with the same structure as `tree`
-            bool_masks += [item]
-        else:
-            raise NotImplementedError(
-                f"Indexing with {type(item)} is not implemented.\n"
-                "Example of supported indexing:\n\n"
-                ">>> import jax\n"
-                ">>> import pytreeclass as pytc\n"
-                f"class {type(tree).__name__}(pytc.TreeClass):\n"
-                "    ...\n\n"
-                f">>> tree = {type(tree).__name__}(...)\n"
-                ">>> # indexing by boolean pytree\n"
-                ">>> mask = jax.tree_map(lambda x: x > 0, tree)\n"
-                ">>> tree.at[mask].get()\n\n"
-                ">>> # indexing by attribute name\n"
-                ">>> tree.at[`attribute_name`].get()\n\n"
-                ">>> # indexing by leaf index\n"
-                ">>> tree.at[index].get()\n"
-                ">>> # indexing with multiple keys\n"
-                ">>> tree.at[{0,'attribute_name'}].get()"
-            )
+    seen_keys_container = False
+    level_paths = []
+
+    def verify_and_aggregate_is_leaf(x) -> bool:
+        # use is_leaf with non-local to traverse the tree depth-first manner
+        # required for verifying if a pytree is a valid indexing pytree
+        nonlocal seen_keys_container
+        nonlocal level_paths
+        nonlocal bool_masks
+        # used to check if a pytree is a valid indexing pytree
+        # used with `is_leaf` argument of any `jtu.tree_*` function
+        leaves, treedef = jtu.tree_flatten(x)
+
+        if treedef == treedef0 and all(map(_is_bool_leaf, leaves)):
+            # boolean pytrees of same structure as `tree` is a valid indexing pytree
+            bool_masks += [x]
+            return True
+        if isinstance(resolved_key := indexer_dispatcher(x), BaseKey):
+            # valid resolution of `BaseKey` is a valid indexing leaf
+            # makes it possible to dispatch on multi-leaf pytree
+            level_paths += [resolved_key]
+            return False
+        if isinstance(x, tuple) and seen_keys_container is False:
+            # maybe container of other keys but can be a container of one level
+            # to avoid something like this [("a",), ("b",)]
+            seen_keys_container = True
+            return False
+        # not a container of other keys or a pytree of same structure
+        raise NotImplementedError(_NOT_IMPLEMENTED_INDEXING.format(x))
+
+    for level_keys in where:
+        # each for loop iteration is a level in the where path
+        jtu.tree_leaves(level_keys, is_leaf=verify_and_aggregate_is_leaf)
+        path_masks += [MultiKey(*level_paths)] if len(level_paths) > 1 else level_paths
+        level_paths = []
+        seen_keys_container = False
 
     if path_masks:
         mask = _generate_path_mask(tree, path_masks, is_leaf=is_leaf)
 
     if bool_masks:
         all_masks = [mask, *bool_masks] if mask else bool_masks
-        mask = _combine_maybe_bool_masks(*all_masks)
+        mask = jax.tree_map(_combine_bool_leaves, *all_masks)
 
     return mask
 
