@@ -244,7 +244,7 @@ class AtIndexer(NamedTuple):
                 return jnp.where(where, set_value, leaf)
             return set_value if where else leaf
 
-        if jtu.tree_structure(self.tree) == jtu.tree_structure(set_value):
+        if jtu.tree_structure(self.tree, is_leaf) == jtu.tree_structure(set_value):
             # do not broadcast set_value if it is a pytree of same structure
             # for example tree.at[where].set(tree2) will set all tree leaves
             # to tree2 leaves if tree2 is a pytree of same structure as tree
@@ -894,7 +894,7 @@ def tree_freeze(
             is_leaf=is_leaf,
         )
 
-    if jtu.tree_structure(tree) == jtu.tree_structure(mask):
+    if jtu.tree_structure(tree, is_leaf=is_leaf) == jtu.tree_structure(mask):
         return jax.tree_map(
             lambda x, y: freeze(x) if y else x,
             tree,
@@ -952,7 +952,7 @@ def tree_unfreeze(tree: T, mask: T | Callable[[Any], bool] = lambda _: True):
             is_leaf=is_frozen,
         )
 
-    if jtu.tree_structure(tree) == jtu.tree_structure(mask):
+    if jtu.tree_structure(tree, is_leaf=is_frozen) == jtu.tree_structure(mask):
         return jax.tree_map(
             lambda x, y: unfreeze(x) if y else x,
             tree,
