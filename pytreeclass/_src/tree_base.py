@@ -665,6 +665,14 @@ class TreeClass(metaclass=TreeClassMeta):
         return is_tree_equal(self, other)
 
 
+@pp_dispatcher.register(TreeClass)
+def treeclass_pp(node: TreeClass, **spec: Unpack[PPSpec]) -> str:
+    name = type(node).__name__
+    skip = [f.name for f in fields(node) if not f.repr]
+    kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
+    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
+
+
 def _frozen_error(opname: str, tree):
     raise NotImplementedError(
         f"Cannot apply `{opname}` operation to a frozen object `{tree!r}`.\n"
@@ -680,8 +688,8 @@ class _Frozen(Generic[T]):
     __slots__ = ["__wrapped__", "__weakref__"]
     __wrapped__: T
 
-    def __init__(self, x: T) -> None:
-        object.__setattr__(self, "__wrapped__", x)
+    def __init__(self, tree: T) -> None:
+        object.__setattr__(self, "__wrapped__", tree)
 
     def __setattr__(self, _, __) -> None:
         raise AttributeError("Cannot assign to frozen instance.")
@@ -752,6 +760,19 @@ def freeze(wrapped: _Frozen[T] | T) -> _Frozen[T]:
         >>> a[1] = pytc.freeze(a[1])
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
+
+    Note:
+        - `freeze` is idempotent, i.e. `freeze(freeze(x)) == freeze(x)`
+        - Use `tree_freeze` for the `tree_map` version of `freeze`.
+            Example:
+                >>> import pytreeclass as pytc
+                >>> tree = [1,2,3]
+                >>> # freezing the pytree items
+                >>> pytc.tree_freeze(tree)
+                [#1, #2, #3]
+                >>> # freeze the pytree itself
+                >>> pytc.freeze(tree)
+                #[1, 2, 3]
     """
     return wrapped if is_frozen(wrapped) else _Frozen(wrapped)  # type: ignore
 
@@ -812,9 +833,135 @@ def is_nondiff(wrapped: Any) -> bool:
     return True
 
 
-@pp_dispatcher.register(TreeClass)
-def treeclass_pp(node: TreeClass, **spec: Unpack[PPSpec]) -> str:
-    name = type(node).__name__
-    skip = [f.name for f in fields(node) if not f.repr]
-    kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
-    return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
+def tree_freeze(
+    tree: T,
+    mask: T | Callable[[Any], bool] = is_nondiff,
+    *,
+    is_leaf: IsLeafType = None,
+):
+    """Freeze a tree of values to avoid updating it by `jax` transformations.
+
+    Args:
+        tree: A pytree of values.
+        mask: A pytree of boolean values or a callable that accepts a leaf and
+            returns a boolean. If a leaf is True either in the mask or the
+            callable output , the leaf is frozen, otherwise it is unchanged.
+            defaults to `pytc.is_nondiff` which freezes all non-differentiable nodes.
+        is_leaf: A callable that accepts a leaf and returns a boolean. If
+            provided, it is used to determine if a value is a leaf. for example,
+            `is_leaf=lambda x: isinstance(x, list)` will treat lists as leaves
+            and will not recurse into them.
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> tree = [1, 2, {"a": 3, "b": 4.0}]
+        >>> # freeze all non-differentiable nodes by default
+        >>> # the frozen values are prefixed with `#`
+        >>> pytc.tree_freeze(tree)
+        [#1, #2, {'a': #3, 'b': 4.0}]
+        >>> pytc.tree_freeze(tree, mask=lambda x: x>2)
+        [1, 2, {'a': #3, 'b': #4.0}]
+
+    Note:
+        - freezing a value wraps it with a wrapper that yields no leaves when
+            `jax.tree_util.tree_flatten` is called on it.
+        - `tree_freeze` uses `jax.tree_util.tree_map` that applies freezing to
+            all leaves of the tree. This means that if a leaf is a container
+            (e.g. list, dict, tuple, etc.) the container itself is not frozen,
+            but its leaves are. whereas `pytreeclass.freeze` freezes the container
+            itself.
+        - `tree_freeze` common use case is to freeze non-differentiable
+            in conjunction with `tree_unfreeze` to handle non-differentiable
+            nodes in `jax` transformations.
+
+            Example:
+                >>> # pass non-differentiable nodes to `jax.grad`
+                >>> import pytreeclass as pytc
+                >>> import jax
+                >>> @jax.grad
+                ... def square(tree):
+                ...     tree = pytc.tree_unfreeze(tree)
+                ...     return tree[0]**2
+                >>> tree = (1., 2)  # contains a non-differentiable node
+                >>> square(pytc.tree_freeze(tree))
+                (Array(2., dtype=float32, weak_type=True), #2)
+    """
+
+    if isinstance(mask, Callable):
+        return jax.tree_map(
+            lambda x: freeze(x) if mask(x) else x,
+            tree,
+            is_leaf=is_leaf,
+        )
+
+    if jtu.tree_structure(tree) == jtu.tree_structure(mask):
+        return jax.tree_map(
+            lambda x, y: freeze(x) if y else x,
+            tree,
+            mask,
+            is_leaf=is_leaf,
+        )
+
+    raise ValueError(
+        f"`mask` must be a callable that accepts a leaf a returns a boolean "
+        f"or a tree with the same structure as tree with boolean leaves."
+        f" Got {mask=} and {tree=}."
+    )
+
+
+def tree_unfreeze(tree: T, mask: T | Callable[[Any], bool] = lambda _: True):
+    """Unreeze a tree of values that were frozen by `tree_freeze`/`freeze`.
+
+    Args:
+        tree: A pytree of values.
+        mask: A pytree of boolean values or a callable that accepts a leaf and
+            returns a boolean. If a leaf is True either in the mask or the
+            callable return , the leaf is unfrozen, otherwise it is unchanged.
+            defaults to `lambda _: True` which unfreezes all nodes.
+    Example:
+        >>> import pytreeclass as pytc
+        >>> tree = [1, 2, {"a": 3, "b": 4}]
+        >>> pytc.tree_unfreeze(pytc.tree_freeze(tree))
+        [1, 2, {'a': 3, 'b': 4}]
+
+    Note:
+        - `tree_unfreeze` uses `jax.tree_util.tree_map` that applies unfreezing
+            to all leaves of the tree. This means that if a leaf is a container
+            (e.g. list, dict, tuple, etc.) the container itself is not unfrozen,
+            but its leaves are. whereas `unfreeze` unfreezes the container.
+        - `tree_unfreeze` common use case is to unfreeze non-differentiable
+            nodes that were frozen by `tree_freeze` to be passed to `jax`
+
+            Example:
+                >>> # pass non-differentiable nodes to `jax.grad`
+                >>> import pytreeclass as pytc
+                >>> import jax
+                >>> @jax.grad
+                ... def square(tree):
+                ...     tree = pytc.tree_unfreeze(tree)
+                ...     return tree[0]**2
+                >>> tree = (1., 2)  # contains a non-differentiable node
+                >>> square(pytc.tree_freeze(tree))
+                (Array(2., dtype=float32, weak_type=True), #2)
+    """
+
+    if isinstance(mask, Callable):
+        return jax.tree_map(
+            lambda x: unfreeze(x) if mask(x) else x,
+            tree,
+            is_leaf=is_frozen,
+        )
+
+    if jtu.tree_structure(tree) == jtu.tree_structure(mask):
+        return jax.tree_map(
+            lambda x, y: unfreeze(x) if y else x,
+            tree,
+            mask,
+            is_leaf=is_frozen,
+        )
+
+    raise ValueError(
+        f"`mask` must be a callable that accepts a leaf a returns a boolean "
+        f"or a tree with the same structure as tree with boolean values."
+        f" Got {mask=} and {tree=}."
+    )

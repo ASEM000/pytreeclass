@@ -18,8 +18,11 @@ Public API
     tree_repr_with_trace
     pp_dispatcher
     is_nondiff
+    freeze
+    tree_freeze
     is_frozen
     unfreeze
+    tree_unfreeze
     bcmap
     Partial
     AtIndexer
@@ -61,9 +64,11 @@ Wrapping and freezing API
 .. currentmodule:: pytreeclass 
 
 .. autofunction:: is_nondiff
-.. autofunction:: is_frozen
 .. autofunction:: freeze
+.. autofunction:: tree_freeze
+.. autofunction:: is_frozen
 .. autofunction:: unfreeze
+.. autofunction:: tree_unfreeze
 
 
 Advanced API

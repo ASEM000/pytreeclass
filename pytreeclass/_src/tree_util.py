@@ -276,12 +276,6 @@ def _is_bool_leaf(leaf: Any) -> bool:
     return isinstance(leaf, bool)
 
 
-def _non_tree_leaves(x, treedef: jtu.PyTreeDef):
-    # return leaves of an arbitrary pytree with
-    # pytrees item of same structure as `treedef` treated as a single leaf
-    return jtu.tree_leaves(x, is_leaf=lambda x: jtu.tree_structure(x) == treedef)
-
-
 def _resolve_where(
     tree: T,
     where: tuple[Any, ...],  # type: ignore
@@ -298,9 +292,7 @@ def _resolve_where(
     def verify_and_aggregate_is_leaf(x) -> bool:
         # use is_leaf with non-local to traverse the tree depth-first manner
         # required for verifying if a pytree is a valid indexing pytree
-        nonlocal seen_keys_container
-        nonlocal level_paths
-        nonlocal bool_masks
+        nonlocal seen_keys_container, level_paths, bool_masks
         # used to check if a pytree is a valid indexing pytree
         # used with `is_leaf` argument of any `jtu.tree_*` function
         leaves, treedef = jtu.tree_flatten(x)
@@ -309,16 +301,19 @@ def _resolve_where(
             # boolean pytrees of same structure as `tree` is a valid indexing pytree
             bool_masks += [x]
             return True
+
         if isinstance(resolved_key := indexer_dispatcher(x), BaseKey):
             # valid resolution of `BaseKey` is a valid indexing leaf
             # makes it possible to dispatch on multi-leaf pytree
             level_paths += [resolved_key]
             return False
+
         if isinstance(x, tuple) and seen_keys_container is False:
             # maybe container of other keys but can be a container of one level
             # to avoid something like this [("a",), ("b",)]
             seen_keys_container = True
             return False
+
         # not a container of other keys or a pytree of same structure
         raise NotImplementedError(_NOT_IMPLEMENTED_INDEXING.format(x))
 

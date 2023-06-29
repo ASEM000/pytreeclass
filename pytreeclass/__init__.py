@@ -5,6 +5,8 @@ from pytreeclass._src.tree_base import (
     freeze,
     is_frozen,
     is_nondiff,
+    tree_freeze,
+    tree_unfreeze,
     unfreeze,
 )
 from pytreeclass._src.tree_pprint import (
@@ -46,6 +48,8 @@ __all__ = (
     "is_frozen",
     "freeze",
     "unfreeze",
+    "tree_freeze",
+    "tree_unfreeze",
     # masking and indexing utils
     "bcmap",
     "AtIndexer",
