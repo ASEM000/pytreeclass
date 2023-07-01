@@ -1,12 +1,11 @@
 from pytreeclass._src.code_build import field, fields
-from pytreeclass._src.tree_base import (
-    AtIndexer,
-    TreeClass,
+from pytreeclass._src.tree_base import AtIndexer, TreeClass
+from pytreeclass._src.tree_mask import (
     freeze,
     is_frozen,
     is_nondiff,
-    tree_freeze,
-    tree_unfreeze,
+    tree_mask,
+    tree_unmask,
     unfreeze,
 )
 from pytreeclass._src.tree_pprint import (
@@ -48,8 +47,8 @@ __all__ = (
     "is_frozen",
     "freeze",
     "unfreeze",
-    "tree_freeze",
-    "tree_unfreeze",
+    "tree_mask",
+    "tree_unmask",
     # masking and indexing utils
     "bcmap",
     "AtIndexer",
@@ -61,7 +60,7 @@ __all__ = (
     "BaseKey",
 )
 
-__version__ = "0.3.9"
+__version__ = "0.4.0"
 
 AtIndexer.__module__ = "pytreeclass"
 TreeClass.__module__ = "pytreeclass"

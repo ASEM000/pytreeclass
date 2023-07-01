@@ -58,17 +58,17 @@ Pretty Printing API
 .. autofunction:: tree_repr_with_trace
 .. autofunction:: pp_dispatcher
 
-Wrapping and freezing API
+Masking/Unmasking API
 -------------------------
 
 .. currentmodule:: pytreeclass 
 
 .. autofunction:: is_nondiff
 .. autofunction:: freeze
-.. autofunction:: tree_freeze
-.. autofunction:: is_frozen
 .. autofunction:: unfreeze
-.. autofunction:: tree_unfreeze
+.. autofunction:: is_frozen
+.. autofunction:: tree_mask
+.. autofunction:: tree_unmask
 
 
 Advanced API

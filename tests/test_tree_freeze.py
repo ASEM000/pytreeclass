@@ -387,8 +387,8 @@ def test_wrapper():
 
 def test_tree_freeze_tree_unfreeze():
     tree = [1, 2, 3.0]
-    assert jtu.tree_leaves(pytc.tree_freeze(tree)) == [3.0]
-    assert jtu.tree_leaves(pytc.tree_unfreeze(pytc.tree_freeze(tree))) == [1, 2, 3.0]
+    assert jtu.tree_leaves(pytc.tree_mask(tree)) == [3.0]
+    assert jtu.tree_leaves(pytc.tree_unmask(pytc.tree_mask(tree))) == [1, 2, 3.0]
 
     mask_func = lambda x: x < 2
-    assert jtu.tree_leaves(pytc.tree_freeze(tree, mask_func)) == [2, 3.0]
+    assert jtu.tree_leaves(pytc.tree_mask(tree, mask_func)) == [2, 3.0]
