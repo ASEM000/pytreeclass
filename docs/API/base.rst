@@ -83,7 +83,6 @@ Advanced API
         set,
         apply,
         scan,
-        __call__,
 .. autoclass:: RegexKey
     :members:
         __eq__

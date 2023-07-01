@@ -123,16 +123,6 @@ def freeze(wrapped: _Frozen[T] | T) -> _Frozen[T]:
 
     Note:
         - `freeze` is idempotent, i.e. `freeze(freeze(x)) == freeze(x)`
-        - Use `tree_freeze` for the `tree_map` version of `freeze`.
-            Example:
-                >>> import pytreeclass as pytc
-                >>> tree = [1,2,3]
-                >>> # freezing the pytree items
-                >>> pytc.tree_freeze(tree)
-                [#1, #2, #3]
-                >>> # freeze the pytree itself
-                >>> pytc.freeze(tree)
-                #[1, 2, 3]
     """
     return wrapped if is_frozen(wrapped) else _Frozen(wrapped)  # type: ignore
 
