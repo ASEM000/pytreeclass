@@ -61,8 +61,8 @@ __all__ = (
     "is_frozen",
     "freeze",
     "unfreeze",
-    "tree_mask",
     "tree_unmask",
+    "tree_mask",
     # indexing utils
     "AtIndexer",
     "BaseKey",

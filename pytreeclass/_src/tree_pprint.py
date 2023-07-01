@@ -58,13 +58,15 @@ def pp_dispatcher(node: Any, **spec: Unpack[PPSpec]) -> str:
     """Register a new or override an existing pretty printer by type using
     `pp_dispatcher.register` to be used by `tree_repr` and `tree_str`.
 
-    Args:
-        node: The node to be pretty printed.
-        **spec: The pretty print specification
-        - indent: The current indentation level
-        - kind: The kind of pretty print, either "REPR" or "STR"
-        - width: The maximum width of the pretty printed string
-        - depth: The maximum depth of the pretty printed string
+    Note:
+        The defined pretty printer has to be a function that takes the following
+        arguments:
+            - node: The node to be pretty printed.
+            - indent: The current indentation level (keyword only).
+            - kind: The kind of pretty print, either "REPR" or "STR".
+            - width: The maximum width of the pretty printed string.
+            - depth: The maximum depth of the pretty printed string.
+        and returns a string.
 
     Returns:
         The pretty printed string.
@@ -75,7 +77,7 @@ def pp_dispatcher(node: Any, **spec: Unpack[PPSpec]) -> str:
         ...     def __init__(self, x):
         ...         self.x = x
         >>> @pytc.pp_dispatcher.register(MyType)
-        ... def my_pp(node, **spec) -> str:
+        ... def my_pp(node, *, indent, kind, width, depth):
         ...     return "MyType pp"
         >>> pytc.tree_repr(MyType(1))
         'MyType pp'
@@ -107,7 +109,6 @@ def general_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
 def pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     if spec["depth"] < 0:
         return "..."
-
     return format_width(pp_dispatcher(node, **spec), width=spec["width"])
 
 

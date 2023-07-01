@@ -225,12 +225,7 @@ class TreeClass(metaclass=TreeClassMeta):
 
     """
 
-    def __init_subclass__(
-        klass: type[T],
-        *a,
-        leafwise: bool = False,
-        **k,
-    ) -> None:
+    def __init_subclass__(klass: type[T], *a, leafwise: bool = False, **k) -> None:
         if "__setattr__" in vars(klass) or "__delattr__" in vars(klass):
             raise TypeError(
                 f"Unable to transform the class `{klass.__name__}` "

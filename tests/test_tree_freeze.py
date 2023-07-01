@@ -258,7 +258,7 @@ def test_non_dataclass_input_to_freeze():
     assert jtu.tree_leaves(pytc.freeze(1)) == []
 
 
-def test_tree_freeze():
+def test_tree_mask():
     class l0(pytc.TreeClass, leafwise=True):
         x: int = 2
         y: int = 3
@@ -283,7 +283,7 @@ def test_tree_freeze():
     assert jtu.tree_leaves(tree.at["b"].at["y"].apply(pytc.freeze)) == [1, 2]
 
 
-def test_tree_unfreeze():
+def test_tree_unmask():
     class l0(pytc.TreeClass, leafwise=True):
         x: int = 2
         y: int = 3
@@ -312,7 +312,7 @@ def test_tree_unfreeze():
     assert jtu.tree_leaves(unfrozen_tree) == [2, 3]
 
 
-def test_tree_freeze_unfreeze():
+def test_tree_mask_unfreeze():
     class l0(pytc.TreeClass, leafwise=True):
         x: int = 2
         y: int = 3
@@ -399,7 +399,7 @@ def test_wrapper():
     assert wrapped != 1
 
 
-def test_tree_freeze_tree_unfreeze():
+def test_tree_mask_tree_unmask():
     tree = [1, 2, 3.0]
     assert jtu.tree_leaves(pytc.tree_mask(tree)) == [3.0]
     assert jtu.tree_leaves(pytc.tree_unmask(pytc.tree_mask(tree))) == [1, 2, 3.0]

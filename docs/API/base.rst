@@ -19,10 +19,10 @@ Public API
     pp_dispatcher
     is_nondiff
     freeze
-    tree_freeze
+    tree_mask
     is_frozen
     unfreeze
-    tree_unfreeze
+    tree_unmask
     bcmap
     Partial
     AtIndexer

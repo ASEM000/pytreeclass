@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Generic, NamedTuple, TypeVar
+from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 
 import jax
 import jax.tree_util as jtu
@@ -26,6 +26,7 @@ from pytreeclass._src.tree_pprint import tree_repr, tree_str
 from pytreeclass._src.tree_util import IsLeafType, is_tree_equal, tree_copy, tree_hash
 
 T = TypeVar("T")
+MaskType = Union[T, Callable[[Any], bool]]
 
 
 class _FrozneError(NamedTuple):
@@ -36,7 +37,7 @@ class _FrozneError(NamedTuple):
             f"Cannot apply `{self.opname}` operation to a frozen object "
             f"{', '.join(map(str, a))} "
             f"{', '.join(k + '=' + str(v) for k, v in k.items())}.\n"
-            "Unfreeze the object first by unmasking the Frozen mask:\n"
+            "Unfreeze the object first by unmasking the frozen mask:\n"
             "Example:\n"
             ">>> import jax\n"
             ">>> import pytreeclass as pytc\n"
@@ -48,8 +49,8 @@ class _Frozen(Generic[T]):
     __slots__ = ["__wrapped__", "__weakref__"]
     __wrapped__: T
 
-    def __init__(self, tree: T) -> None:
-        object.__setattr__(self, "__wrapped__", tree)
+    def __init__(self, node: T) -> None:
+        object.__setattr__(self, "__wrapped__", node)
 
     def __setattr__(self, _, __) -> None:
         raise AttributeError("Cannot assign to frozen instance.")
@@ -153,8 +154,7 @@ def unfreeze(wrapped: _Frozen[T] | T) -> T:
 
 
 def is_nondiff(wrapped: Any) -> bool:
-    """
-    Returns True if the node is a non-differentiable node, and False for if the
+    """Returns True if the node is a non-differentiable node, and False for if the
     node is of type float, complex number, or a numpy array of floats or
     complex numbers.
 
@@ -185,7 +185,7 @@ def is_nondiff(wrapped: Any) -> bool:
 
 def _tree_mask_map(
     tree: T,
-    mask: T | Callable[[Any], bool],
+    mask: MaskType,
     func: type | Callable[[Any], Any],
     *,
     is_leaf: IsLeafType = None,
@@ -216,37 +216,39 @@ def _tree_mask_map(
     )
 
 
-def tree_mask(
-    tree: T,
-    mask: T | Callable[[Any], bool] = is_nondiff,
-    *,
-    wrap: type | Callable[[Any], Any] = freeze,
-    is_leaf: IsLeafType = None,
-):
-    """Mask a tree leaves by `wrap` according to `mask`
+def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = None):
+    """Mask tree leaves according to `mask` to exclude masked leaves from
+    `jax.tree_util` functions. defaults to masking non-inexact nodes.
 
     Args:
         tree: A pytree of values.
         mask: A pytree of boolean values or a callable that accepts a leaf and
-            returns a boolean. If a leaf is True either in the mask or the
-            callable, the leaf is wrapped by `wrapper`, otherwise it is unchanged.
-            defaults to `is_nondiff` which returns true for non-differentiable nodes.
-        wrap: A class or a callable that accepts a leaf and returns a wrapped
-            leaf. defaults to `freeze` which wraps with a wrapper that yields no
-            leaves when `jax.tree_util.tree_flatten` is called on it.
+            returns a boolean. If a leaf is `True` either in the mask or the
+            callable, the leaf is wrapped by with a wrapper that yields no
+            leaves when `jax.tree_util.tree_flatten` is called on it, otherwise
+            it is unchanged. defaults to `is_nondiff` which returns true for
+            non-differentiable nodes.
         is_leaf: A callable that accepts a leaf and returns a boolean. If
             provided, it is used to determine if a value is a leaf. for example,
             `is_leaf=lambda x: isinstance(x, list)` will treat lists as leaves
             and will not recurse into them.
 
+    Note:
+        - Masked leaves are wrapped with a wrapper that yields no leaves when
+            `jax.tree_util.tree_flatten` is called on it.
+        - Use masking on tree containing non-differentiable nodes before passing
+            the tree to a `jax` transformation.
+
     Example:
         >>> import pytreeclass as pytc
         >>> tree = [1, 2, {"a": 3, "b": 4.}]
-        >>> # freeze all non-differentiable nodes by default
-        >>> frozen_tree = pytc.tree_mask(tree)
-        >>> frozen_tree
+        >>> # mask all non-differentiable nodes by default
+        >>> masked_tree = pytc.tree_mask(tree)
+        >>> masked_tree
         [#1, #2, {'a': #3, 'b': 4.0}]
-        >>> pytc.tree_unmask(frozen_tree)
+        >>> jax.tree_util.tree_leaves(masked_tree)
+        [4.0]
+        >>> pytc.tree_unmask(masked_tree)
         [1, 2, {'a': 3, 'b': 4.0}]
 
     Example:
@@ -261,38 +263,29 @@ def tree_mask(
         >>> square(pytc.tree_mask(tree))
         (Array(2., dtype=float32, weak_type=True), #2)
     """
-    return _tree_mask_map(tree, mask=mask, func=wrap, is_leaf=is_leaf)
+    return _tree_mask_map(tree, mask=mask, func=freeze, is_leaf=is_leaf)
 
 
-def tree_unmask(
-    tree: T,
-    mask: T | Callable[[Any], bool] = lambda _: True,
-    *,
-    unwrap: Callable[[Any], Any] = unfreeze,
-    is_wrap: Callable[[Any], bool] = is_frozen,
-):
-    """Unmask a tree leaves by `unwrap` according to `mask`
+def tree_unmask(tree: T, mask: MaskType = lambda _: True):
+    """Undo the masking of tree leaves according to `mask`. defaults to unmasking all leaves.
 
     Args:
         tree: A pytree of values.
         mask: A pytree of boolean values or a callable that accepts a leaf and
             returns a boolean. If a leaf is True either in the mask or the
-            callable, the leaf is unwrapped by `unwrap`, otherwise it is unchanged.
-            defaults to `lambda _: True` which returns true for all nodes.
-        unwrap: A callable that accepts a leaf and returns an unwrapped leaf.
-            defaults to `unfreeze` which unwraps a frozen leaf.
-        is_wrap: A callable that accepts a leaf and returns a boolean. to
-            determine if a value is wrapped by `wrap`. defaults to `is_frozen`
-            which returns true for frozen nodes.
+            callable, the leaf is unfrozen, otherwise it is unchanged. defaults
+            unmasking all nodes.
 
     Example:
         >>> import pytreeclass as pytc
         >>> tree = [1, 2, {"a": 3, "b": 4.}]
-        >>> # freeze all non-differentiable nodes by default
-        >>> frozen_tree = pytc.tree_mask(tree)
-        >>> frozen_tree
+        >>> # mask all non-differentiable nodes by default
+        >>> masked_tree = pytc.tree_mask(tree)
+        >>> masked_tree
         [#1, #2, {'a': #3, 'b': 4.0}]
-        >>> pytc.tree_unmask(frozen_tree)
+        >>> jax.tree_util.tree_leaves(masked_tree)
+        [4.0]
+        >>> pytc.tree_unmask(masked_tree)
         [1, 2, {'a': 3, 'b': 4.0}]
 
     Example:
@@ -307,6 +300,4 @@ def tree_unmask(
         >>> square(pytc.tree_mask(tree))
         (Array(2., dtype=float32, weak_type=True), #2)
     """
-    # on backend this is exactly the same as `tree_mask`, but with different defaults
-    # and `is_wrap` is named of `is_leaf to make it easier for the end-user.
-    return _tree_mask_map(tree, mask=mask, func=unwrap, is_leaf=is_wrap)
+    return _tree_mask_map(tree, mask=mask, func=unfreeze, is_leaf=is_frozen)
