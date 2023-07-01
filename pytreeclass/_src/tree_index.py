@@ -623,7 +623,7 @@ class AtIndexer(NamedTuple):
             3
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
-        tree = self.tree.at[where].get(is_leaf=is_leaf)  # type: ignore
+        tree = self.at[where].get(is_leaf=is_leaf)  # type: ignore
         if initializer is _no_initializer:
             return jtu.tree_reduce(func, tree)
         return jtu.tree_reduce(func, tree, initializer)
