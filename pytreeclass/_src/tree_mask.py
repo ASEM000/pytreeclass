@@ -307,6 +307,7 @@ def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = Non
         - Masked leaves are wrapped with a wrapper that yields no leaves when
             `jax.tree_util.tree_flatten` is called on it.
         - Masking is equivalent to applying `freeze` to the masked leaves.
+
             >>> import pytreeclass as pytc
             >>> import jax
             >>> tree = [1, 2, {"a": 3, "b": 4.}]
@@ -381,6 +382,7 @@ def tree_unmask(tree: T, mask: MaskType = lambda _: True):
 
     Note:
         - Unmasking is equivalent to applying `unfreeze` on the masked leaves.
+
             >>> import pytreeclass as pytc
             >>> import jax
             >>> tree = [1, 2, {"a": 3, "b": 4.}]
