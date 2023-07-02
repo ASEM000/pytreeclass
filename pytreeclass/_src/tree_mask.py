@@ -264,7 +264,7 @@ def _tree_mask_map(
     lhsdef = jtu.tree_structure(tree, is_leaf=is_leaf)
     rhsdef = jtu.tree_structure(mask, is_leaf)
 
-    if lhsdef == rhsdef:
+    if (lhsdef == rhsdef) and (type(mask) is type(tree)):
         return jax.tree_map(
             lambda x, y: func(x) if y else x,
             tree,
