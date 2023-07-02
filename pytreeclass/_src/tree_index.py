@@ -80,7 +80,7 @@ class BaseKey(abc.ABC):
         ...        self.name = name
         ...        self.type = type
         ...    def __eq__(self, other):
-        ...        if isinstance(other, NameTypeContainer) :
+        ...        if isinstance(other, NameTypeContainer):
         ...            return other == (self.name, self.type)
         ...        return False
         >>> tree = tree.at[MatchNameType("a", int)].get()
@@ -275,14 +275,13 @@ def _resolve_where(
     bool_masks: list[T] = []
     path_masks: list[BaseKey] = []
     treedef0 = jtu.tree_structure(tree, is_leaf=is_leaf)
-
-    seen_keys_container = False
+    seen_tuple = False  # handle multiple keys at the same level
     level_paths = []
 
     def verify_and_aggregate_is_leaf(x) -> bool:
         # use is_leaf with non-local to traverse the tree depth-first manner
         # required for verifying if a pytree is a valid indexing pytree
-        nonlocal seen_keys_container, level_paths, bool_masks
+        nonlocal seen_tuple, level_paths, bool_masks
         # used to check if a pytree is a valid indexing pytree
         # used with `is_leaf` argument of any `jtu.tree_*` function
         leaves, treedef = jtu.tree_flatten(x)
@@ -298,10 +297,9 @@ def _resolve_where(
             level_paths += [resolved_key]
             return False
 
-        if isinstance(x, tuple) and seen_keys_container is False:
-            # maybe container of other keys but can be a container of one level
-            # to avoid something like this [("a",), ("b",)]
-            seen_keys_container = True
+        if type(x) is tuple and seen_tuple is False:
+            # e.g. `at[1,2,3]` but not `at[1,(2,3)]``
+            seen_tuple = True
             return False
 
         # not a container of other keys or a pytree of same structure
@@ -312,7 +310,7 @@ def _resolve_where(
         jtu.tree_leaves(level_keys, is_leaf=verify_and_aggregate_is_leaf)
         path_masks += [MultiKey(*level_paths)] if len(level_paths) > 1 else level_paths
         level_paths = []
-        seen_keys_container = False
+        seen_tuple = False
 
     if path_masks:
         mask = _generate_path_mask(tree, path_masks, is_leaf=is_leaf)
@@ -342,14 +340,15 @@ class AtIndexer(NamedTuple):
         >>> # use `AtIndexer` on a pytree (e.g. dict,list,tuple,etc.)
         >>> import pytreeclass as pytc
         >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-        >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].get()
+        >>> tree = pytc.AtIndexer(tree)
+        >>> tree.at["level1_0"].at["level2_0"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
         >>> # get multiple keys at once at the same level
-        >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0", "level2_1"].get()
+        >>> tree.at["level1_0"].at["level2_0", "level2_1"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': 200}, 'level1_1': None}
         >>> # get with a mask
         >>> mask = {"level1_0": {"level2_0": True, "level2_1": False}, "level1_1": True}
-        >>> pytc.AtIndexer(tree).at[mask].get()
+        >>> tree.at[mask].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': 300}
 
     Example:
@@ -404,7 +403,8 @@ class AtIndexer(NamedTuple):
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].get()
+            >>> tree = pytc.AtIndexer(tree)
+            >>> tree.at["level1_0"].at["level2_0"].get()
             {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
 
         Example:
@@ -441,7 +441,8 @@ class AtIndexer(NamedTuple):
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].set('SET')
+            >>> tree = pytc.AtIndexer(tree)
+            >>> tree.at["level1_0"].at["level2_0"].set('SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
@@ -489,7 +490,8 @@ class AtIndexer(NamedTuple):
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].apply(lambda _: 'SET')
+            >>> tree = pytc.AtIndexer(tree)
+            >>> tree.at["level1_0"].at["level2_0"].apply(lambda _: 'SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
@@ -542,7 +544,8 @@ class AtIndexer(NamedTuple):
             >>> def scan_func(leaf, state):
             ...     return 'SET', state + 1
             >>> init_state = 0
-            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].scan(scan_func, state=init_state)
+            >>> tree = pytc.AtIndexer(tree)
+            >>> tree.at["level1_0"].at["level2_0"].scan(scan_func, state=init_state)
             ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
 
         Example:

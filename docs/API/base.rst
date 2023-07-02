@@ -16,7 +16,6 @@ Public API
     tree_str
     tree_summary
     tree_repr_with_trace
-    pp_dispatcher
     is_nondiff
     freeze
     tree_mask
@@ -56,7 +55,6 @@ Pretty Printing API
 .. autofunction:: tree_str
 .. autofunction:: tree_summary
 .. autofunction:: tree_repr_with_trace
-.. autofunction:: pp_dispatcher
 
 Masking/Unmasking API
 -------------------------

@@ -236,6 +236,15 @@ def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = Non
     Note:
         - Masked leaves are wrapped with a wrapper that yields no leaves when
             `jax.tree_util.tree_flatten` is called on it.
+        - Masking is equivalent to applying `freeze` to the masked leaves.
+            >>> import pytreeclass as pytc
+            >>> import jax
+            >>> tree = [1, 2, {"a": 3, "b": 4.}]
+            >>> # mask all non-differentiable nodes by default
+            >>> def mask_if_nondiff(x):
+            ...     return pytc.freeze(x) if pytc.is_nondiff(x) else x
+            >>> masked_tree = jax.tree_map(mask_if_nondiff, tree)
+
         - Use masking on tree containing non-differentiable nodes before passing
             the tree to a `jax` transformation.
 
@@ -299,5 +308,13 @@ def tree_unmask(tree: T, mask: MaskType = lambda _: True):
         >>> tree = (1., 2)  # contains a non-differentiable node
         >>> square(pytc.tree_mask(tree))
         (Array(2., dtype=float32, weak_type=True), #2)
+
+    Note:
+        - Unmasking is equivalent to applying `unfreeze` on the masked leaves.
+            >>> import pytreeclass as pytc
+            >>> import jax
+            >>> tree = [1, 2, {"a": 3, "b": 4.}]
+            >>> # unmask all nodes
+            >>> tree = jax.tree_map(pytc.unfreeze, tree, is_leaf=pytc.is_frozen)
     """
     return _tree_mask_map(tree, mask=mask, func=unfreeze, is_leaf=is_frozen)
