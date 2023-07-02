@@ -49,7 +49,7 @@ def test_func_pp():
         ...  # fmt: skip
 
     assert (
-        func_pp(example, indent=0, kind="str", width=60, depth=0, history=set())
+        func_pp(example, indent=0, kind="str", width=60, depth=0, seen=set())
         == "example(a, b, *c, d, e, **f)"
     )
     # assert (
@@ -57,7 +57,7 @@ def test_func_pp():
     #     == "Lambda(x)"
     # )
     assert (
-        func_pp(jax.nn.relu, indent=0, kind="str", width=60, depth=0, history=set())
+        func_pp(jax.nn.relu, indent=0, kind="str", width=60, depth=0, seen=set())
         == "relu(*args, **kwargs)"
     )
     assert (
@@ -67,7 +67,7 @@ def test_func_pp():
             kind="str",
             width=60,
             depth=0,
-            history=set(),
+            seen=set(),
         )
         == "Partial(relu(*args, **kwargs))"
     )
@@ -78,12 +78,12 @@ def test_func_pp():
             kind="str",
             width=60,
             depth=0,
-            history=set(),
+            seen=set(),
         )
         == "Partial(relu(*args, **kwargs))"
     )
     assert (
-        func_pp(ji.he_normal, indent=0, kind="str", width=60, depth=0, history=set())
+        func_pp(ji.he_normal, indent=0, kind="str", width=60, depth=0, seen=set())
         == "he_normal(in_axis, out_axis, batch_axis, dtype)"
     )
 

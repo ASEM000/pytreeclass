@@ -267,14 +267,14 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
     return wrapper
 
 
-def _unary_op(func):
+def uop(func):
     def wrapper(self):
         return jtu.tree_map(func, self)
 
     return ft.wraps(func)(wrapper)
 
 
-def _binary_op(func):
+def bop(func):
     def wrapper(leaf, rhs=None):
         if isinstance(rhs, type(leaf)):
             return jtu.tree_map(func, leaf, rhs)
@@ -283,7 +283,7 @@ def _binary_op(func):
     return ft.wraps(func)(wrapper)
 
 
-def _swop(func):
+def swop(func):
     # swaping the arguments of a two-arg function
     return ft.wraps(func)(lambda leaf, rhs: func(rhs, leaf))
 
@@ -293,48 +293,48 @@ def _leafwise_transform(klass: type[T]) -> type[T]:
     # that enable the user to apply a function to
     # all the leaves of the tree
     for key, method in (
-        ("__abs__", _unary_op(abs)),
-        ("__add__", _binary_op(op.add)),
-        ("__and__", _binary_op(op.and_)),
-        ("__ceil__", _unary_op(ceil)),
-        ("__divmod__", _binary_op(divmod)),
-        ("__eq__", _binary_op(op.eq)),
-        ("__floor__", _unary_op(floor)),
-        ("__floordiv__", _binary_op(op.floordiv)),
-        ("__ge__", _binary_op(op.ge)),
-        ("__gt__", _binary_op(op.gt)),
-        ("__invert__", _unary_op(op.invert)),
-        ("__le__", _binary_op(op.le)),
-        ("__lshift__", _binary_op(op.lshift)),
-        ("__lt__", _binary_op(op.lt)),
-        ("__matmul__", _binary_op(op.matmul)),
-        ("__mod__", _binary_op(op.mod)),
-        ("__mul__", _binary_op(op.mul)),
-        ("__ne__", _binary_op(op.ne)),
-        ("__neg__", _unary_op(op.neg)),
-        ("__or__", _binary_op(op.or_)),
-        ("__pos__", _unary_op(op.pos)),
-        ("__pow__", _binary_op(op.pow)),
-        ("__radd__", _binary_op(_swop(op.add))),
-        ("__rand__", _binary_op(_swop(op.and_))),
-        ("__rdivmod__", _binary_op(_swop(divmod))),
-        ("__rfloordiv__", _binary_op(_swop(op.floordiv))),
-        ("__rlshift__", _binary_op(_swop(op.lshift))),
-        ("__rmatmul__", _binary_op(_swop(op.matmul))),
-        ("__rmod__", _binary_op(_swop(op.mod))),
-        ("__rmul__", _binary_op(_swop(op.mul))),
-        ("__ror__", _binary_op(_swop(op.or_))),
-        ("__round__", _binary_op(round)),
-        ("__rpow__", _binary_op(_swop(op.pow))),
-        ("__rrshift__", _binary_op(_swop(op.rshift))),
-        ("__rshift__", _binary_op(op.rshift)),
-        ("__rsub__", _binary_op(_swop(op.sub))),
-        ("__rtruediv__", _binary_op(_swop(op.truediv))),
-        ("__rxor__", _binary_op(_swop(op.xor))),
-        ("__sub__", _binary_op(op.sub)),
-        ("__truediv__", _binary_op(op.truediv)),
-        ("__trunc__", _unary_op(trunc)),
-        ("__xor__", _binary_op(op.xor)),
+        ("__abs__", uop(abs)),
+        ("__add__", bop(op.add)),
+        ("__and__", bop(op.and_)),
+        ("__ceil__", uop(ceil)),
+        ("__divmod__", bop(divmod)),
+        ("__eq__", bop(op.eq)),
+        ("__floor__", uop(floor)),
+        ("__floordiv__", bop(op.floordiv)),
+        ("__ge__", bop(op.ge)),
+        ("__gt__", bop(op.gt)),
+        ("__invert__", uop(op.invert)),
+        ("__le__", bop(op.le)),
+        ("__lshift__", bop(op.lshift)),
+        ("__lt__", bop(op.lt)),
+        ("__matmul__", bop(op.matmul)),
+        ("__mod__", bop(op.mod)),
+        ("__mul__", bop(op.mul)),
+        ("__ne__", bop(op.ne)),
+        ("__neg__", uop(op.neg)),
+        ("__or__", bop(op.or_)),
+        ("__pos__", uop(op.pos)),
+        ("__pow__", bop(op.pow)),
+        ("__radd__", bop(swop(op.add))),
+        ("__rand__", bop(swop(op.and_))),
+        ("__rdivmod__", bop(swop(divmod))),
+        ("__rfloordiv__", bop(swop(op.floordiv))),
+        ("__rlshift__", bop(swop(op.lshift))),
+        ("__rmatmul__", bop(swop(op.matmul))),
+        ("__rmod__", bop(swop(op.mod))),
+        ("__rmul__", bop(swop(op.mul))),
+        ("__ror__", bop(swop(op.or_))),
+        ("__round__", bop(round)),
+        ("__rpow__", bop(swop(op.pow))),
+        ("__rrshift__", bop(swop(op.rshift))),
+        ("__rshift__", bop(op.rshift)),
+        ("__rsub__", bop(swop(op.sub))),
+        ("__rtruediv__", bop(swop(op.truediv))),
+        ("__rxor__", bop(swop(op.xor))),
+        ("__sub__", bop(op.sub)),
+        ("__truediv__", bop(op.truediv)),
+        ("__trunc__", uop(trunc)),
+        ("__xor__", bop(op.xor)),
     ):
         if key not in vars(klass):
             # do not override any user defined methods

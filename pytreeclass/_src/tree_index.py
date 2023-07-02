@@ -216,7 +216,7 @@ _NOT_IMPLEMENTED_INDEXING = """Indexing with {} is not implemented, supported in
 - Boolean mask of the same structure as the tree
 - `re.Pattern` to index all keys matching a regex pattern.
 - Instance of `BaseKey` with custom logic to index a pytree.
-- `set` of (set,int,...,re.Pattern,instance of `BaseKey`) to index multiple keys at once.
+- `tuple` of the above types to match multiple leaves at the same level.
 """
 
 
@@ -334,7 +334,7 @@ class AtIndexer(NamedTuple):
             - a boolean mask of the same structure as the tree
             - `re.Pattern` to index all keys matching a regex pattern.
             - an instance of `BaseKey` with custom logic to index a pytree.
-            - a tuple of the above to index multiple keys at the same level.
+            - a tuple of the above to match multiple keys at the same level.
 
     Example:
         >>> # use `AtIndexer` on a pytree (e.g. dict,list,tuple,etc.)

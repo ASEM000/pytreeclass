@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+import functools as ft
+import hashlib
 from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 
 import jax
@@ -45,7 +47,7 @@ class _FrozneError(NamedTuple):
         )
 
 
-class _Frozen(Generic[T]):
+class _FrozenBase(Generic[T]):
     __slots__ = ["__wrapped__", "__weakref__"]
     __wrapped__: T
 
@@ -65,15 +67,17 @@ class _Frozen(Generic[T]):
         return "#" + tree_str(self.__wrapped__)
 
     def __copy__(self) -> _Frozen[T]:
-        return _Frozen(tree_copy(self.__wrapped__))
+        return type(self)(tree_copy(self.__wrapped__))
 
-    def __eq__(self, rhs: Any) -> bool | jax.Array:
-        if not isinstance(rhs, _Frozen):
-            return False
-        return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
+    def __init_subclass__(klass, *a, **k) -> None:
+        # register subclass as an empty pytree node
+        super().__init_subclass__(*a, **k)
 
-    def __hash__(self) -> int:
-        return tree_hash(self.__wrapped__)
+        jtu.register_pytree_node(
+            nodetype=klass,
+            flatten_func=lambda tree: ((), tree),
+            unflatten_func=lambda treedef, _: treedef,
+        )
 
     # raise helpful error message when trying to interact with frozen object
     __add__ = __radd__ = __iadd__ = _FrozneError("+")
@@ -93,16 +97,44 @@ class _Frozen(Generic[T]):
     __call__ = _FrozneError("__call__")
 
 
-jtu.register_pytree_node(
-    nodetype=_Frozen,
-    flatten_func=lambda tree: ((), tree),
-    unflatten_func=lambda treedef, _: treedef,
-)
+class _Frozen(_FrozenBase):
+    def __eq__(self, rhs: Any) -> bool | jax.Array:
+        if not isinstance(rhs, _Frozen):
+            return False
+        return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
+
+    def __hash__(self) -> int:
+        return tree_hash(self.__wrapped__)
 
 
-def freeze(wrapped: _Frozen[T] | T) -> _Frozen[T]:
+class _FrozenArray(_FrozenBase):
+    def __hash__(self) -> int:
+        # hash by numpy array bytes
+        return int(hashlib.sha256(np.array(self.__wrapped__).tobytes()).hexdigest(), 16)
+
+    def __eq__(self, x) -> bool:
+        if not isinstance(x, _FrozenArray):
+            return False
+        lhs = self.__wrapped__
+        rhs = x.__wrapped__
+        if lhs.shape != rhs.shape:
+            return False
+        if lhs.dtype != rhs.dtype:
+            return False
+        return np.all(lhs == rhs)
+
+
+@ft.singledispatch
+def freeze(value: T) -> _Frozen[T]:
     """Freeze a value to avoid updating it by `jax` transformations.
 
+    Args:
+        value: A value to freeze.
+
+    Note:
+        - `freeze` is idempotent, i.e. `freeze(freeze(x)) == freeze(x)`.
+        - `freeze` uses single dispatch to support custom types. To define a custom
+            wrapper for a certain type, use `freeze.register(type, func)`.
     Example:
         >>> import jax
         >>> import pytreeclass as pytc
@@ -121,22 +153,38 @@ def freeze(wrapped: _Frozen[T] | T) -> _Frozen[T]:
         >>> a[1] = pytc.freeze(a[1])
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
-
-    Note:
-        - `freeze` is idempotent, i.e. `freeze(freeze(x)) == freeze(x)`
     """
-    return wrapped if is_frozen(wrapped) else _Frozen(wrapped)  # type: ignore
+    return _Frozen(value)
 
 
-def is_frozen(wrapped: Any) -> bool:
+@freeze.register(np.ndarray)
+@freeze.register(jax.Array)
+def _(value: T) -> _FrozenArray[T]:
+    return _FrozenArray(value)
+
+
+@freeze.register(_FrozenBase)
+def _(value: _FrozenBase[T]) -> _FrozenBase[T]:
+    # idempotent freeze
+    return value
+
+
+def is_frozen(value: Any) -> bool:
     """Returns True if the value is a frozen wrapper."""
-    return isinstance(wrapped, _Frozen)
+    return isinstance(value, _FrozenBase)
 
 
-def unfreeze(wrapped: _Frozen[T] | T) -> T:
+@ft.singledispatch
+def unfreeze(value: T) -> T:
     """Unfreeze `frozen` value, otherwise return the value itself.
 
-    - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
+    Args:
+        value: A value to unfreeze.
+
+    Note:
+        - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
+        - `unfreeze` uses single dispatch to support custom types. To define a custom
+            behavior for a certain type, use `unfreeze.register(type, func)`.
 
     Example:
         >>> import pytreeclass as pytc
@@ -150,13 +198,26 @@ def unfreeze(wrapped: _Frozen[T] | T) -> T:
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
-    return getattr(wrapped, "__wrapped__") if is_frozen(wrapped) else wrapped
+    return value
 
 
-def is_nondiff(wrapped: Any) -> bool:
+@unfreeze.register(_FrozenBase)
+def _(value: _FrozenBase[T]) -> T:
+    return getattr(value, "__wrapped__")
+
+
+@ft.singledispatch
+def is_nondiff(value: Any) -> bool:
     """Returns True if the node is a non-differentiable node, and False for if the
     node is of type float, complex number, or a numpy array of floats or
     complex numbers.
+
+    Args:
+        value: A value to check.
+
+    Note:
+        - `is_nondiff` uses single dispatch to support custom types. To define a custom
+            behavior for a certain type, use `is_nondiff.register(type, func)`.
 
     Example:
         >>> import pytreeclass as pytc
@@ -176,11 +237,20 @@ def is_nondiff(wrapped: Any) -> bool:
         to freeze the non-differentiable nodes before passing the tree to a
         `jax` transformation.
     """
-    if hasattr(wrapped, "dtype") and np.issubdtype(wrapped.dtype, np.inexact):
-        return False
-    if isinstance(wrapped, (float, complex)):
-        return False
     return True
+
+
+@is_nondiff.register(np.ndarray)
+@is_nondiff.register(jax.Array)
+def _(value: np.ndarray | jax.Array) -> bool:
+    # return True if the node is non-inexact type, otherwise False
+    return False if np.issubdtype(value.dtype, np.inexact) else True
+
+
+@is_nondiff.register(float)
+@is_nondiff.register(complex)
+def _(_: float | complex) -> bool:
+    return False
 
 
 def _tree_mask_map(
