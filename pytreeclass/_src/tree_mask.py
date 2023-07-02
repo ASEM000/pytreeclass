@@ -66,7 +66,7 @@ class _FrozenBase(Generic[T]):
     def __str__(self) -> str:
         return "#" + tree_str(self.__wrapped__)
 
-    def __copy__(self) -> _Frozen[T]:
+    def __copy__(self) -> _FrozenBase[T]:
         return type(self)(tree_copy(self.__wrapped__))
 
     def __init_subclass__(klass, *a, **k) -> None:
