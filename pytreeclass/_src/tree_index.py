@@ -137,6 +137,9 @@ class NameKey(BaseKey):
 
 
 class EllipsisKey(BaseKey):
+    def __init__(self, _):
+        del _
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
 
@@ -204,10 +207,10 @@ class RegexKey(BaseKey):
 # avoid using container pytree types to avoid conflict between
 # matching as a mask or as an instance of `BaseKey`
 indexer_dispatcher = ft.singledispatch(lambda x: x)
-indexer_dispatcher.register(type(...), lambda _: EllipsisKey())
-indexer_dispatcher.register(int, lambda x: IntKey(x))
-indexer_dispatcher.register(str, lambda x: NameKey(x))
-indexer_dispatcher.register(re.Pattern, lambda x: RegexKey(x))
+indexer_dispatcher.register(type(...), EllipsisKey)
+indexer_dispatcher.register(int, IntKey)
+indexer_dispatcher.register(str, NameKey)
+indexer_dispatcher.register(re.Pattern, RegexKey)
 
 _NOT_IMPLEMENTED_INDEXING = """Indexing with {} is not implemented, supported indexing types are:
 - `str` for mapping keys or class attributes.
