@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 from typing import Any, Callable
 
 import jax
@@ -406,3 +407,19 @@ def test_tree_mask_tree_unmask():
 
     mask_func = lambda x: x < 2
     assert jtu.tree_leaves(pytc.tree_mask(tree, mask_func)) == [2, 3.0]
+
+    frozen_array = pytc.tree_mask(jnp.ones((5, 5)), mask=lambda _: True)
+
+    assert frozen_array == frozen_array
+
+    assert pytc.freeze(pytc.freeze(1)) == pytc.freeze(1)
+
+    assert pytc.tree_mask({"a": 1}, mask={"a": True}) == {"a": pytc.freeze(1)}
+
+    with pytest.raises(ValueError):
+        pytc.tree_mask({"a": 1}, mask=1.0)
+
+    assert copy.copy(pytc.freeze(1)) == pytc.freeze(1)
+
+    with pytest.raises(NotImplementedError):
+        pytc.freeze(1) + 1
