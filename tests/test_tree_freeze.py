@@ -411,6 +411,9 @@ def test_tree_mask_tree_unmask():
     frozen_array = pytc.tree_mask(jnp.ones((5, 5)), mask=lambda _: True)
 
     assert frozen_array == frozen_array
+    assert not (frozen_array == pytc.freeze(jnp.ones((5, 6))))
+    assert not (frozen_array == pytc.freeze(jnp.ones((5, 5)).astype(jnp.uint8)))
+    assert hash(frozen_array) == hash(frozen_array)
 
     assert pytc.freeze(pytc.freeze(1)) == pytc.freeze(1)
 

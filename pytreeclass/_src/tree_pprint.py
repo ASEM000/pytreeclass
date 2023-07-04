@@ -220,13 +220,6 @@ def type_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     return pp(jax.ShapeDtypeStruct(*shape_dype), **spec)
 
 
-def size_pp(size: int, **spec: Unpack[PPSpec]):
-    ORDER_KEY = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-    size_order = int(math.log(size, 1024)) if size > 0 else 0
-    text = f"{(size)/(1024**size_order):.2f}{ORDER_KEY[size_order]}"
-    return pp(text, **spec)
-
-
 def tree_repr(
     tree: PyTree,
     *,
@@ -470,13 +463,13 @@ def tree_mermaid(
     def step(node: Node, depth: int = 0) -> str:
         if len(node.children) == 0:
             ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
-            key, _, value = node.data
+            (key, _), value = node.data
             text = f"{key}=" if key is not None else ""
             text += pp(value, **ppspec)
             text = "<b>" + text + "</b>"
             return f'\tid{id(node.parent)} --- id{id(node)}("{text}")\n'
 
-        key, type, _ = node.data
+        (key, type), _ = node.data
         text = f"{key}:" if key is not None else ""
         text += f"{type.__name__}"
         text = "<b>" + text + "</b>"

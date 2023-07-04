@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import dataclasses as dc
+import re
 from collections import namedtuple
 
 # import jax
@@ -160,17 +161,16 @@ def test_custom_jax_class():
     assert tree_str(Test) == str(Test)
 
 
-@pytest.mark.skip(reason="depends on object id")
 def test_tree_mermaid():
     assert (
-        tree_mermaid(r1, depth=1)
+        re.sub(r"id\d*", "***", tree_mermaid(r1, depth=1))
         # trunk-ignore(flake8/E501)
-        == 'flowchart LR\n    id0(<b>Repr1</b>)\n    id0 --- id1("</b>.a=1</b>")\n    id0 --- id2("</b>.b=\'string\'</b>")\n    id0 --- id3("</b>.c=1.0</b>")\n    id0 --- id4("</b>.d=\'aaaaa\'</b>")\n    id0 --- id5("</b>.e=[...]</b>")\n    id0 --- id6("</b>.f={...}</b>")\n    id0 --- id7("</b>.g={...}</b>")\n    id0 --- id8("</b>.h=f32[5,1](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id0 --- id9("</b>.i=f32[1,6](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id0 --- id10("</b>.j=f32[1,1,4,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id0 --- id11("</b>.k=(...)</b>")\n    id0 --- id12("</b>.l=a(...)</b>")\n    id0 --- id13("</b>.m=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id0 --- id14("</b>.n=bool[]</b>")\n    id0 --- id15("</b>.o=c64[2]</b>")\n'
+        == 'flowchart LR\n    ***("<b>Repr1</b>")\n    *** --- ***("<b>.a=1</b>")\n    *** --- ***("<b>.b=\'string\'</b>")\n    *** --- ***("<b>.c=1.0</b>")\n    *** --- ***("<b>.d=\'aaaaa\'</b>")\n    *** --- ***("<b>.e=[...]</b>")\n    *** --- ***("<b>.f={...}</b>")\n    *** --- ***("<b>.g={...}</b>")\n    *** --- ***("<b>.h=f32[5,1](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.i=f32[1,6](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.j=f32[1,1,4,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.k=(...)</b>")\n    *** --- ***("<b>.l=a(...)</b>")\n    *** --- ***("<b>.m=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.n=bool[]</b>")\n    *** --- ***("<b>.o=c64[2]</b>")'
     )
     assert (
-        tree_mermaid(r1, depth=2)
+        re.sub(r"id\d*", "***", tree_mermaid(r1, depth=2))
         # trunk-ignore(flake8/E501)
-        == 'flowchart LR\n    id5 --- id6("</b>[0]=10</b>")\n    id5 --- id7("</b>[1]=10</b>")\n    id5 --- id8("</b>[2]=10</b>")\n    id5 --- id9("</b>[3]=10</b>")\n    id5 --- id10("</b>[4]=10</b>")\n    id12 --- id13("</b>[\'a\']=\'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\'</b>")\n    id12 --- id14("</b>[\'b\']=\'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\'</b>")\n    id12 --- id15("</b>[\'c\']=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id19 --- id20("</b>[0]=1</b>")\n    id19 --- id21("</b>[1]=2</b>")\n    id19 --- id22("</b>[2]=3</b>")\n    id23 --- id24("</b>.b=1</b>")\n    id23 --- id25("</b>.c=2</b>")\n    id0(<b>Repr1</b>)\n    id0 --- id1("</b>.a=1</b>")\n    id0 --- id2("</b>.b=\'string\'</b>")\n    id0 --- id3("</b>.c=1.0</b>")\n    id0 --- id4("</b>.d=\'aaaaa\'</b>")\n    id0 --- id5("</b>.e:list</b>")\n    id0 --- id11("</b>.f={...}</b>")\n    id0 --- id12("</b>.g:dict</b>")\n    id0 --- id16("</b>.h=f32[5,1](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id0 --- id17("</b>.i=f32[1,6](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id0 --- id18("</b>.j=f32[1,1,4,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id0 --- id19("</b>.k:tuple</b>")\n    id0 --- id23("</b>.l:a</b>")\n    id0 --- id26("</b>.m=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    id0 --- id27("</b>.n=bool[]</b>")\n    id0 --- id28("</b>.o=c64[2]</b>")\n'
+        == 'flowchart LR\n    ***("<b>Repr1</b>")\n    *** --- ***("<b>.a=1</b>")\n    *** --- ***("<b>.b=\'string\'</b>")\n    *** --- ***("<b>.c=1.0</b>")\n    *** --- ***("<b>.d=\'aaaaa\'</b>")\n    *** --- ***("<b>.e:list</b>")\n    *** --- ***("<b>[0]=10</b>")\n    *** --- ***("<b>[1]=10</b>")\n    *** --- ***("<b>[2]=10</b>")\n    *** --- ***("<b>[3]=10</b>")\n    *** --- ***("<b>[4]=10</b>")\n    *** --- ***("<b>.f={...}</b>")\n    *** --- ***("<b>.g:dict</b>")\n    *** --- ***("<b>[\'a\']=\'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\'</b>")\n    *** --- ***("<b>[\'b\']=\'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\'</b>")\n    *** --- ***("<b>[\'c\']=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.h=f32[5,1](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.i=f32[1,6](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.j=f32[1,1,4,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.k:tuple</b>")\n    *** --- ***("<b>[0]=1</b>")\n    *** --- ***("<b>[1]=2</b>")\n    *** --- ***("<b>[2]=3</b>")\n    *** --- ***("<b>.l:a</b>")\n    *** --- ***("<b>.b=1</b>")\n    *** --- ***("<b>.c=2</b>")\n    *** --- ***("<b>.m=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])</b>")\n    *** --- ***("<b>.n=bool[]</b>")\n    *** --- ***("<b>.o=c64[2]</b>")'
     )
 
 
