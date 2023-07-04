@@ -11,19 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Define a class that convert a class to a JAX compatible tree structure"""
 
 from __future__ import annotations
 
 import abc
-from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Any, Generic, Hashable, NamedTuple, TypeVar
+from typing import Any, Hashable, TypeVar
 
 import jax
-import jax.numpy as jnp
 import jax.tree_util as jtu
-import numpy as np
 from typing_extensions import Unpack, dataclass_transform
 
 from pytreeclass._src.code_build import (
@@ -33,6 +31,7 @@ from pytreeclass._src.code_build import (
     field,
     fields,
 )
+from pytreeclass._src.tree_index import AtIndexer
 from pytreeclass._src.tree_pprint import (
     PPSpec,
     attr_value_pp,
@@ -42,12 +41,8 @@ from pytreeclass._src.tree_pprint import (
     tree_str,
 )
 from pytreeclass._src.tree_util import (
-    BaseKey,
-    IsLeafType,
     NamedSequenceKey,
-    NameKey,
     _leafwise_transform,
-    _resolve_where,
     is_tree_equal,
     tree_copy,
     tree_hash,
@@ -57,7 +52,6 @@ T = TypeVar("T", bound=Hashable)
 S = TypeVar("S")
 PyTree = Any
 EllipsisType = type(Ellipsis)
-_no_initializer = object()
 
 
 # allow methods in mutable context to be called without raising `AttributeError`
@@ -106,310 +100,7 @@ def _register_treeclass(klass: type[T]) -> type[T]:
     return klass
 
 
-class AtIndexer(NamedTuple):
-    """Index a pytree at a given path using a path or mask.
-
-    Args:
-        tree: pytree to index
-        where: one of the following:
-            - `str` for mapping keys or class attributes.
-            - `int` for positional indexing for sequences.
-            - `...` to select all leaves.
-            - a boolean mask of the same structure as the tree
-            - `re.Pattern` to index all keys matching a regex pattern.
-            - an instance of `BaseKey` with custom logic to index a pytree.
-            - a tuple of the above to index multiple keys at the same level.
-
-    Example:
-        >>> # use `AtIndexer` on a pytree (e.g. dict,list,tuple,etc.)
-        >>> import pytreeclass as pytc
-        >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-        >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].get()
-        {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
-        >>> # get multiple keys at once at the same level
-        >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0", "level2_1"].get()
-        {'level1_0': {'level2_0': 100, 'level2_1': 200}, 'level1_1': None}
-        >>> # get with a mask
-        >>> mask = {"level1_0": {"level2_0": True, "level2_1": False}, "level1_1": True}
-        >>> pytc.AtIndexer(tree).at[mask].get()
-        {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': 300}
-
-    Example:
-        >>> # use `AtIndexer` in a class
-        >>> import jax.tree_util as jtu
-        >>> import pytreeclass as pytc
-        >>> @jax.tree_util.register_pytree_with_keys_class
-        ... class Tree:
-        ...    def __init__(self, a, b):
-        ...        self.a = a
-        ...        self.b = b
-        ...    def tree_flatten_with_keys(self):
-        ...        kva = (jtu.GetAttrKey("a"), self.a)
-        ...        kvb = (jtu.GetAttrKey("b"), self.b)
-        ...        return (kva, kvb), None
-        ...    @classmethod
-        ...    def tree_unflatten(cls, aux_data, children):
-        ...        return cls(*children)
-        ...    @property
-        ...    def at(self):
-        ...        return pytc.AtIndexer(self)
-        ...    def __repr__(self) -> str:
-        ...        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
-        >>> Tree(1, 2).at["a"].get()
-        Tree(a=1, b=None)
-    """
-
-    tree: PyTree
-    where: tuple[BaseKey | PyTree] | tuple[()] = ()
-
-    def __getitem__(self, where: Any) -> AtIndexer:
-        return AtIndexer(self.tree, (*self.where, where))
-
-    def __getattr__(self, name: str) -> AtIndexer:
-        """Support nested indexing"""
-        if name == "at":
-            # pass the current tree and the current path to the next `.at`
-            return AtIndexer(tree=self.tree, where=self.where)
-
-        raise AttributeError(f"`{self!r}` has no attribute {name!r}.")
-
-    def get(self, *, is_leaf: IsLeafType = None) -> PyTree:
-        """Get the leaf values at the specified location.
-
-        Args:
-            is_leaf: a predicate function to determine if a value is a leaf.
-
-        Returns:
-            A _new_ pytree of leaf values at the specified location, with the
-            non-selected leaf values set to None if the leaf is not an array.
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].get()
-            {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
-            ...     a: int
-            ...     b: int
-            >>> tree = Tree(a=1, b=2)
-            >>> # get `a` and return a new instance
-            >>> # with `None` for all other leaves
-            >>> tree.at['a'].get()
-            Tree(a=1, b=None)
-        """
-        where = _resolve_where(self.tree, self.where, is_leaf)
-
-        def leaf_get(leaf: Any, where: Any):
-            if isinstance(where, (jax.Array, np.ndarray)) and where.ndim != 0:
-                return leaf[jnp.where(where)]
-            return leaf if where else None
-
-        return jtu.tree_map(leaf_get, self.tree, where, is_leaf=is_leaf)
-
-    def set(self, set_value: Any, *, is_leaf: IsLeafType = None):
-        """Set the leaf values at the specified location.
-
-        Args:
-            set_value: the value to set at the specified location.
-            is_leaf: a predicate function to determine if a value is a leaf.
-
-        Returns:
-            A pytree with the leaf values at the specified location
-            set to `set_value`.
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].set('SET')
-            {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
-            ...     a: int
-            ...     b: int
-            >>> tree = Tree(a=1, b=2)
-            >>> # set `a` and return a new instance
-            >>> # with all other leaves unchanged
-            >>> tree.at['a'].set(100)
-            Tree(a=100, b=2)
-        """
-        where = _resolve_where(self.tree, self.where, is_leaf)
-
-        def leaf_set(leaf: Any, where: Any, set_value: Any):
-            if isinstance(where, (jax.Array, np.ndarray)):
-                return jnp.where(where, set_value, leaf)
-            return set_value if where else leaf
-
-        if jtu.tree_structure(self.tree, is_leaf) == jtu.tree_structure(set_value):
-            # do not broadcast set_value if it is a pytree of same structure
-            # for example tree.at[where].set(tree2) will set all tree leaves
-            # to tree2 leaves if tree2 is a pytree of same structure as tree
-            # instead of making each leaf of tree a copy of tree2
-            # is design is similar to `numpy` design `Array.at[...].set(Array)`
-            return jtu.tree_map(leaf_set, self.tree, where, set_value, is_leaf=is_leaf)
-
-        # set_value is broadcasted to tree leaves
-        # for example tree.at[where].set(1) will set all tree leaves to 1
-        partial_leaf_set = lambda leaf, where: leaf_set(leaf, where, set_value)
-        return jtu.tree_map(partial_leaf_set, self.tree, where, is_leaf=is_leaf)
-
-    def apply(self, func: Callable[[Any], Any], *, is_leaf: IsLeafType = None):
-        """Apply a function to the leaf values at the specified location.
-
-        Args:
-            func: the function to apply to the leaf values.
-            is_leaf: a predicate function to determine if a value is a leaf.
-
-        Returns:
-            A pytree with the leaf values at the specified location set to
-            the result of applying `func` to the leaf values.
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].apply(lambda _: 'SET')
-            {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
-            ...     a: int
-            ...     b: int
-            >>> tree = Tree(a=1, b=2)
-            >>> # apply to `a` and return a new instance
-            >>> # with all other leaves unchanged
-            >>> tree.at['a'].apply(lambda _: 100)
-            Tree(a=100, b=2)
-        """
-        where = _resolve_where(self.tree, self.where, is_leaf)
-
-        def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, (jax.Array, np.ndarray)):
-                return jnp.where(where, func(leaf), leaf)
-            return func(leaf) if where else leaf
-
-        return jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
-
-    def scan(
-        self,
-        func: Callable[[Any, S], tuple[Any, S]],
-        state: S,
-        *,
-        is_leaf: IsLeafType = None,
-    ) -> tuple[PyTree, S]:
-        """Apply a function to the leaf values at the specified location defined
-        by the mask while carrying a state.
-
-        Args:
-            func: the function to apply to the leaf values. the function accepts
-                a leaf value and a state and returns a tuple of the new leaf
-                value and updated state.
-            state: the initial state to carry.
-            is_leaf: a predicate function to determine if a value is a leaf. for
-                example, `lambda x: isinstance(x, list)` will treat all lists
-                as leaves and will not recurse into list items.
-
-        Returns:
-            A tuple of a pytree with the leaf values at the specified location
-            set to the result of applying `func` to the leaf values and the
-            new state.
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> def scan_func(leaf, state):
-            ...     return 'SET', state + 1
-            >>> init_state = 0
-            >>> pytc.AtIndexer(tree).at["level1_0"].at["level2_0"].scan(scan_func, state=init_state)
-            ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> from typing import NamedTuple
-            >>> class State(NamedTuple):
-            ...     func_evals: int = 0
-            >>> class Tree(pytc.TreeClass):
-            ...     a: int
-            ...     b: int
-            ...     c: int
-            >>> tree = Tree(a=1, b=2, c=3)
-            >>> def scan_func(leaf, state: State):
-            ...     state = State(state.func_evals + 1)
-            ...     return leaf + 1, state
-            >>> # apply to `a` and `b` and return a new instance with all other
-            >>> # leaves unchanged and the new state that counts the number of
-            >>> # function evaluations
-            >>> tree.at['a','b'].scan(scan_func, state=State())
-            (Tree(a=2, b=3, c=3), State(func_evals=2))
-
-        Note:
-            - `scan` applies a binary `func` to the leaf values while carrying
-                a state and returning a final state and tree leaves with the
-                the `func` applied to them. While `reduce` applies a binary
-                `func` to the leaf values while carrying a state and returning
-                a single value.
-        """
-        where = _resolve_where(self.tree, self.where, is_leaf)
-
-        running_state = state
-
-        def stateless_func(leaf):
-            nonlocal running_state
-            leaf, running_state = func(leaf, running_state)
-            return leaf
-
-        def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, (jax.Array, np.ndarray)):
-                return jnp.where(where, stateless_func(leaf), leaf)
-            return stateless_func(leaf) if where else leaf
-
-        out = jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
-        return out, running_state
-
-    def reduce(
-        self,
-        func: Callable[[Any, Any], Any],
-        *,
-        initializer: Any = _no_initializer,
-        is_leaf: IsLeafType = None,
-    ) -> Any:
-        """Reduce the leaf values at the specified location.
-
-        Args:
-            func: the function to reduce the leaf values.
-            initializer: the initializer value for the reduction.
-            is_leaf: a predicate function to determine if a value is a leaf.
-
-        Returns:
-            The result of reducing the leaf values at the specified location.
-
-        Note:
-            - If `initializer` is not specified, the first leaf value is used as
-                the initializer.
-            - `reduce` applies a binary `func` to each leaf values while accumulating
-                a state a returns the final result. while `scan` applies `func` to each
-                leaf value while carrying a state and returns the final state and
-                the leaves of the tree with the result of applying `func` to each leaf.
-
-        Example:
-            >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
-            ...     a: int
-            ...     b: int
-            >>> tree = Tree(a=1, b=2)
-            >>> tree.at[...].reduce(lambda a, b: a + b, initializer=0)
-            3
-        """
-        where = _resolve_where(self.tree, self.where, is_leaf)
-        tree = self.tree.at[where].get(is_leaf=is_leaf)  # type: ignore
-        if initializer is _no_initializer:
-            return jtu.tree_reduce(func, tree)
-        return jtu.tree_reduce(func, tree, initializer)
-
+class TreeClassIndexer(AtIndexer):
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         """
         Call the function at the specified location and return a **copy**
@@ -437,7 +128,7 @@ class AtIndexer(NamedTuple):
             - Use .at["method_name"](*, **) to call a method that mutates the instance.
         """
 
-        def recursive_getattr(tree: Any, where: tuple[NameKey, ...]):
+        def recursive_getattr(tree: Any, where: tuple[str, ...]):
             if not isinstance(where[0], str):
                 raise TypeError(f"Expected string, got {type(where[0])!r}.")
             if len(where) == 1:
@@ -534,12 +225,7 @@ class TreeClass(metaclass=TreeClassMeta):
 
     """
 
-    def __init_subclass__(
-        klass: type[T],
-        *a,
-        leafwise: bool = False,
-        **k,
-    ) -> None:
+    def __init_subclass__(klass: type[T], *a, leafwise: bool = False, **k) -> None:
         if "__setattr__" in vars(klass) or "__delattr__" in vars(klass):
             raise TypeError(
                 f"Unable to transform the class `{klass.__name__}` "
@@ -596,7 +282,7 @@ class TreeClass(metaclass=TreeClassMeta):
         getattr(object, "__delattr__")(self, key)
 
     @property
-    def at(self) -> AtIndexer:
+    def at(self) -> TreeClassIndexer:
         """Immutable out-of-place indexing
 
         - `.at[***].get()`:
@@ -647,7 +333,7 @@ class TreeClass(metaclass=TreeClassMeta):
             - `pytree.at[*].at[**]` is equivalent to selecting pytree.*.**
             - `pytree.at[*, **]` is equivalent selecting pytree.* and pytree.**
         """
-        return AtIndexer(self)
+        return TreeClassIndexer(self)
 
     def __repr__(self) -> str:
         return tree_repr(self)
@@ -671,297 +357,3 @@ def treeclass_pp(node: TreeClass, **spec: Unpack[PPSpec]) -> str:
     skip = [f.name for f in fields(node) if not f.repr]
     kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
     return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
-
-
-def _frozen_error(opname: str, tree):
-    raise NotImplementedError(
-        f"Cannot apply `{opname}` operation to a frozen object `{tree!r}`.\n"
-        "Unfreeze the object first to apply operations to it\n"
-        "Example:\n"
-        ">>> import jax\n"
-        ">>> import pytreeclass as pytc\n"
-        ">>> tree = jax.tree_map(pytc.unfreeze, tree, is_leaf=pytc.is_frozen)"
-    )
-
-
-class _Frozen(Generic[T]):
-    __slots__ = ["__wrapped__", "__weakref__"]
-    __wrapped__: T
-
-    def __init__(self, tree: T) -> None:
-        object.__setattr__(self, "__wrapped__", tree)
-
-    def __setattr__(self, _, __) -> None:
-        raise AttributeError("Cannot assign to frozen instance.")
-
-    def __delattr__(self, _: str) -> None:
-        raise AttributeError("Cannot delete from frozen instance.")
-
-    def __repr__(self) -> str:
-        return "#" + tree_repr(self.__wrapped__)
-
-    def __str__(self) -> str:
-        return "#" + tree_str(self.__wrapped__)
-
-    def __copy__(self) -> _Frozen[T]:
-        return _Frozen(tree_copy(self.__wrapped__))
-
-    def __eq__(self, rhs: Any) -> bool | jax.Array:
-        if not isinstance(rhs, _Frozen):
-            return False
-        return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
-
-    def __hash__(self) -> int:
-        return tree_hash(self.__wrapped__)
-
-    # raise helpful error message when trying to interact with frozen object
-    __add__ = __radd__ = __iadd__ = lambda x, _: _frozen_error("+", x)
-    __sub__ = __rsub__ = __isub__ = lambda x, _: _frozen_error("-", x)
-    __mul__ = __rmul__ = __imul__ = lambda x, _: _frozen_error("*", x)
-    __matmul__ = __rmatmul__ = __imatmul__ = lambda x, _: _frozen_error("@", x)
-    __truediv__ = __rtruediv__ = __itruediv__ = lambda x, _: _frozen_error("/", x)
-    __floordiv__ = __rfloordiv__ = __ifloordiv__ = lambda x, _: _frozen_error("//", x)
-    __mod__ = __rmod__ = __imod__ = lambda x, _: _frozen_error("%", x)
-    __pow__ = __rpow__ = __ipow__ = lambda x, _: _frozen_error("**", x)
-    __lshift__ = __rlshift__ = __ilshift__ = lambda x, _: _frozen_error("<<", x)
-    __rshift__ = __rrshift__ = __irshift__ = lambda x, _: _frozen_error(">>", x)
-    __and__ = __rand__ = __iand__ = lambda x, _: _frozen_error("and", x)
-    __xor__ = __rxor__ = __ixor__ = lambda x, _: _frozen_error("xor", x)
-    __or__ = __ror__ = __ior__ = lambda x, _: _frozen_error("or", x)
-    __neg__ = __pos__ = __abs__ = __invert__ = lambda x: _frozen_error("unary op", x)
-    __call__ = lambda x, *_, **__: _frozen_error("call", x)
-
-
-jtu.register_pytree_node(
-    nodetype=_Frozen,
-    flatten_func=lambda tree: ((), tree),
-    unflatten_func=lambda treedef, _: treedef,
-)
-
-
-def freeze(wrapped: _Frozen[T] | T) -> _Frozen[T]:
-    """Freeze a value to avoid updating it by `jax` transformations.
-
-    Example:
-        >>> import jax
-        >>> import pytreeclass as pytc
-        >>> import jax.tree_util as jtu
-        >>> # Usage with `jax.tree_util.tree_leaves`
-        >>> # no leaves for a wrapped value
-        >>> jtu.tree_leaves(pytc.freeze(2.))
-        []
-
-        >>> # retrieve the frozen wrapper value using `is_leaf=pytc.is_frozen`
-        >>> jtu.tree_leaves(pytc.freeze(2.), is_leaf=pytc.is_frozen)
-        [#2.0]
-
-        >>> # Usage with `jax.tree_util.tree_map`
-        >>> a= [1,2,3]
-        >>> a[1] = pytc.freeze(a[1])
-        >>> jtu.tree_map(lambda x:x+100, a)
-        [101, #2, 103]
-
-    Note:
-        - `freeze` is idempotent, i.e. `freeze(freeze(x)) == freeze(x)`
-        - Use `tree_freeze` for the `tree_map` version of `freeze`.
-            Example:
-                >>> import pytreeclass as pytc
-                >>> tree = [1,2,3]
-                >>> # freezing the pytree items
-                >>> pytc.tree_freeze(tree)
-                [#1, #2, #3]
-                >>> # freeze the pytree itself
-                >>> pytc.freeze(tree)
-                #[1, 2, 3]
-    """
-    return wrapped if is_frozen(wrapped) else _Frozen(wrapped)  # type: ignore
-
-
-def is_frozen(wrapped: Any) -> bool:
-    """Returns True if the value is a frozen wrapper."""
-    return isinstance(wrapped, _Frozen)
-
-
-def unfreeze(wrapped: _Frozen[T] | T) -> T:
-    """Unfreeze `frozen` value, otherwise return the value itself.
-
-    - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> import jax
-        >>> frozen_value = pytc.freeze(1)
-        >>> pytc.unfreeze(frozen_value)
-        1
-        >>> # usage with `jax.tree_map`
-        >>> frozen_tree = jax.tree_map(pytc.freeze, {"a": 1, "b": 2})
-        >>> unfrozen_tree = jax.tree_map(pytc.unfreeze, frozen_tree, is_leaf=pytc.is_frozen)
-        >>> unfrozen_tree
-        {'a': 1, 'b': 2}
-    """
-    return getattr(wrapped, "__wrapped__") if is_frozen(wrapped) else wrapped
-
-
-def is_nondiff(wrapped: Any) -> bool:
-    """
-    Returns True if the node is a non-differentiable node, and False for if the
-    node is of type float, complex number, or a numpy array of floats or
-    complex numbers.
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> import jax.numpy as jnp
-        >>> pytc.is_nondiff(jnp.array(1))  # int array is non-diff type
-        True
-        >>> pytc.is_nondiff(jnp.array(1.))  # float array is diff type
-        False
-        >>> pytc.is_nondiff(1)  # int is non-diff type
-        True
-        >>> pytc.is_nondiff(1.)  # float is diff type
-        False
-
-    Note:
-        This function is meant to be used with `jax.tree_map` to
-        create a mask for non-differentiable nodes in a tree, that can be used
-        to freeze the non-differentiable nodes before passing the tree to a
-        `jax` transformation.
-    """
-    if hasattr(wrapped, "dtype") and np.issubdtype(wrapped.dtype, np.inexact):
-        return False
-    if isinstance(wrapped, (float, complex)):
-        return False
-    return True
-
-
-def tree_freeze(
-    tree: T,
-    mask: T | Callable[[Any], bool] = is_nondiff,
-    *,
-    is_leaf: IsLeafType = None,
-):
-    """Freeze a tree of values to avoid updating it by `jax` transformations.
-
-    Args:
-        tree: A pytree of values.
-        mask: A pytree of boolean values or a callable that accepts a leaf and
-            returns a boolean. If a leaf is True either in the mask or the
-            callable output , the leaf is frozen, otherwise it is unchanged.
-            defaults to `pytc.is_nondiff` which freezes all non-differentiable nodes.
-        is_leaf: A callable that accepts a leaf and returns a boolean. If
-            provided, it is used to determine if a value is a leaf. for example,
-            `is_leaf=lambda x: isinstance(x, list)` will treat lists as leaves
-            and will not recurse into them.
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> tree = [1, 2, {"a": 3, "b": 4.0}]
-        >>> # freeze all non-differentiable nodes by default
-        >>> # the frozen values are prefixed with `#`
-        >>> pytc.tree_freeze(tree)
-        [#1, #2, {'a': #3, 'b': 4.0}]
-        >>> pytc.tree_freeze(tree, mask=lambda x: x>2)
-        [1, 2, {'a': #3, 'b': #4.0}]
-
-    Note:
-        - freezing a value wraps it with a wrapper that yields no leaves when
-            `jax.tree_util.tree_flatten` is called on it.
-        - `tree_freeze` uses `jax.tree_util.tree_map` that applies freezing to
-            all leaves of the tree. This means that if a leaf is a container
-            (e.g. list, dict, tuple, etc.) the container itself is not frozen,
-            but its leaves are. whereas `pytreeclass.freeze` freezes the container
-            itself.
-        - `tree_freeze` common use case is to freeze non-differentiable
-            in conjunction with `tree_unfreeze` to handle non-differentiable
-            nodes in `jax` transformations.
-
-            Example:
-                >>> # pass non-differentiable nodes to `jax.grad`
-                >>> import pytreeclass as pytc
-                >>> import jax
-                >>> @jax.grad
-                ... def square(tree):
-                ...     tree = pytc.tree_unfreeze(tree)
-                ...     return tree[0]**2
-                >>> tree = (1., 2)  # contains a non-differentiable node
-                >>> square(pytc.tree_freeze(tree))
-                (Array(2., dtype=float32, weak_type=True), #2)
-    """
-
-    if isinstance(mask, Callable):
-        return jax.tree_map(
-            lambda x: freeze(x) if mask(x) else x,
-            tree,
-            is_leaf=is_leaf,
-        )
-
-    if jtu.tree_structure(tree, is_leaf=is_leaf) == jtu.tree_structure(mask):
-        return jax.tree_map(
-            lambda x, y: freeze(x) if y else x,
-            tree,
-            mask,
-            is_leaf=is_leaf,
-        )
-
-    raise ValueError(
-        f"`mask` must be a callable that accepts a leaf a returns a boolean "
-        f"or a tree with the same structure as tree with boolean leaves."
-        f" Got {mask=} and {tree=}."
-    )
-
-
-def tree_unfreeze(tree: T, mask: T | Callable[[Any], bool] = lambda _: True):
-    """Unreeze a tree of values that were frozen by `tree_freeze`/`freeze`.
-
-    Args:
-        tree: A pytree of values.
-        mask: A pytree of boolean values or a callable that accepts a leaf and
-            returns a boolean. If a leaf is True either in the mask or the
-            callable return , the leaf is unfrozen, otherwise it is unchanged.
-            defaults to `lambda _: True` which unfreezes all nodes.
-    Example:
-        >>> import pytreeclass as pytc
-        >>> tree = [1, 2, {"a": 3, "b": 4}]
-        >>> pytc.tree_unfreeze(pytc.tree_freeze(tree))
-        [1, 2, {'a': 3, 'b': 4}]
-
-    Note:
-        - `tree_unfreeze` uses `jax.tree_util.tree_map` that applies unfreezing
-            to all leaves of the tree. This means that if a leaf is a container
-            (e.g. list, dict, tuple, etc.) the container itself is not unfrozen,
-            but its leaves are. whereas `unfreeze` unfreezes the container.
-        - `tree_unfreeze` common use case is to unfreeze non-differentiable
-            nodes that were frozen by `tree_freeze` to be passed to `jax`
-
-            Example:
-                >>> # pass non-differentiable nodes to `jax.grad`
-                >>> import pytreeclass as pytc
-                >>> import jax
-                >>> @jax.grad
-                ... def square(tree):
-                ...     tree = pytc.tree_unfreeze(tree)
-                ...     return tree[0]**2
-                >>> tree = (1., 2)  # contains a non-differentiable node
-                >>> square(pytc.tree_freeze(tree))
-                (Array(2., dtype=float32, weak_type=True), #2)
-    """
-
-    if isinstance(mask, Callable):
-        return jax.tree_map(
-            lambda x: unfreeze(x) if mask(x) else x,
-            tree,
-            is_leaf=is_frozen,
-        )
-
-    if jtu.tree_structure(tree, is_leaf=is_frozen) == jtu.tree_structure(mask):
-        return jax.tree_map(
-            lambda x, y: unfreeze(x) if y else x,
-            tree,
-            mask,
-            is_leaf=is_frozen,
-        )
-
-    raise ValueError(
-        f"`mask` must be a callable that accepts a leaf a returns a boolean "
-        f"or a tree with the same structure as tree with boolean values."
-        f" Got {mask=} and {tree=}."
-    )

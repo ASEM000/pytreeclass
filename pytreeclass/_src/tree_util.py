@@ -11,15 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Utility functions for pytrees."""
 
 from __future__ import annotations
 
-import abc
 import dataclasses as dc
 import functools as ft
 import operator as op
-import re
 from math import ceil, floor, trunc
 from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
@@ -49,289 +48,6 @@ class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
     # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
     def __str__(self):
         return f".{self.name}"
-
-
-class BaseKey(abc.ABC):
-    """Parent class for all match classes.
-
-    Note:
-        subclass this class to create custom match keys by implementing
-        the __eq__ method. The __eq__ method should return True if the
-        key matches the given path entry and False otherwise. The path entry
-        refers to the entry defined in the `tree_flatten_with_keys` method of
-        the pytree class.
-
-    Example:
-        >>> # define an match strategy to match a leaf with a given name and type
-        >>> import pytreeclass as pytc
-        >>> from typing import NamedTuple
-        >>> import jax
-        >>> class NameTypeContainer(NamedTuple):
-        ...     name: str
-        ...     type: type
-        >>> @jax.tree_util.register_pytree_with_keys_class
-        ... class Tree:
-        ...    def __init__(self, a, b) -> None:
-        ...        self.a = a
-        ...        self.b = b
-        ...    def tree_flatten_with_keys(self):
-        ...        ak = (NameTypeContainer("a", type(self.a)), self.a)
-        ...        bk = (NameTypeContainer("b", type(self.b)), self.b)
-        ...        return (ak, bk), None
-        ...    @classmethod
-        ...    def tree_unflatten(cls, aux_data, children):
-        ...        return cls(*children)
-        ...    @property
-        ...    def at(self):
-        ...        return pytc.AtIndexer(self)
-        >>> tree = Tree(1, 2)
-        >>> class MatchNameType(pytc.BaseKey):
-        ...    def __init__(self, name, type):
-        ...        self.name = name
-        ...        self.type = type
-        ...    def __eq__(self, other):
-        ...        if isinstance(other, NameTypeContainer) :
-        ...            return other == (self.name, self.type)
-        ...        return False
-        >>> tree = tree.at[MatchNameType("a", int)].get()
-        >>> assert jax.tree_util.tree_leaves(tree) == [1]
-    """
-
-    @abc.abstractmethod
-    def __eq__(self, entry: KeyEntry) -> bool:
-        pass
-
-
-class IntKey(BaseKey):
-    def __init__(self, idx: int) -> None:
-        self.idx = idx
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(idx={self.idx})"
-
-    @ft.singledispatchmethod
-    def __eq__(self, _: KeyEntry) -> bool:
-        return False
-
-    @__eq__.register(int)
-    def _(self, other: int) -> bool:
-        return self.idx == other
-
-    @__eq__.register(jtu.SequenceKey)
-    def _(self, other) -> bool:
-        return self.idx == other.idx
-
-
-class NameKey(BaseKey):
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name})"
-
-    @ft.singledispatchmethod
-    def __eq__(self, _: KeyEntry) -> bool:
-        return False
-
-    @__eq__.register(str)
-    def _(self, other: str) -> bool:
-        return self.name == other
-
-    @__eq__.register(jtu.GetAttrKey)
-    def _(self, other) -> bool:
-        return self.name == other.name
-
-    @__eq__.register(jtu.DictKey)
-    def _(self, other) -> bool:
-        return self.name == other.key
-
-
-class EllipsisKey(BaseKey):
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
-
-    def __eq__(self, _: KeyEntry) -> bool:
-        return True
-
-
-class MultiKey(BaseKey):
-    """Match a leaf with multiple keys at the same level."""
-
-    def __init__(self, *keys: tuple[BaseKey, ...]):
-        self.keys = tuple(keys)
-
-    def __eq__(self, entry) -> bool:
-        return any(entry == key for key in self.keys)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(keys={self.keys})"
-
-
-class RegexKey(BaseKey):
-    """Match a leaf with a regex pattern inside 'at' property.
-
-    Args:
-        pattern: regex pattern to match.
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> import re
-        >>> class Tree(pytc.TreeClass):
-        ...     weight_1: float = 1.0
-        ...     weight_2: float = 2.0
-        ...     weight_3: float = 3.0
-        ...     bias: float = 0.0
-        >>> tree = Tree()
-        >>> tree.at[re.compile(r"weight_.*")].set(100.0)  # set all weights to 100.0
-        Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
-    """
-
-    def __init__(self, pattern: str) -> None:
-        self.pattern = pattern
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(pattern={self.pattern})"
-
-    @ft.singledispatchmethod
-    def __eq__(self, _: KeyEntry) -> bool:
-        return False
-
-    @__eq__.register(str)
-    def _(self, other: str) -> bool:
-        return re.fullmatch(self.pattern, other) is not None
-
-    @__eq__.register(jtu.GetAttrKey)
-    def _(self, other) -> bool:
-        return re.fullmatch(self.pattern, other.name) is not None
-
-    @__eq__.register(jtu.DictKey)
-    def _(self, other) -> bool:
-        return re.fullmatch(self.pattern, other.key) is not None
-
-
-# dispatch on type of indexer to convert input item to at indexer
-# `__getitem__` to the appropriate key
-# avoid using container pytree types to avoid conflict between
-# matching as a mask or as an instance of `BaseKey`
-indexer_dispatcher = ft.singledispatch(lambda x: x)
-indexer_dispatcher.register(type(...), lambda _: EllipsisKey())
-indexer_dispatcher.register(int, lambda x: IntKey(x))
-indexer_dispatcher.register(str, lambda x: NameKey(x))
-indexer_dispatcher.register(re.Pattern, lambda x: RegexKey(x))
-
-_NOT_IMPLEMENTED_INDEXING = """Indexing with {} is not implemented, supported indexing types are:
-- `str` for mapping keys or class attributes.
-- `int` for positional indexing for sequences.
-- `...` to select all leaves.
-- Boolean mask of the same structure as the tree
-- `re.Pattern` to index all keys matching a regex pattern.
-- Instance of `BaseKey` with custom logic to index a pytree.
-- `set` of (set,int,...,re.Pattern,instance of `BaseKey`) to index multiple keys at once.
-"""
-
-
-def _generate_path_mask(
-    tree: PyTree,
-    where: tuple[BaseKey, ...],
-    is_leaf: IsLeafType = None,
-) -> PyTree:
-    # generate a boolean mask for `where` path in `tree`
-    # where path is a tuple of indices or keys, for example
-    # where=("a",) wil set all leaves of `tree` with key "a" to True and
-    # all other leaves to False
-    match = False
-
-    def map_func(path, _: Any):
-        if len(where) > len(path):
-            # path is shorter than `where` path. for example
-            # where=("a", "b") and the current path is ("a",) then
-            # the current path is not a match
-            return False
-        for wi, ki in zip(where, path):
-            if not (wi == ki):
-                return False
-
-        nonlocal match
-
-        return (match := True)
-
-    mask = jtu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
-
-    if not match:
-        raise LookupError(f"No leaf match is found for {where=}.")
-
-    return mask
-
-
-def _combine_bool_leaves(*leaves):
-    verdict = True
-    for leaf in leaves:
-        verdict &= leaf
-    return verdict
-
-
-def _is_bool_leaf(leaf: Any) -> bool:
-    if hasattr(leaf, "dtype"):
-        return leaf.dtype == "bool"
-    return isinstance(leaf, bool)
-
-
-def _resolve_where(
-    tree: T,
-    where: tuple[Any, ...],  # type: ignore
-    is_leaf: IsLeafType = None,
-) -> T | None:
-    mask = None
-    bool_masks: list[T] = []
-    path_masks: list[BaseKey] = []
-    treedef0 = jtu.tree_structure(tree, is_leaf=is_leaf)
-
-    seen_keys_container = False
-    level_paths = []
-
-    def verify_and_aggregate_is_leaf(x) -> bool:
-        # use is_leaf with non-local to traverse the tree depth-first manner
-        # required for verifying if a pytree is a valid indexing pytree
-        nonlocal seen_keys_container, level_paths, bool_masks
-        # used to check if a pytree is a valid indexing pytree
-        # used with `is_leaf` argument of any `jtu.tree_*` function
-        leaves, treedef = jtu.tree_flatten(x)
-
-        if treedef == treedef0 and all(map(_is_bool_leaf, leaves)):
-            # boolean pytrees of same structure as `tree` is a valid indexing pytree
-            bool_masks += [x]
-            return True
-
-        if isinstance(resolved_key := indexer_dispatcher(x), BaseKey):
-            # valid resolution of `BaseKey` is a valid indexing leaf
-            # makes it possible to dispatch on multi-leaf pytree
-            level_paths += [resolved_key]
-            return False
-
-        if isinstance(x, tuple) and seen_keys_container is False:
-            # maybe container of other keys but can be a container of one level
-            # to avoid something like this [("a",), ("b",)]
-            seen_keys_container = True
-            return False
-
-        # not a container of other keys or a pytree of same structure
-        raise NotImplementedError(_NOT_IMPLEMENTED_INDEXING.format(x))
-
-    for level_keys in where:
-        # each for loop iteration is a level in the where path
-        jtu.tree_leaves(level_keys, is_leaf=verify_and_aggregate_is_leaf)
-        path_masks += [MultiKey(*level_paths)] if len(level_paths) > 1 else level_paths
-        level_paths = []
-        seen_keys_container = False
-
-    if path_masks:
-        mask = _generate_path_mask(tree, path_masks, is_leaf=is_leaf)
-
-    if bool_masks:
-        all_masks = [mask, *bool_masks] if mask else bool_masks
-        mask = jax.tree_map(_combine_bool_leaves, *all_masks)
-
-    return mask
 
 
 def tree_hash(*trees: PyTree) -> int:
@@ -551,14 +267,14 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
     return wrapper
 
 
-def _unary_op(func):
+def uop(func):
     def wrapper(self):
         return jtu.tree_map(func, self)
 
     return ft.wraps(func)(wrapper)
 
 
-def _binary_op(func):
+def bop(func):
     def wrapper(leaf, rhs=None):
         if isinstance(rhs, type(leaf)):
             return jtu.tree_map(func, leaf, rhs)
@@ -567,7 +283,7 @@ def _binary_op(func):
     return ft.wraps(func)(wrapper)
 
 
-def _swop(func):
+def swop(func):
     # swaping the arguments of a two-arg function
     return ft.wraps(func)(lambda leaf, rhs: func(rhs, leaf))
 
@@ -577,48 +293,48 @@ def _leafwise_transform(klass: type[T]) -> type[T]:
     # that enable the user to apply a function to
     # all the leaves of the tree
     for key, method in (
-        ("__abs__", _unary_op(abs)),
-        ("__add__", _binary_op(op.add)),
-        ("__and__", _binary_op(op.and_)),
-        ("__ceil__", _unary_op(ceil)),
-        ("__divmod__", _binary_op(divmod)),
-        ("__eq__", _binary_op(op.eq)),
-        ("__floor__", _unary_op(floor)),
-        ("__floordiv__", _binary_op(op.floordiv)),
-        ("__ge__", _binary_op(op.ge)),
-        ("__gt__", _binary_op(op.gt)),
-        ("__invert__", _unary_op(op.invert)),
-        ("__le__", _binary_op(op.le)),
-        ("__lshift__", _binary_op(op.lshift)),
-        ("__lt__", _binary_op(op.lt)),
-        ("__matmul__", _binary_op(op.matmul)),
-        ("__mod__", _binary_op(op.mod)),
-        ("__mul__", _binary_op(op.mul)),
-        ("__ne__", _binary_op(op.ne)),
-        ("__neg__", _unary_op(op.neg)),
-        ("__or__", _binary_op(op.or_)),
-        ("__pos__", _unary_op(op.pos)),
-        ("__pow__", _binary_op(op.pow)),
-        ("__radd__", _binary_op(_swop(op.add))),
-        ("__rand__", _binary_op(_swop(op.and_))),
-        ("__rdivmod__", _binary_op(_swop(divmod))),
-        ("__rfloordiv__", _binary_op(_swop(op.floordiv))),
-        ("__rlshift__", _binary_op(_swop(op.lshift))),
-        ("__rmatmul__", _binary_op(_swop(op.matmul))),
-        ("__rmod__", _binary_op(_swop(op.mod))),
-        ("__rmul__", _binary_op(_swop(op.mul))),
-        ("__ror__", _binary_op(_swop(op.or_))),
-        ("__round__", _binary_op(round)),
-        ("__rpow__", _binary_op(_swop(op.pow))),
-        ("__rrshift__", _binary_op(_swop(op.rshift))),
-        ("__rshift__", _binary_op(op.rshift)),
-        ("__rsub__", _binary_op(_swop(op.sub))),
-        ("__rtruediv__", _binary_op(_swop(op.truediv))),
-        ("__rxor__", _binary_op(_swop(op.xor))),
-        ("__sub__", _binary_op(op.sub)),
-        ("__truediv__", _binary_op(op.truediv)),
-        ("__trunc__", _unary_op(trunc)),
-        ("__xor__", _binary_op(op.xor)),
+        ("__abs__", uop(abs)),
+        ("__add__", bop(op.add)),
+        ("__and__", bop(op.and_)),
+        ("__ceil__", uop(ceil)),
+        ("__divmod__", bop(divmod)),
+        ("__eq__", bop(op.eq)),
+        ("__floor__", uop(floor)),
+        ("__floordiv__", bop(op.floordiv)),
+        ("__ge__", bop(op.ge)),
+        ("__gt__", bop(op.gt)),
+        ("__invert__", uop(op.invert)),
+        ("__le__", bop(op.le)),
+        ("__lshift__", bop(op.lshift)),
+        ("__lt__", bop(op.lt)),
+        ("__matmul__", bop(op.matmul)),
+        ("__mod__", bop(op.mod)),
+        ("__mul__", bop(op.mul)),
+        ("__ne__", bop(op.ne)),
+        ("__neg__", uop(op.neg)),
+        ("__or__", bop(op.or_)),
+        ("__pos__", uop(op.pos)),
+        ("__pow__", bop(op.pow)),
+        ("__radd__", bop(swop(op.add))),
+        ("__rand__", bop(swop(op.and_))),
+        ("__rdivmod__", bop(swop(divmod))),
+        ("__rfloordiv__", bop(swop(op.floordiv))),
+        ("__rlshift__", bop(swop(op.lshift))),
+        ("__rmatmul__", bop(swop(op.matmul))),
+        ("__rmod__", bop(swop(op.mod))),
+        ("__rmul__", bop(swop(op.mul))),
+        ("__ror__", bop(swop(op.or_))),
+        ("__round__", bop(round)),
+        ("__rpow__", bop(swop(op.pow))),
+        ("__rrshift__", bop(swop(op.rshift))),
+        ("__rshift__", bop(op.rshift)),
+        ("__rsub__", bop(swop(op.sub))),
+        ("__rtruediv__", bop(swop(op.truediv))),
+        ("__rxor__", bop(swop(op.xor))),
+        ("__sub__", bop(op.sub)),
+        ("__truediv__", bop(op.truediv)),
+        ("__trunc__", uop(trunc)),
+        ("__xor__", bop(op.xor)),
     ):
         if key not in vars(klass):
             # do not override any user defined methods

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Constructor code generation from type annotations."""
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ class Field(NamedTuple):
     repr: bool = True
     kind: ArgKindType = "POS_OR_KW"
     metadata: dict[str, Any] | None = None
-    callbacks: Sequence[Any] = ()
+    callbacks: Sequence[Callable[[Any], Any]] = ()
     alias: str | None = None
 
     def __call__(self, value: Any):
@@ -126,7 +127,7 @@ def field(
 
 @ft.lru_cache(maxsize=128)
 def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
-    field_map = dict()  # type: dict[str, Field]
+    field_map: dict[str, Field] = dict()
 
     if klass is object:
         return MappingProxyType(field_map)

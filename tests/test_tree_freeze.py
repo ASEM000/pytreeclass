@@ -1,3 +1,17 @@
+# Copyright 2023 PyTreeClass authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Any, Callable
 
 import jax
@@ -244,7 +258,7 @@ def test_non_dataclass_input_to_freeze():
     assert jtu.tree_leaves(pytc.freeze(1)) == []
 
 
-def test_tree_freeze():
+def test_tree_mask():
     class l0(pytc.TreeClass, leafwise=True):
         x: int = 2
         y: int = 3
@@ -269,7 +283,7 @@ def test_tree_freeze():
     assert jtu.tree_leaves(tree.at["b"].at["y"].apply(pytc.freeze)) == [1, 2]
 
 
-def test_tree_unfreeze():
+def test_tree_unmask():
     class l0(pytc.TreeClass, leafwise=True):
         x: int = 2
         y: int = 3
@@ -298,7 +312,7 @@ def test_tree_unfreeze():
     assert jtu.tree_leaves(unfrozen_tree) == [2, 3]
 
 
-def test_tree_freeze_unfreeze():
+def test_tree_mask_unfreeze():
     class l0(pytc.TreeClass, leafwise=True):
         x: int = 2
         y: int = 3
@@ -385,10 +399,10 @@ def test_wrapper():
     assert wrapped != 1
 
 
-def test_tree_freeze_tree_unfreeze():
+def test_tree_mask_tree_unmask():
     tree = [1, 2, 3.0]
-    assert jtu.tree_leaves(pytc.tree_freeze(tree)) == [3.0]
-    assert jtu.tree_leaves(pytc.tree_unfreeze(pytc.tree_freeze(tree))) == [1, 2, 3.0]
+    assert jtu.tree_leaves(pytc.tree_mask(tree)) == [3.0]
+    assert jtu.tree_leaves(pytc.tree_unmask(pytc.tree_mask(tree))) == [1, 2, 3.0]
 
     mask_func = lambda x: x < 2
-    assert jtu.tree_leaves(pytc.tree_freeze(tree, mask_func)) == [2, 3.0]
+    assert jtu.tree_leaves(pytc.tree_mask(tree, mask_func)) == [2, 3.0]

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Utilities for pretty printing pytrees."""
+
 from __future__ import annotations
 
 import dataclasses as dc
@@ -43,41 +45,17 @@ class PPSpec(TypedDict):
     kind: Literal["REPR", "STR"]
     width: int
     depth: int | float
+    seen: set[int]
 
 
 PyTree = Any
 PP = Callable[[Any, Unpack[PPSpec]], str]
-ORDER_KEY = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
 from_iterable = chain.from_iterable
 
 
 @ft.singledispatch
 def pp_dispatcher(node: Any, **spec: Unpack[PPSpec]) -> str:
-    """Register a new or override an existing pretty printer by type using
-    `pp_dispatcher.register` to be used by `tree_repr` and `tree_str`.
-
-    Args:
-        node: The node to be pretty printed.
-        **spec: The pretty print specification
-        - indent: The current indentation level
-        - kind: The kind of pretty print, either "REPR" or "STR"
-        - width: The maximum width of the pretty printed string
-        - depth: The maximum depth of the pretty printed string
-
-    Returns:
-        The pretty printed string.
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> class MyType:
-        ...     def __init__(self, x):
-        ...         self.x = x
-        >>> @pytc.pp_dispatcher.register(MyType)
-        ... def my_pp(node, **spec) -> str:
-        ...     return "MyType pp"
-        >>> pytc.tree_repr(MyType(1))
-        'MyType pp'
-    """
+    """Register a new or override an existing pretty printer by type using"""
     return general_pp(node, **spec)
 
 
@@ -106,6 +84,11 @@ def pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     if spec["depth"] < 0:
         return "..."
 
+    if (node_id := id(node)) in spec["seen"]:
+        # useful to avoid infinite recursion in cyclic references
+        # e.g. (a:=[1,2,3];a.append(a))
+        return f"CyclicRef(id={node_id})"
+
     return format_width(pp_dispatcher(node, **spec), width=spec["width"])
 
 
@@ -115,6 +98,7 @@ def pps(xs: Iterable[Any], pp: PP, **spec: Unpack[PPSpec]) -> str:
 
     spec["indent"] += 1
     spec["depth"] -= 1
+    spec["seen"].add(id(xs))  # avoid infinite recursion in cyclic references
 
     text = (
         "\n"
@@ -237,6 +221,7 @@ def type_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
 
 
 def size_pp(size: int, **spec: Unpack[PPSpec]):
+    ORDER_KEY = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
     size_order = int(math.log(size, 1024)) if size > 0 else 0
     text = f"{(size)/(1024**size_order):.2f}{ORDER_KEY[size_order]}"
     return pp(text, **spec)
@@ -271,7 +256,7 @@ def tree_repr(
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
     """
-    text = pp(tree, indent=0, kind="REPR", width=width, depth=depth)
+    text = pp(tree, indent=0, kind="REPR", width=width, depth=depth, seen=set())
     return text.expandtabs(tabwidth)
 
 
@@ -300,7 +285,7 @@ def tree_str(
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
     """
-    text = pp(tree, indent=0, kind="STR", width=width, depth=depth)
+    text = pp(tree, indent=0, kind="STR", width=width, depth=depth, seen=set())
     return text.expandtabs(tabwidth)
 
 
@@ -355,7 +340,7 @@ def tree_indent(
         indent = smark * depth
 
         if (len(node.children)) == 0:
-            ppspec = dict(indent=0, kind="REPR", width=80, depth=0)
+            ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
             text = f"{indent}"
             (key, _), value = node.data
             text += f"{key}=" if key is not None else ""
@@ -437,7 +422,7 @@ def tree_diagram(
         branch = (lmark if is_last else cmark) if depth > 0 else ""
 
         if (child_count := len(node.children)) == 0:
-            ppspec = dict(indent=0, kind="REPR", width=80, depth=0)
+            ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
             (key, _), value = node.data
             text = f"{indent}"
             text += f"{branch}{key}=" if key is not None else ""
@@ -484,7 +469,7 @@ def tree_mermaid(
 
     def step(node: Node, depth: int = 0) -> str:
         if len(node.children) == 0:
-            ppspec = dict(indent=0, kind="REPR", width=80, depth=0)
+            ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
             key, _, value = node.data
             text = f"{key}=" if key is not None else ""
             text += pp(value, **ppspec)
@@ -735,6 +720,7 @@ def tree_summary(
     """
     ROWS = [["Name", "Type", "Count"]]
     COUNT = 0
+    ppspec = dict(indent=0, kind="STR", width=60, depth=depth, seen=set())
 
     # use `unzip2` from `jax.util` to avoid [] leaves
     # based on this issue:
@@ -756,12 +742,12 @@ def tree_summary(
             continue
 
         paths = jtu.keystr(trace[0])
-        types = type_pp(leaf, indent=0, kind="STR", width=60, depth=depth)
+        types = type_pp(leaf, **ppspec)
         counts = f"{count:,}"
         ROWS += [[paths, types, counts]]
 
     paths = "Σ"
-    types = type_pp(tree, indent=0, kind="STR", width=60, depth=depth)
+    types = type_pp(tree, **ppspec)
     counts = f"{COUNT:,}"
     ROWS += [[paths, types, counts]]
     return _table(ROWS)

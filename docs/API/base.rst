@@ -16,13 +16,12 @@ Public API
     tree_str
     tree_summary
     tree_repr_with_trace
-    pp_dispatcher
     is_nondiff
     freeze
-    tree_freeze
+    tree_mask
     is_frozen
     unfreeze
-    tree_unfreeze
+    tree_unmask
     bcmap
     Partial
     AtIndexer
@@ -56,19 +55,18 @@ Pretty Printing API
 .. autofunction:: tree_str
 .. autofunction:: tree_summary
 .. autofunction:: tree_repr_with_trace
-.. autofunction:: pp_dispatcher
 
-Wrapping and freezing API
+Masking/Unmasking API
 -------------------------
 
 .. currentmodule:: pytreeclass 
 
 .. autofunction:: is_nondiff
 .. autofunction:: freeze
-.. autofunction:: tree_freeze
-.. autofunction:: is_frozen
 .. autofunction:: unfreeze
-.. autofunction:: tree_unfreeze
+.. autofunction:: is_frozen
+.. autofunction:: tree_mask
+.. autofunction:: tree_unmask
 
 
 Advanced API
@@ -83,7 +81,6 @@ Advanced API
         set,
         apply,
         scan,
-        __call__,
 .. autoclass:: RegexKey
     :members:
         __eq__
