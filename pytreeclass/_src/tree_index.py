@@ -96,9 +96,6 @@ class IntKey(BaseKey):
     def __init__(self, idx: int) -> None:
         self.idx = idx
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(idx={self.idx})"
-
     @ft.singledispatchmethod
     def __eq__(self, _: KeyEntry) -> bool:
         return False
@@ -115,9 +112,6 @@ class IntKey(BaseKey):
 class NameKey(BaseKey):
     def __init__(self, name: str) -> None:
         self.name = name
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name})"
 
     @ft.singledispatchmethod
     def __eq__(self, _: KeyEntry) -> bool:
@@ -140,9 +134,6 @@ class EllipsisKey(BaseKey):
     def __init__(self, _):
         del _
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
-
     def __eq__(self, _: KeyEntry) -> bool:
         return True
 
@@ -155,9 +146,6 @@ class MultiKey(BaseKey):
 
     def __eq__(self, entry) -> bool:
         return any(entry == key for key in self.keys)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(keys={self.keys})"
 
 
 class RegexKey(BaseKey):
@@ -181,9 +169,6 @@ class RegexKey(BaseKey):
 
     def __init__(self, pattern: str) -> None:
         self.pattern = pattern
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(pattern={self.pattern})"
 
     @ft.singledispatchmethod
     def __eq__(self, _: KeyEntry) -> bool:

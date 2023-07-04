@@ -720,6 +720,8 @@ def test_regexkey():
     tree = tree.at[re.compile(r"weight_.*")].set(100.0)
     # Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     assert jtu.tree_leaves(tree) == [100.0, 100.0, 100.0, 0.0]
+    tree = pytc.AtIndexer({"a": 1, "b": 2}).at[re.compile(r"a")].set(100.0)
+    assert tree == {"a": 100.0, "b": 2}
 
 
 def test_custom_key():
@@ -779,13 +781,14 @@ def test_scan():
         a: int = 1
         b: int = 2
         c: int = 3
+        d: jax.Array = jnp.array([4, 5])
 
     tree = Tree()
 
     def func_with_state(x, state):
         return x + 1, state + 1
 
-    tree, state = tree.at["a", "b"].scan(func_with_state, state=1)
+    tree, state = tree.at["a", "b", "d"].scan(func_with_state, state=1)
 
-    assert pytc.is_tree_equal(tree, Tree(a=2, b=3, c=3))
-    assert state == 3
+    assert pytc.is_tree_equal(tree, Tree(a=2, b=3, c=3, d=jnp.array([5, 6])))
+    assert state == 4
