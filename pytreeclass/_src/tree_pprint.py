@@ -212,14 +212,6 @@ def dict_pp(node: dict, **spec: Unpack[PPSpec]) -> str:
     return "{" + pps(node.items(), pp=key_value_pp, **spec) + "}"
 
 
-def type_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
-    if not isinstance(node, (jax.Array, np.ndarray)):
-        return f"{type(node).__name__}"
-
-    shape_dype = node.shape, node.dtype
-    return pp(jax.ShapeDtypeStruct(*shape_dype), **spec)
-
-
 def tree_repr(
     tree: PyTree,
     *,
@@ -501,12 +493,6 @@ def format_width(string, width=60):
     return string.replace("\n", "").replace("\t", "")
 
 
-def _calculate_count(leaf: Any) -> tuple[int, int]:
-    if hasattr(leaf, "shape") and hasattr(leaf, "nbytes"):
-        return int(np.array(leaf.shape).prod())
-    return 1
-
-
 # table printing
 
 
@@ -672,6 +658,76 @@ def _table(rows: list[list[str]], transpose: bool = False) -> str:
     return _hstack(*(_vbox(*col) for col in cols))
 
 
+def size_pp(size: int, **spec: Unpack[PPSpec]):
+    del spec
+    order_alpha = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+    size_order = int(math.log(size, 1024)) if size else 0
+    text = f"{(size)/(1024**size_order):.2f}{order_alpha[size_order]}"
+    return text
+
+
+# `tree_summary`` display dispatchers to make `tree_summary` more customizable
+# for type, count, and size display.
+# for example, array count uses the array size instead, where as some other
+# custom object might make use of this feature to display the number of elements
+# differently. for size, only arrays can have a size, as other type sizes are
+# not meaningful. user can define their own dispatchers for their custom types
+# display e.g `f32[10,10]` instead of simply `Array`.
+
+
+@ft.singledispatch
+def type_dispatcher(node: Any) -> str:
+    return type(node).__name__
+
+
+@type_dispatcher.register(np.ndarray)
+@type_dispatcher.register(jax.Array)
+@type_dispatcher.register(jax.ShapeDtypeStruct)
+def _(node: Any) -> str:
+    """Return the type repr of the node."""
+    shape_dype = node.shape, node.dtype
+    spec = dict(indent=0, kind="REPR", width=80, depth=float("inf"), seen=set())
+    return pp(jax.ShapeDtypeStruct(*shape_dype), **spec)
+
+
+@ft.singledispatch
+def count_dispatcher(_: Any) -> int:
+    """Return the number of elements in a node."""
+    return 1
+
+
+@count_dispatcher.register(jax.Array)
+@count_dispatcher.register(np.ndarray)
+def _(node: jax.Array | np.ndarray) -> int:
+    return node.size
+
+
+@ft.singledispatch
+def size_dispatcher(node: Any) -> None:
+    """Return the size of a node in bytes"""
+    return 0
+
+
+@size_dispatcher.register(jax.Array)
+@size_dispatcher.register(np.ndarray)
+def _(node: jax.Array | np.ndarray) -> int:
+    return node.nbytes
+
+
+def tree_size(tree: PyTree) -> int:
+    def reduce_func(acc, node):
+        return acc + size_dispatcher(node)
+
+    return jtu.tree_reduce(reduce_func, tree, initializer=0)
+
+
+def tree_count(tree: PyTree) -> int:
+    def reduce_func(acc, node):
+        return acc + count_dispatcher(node)
+
+    return jtu.tree_reduce(reduce_func, tree, initializer=0)
+
+
 def tree_summary(
     tree: PyTree,
     *,
@@ -682,38 +738,61 @@ def tree_summary(
 
     Args:
         tree: a jax registered pytree to summarize.
-        depth: max depth to traverse the tree. defaults to maximum depth.
+        depth: max depth to display the tree. defaults to maximum depth.
         is_leaf: function to determine if a node is a leaf. defaults to None
 
     Returns:
         String summary of the tree structure
-        - First column: path to the node
-        - Second column: type of the node
-        - Third column: number of leaves in the node
+        - First column: path to the node.
+        - Second column: type of the node. to control the displayed type use
+            `tree_summary.def_type(type, func) to define a custom type display function.
+        - Third column: number of leaves in the node. for arrays the number of leaves
+            is the number of elements in the array, otherwise its 1. to control the
+            number of leaves of a node use `tree_summary.def_count(type,func)`
+        - Fourth column: size of the node in bytes. if the node is array the size
+            is the size of the array in bytes, otherwise its the size is not displayed.
+            to control the size of a node use `tree_summary.def_size(type,func)`
         - Last row: type of parent, number of leaves of the parent
-
-    Note:
-        Array elements are considered as leaves, for example:
-        `jnp.array([1,2,3])` has 3 leaves
 
     Example:
         >>> import pytreeclass as pytc
-        >>> print(pytc.tree_summary([1,[2,[3]]]))
-        ┌─────────┬────┬─────┐
-        │Name     │Type│Count│
-        ├─────────┼────┼─────┤
-        │[0]      │int │1    │
-        ├─────────┼────┼─────┤
-        │[1][0]   │int │1    │
-        ├─────────┼────┼─────┤
-        │[1][1][0]│int │1    │
-        ├─────────┼────┼─────┤
-        │Σ        │list│3    │
-        └─────────┴────┴─────┘
+        >>> import jax.numpy as jnp
+        >>> print(pytc.tree_summary([1, [2, [3]], jnp.array([1, 2, 3])]))
+        ┌─────────┬──────┬─────┬──────┐
+        │Name     │Type  │Count│Size  │
+        ├─────────┼──────┼─────┼──────┤
+        │[0]      │int   │1    │      │
+        ├─────────┼──────┼─────┼──────┤
+        │[1][0]   │int   │1    │      │
+        ├─────────┼──────┼─────┼──────┤
+        │[1][1][0]│int   │1    │      │
+        ├─────────┼──────┼─────┼──────┤
+        │[2]      │i32[3]│3    │12.00B│
+        ├─────────┼──────┼─────┼──────┤
+        │Σ        │list  │6    │12.00B│
+        └─────────┴──────┴─────┴──────┘
+
+    Example:
+        >>> # set python `int` to have 4 bytes using dispatching
+        >>> import pytreeclass as pytc
+        >>> print(pytc.tree_summary(1))
+        ┌────┬────┬─────┬────┐
+        │Name│Type│Count│Size│
+        ├────┼────┼─────┼────┤
+        │Σ   │int │1    │    │
+        └────┴────┴─────┴────┘
+        >>> @pytc.tree_summary.def_size(int)
+        ... def _(node: int) -> int:
+        ...     return 4
+        >>> print(pytc.tree_summary(1))
+        ┌────┬────┬─────┬─────┐
+        │Name│Type│Count│Size │
+        ├────┼────┼─────┼─────┤
+        │Σ   │int │1    │4.00B│
+        └────┴────┴─────┴─────┘
     """
-    ROWS = [["Name", "Type", "Count"]]
-    COUNT = 0
-    ppspec = dict(indent=0, kind="STR", width=60, depth=depth, seen=set())
+    rows = [["Name", "Type", "Count", "Size"]]
+    tcount = tsize = 0
 
     # use `unzip2` from `jax.util` to avoid [] leaves
     # based on this issue:
@@ -726,24 +805,32 @@ def tree_summary(
     )
 
     for trace, leaf in zip(traces, leaves):
-        count = _calculate_count(leaf)
-        COUNT += count
+        tcount += (count := tree_count(leaf))
+        tsize += (size := tree_size(leaf))
 
         if trace == ((), ()):
             # avoid printing the leaf trace (which is the root of the tree)
             # twice, once as a leaf and once as the root at the end
             continue
 
-        paths = jtu.keystr(trace[0])
-        types = type_pp(leaf, **ppspec)
-        counts = f"{count:,}"
-        ROWS += [[paths, types, counts]]
+        paths, _ = trace
+        pstr = jtu.keystr(paths)
+        tstr = type_dispatcher(leaf)
+        cstr = f"{count:,}" if count else ""
+        sstr = size_pp(size) if size else ""
+        rows += [[pstr, tstr, cstr, sstr]]
 
-    paths = "Σ"
-    types = type_pp(tree, **ppspec)
-    counts = f"{COUNT:,}"
-    ROWS += [[paths, types, counts]]
-    return _table(ROWS)
+    pstr = "Σ"
+    tstr = type_dispatcher(tree)
+    cstr = f"{tcount:,}" if tcount else ""
+    sstr = size_pp(tsize) if tsize else ""
+    rows += [[pstr, tstr, cstr, sstr]]
+    return _table(rows)
+
+
+tree_summary.def_count = count_dispatcher.register
+tree_summary.def_size = size_dispatcher.register
+tree_summary.def_type = type_dispatcher.register
 
 
 def tree_repr_with_trace(
