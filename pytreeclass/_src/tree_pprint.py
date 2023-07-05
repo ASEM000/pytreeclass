@@ -87,7 +87,7 @@ def pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     if (node_id := id(node)) in spec["seen"]:
         # useful to avoid infinite recursion in cyclic references
         # e.g. (a:=[1,2,3];a.append(a))
-        return f"CyclicRef(id={node_id})"
+        return f"<cyclic reference to {node_id}>"
 
     return format_width(pp_dispatcher(node, **spec), width=spec["width"])
 
