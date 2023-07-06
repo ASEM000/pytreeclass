@@ -23,8 +23,9 @@ from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 import jax
 import jax.tree_util as jtu
 import numpy as np
+from typing_extensions import Unpack
 
-from pytreeclass._src.tree_pprint import tree_repr, tree_str
+from pytreeclass._src.tree_pprint import PPSpec, tree_repr, tree_str, type_dispatcher
 from pytreeclass._src.tree_util import IsLeafType, is_tree_equal, tree_copy, tree_hash
 
 T = TypeVar("T")
@@ -97,26 +98,31 @@ class _FrozenBase(Generic[T]):
     __call__ = _FrozneError("__call__")
 
 
-class _Frozen(_FrozenBase):
-    def __eq__(self, rhs: Any) -> bool | jax.Array:
-        if not isinstance(rhs, _Frozen):
-            return False
-        return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
+@type_dispatcher.register(_FrozenBase)
+def _(node, **spec: Unpack[PPSpec]) -> str:
+    return f"#{type_dispatcher(node.__wrapped__)}"
 
+
+class _FrozenHashable(_FrozenBase):
     def __hash__(self) -> int:
         return tree_hash(self.__wrapped__)
+
+    def __eq__(self, rhs: Any) -> bool | jax.Array:
+        if not isinstance(rhs, _FrozenHashable):
+            return False
+        return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
 
 
 class _FrozenArray(_FrozenBase):
     def __hash__(self) -> int:
-        # hash by numpy array bytes
-        return int(hashlib.sha256(np.array(self.__wrapped__).tobytes()).hexdigest(), 16)
+        bytes = np.array(self.__wrapped__).tobytes()
+        return int(hashlib.sha256(bytes).hexdigest(), 16)
 
-    def __eq__(self, x) -> bool:
-        if not isinstance(x, _FrozenArray):
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, _FrozenArray):
             return False
-        lhs = self.__wrapped__
-        rhs = x.__wrapped__
+
+        lhs, rhs = self.__wrapped__, other.__wrapped__
         if lhs.shape != rhs.shape:
             return False
         if lhs.dtype != rhs.dtype:
@@ -125,7 +131,7 @@ class _FrozenArray(_FrozenBase):
 
 
 @ft.singledispatch
-def freeze(value: T) -> _Frozen[T]:
+def freeze(value: T) -> _FrozenHashable[T]:
     """Freeze a value to avoid updating it by `jax` transformations.
 
     Args:
@@ -154,7 +160,7 @@ def freeze(value: T) -> _Frozen[T]:
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
     """
-    return _Frozen(value)
+    return _FrozenHashable(value)
 
 
 @freeze.register(np.ndarray)
