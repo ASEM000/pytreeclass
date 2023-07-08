@@ -23,9 +23,8 @@ from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 import jax
 import jax.tree_util as jtu
 import numpy as np
-from typing_extensions import Unpack
 
-from pytreeclass._src.tree_pprint import PPSpec, tree_repr, tree_str, type_dispatcher
+from pytreeclass._src.tree_pprint import tree_repr, tree_str, type_dispatcher
 from pytreeclass._src.tree_util import IsLeafType, is_tree_equal, tree_copy, tree_hash
 
 T = TypeVar("T")
@@ -99,7 +98,7 @@ class _FrozenBase(Generic[T]):
 
 
 @type_dispatcher.register(_FrozenBase)
-def _(node, **spec: Unpack[PPSpec]) -> str:
+def _(node) -> str:
     return f"#{type_dispatcher(node.__wrapped__)}"
 
 

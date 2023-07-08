@@ -788,7 +788,7 @@ def test_scan():
     def func_with_state(x, state):
         return x + 1, state + 1
 
-    tree, state = tree.at["a", "b", "d"].scan(func_with_state, state=1)
+    state, tree = tree.at["a", "b", "d"].scan(func_with_state, state=1)
 
     assert pytc.is_tree_equal(tree, Tree(a=2, b=3, c=3, d=jnp.array([5, 6])))
     assert state == 4

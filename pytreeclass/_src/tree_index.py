@@ -508,7 +508,7 @@ class AtIndexer(NamedTuple):
         state: S,
         *,
         is_leaf: IsLeafType = None,
-    ) -> tuple[PyTree, S]:
+    ) -> tuple[S, PyTree]:
         """Apply a function to the leaf values at the specified location defined
         by the mask while carrying a state.
 
@@ -529,12 +529,12 @@ class AtIndexer(NamedTuple):
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> def scan_func(leaf, state):
-            ...     return 'SET', state + 1
+            >>> def scan_func(state, leaf):
+            ...     return state + 1, 'SET'
             >>> init_state = 0
             >>> tree = pytc.AtIndexer(tree)
             >>> tree.at["level1_0"].at["level2_0"].scan(scan_func, state=init_state)
-            ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
+            (1, {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300})
 
         Example:
             >>> import pytreeclass as pytc
@@ -546,14 +546,14 @@ class AtIndexer(NamedTuple):
             ...     b: int
             ...     c: int
             >>> tree = Tree(a=1, b=2, c=3)
-            >>> def scan_func(leaf, state: State):
+            >>> def scan_func(state: State, leaf):
             ...     state = State(state.func_evals + 1)
-            ...     return leaf + 1, state
+            ...     return state, leaf + 1
             >>> # apply to `a` and `b` and return a new instance with all other
             >>> # leaves unchanged and the new state that counts the number of
             >>> # function evaluations
             >>> tree.at['a','b'].scan(scan_func, state=State())
-            (Tree(a=2, b=3, c=3), State(func_evals=2))
+            (State(func_evals=2), Tree(a=2, b=3, c=3))
 
         Note:
             - `scan` applies a binary `func` to the leaf values while carrying
@@ -568,7 +568,7 @@ class AtIndexer(NamedTuple):
 
         def stateless_func(leaf):
             nonlocal running_state
-            leaf, running_state = func(leaf, running_state)
+            running_state, leaf = func(running_state, leaf)
             return leaf
 
         def leaf_apply(leaf: Any, where: bool):
@@ -577,7 +577,7 @@ class AtIndexer(NamedTuple):
             return stateless_func(leaf) if where else leaf
 
         out = jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
-        return out, running_state
+        return running_state, out
 
     def reduce(
         self,
