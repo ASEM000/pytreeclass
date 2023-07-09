@@ -28,6 +28,7 @@ from pytreeclass._src.code_build import (
     Field,
     _build_field_map,
     _build_init_method,
+    field,
     fields,
 )
 from pytreeclass._src.tree_index import AtIndexer
@@ -154,7 +155,7 @@ class TreeClassMeta(abc.ABCMeta):
         return self
 
 
-@dataclass_transform(field_specifiers=(Field,))
+@dataclass_transform(field_specifiers=(Field, field))
 class TreeClass(metaclass=TreeClassMeta):
     """Convert a class to a JAX compatible tree structure.
 

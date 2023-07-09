@@ -55,8 +55,8 @@ class Field(NamedTuple):
 
 
 def field(
-    default: Any = NULL,
     *,
+    default: Any = NULL,
     init: bool = True,
     repr: bool = True,
     kind: ArgKindType = "POS_OR_KW",
