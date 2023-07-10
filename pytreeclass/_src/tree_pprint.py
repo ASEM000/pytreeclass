@@ -20,9 +20,10 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import math
+import re
 from itertools import chain
 from types import FunctionType
-from typing import Any, Callable, Iterable, Literal
+from typing import Any, Callable, Iterable, Literal, NamedTuple
 
 import jax
 import jax.tree_util as jtu
@@ -52,10 +53,69 @@ PyTree = Any
 PP = Callable[[Any, Unpack[PPSpec]], str]
 from_iterable = chain.from_iterable
 
+class HIGHLIGHT:
+    BLACK = "\033[30m"
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    MAGENTA = "\033[35m"
+    CYAN = "\033[36m"
+    WHITE = "\033[37m"
+    DARKGREY = "\033[90m"
+    END = "\033[0m"
+    BOLD = "\033[1m"
+    ITALIC = "\033[3m"
+    UNDERLINE = "\033[4m"
+    BLINK = "\033[5m"
+    GRAY = "\033[90m"
+    NULL = ""
+
+
+class HighlightEntry(NamedTuple):
+    pattern: str
+    highlight: str
+
+
+sheet: dict[str, HighlightEntry] = {}
+# more specific to less specific patterns
+sheet["HIGHLIGHTED"] = HighlightEntry(r"\033\[\d+m.*\033\[0m", HIGHLIGHT.NULL)
+sheet["NUMBER"] = HighlightEntry(r"\s*\d+\.?\d*j?", HIGHLIGHT.BLUE)
+sheet["TRUE"] = HighlightEntry(r"True", HIGHLIGHT.GREEN + HIGHLIGHT.ITALIC)
+sheet["FALSE"] = HighlightEntry(r"False", HIGHLIGHT.RED + HIGHLIGHT.ITALIC)
+sheet["CLASS"] = HighlightEntry(r"\w+(?=\()", HIGHLIGHT.MAGENTA + HIGHLIGHT.BOLD)
+sheet["ATTRIBUTE"] = HighlightEntry(r"\w+(?==)", HIGHLIGHT.BOLD)
+sheet["KEY"] = HighlightEntry(r"\w+(?=:)", HIGHLIGHT.BOLD)
+sheet["TYPE"] = HighlightEntry(r"\w+(?=\[)", HIGHLIGHT.GRAY + HIGHLIGHT.BOLD)
+sheet["STRING"] = HighlightEntry(r"\w+", HIGHLIGHT.GREEN)
+sheet["BRACES"] = HighlightEntry(r"\[|\]|\(|\)|\{|\}", HIGHLIGHT.BOLD)
+sheet["NEWLINE"] = HighlightEntry(r"\n", HIGHLIGHT.NULL)
+sheet["REST"] = HighlightEntry(r".", HIGHLIGHT.NULL)
+
+
+pattern = r"|".join(f"(?P<{name}>{rule.pattern})" for name, rule in sheet.items())
+
+
+def highlight_text(text: str) -> str:
+    """Highlight text using ANSI escape sequences."""
+    tokens: list[tuple[str, str]] = []
+    output: str = ""
+
+    for match in re.finditer(pattern, text):
+        name = match.lastgroup
+        value = match.group(name)
+        tokens += [(value, name)]
+
+    for token in tokens:
+        value, name = token
+        highlight = sheet[name].highlight
+        output += f"{highlight}{value}{HIGHLIGHT.END}"
+
+    return output
 
 @ft.singledispatch
 def pp_dispatcher(node: Any, **spec: Unpack[PPSpec]) -> str:
-    """Register a new or override an existing pretty printer by type using"""
+    """Register a new or override an existing pretty printer by type using."""
     return general_pp(node, **spec)
 
 
@@ -121,7 +181,7 @@ def attr_value_pp(x: tuple[str, Any], **spec: Unpack[PPSpec]) -> str:
 
 @pp_dispatcher.register(jax.ShapeDtypeStruct)
 def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
-    """Pretty print a node with dtype and shape"""
+    """Pretty print a node with dtype and shape."""
     shape = f"{node.shape}".replace(",", "")
     shape = shape.replace("(", "[")
     shape = shape.replace(")", "]")
@@ -135,7 +195,7 @@ def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
 @pp_dispatcher.register(np.ndarray)
 @pp_dispatcher.register(jax.Array)
 def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
-    """Replace np.ndarray repr with short hand notation for type and shape"""
+    """Replace np.ndarray repr with short hand notation for type and shape."""
     if spec["kind"] == "STR":
         return general_pp(node, **spec)
 
@@ -218,14 +278,16 @@ def tree_repr(
     width: int = 80,
     tabwidth: int = 2,
     depth: int | float = float("inf"),
+    highlight: bool = False,
 ) -> str:
-    """Prertty print arbitrary PyTrees `__repr__`
+    """Prertty print arbitrary pytrees.
 
     Args:
         tree: PyTree
-        width: max width of the repr string
-        tabwidth: tab width of the repr string
-        depth: max depth of the repr string
+        width: max width of the repr string.
+        tabwidth: tab width of the repr string.
+        depth: max depth of the repr string.
+        highlight: highlight the repr string with ANSI escape code.
 
     Example:
         >>> import pytreeclass as pytc
@@ -242,7 +304,8 @@ def tree_repr(
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
     """
     text = pp(tree, indent=0, kind="REPR", width=width, depth=depth, seen=set())
-    return text.expandtabs(tabwidth)
+    text = text.expandtabs(tabwidth)
+    return highlight_text(text) if highlight is True else text
 
 
 def tree_str(
@@ -251,14 +314,17 @@ def tree_str(
     width: int = 80,
     tabwidth: int = 2,
     depth: int | float = float("inf"),
+    highlight: bool = False,
 ) -> str:
-    """Prertty print arbitrary PyTrees `__str__`
+    """Prertty print arbitrary pytrees string representation.
 
     Args:
         tree: PyTree
-        width: max width of the str string
-        tabwidth: tab width of the repr string
-        depth: max depth of the repr string
+        width: max width of the str string.
+        tabwidth: tab width of the repr string.
+        depth: max depth of the repr string.
+        highlight: highlight the repr string with ANSI escape code.
+
     Example:
         >>> import pytreeclass as pytc
         >>> import jax.numpy as jnp
@@ -271,7 +337,8 @@ def tree_str(
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
     """
     text = pp(tree, indent=0, kind="STR", width=width, depth=depth, seen=set())
-    return text.expandtabs(tabwidth)
+    text= text.expandtabs(tabwidth)
+    return highlight_text(text) if highlight is True else text
 
 
 def _is_trace_leaf_depth_factory(depth: int | float):
@@ -293,6 +360,7 @@ def tree_indent(
     depth: int | float = float("inf"),
     is_leaf: IsLeafType = None,
     tabwidth: int | None = 4,
+    highlight: bool = False,
 ):
     """Returns a string representation of the tree with indentation.
 
@@ -302,6 +370,7 @@ def tree_indent(
         is_leaf: A function that takes a node and returns True if it is a leaf node.
         tabwidth: The number of spaces per indentation level. if `None`
             then tabs are not expanded.
+        highlight: highlight the repr string with ANSI escape code.
 
     Example:
         >>> import pytreeclass as pytc
@@ -347,7 +416,8 @@ def tree_indent(
         is_trace_leaf=_is_trace_leaf_depth_factory(depth),
     )
     text = step(root)
-    return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
+    text = (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
+    return highlight_text(text) if highlight is True else text
 
 
 def tree_diagram(
@@ -356,13 +426,16 @@ def tree_diagram(
     depth: int | float = float("inf"),
     is_leaf: IsLeafType = None,
     tabwidth: int = 4,
+    highlight: bool = False,
 ):
     """Pretty print arbitrary PyTrees tree with tree structure diagram.
 
     Args:
         tree: PyTree
-        depth: depth of the tree to print. default is max depth
-        is_leaf: function to determine if a node is a leaf. default is None
+        depth: depth of the tree to print. default is max depth.
+        is_leaf: function to determine if a node is a leaf. default is None.
+        tabwidth: tab width of the repr string.
+        highlight: highlight the repr string with ANSI escape code.
 
     Example:
         >>> import pytreeclass as pytc
@@ -435,7 +508,8 @@ def tree_diagram(
         is_trace_leaf=_is_trace_leaf_depth_factory(depth),
     )
     text = step(root, is_last=len(root.children) == 1)
-    return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
+    text =  (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
+    return highlight_text(text) if highlight is True else text
 
 
 def tree_mermaid(
@@ -443,13 +517,16 @@ def tree_mermaid(
     depth: int | float = float("inf"),
     is_leaf: IsLeafType = None,
     tabwidth: int | None = 4,
+    highlight: bool = False,
 ) -> str:
-    """generate a mermaid diagram syntax for arbitrary PyTrees.
+    """Generate a mermaid diagram syntax for arbitrary pytrees.
 
     Args:
-        tree: PyTree
+        tree: a pytree
         depth: depth of the tree to print. default is max depth
         is_leaf: function to determine if a node is a leaf. default is None
+        tabwidth: tab width for the output. default is 4
+        highlight: highlight the repr string with ANSI escape code.
     """
 
     def step(node: Node, depth: int = 0) -> str:
@@ -482,11 +559,12 @@ def tree_mermaid(
     )
     text = "flowchart LR\n" + step(root)
 
-    return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
+    text= (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
+    return highlight_text(text) if highlight is True else text
 
 
 def format_width(string, width=60):
-    """strip newline/tab characters if less than max width"""
+    """Strip newline/tab characters if less than max width."""
     children_length = len(string) - string.count("\n") - string.count("\t")
     if children_length > width:
         return string
@@ -704,7 +782,7 @@ def _(node: jax.Array | np.ndarray) -> int:
 
 @ft.singledispatch
 def size_dispatcher(node: Any) -> None:
-    """Return the size of a node in bytes"""
+    """Return the size of a node in bytes."""
     return 0
 
 
@@ -733,6 +811,7 @@ def tree_summary(
     *,
     depth: int | float = float("inf"),
     is_leaf: IsLeafType = None,
+    highlight: bool = False,
 ) -> str:
     """Print a summary of an arbitrary PyTree.
 
@@ -740,6 +819,7 @@ def tree_summary(
         tree: a jax registered pytree to summarize.
         depth: max depth to display the tree. defaults to maximum depth.
         is_leaf: function to determine if a node is a leaf. defaults to None
+        highlight: highlight the repr string with ANSI escape code.
 
     Returns:
         String summary of the tree structure
@@ -825,7 +905,8 @@ def tree_summary(
     cstr = f"{tcount:,}" if tcount else ""
     sstr = size_pp(tsize) if tsize else ""
     rows += [[pstr, tstr, cstr, sstr]]
-    return _table(rows)
+    text = _table(rows)
+    return highlight_text(text) if highlight is True else text
 
 
 tree_summary.def_count = count_dispatcher.register
@@ -837,15 +918,15 @@ def tree_repr_with_trace(
     tree: PyTree,
     is_leaf: IsLeafType = None,
     transpose: bool = False,
+    highlight: bool = False,
 ) -> PyTree:
-    """
-    Return a PyTree with the same structure, but with the leaves replaced
-    by a summary of the trace.
+    """Return a PyTree the leaves replaced by a summary of the trace.
 
     Args:
         tree: pytree to summarize.
-        is_leaf: function to determine if a node is a leaf. defaults to None
-        transpose: transpose the table. i.e. rows become cols and cols become rows
+        is_leaf: function to determine if a node is a leaf. defaults to None.
+        transpose: transpose the table. i.e. rows become cols and cols become rows.
+        highlight: highlight the repr string with ANSI escape code.
 
     Example:
         >>> import pytreeclass as pytc
@@ -897,15 +978,18 @@ def tree_repr_with_trace(
     def leaf_trace_summary(trace, leaf) -> str:
         # this can be useful in debugging and raising descriptive errors
 
-        ROWS = [["Value", tree_repr(leaf)]]
+        rows = [["Value", tree_repr(leaf)]]
 
         names = "->".join(str(i) for i in trace[0])
-        ROWS += [["Name path", names]]
+        rows += [["Name path", names]]
 
         types = "->".join(i.__name__ for i in trace[1])
-        ROWS += [["Type path", types]]
+        rows += [["Type path", types]]
 
         # make a pretty table for each leaf
-        return "\n\t" + ("\n\t").join(_table(ROWS, transpose=transpose).split("\n"))
+        text = "\n\t" + ("\n\t").join(_table(rows, transpose=transpose).split("\n"))
+        return highlight_text(text) if highlight is True else text
 
     return tree_map_with_trace(leaf_trace_summary, tree, is_leaf=is_leaf)
+
+
