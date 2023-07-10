@@ -25,7 +25,6 @@ from pytreeclass._src.tree_mask import (
 )
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
-    tree_indent,
     tree_mermaid,
     tree_repr,
     tree_repr_with_trace,
@@ -52,7 +51,6 @@ __all__ = (
     "tree_mermaid",
     "tree_repr",
     "tree_str",
-    "tree_indent",
     "tree_summary",
     # masking utils
     "is_nondiff",

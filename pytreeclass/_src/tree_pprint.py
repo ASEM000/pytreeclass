@@ -287,69 +287,6 @@ def _is_trace_leaf_depth_factory(depth: int | float):
     return is_trace_leaf
 
 
-def tree_indent(
-    tree: Any,
-    *,
-    depth: int | float = float("inf"),
-    is_leaf: IsLeafType = None,
-    tabwidth: int | None = 4,
-):
-    """Returns a string representation of the tree with indentation.
-
-    Args:
-        tree: The tree to be printed.
-        depth: The maximum depth of the tree to be printed.
-        is_leaf: A function that takes a node and returns True if it is a leaf node.
-        tabwidth: The number of spaces per indentation level. if `None`
-            then tabs are not expanded.
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> tree = [1, [2, 3], [4, [5, 6]]]
-        >>> print(pytc.tree_indent(tree))
-        list
-            [0]=1
-            [1]:list
-                [0]=2
-                [1]=3
-            [2]:list
-                [0]=4
-                [1]:list
-                    [0]=5
-                    [1]=6
-
-    """
-    smark = (" \t")[:tabwidth]  # space mark
-
-    def step(node: Node, depth: int = 0) -> str:
-        indent = smark * depth
-
-        if (len(node.children)) == 0:
-            ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
-            text = f"{indent}"
-            (key, _), value = node.data
-            text += f"{key}=" if key is not None else ""
-            text += pp(value, **ppspec)
-            return text + "\n"
-
-        (key, type), _ = node.data
-        text = f"{indent}"
-        text += f"{key}:" if key is not None else ""
-        text += f"{type.__name__}\n"
-
-        for child in node:
-            text += step(child, depth=depth + 1)
-        return text
-
-    root = construct_tree(
-        tree,
-        is_leaf=is_leaf,
-        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
-    )
-    text = step(root)
-    return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
-
-
 def tree_diagram(
     tree: Any,
     *,

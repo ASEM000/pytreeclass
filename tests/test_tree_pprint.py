@@ -27,7 +27,6 @@ import pytreeclass as pytc
 from pytreeclass import (
     TreeClass,
     tree_diagram,
-    tree_indent,
     tree_mermaid,
     tree_repr,
     tree_repr_with_trace,
@@ -117,18 +116,13 @@ def test_tree_summary():
     )
 
 
-def _tree_to_indent(str):
-    return str.replace("├── ", "    ").replace("└── ", "    ").replace("│", " ")
-
-
 def test_tree_diagram():
-    assert tree_diagram(r1, depth=0) == tree_indent(r1, depth=0) == "Repr1(...)"
+    assert tree_diagram(r1, depth=0) == "Repr1(...)"
 
     # trunk-ignore(flake8/E501)
     out = "Repr1\n├── .a=1\n├── .b='string'\n├── .c=1.0\n├── .d='aaaaa'\n├── .e=[...]\n├── .f={...}\n├── .g={...}\n├── .h=f32[5,1](μ=1.00, σ=0.00, ∈[1.00,1.00])\n├── .i=f32[1,6](μ=1.00, σ=0.00, ∈[1.00,1.00])\n├── .j=f32[1,1,4,5](μ=1.00, σ=0.00, ∈[1.00,1.00])\n├── .k=(...)\n├── .l=a(...)\n├── .m=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])\n├── .n=bool[]\n└── .o=c64[2]"
 
     assert tree_diagram(r1, depth=1) == out
-    assert tree_indent(r1, depth=1) == _tree_to_indent(out)
 
 
 def test_custom_jax_class():
@@ -150,7 +144,6 @@ def test_custom_jax_class():
     out = "Test\n├── .leaf_0=1\n└── .leaf_1=2"
     assert tree_diagram(t) == tree_diagram(t, depth=3) == out
 
-    assert tree_indent(t) == tree_indent(t, depth=3) == _tree_to_indent(out)
     assert (
         tree_summary(t)
         == tree_summary(t, depth=4)
@@ -223,8 +216,6 @@ def test_extra_tree_diagram():
     out = "L2\n├── .e=4\n├── .f:L1\n│   ├── .c:L0\n│   │   ├── .a=1\n│   │   └── .b=2\n│   └── .d=3\n├── .g:L0\n│   ├── .a=1\n│   └── .b=2\n└── .h=5"
 
     assert (tree_diagram(tree)) == out
-
-    assert tree_indent(tree) == _tree_to_indent(out)
 
     class L0(TreeClass):
         a: int = 1
