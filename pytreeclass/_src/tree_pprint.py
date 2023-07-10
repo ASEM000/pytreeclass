@@ -519,7 +519,7 @@ def tree_diagram(
         is_trace_leaf=_is_trace_leaf_depth_factory(depth),
     )
     text = step(root, is_last=len(root.children) == 1)
-    text =  (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
+    text = (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
     return highlight_text(text) if highlight is True else text
 
 
