@@ -76,19 +76,30 @@ class HighlightEntry(NamedTuple):
     pattern: str
     highlight: str
 
-
+# ** more specific to less specific patterns **
 sheet: dict[str, HighlightEntry] = {}
-# more specific to less specific patterns
+
+# avoid repeated highlighting
 sheet["HIGHLIGHTED"] = HighlightEntry(r"\033\[\d+m.*\033\[0m", HIGHLIGHT.NULL)
-sheet["NUMBER"] = HighlightEntry(r"\s*\d+\.?\d*j?", HIGHLIGHT.BLUE)
+
+# literal values
 sheet["TRUE"] = HighlightEntry(r"True", HIGHLIGHT.GREEN + HIGHLIGHT.ITALIC)
 sheet["FALSE"] = HighlightEntry(r"False", HIGHLIGHT.RED + HIGHLIGHT.ITALIC)
+sheet["HASHTAG"] = HighlightEntry(r"#", HIGHLIGHT.GRAY + HIGHLIGHT.BOLD)
+sheet["BRACES"] = HighlightEntry(r"\[|\]|\(|\)|\{|\}", HIGHLIGHT.BOLD)
+sheet["BOX"] = HighlightEntry(r"├|─|└|│|┬|┴|┼|┤|┐|┘|┌", HIGHLIGHT.GRAY)
+
+# lookahead patterns
 sheet["CLASS"] = HighlightEntry(r"\w+(?=\()", HIGHLIGHT.MAGENTA + HIGHLIGHT.BOLD)
 sheet["ATTRIBUTE"] = HighlightEntry(r"\w+(?==)", HIGHLIGHT.BOLD)
 sheet["KEY"] = HighlightEntry(r"\w+(?=:)", HIGHLIGHT.BOLD)
 sheet["TYPE"] = HighlightEntry(r"\w+(?=\[)", HIGHLIGHT.GRAY + HIGHLIGHT.BOLD)
+
+# general types
+sheet["NUMBER"] = HighlightEntry(r"\d+\.?\d*j?", HIGHLIGHT.BLUE)
 sheet["STRING"] = HighlightEntry(r"\w+", HIGHLIGHT.GREEN)
-sheet["BRACES"] = HighlightEntry(r"\[|\]|\(|\)|\{|\}", HIGHLIGHT.BOLD)
+
+# rest
 sheet["NEWLINE"] = HighlightEntry(r"\n", HIGHLIGHT.NULL)
 sheet["REST"] = HighlightEntry(r".", HIGHLIGHT.NULL)
 
