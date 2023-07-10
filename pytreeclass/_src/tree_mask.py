@@ -140,6 +140,7 @@ def freeze(value: T) -> _FrozenHashable[T]:
         - `freeze` is idempotent, i.e. `freeze(freeze(x)) == freeze(x)`.
         - `freeze` uses single dispatch to support custom types. To define a custom
             wrapper for a certain type, use `freeze.register(type, func)`.
+
     Example:
         >>> import jax
         >>> import pytreeclass as pytc
@@ -213,9 +214,7 @@ def _(value: _FrozenBase[T]) -> T:
 
 @ft.singledispatch
 def is_nondiff(value: Any) -> bool:
-    """Returns True if the node is a non-differentiable node, and False for if the
-    node is of type float, complex number, or a numpy array of floats or
-    complex numbers.
+    """Returns True for non-inexact types, False otherwise.
 
     Args:
         value: A value to check.
@@ -292,8 +291,7 @@ def _tree_mask_map(
 
 
 def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = None):
-    """Mask tree leaves according to `mask` to exclude masked leaves from
-    `jax.tree_util` functions. defaults to masking non-inexact nodes.
+    """Mask leaves of a pytree based on `mask` boolean pytree or callable.
 
     Args:
         tree: A pytree of values.

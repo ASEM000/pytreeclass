@@ -230,8 +230,8 @@ def _generate_path_mask(
                 return False
 
         nonlocal match
-
-        return (match := True)
+        match = True
+        return match
 
     mask = jtu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
 
@@ -371,7 +371,7 @@ class AtIndexer(NamedTuple):
         return type(self)(self.tree, (*self.where, where))
 
     def __getattr__(self, name: str) -> AtIndexer:
-        """Support nested indexing"""
+        """Support nested indexing."""
         if name == "at":
             # pass the current tree and the current path to the next `.at`
             return type(self)(tree=self.tree, where=self.where)
@@ -509,8 +509,7 @@ class AtIndexer(NamedTuple):
         *,
         is_leaf: IsLeafType = None,
     ) -> tuple[S, PyTree]:
-        """Apply a function to the leaf values at the specified location defined
-        by the mask while carrying a state.
+        """Apply a function with carrtying a state.
 
         Args:
             func: the function to apply to the leaf values. the function accepts

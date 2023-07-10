@@ -84,7 +84,6 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
     Note:
         Under `jit` the return type is boolean `jax.Array` instead of `bool`.
     """
-
     tree0, *rest = trees
     leaves0, treedef0 = jtu.tree_flatten(tree0)
     verdict = True
@@ -98,8 +97,7 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
 
 
 class Partial:
-    """
-    jaxable Partial function with support for positional partial application.
+    """jaxable Partial function with support for positional partial application.
 
     Example:
         >>> import pytreeclass as pytc
@@ -164,9 +162,7 @@ jtu.register_pytree_node(
 
 
 def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
-    """
-    (map)s a function over pytrees leaves with automatic (b)road(c)asting
-    for scalar arguments
+    """Map a function over pytree leaves with automatic broadcasting for scalar arguments.
 
     Args:
         func: the function to be mapped over the pytree
@@ -440,7 +436,8 @@ def tree_map_with_trace(
 ) -> Any:
     # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
     # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
-    """
+    """Map a function over a pytree, with trace and type path.
+    
     Similar to `jax.tree_util.tree_map_with_path` that accept a function
     that takes a two-item tuple for key path and type path.
 

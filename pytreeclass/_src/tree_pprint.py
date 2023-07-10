@@ -55,7 +55,7 @@ from_iterable = chain.from_iterable
 
 @ft.singledispatch
 def pp_dispatcher(node: Any, **spec: Unpack[PPSpec]) -> str:
-    """Register a new or override an existing pretty printer by type using"""
+    """Register a new or override an existing pretty printer by type using."""
     return general_pp(node, **spec)
 
 
@@ -121,7 +121,7 @@ def attr_value_pp(x: tuple[str, Any], **spec: Unpack[PPSpec]) -> str:
 
 @pp_dispatcher.register(jax.ShapeDtypeStruct)
 def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
-    """Pretty print a node with dtype and shape"""
+    """Pretty print a node with dtype and shape."""
     shape = f"{node.shape}".replace(",", "")
     shape = shape.replace("(", "[")
     shape = shape.replace(")", "]")
@@ -135,7 +135,7 @@ def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
 @pp_dispatcher.register(np.ndarray)
 @pp_dispatcher.register(jax.Array)
 def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
-    """Replace np.ndarray repr with short hand notation for type and shape"""
+    """Replace np.ndarray repr with short hand notation for type and shape."""
     if spec["kind"] == "STR":
         return general_pp(node, **spec)
 
@@ -219,7 +219,7 @@ def tree_repr(
     tabwidth: int = 2,
     depth: int | float = float("inf"),
 ) -> str:
-    """Prertty print arbitrary PyTrees `__repr__`
+    """Prertty print arbitrary PyTrees `__repr__`.
 
     Args:
         tree: PyTree
@@ -252,7 +252,7 @@ def tree_str(
     tabwidth: int = 2,
     depth: int | float = float("inf"),
 ) -> str:
-    """Prertty print arbitrary PyTrees `__str__`
+    """Prertty print arbitrary PyTrees `__str__`.
 
     Args:
         tree: PyTree
@@ -362,7 +362,8 @@ def tree_diagram(
     Args:
         tree: PyTree
         depth: depth of the tree to print. default is max depth
-        is_leaf: function to determine if a node is a leaf. default is None
+        is_leaf: function to determine if a node is a leaf. default is None.
+        tabwidth: tab width of the repr string. default is 4.
 
     Example:
         >>> import pytreeclass as pytc
@@ -444,12 +445,13 @@ def tree_mermaid(
     is_leaf: IsLeafType = None,
     tabwidth: int | None = 4,
 ) -> str:
-    """generate a mermaid diagram syntax for arbitrary PyTrees.
+    """Generate a mermaid diagram syntax for arbitrary PyTrees.
 
     Args:
         tree: PyTree
         depth: depth of the tree to print. default is max depth
         is_leaf: function to determine if a node is a leaf. default is None
+        tabwidth: tab width of the repr string. default is 4.
     """
 
     def step(node: Node, depth: int = 0) -> str:
@@ -486,7 +488,7 @@ def tree_mermaid(
 
 
 def format_width(string, width=60):
-    """strip newline/tab characters if less than max width"""
+    """Strip newline/tab characters if less than max width."""
     children_length = len(string) - string.count("\n") - string.count("\t")
     if children_length > width:
         return string
@@ -704,7 +706,7 @@ def _(node: jax.Array | np.ndarray) -> int:
 
 @ft.singledispatch
 def size_dispatcher(node: Any) -> None:
-    """Return the size of a node in bytes"""
+    """Return the size of a node in bytes."""
     return 0
 
 
@@ -838,9 +840,7 @@ def tree_repr_with_trace(
     is_leaf: IsLeafType = None,
     transpose: bool = False,
 ) -> PyTree:
-    """
-    Return a PyTree with the same structure, but with the leaves replaced
-    by a summary of the trace.
+    """Return a pytree with leaf nodes replaced with their trace.
 
     Args:
         tree: pytree to summarize.
@@ -897,15 +897,15 @@ def tree_repr_with_trace(
     def leaf_trace_summary(trace, leaf) -> str:
         # this can be useful in debugging and raising descriptive errors
 
-        ROWS = [["Value", tree_repr(leaf)]]
+        rows = [["Value", tree_repr(leaf)]]
 
         names = "->".join(str(i) for i in trace[0])
-        ROWS += [["Name path", names]]
+        rows += [["Name path", names]]
 
         types = "->".join(i.__name__ for i in trace[1])
-        ROWS += [["Type path", types]]
+        rows += [["Type path", types]]
 
         # make a pretty table for each leaf
-        return "\n\t" + ("\n\t").join(_table(ROWS, transpose=transpose).split("\n"))
+        return "\n\t" + ("\n\t").join(_table(rows, transpose=transpose).split("\n"))
 
     return tree_map_with_trace(leaf_trace_summary, tree, is_leaf=is_leaf)

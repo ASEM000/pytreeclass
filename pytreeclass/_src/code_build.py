@@ -64,7 +64,8 @@ def field(
     callbacks: Sequence[Any] = (),
     alias: str | None = None,
 ) -> Field:
-    """
+    """Field placeholder for type hinted attributes.
+
     Args:
         default: The default value of the field.
         init: Whether the field is included in the object's __init__ function.

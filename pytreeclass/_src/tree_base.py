@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Define a class that convert a class to a JAX compatible tree structure"""
+"""Define a class that convert a class to a JAX compatible tree structure."""
 
 from __future__ import annotations
 
@@ -102,9 +102,7 @@ def _register_treeclass(klass: type[T]) -> type[T]:
 
 class TreeClassIndexer(AtIndexer):
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
-        """
-        Call the function at the specified location and return a **copy**
-        of the tree. with the result of the function call.
+        """Call a method on the tree instance and return result and new instance.
 
         Returns:
             A tuple of the result of the function call and a copy of the a
@@ -283,7 +281,7 @@ class TreeClass(metaclass=TreeClassMeta):
 
     @property
     def at(self) -> TreeClassIndexer:
-        """Immutable out-of-place indexing
+        """Immutable out-of-place indexing.
 
         - `.at[***].get()`:
             Return a new instance with the value at the index otherwise None.
