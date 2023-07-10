@@ -85,6 +85,7 @@ sheet["HIGHLIGHTED"] = HighlightEntry(r"\033\[\d+m.*\033\[0m", HIGHLIGHT.NULL)
 # literal values
 sheet["TRUE"] = HighlightEntry(r"True", HIGHLIGHT.GREEN + HIGHLIGHT.ITALIC)
 sheet["FALSE"] = HighlightEntry(r"False", HIGHLIGHT.RED + HIGHLIGHT.ITALIC)
+sheet["NONE"] = HighlightEntry(r"None", HIGHLIGHT.GRAY + HIGHLIGHT.ITALIC)
 sheet["HASHTAG"] = HighlightEntry(r"#", HIGHLIGHT.GRAY + HIGHLIGHT.BOLD)
 sheet["BRACES"] = HighlightEntry(r"\[|\]|\(|\)|\{|\}", HIGHLIGHT.BOLD)
 sheet["BOX"] = HighlightEntry(r"├|─|└|│|┬|┴|┼|┤|┐|┘|┌", HIGHLIGHT.GRAY)
