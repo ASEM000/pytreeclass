@@ -19,7 +19,7 @@ Install from pip::
    notebooks/getting_started
    notebooks/pytrees
    notebooks/stateful_computations
-   notebooks/freezing
+   notebooks/dealing_with_non_jaxtype.ipynb
    notebooks/common_recipes
    notebooks/build_simple_neural_network
    notebooks/build_mini_optimizer_library
