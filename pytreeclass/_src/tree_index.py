@@ -508,32 +508,32 @@ class AtIndexer(NamedTuple):
         state: S,
         *,
         is_leaf: IsLeafType = None,
-    ) -> tuple[S, PyTree]:
+    ) -> tuple[PyTree, S]:
         """Apply a function with carrtying a state.
 
         Args:
             func: the function to apply to the leaf values. the function accepts
-                a leaf value and a state and returns a tuple of the new leaf
-                value and updated state.
+                a running state and leaf value and returns a tuple of the new 
+                leaf value and the new state.
             state: the initial state to carry.
             is_leaf: a predicate function to determine if a value is a leaf. for
                 example, `lambda x: isinstance(x, list)` will treat all lists
                 as leaves and will not recurse into list items.
 
         Returns:
-            A tuple of a pytree with the leaf values at the specified location
-            set to the result of applying `func` to the leaf values and the
-            new state.
+            A tuple of the final state and pytree with the leaf values at the 
+            specified location set to the result of applying `func` to the leaf 
+            values.
 
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> def scan_func(state, leaf):
-            ...     return state + 1, 'SET'
+            >>> def scan_func(leaf, state):
+            ...     return 'SET', state + 1
             >>> init_state = 0
             >>> tree = pytc.AtIndexer(tree)
             >>> tree.at["level1_0"].at["level2_0"].scan(scan_func, state=init_state)
-            (1, {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300})
+            ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
 
         Example:
             >>> import pytreeclass as pytc
@@ -545,19 +545,19 @@ class AtIndexer(NamedTuple):
             ...     b: int
             ...     c: int
             >>> tree = Tree(a=1, b=2, c=3)
-            >>> def scan_func(state: State, leaf):
+            >>> def scan_func(leaf, state: State):
             ...     state = State(state.func_evals + 1)
-            ...     return state, leaf + 1
+            ...     return leaf + 1, state
             >>> # apply to `a` and `b` and return a new instance with all other
             >>> # leaves unchanged and the new state that counts the number of
             >>> # function evaluations
             >>> tree.at['a','b'].scan(scan_func, state=State())
-            (State(func_evals=2), Tree(a=2, b=3, c=3))
+            (Tree(a=2, b=3, c=3), State(func_evals=2))
 
         Note:
             - `scan` applies a binary `func` to the leaf values while carrying
-                a state and returning a final state and tree leaves with the
-                the `func` applied to them. While `reduce` applies a binary
+                a state and returning a tree leaves with the the `func` applied to 
+                them with final state. While `reduce` applies a binary
                 `func` to the leaf values while carrying a state and returning
                 a single value.
         """
@@ -567,7 +567,7 @@ class AtIndexer(NamedTuple):
 
         def stateless_func(leaf):
             nonlocal running_state
-            running_state, leaf = func(running_state, leaf)
+            leaf, running_state = func(leaf, running_state)
             return leaf
 
         def leaf_apply(leaf: Any, where: bool):
@@ -576,7 +576,7 @@ class AtIndexer(NamedTuple):
             return stateless_func(leaf) if where else leaf
 
         out = jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
-        return running_state, out
+        return out, running_state
 
     def reduce(
         self,
