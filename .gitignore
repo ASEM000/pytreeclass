@@ -4,7 +4,6 @@
 **/.DS_Store
 *.Icon
 *.egg-info/
-*.trunk/
 *.vscode/
 dist
 test.ipynb
