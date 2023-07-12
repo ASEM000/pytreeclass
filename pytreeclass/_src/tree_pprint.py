@@ -729,6 +729,26 @@ def tree_summary(
         ├────┼────┼─────┼─────┤
         │Σ   │int │1    │4.00B│
         └────┴────┴─────┴─────┘
+
+    Example:
+        >>> # set custom type display for jaxprs
+        >>> import jax
+        >>> import pytreeclass as pytc
+        >>> jaxpr = jax.make_jaxpr(func)(1, 2)
+        >>> ClosedJaxprType = type(jax.make_jaxpr(lambda x: x)(1))
+        >>> @pytc.tree_summary.def_type(ClosedJaxprType)
+        >>> def _(expr:ClosedJaxprType) -> str:
+        ...     jaxpr = expr.jaxpr
+        ...     return f"Jaxpr({jaxpr.invars}, {jaxpr.outvars})"
+        >>> def func(x, y):
+        ...     return x
+        >>> jaxpr = jax.make_jaxpr(func)(1, 2)
+        >>> print(pytc.tree_summary(jaxpr))
+        ┌────┬──────────────────┬─────┬────┐
+        │Name│Type              │Count│Size│
+        ├────┼──────────────────┼─────┼────┤
+        │Σ   │Jaxpr([a, b], [a])│1    │    │
+        └────┴──────────────────┴─────┴────┘
     """
     rows = [["Name", "Type", "Count", "Size"]]
     tcount = tsize = 0
