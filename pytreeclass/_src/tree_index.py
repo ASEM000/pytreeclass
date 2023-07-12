@@ -45,11 +45,21 @@ class BaseKey(abc.ABC):
     """Parent class for all match classes.
 
     Note:
-        subclass this class to create custom match keys by implementing
-        the __eq__ method. The __eq__ method should return True if the
-        key matches the given path entry and False otherwise. The path entry
-        refers to the entry defined in the `tree_flatten_with_keys` method of
-        the pytree class.
+        - Subclass this class to create custom match keys by implementing
+            the __eq__ method. The __eq__ method should return True if the
+            key matches the given path entry and False otherwise. The path entry
+            refers to the entry defined in the `tree_flatten_with_keys` method of
+            the pytree class.
+        - Typical path entries are:
+            - `jax.tree_util.GetAttrKey` for attributes
+            - `jax.tree_util.DictKey` for mapping keys
+            - `jax.tree_util.SequenceKey` for sequence indices
+            when implementing the __eq__ method you can use the `singledispatchmethod`
+            to unpack the path entry for example:
+            - `jax.tree_util.GetAttrKey` -> `key.name`
+            - `jax.tree_util.DictKey` -> `key.key`
+            - `jax.tree_util.SequenceKey` -> `key.index`
+            See Examples for more details.
 
     Example:
         >>> # define an match strategy to match a leaf with a given name and type
@@ -85,6 +95,54 @@ class BaseKey(abc.ABC):
         ...        return False
         >>> tree = tree.at[MatchNameType("a", int)].get()
         >>> assert jax.tree_util.tree_leaves(tree) == [1]
+
+    Note:
+        - use `BaseKey.def_alias(type, func) to define an index type alias
+            for `BaseKey` subclasses. This is useful for convience when
+            creating new match strategies.
+
+            >>> import pytreeclass as pytc
+            >>> import functools as ft
+            >>> from types import FunctionType
+            >>> import jax.tree_util as jtu
+            >>> # lets define a new match strategy called `FuncKey` that applies
+            >>> # a function to the path entry and returns True if the function
+            >>> # returns True and False otherwise.
+            >>> # for example `FuncKey(lambda x: x.startswith("a"))` will match
+            >>> # all leaves that start with "a".
+            >>> class FuncKey(pytc.BaseKey):
+            ...    def __init__(self, func):
+            ...        self.func = func
+            ...    @ft.singledispatchmethod
+            ...    def __eq__(self, key):
+            ...        return self.func(key)
+            ...    @__eq__.register(jtu.GetAttrKey)
+            ...    def _(self, key: jtu.GetAttrKey):
+            ...        # unpack the GetAttrKey
+            ...        return self.func(key.name)
+            ...    @__eq__.register(jtu.DictKey)
+            ...    def _(self, key: jtu.DictKey):
+            ...        # unpack the DictKey
+            ...        return self.func(key.key)
+            ...    @__eq__.register(jtu.SequenceKey)
+            ...    def _(self, key: jtu.SequenceKey):
+            ...        return self.func(key.index)
+
+            >>> # instead of using `FuncKey(function)` we can define an alias
+            >>> # for `FuncKey`, for this example we will define any FunctionType
+            >>> # as a `FuncKey` by default.
+            >>> @pytc.BaseKey.def_alias(FunctionType)
+            ... def _(func):
+            ...    return FuncKey(func)
+            >>> # create a simple pytree
+            >>> class Tree(pytc.TreeClass):
+            ...    a: int
+            ...    b: str
+            >>> tree = Tree(1, "string")
+            >>> # now we can use the `FuncKey` alias to match all leaves that
+            >>> # are strings and start with "a"
+            >>> tree.at[lambda x: isinstance(x, str) and x.startswith("a")].get()
+            Tree(a=1, b=None)
     """
 
     @abc.abstractmethod
@@ -105,7 +163,7 @@ class IntKey(BaseKey):
         return self.idx == other
 
     @__eq__.register(jtu.SequenceKey)
-    def _(self, other) -> bool:
+    def _(self, other: jtu.SequenceKey) -> bool:
         return self.idx == other.idx
 
 
@@ -122,11 +180,11 @@ class NameKey(BaseKey):
         return self.name == other
 
     @__eq__.register(jtu.GetAttrKey)
-    def _(self, other) -> bool:
+    def _(self, other: jtu.GetAttrKey) -> bool:
         return self.name == other.name
 
     @__eq__.register(jtu.DictKey)
-    def _(self, other) -> bool:
+    def _(self, other: jtu.__doc__) -> bool:
         return self.name == other.key
 
 
@@ -196,6 +254,9 @@ indexer_dispatcher.register(type(...), EllipsisKey)
 indexer_dispatcher.register(int, IntKey)
 indexer_dispatcher.register(str, NameKey)
 indexer_dispatcher.register(re.Pattern, RegexKey)
+
+BaseKey.def_alias = indexer_dispatcher.register
+
 
 _NOT_IMPLEMENTED_INDEXING = """Indexing with {} is not implemented, supported indexing types are:
 - `str` for mapping keys or class attributes.
@@ -513,7 +574,7 @@ class AtIndexer(NamedTuple):
 
         Args:
             func: the function to apply to the leaf values. the function accepts
-                a running state and leaf value and returns a tuple of the new 
+                a running state and leaf value and returns a tuple of the new
                 leaf value and the new state.
             state: the initial state to carry.
             is_leaf: a predicate function to determine if a value is a leaf. for
@@ -521,8 +582,8 @@ class AtIndexer(NamedTuple):
                 as leaves and will not recurse into list items.
 
         Returns:
-            A tuple of the final state and pytree with the leaf values at the 
-            specified location set to the result of applying `func` to the leaf 
+            A tuple of the final state and pytree with the leaf values at the
+            specified location set to the result of applying `func` to the leaf
             values.
 
         Example:
