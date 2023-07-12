@@ -734,10 +734,9 @@ def tree_summary(
         >>> # set custom type display for jaxprs
         >>> import jax
         >>> import pytreeclass as pytc
-        >>> jaxpr = jax.make_jaxpr(func)(1, 2)
         >>> ClosedJaxprType = type(jax.make_jaxpr(lambda x: x)(1))
         >>> @pytc.tree_summary.def_type(ClosedJaxprType)
-        >>> def _(expr:ClosedJaxprType) -> str:
+        ... def _(expr: ClosedJaxprType) -> str:
         ...     jaxpr = expr.jaxpr
         ...     return f"Jaxpr({jaxpr.invars}, {jaxpr.outvars})"
         >>> def func(x, y):
