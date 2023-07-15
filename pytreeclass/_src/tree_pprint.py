@@ -472,7 +472,7 @@ def tree_dot(
         >>> # that will be passed to graphviz.
         >>> import pytreeclass as pytc
         >>> tree = [1, 2, dict(a=3)]
-        >>> @tree_dot.def_nodestyle(list)
+        >>> @pytc.tree_dot.def_nodestyle(list)
         ... def _(_) -> dict[str, str]:
         ...     return dict(shape="circle", style="filled", fillcolor="lightblue")
         >>> print(pytc.tree_dot(tree))  # doctest: +SKIP
