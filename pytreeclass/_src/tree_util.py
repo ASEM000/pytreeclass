@@ -121,7 +121,7 @@ class Partial:
         - The `...` is used to indicate a placeholder for positional arguments.
         - See: https://stackoverflow.com/a/7811270
         - `Partial` is used internally by `bcmap` which maps a function over pytrees
-            leaves with automatic broadcasting for scalar arguments.
+          leaves with automatic broadcasting for scalar arguments.
     """
 
     __slots__ = ["func", "args", "kwargs", "__weakref__"]  # type: ignore
@@ -437,7 +437,7 @@ def tree_map_with_trace(
     # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
     # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
     """Map a function over a pytree, with trace and type path.
-    
+
     Similar to `jax.tree_util.tree_map_with_path` that accept a function
     that takes a two-item tuple for key path and type path.
 
@@ -529,7 +529,7 @@ def construct_tree(
     )
 
     ti = (None, type(tree))
-    vi = tree if len(traces_leaves) == 1 else None
+    vi = tree
     root = Node(data=(ti, vi))
 
     for trace, leaf in traces_leaves:

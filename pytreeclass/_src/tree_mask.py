@@ -139,7 +139,7 @@ def freeze(value: T) -> _FrozenHashable[T]:
     Note:
         - `freeze` is idempotent, i.e. `freeze(freeze(x)) == freeze(x)`.
         - `freeze` uses single dispatch to support custom types. To define a custom
-            wrapper for a certain type, use `freeze.register(type, func)`.
+           wrapper for a certain type, use `freeze.register(type, func)`.
 
     Example:
         >>> import jax
@@ -190,7 +190,7 @@ def unfreeze(value: T) -> T:
     Note:
         - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
         - `unfreeze` uses single dispatch to support custom types. To define a custom
-            behavior for a certain type, use `unfreeze.register(type, func)`.
+          behavior for a certain type, use `unfreeze.register(type, func)`.
 
     Example:
         >>> import pytreeclass as pytc
@@ -221,7 +221,7 @@ def is_nondiff(value: Any) -> bool:
 
     Note:
         - `is_nondiff` uses single dispatch to support custom types. To define a custom
-            behavior for a certain type, use `is_nondiff.register(type, func)`.
+          behavior for a certain type, use `is_nondiff.register(type, func)`.
 
     Example:
         >>> import pytreeclass as pytc

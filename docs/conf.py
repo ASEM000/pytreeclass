@@ -30,7 +30,7 @@ import pytreeclass
 # -- Project information -----------------------------------------------------
 
 project = "pytreeclass"
-copyright = "2022, Mahmoud Asem"
+copyright = "2023, Mahmoud Asem"
 author = "Mahmoud Asem"
 
 
@@ -53,6 +53,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinxcontrib.katex",
+    "sphinx.ext.graphviz",
     "sphinx_autodoc_typehints",
     "nbsphinx",
     "IPython.sphinxext.ipython_console_highlighting",

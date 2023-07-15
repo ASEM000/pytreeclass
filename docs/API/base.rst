@@ -10,7 +10,7 @@ Public API
     field
     fields
     tree_diagram
-    tree_indent
+    tree_dot
     tree_mermaid
     tree_repr
     tree_str
@@ -25,7 +25,6 @@ Public API
     bcmap
     Partial
     AtIndexer
-    RegexKey
     BaseKey
     tree_map_with_trace
     tree_leaves_with_trace
@@ -49,7 +48,7 @@ Pretty Printing API
 .. currentmodule:: pytreeclass 
 
 .. autofunction:: tree_diagram
-.. autofunction:: tree_indent
+.. autofunction:: tree_dot
 .. autofunction:: tree_mermaid 
 .. autofunction:: tree_repr 
 .. autofunction:: tree_str
@@ -81,9 +80,6 @@ Advanced API
         set,
         apply,
         scan,
-.. autoclass:: RegexKey
-    :members:
-        __eq__
 .. autoclass:: BaseKey
     :members:
         __eq__
