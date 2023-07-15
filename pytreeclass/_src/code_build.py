@@ -44,7 +44,7 @@ class Field(NamedTuple):
     alias: str | None = None
 
     def __call__(self, value: Any):
-        """Call the field's callbacks on `value`."""
+        """Call the callbacks on `value`."""
         for callback in self.callbacks:
             try:
                 value = callback(value)
@@ -168,9 +168,8 @@ def fields(x: Any) -> Sequence[Field]:
     """Returns a tuple of `Field` objects for the given instance or class.
 
     `Field` objects are generated from the class type hints and contains
-    the information about the field `name`, `type`, `default` value, and other
-    information (`init`, `repr`, `kind`, `metadata`,
-    `callbacks`, `alias`) if the user uses the `pytreeclass.field`to annotate.
+    the information about the field information.if the user uses
+    the `pytreeclass.field` to annotate.
 
     Note:
         - If the class is not annotated, an empty tuple is returned.

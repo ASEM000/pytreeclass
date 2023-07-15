@@ -25,6 +25,7 @@ from pytreeclass._src.tree_mask import (
 )
 from pytreeclass._src.tree_pprint import (
     tree_diagram,
+    tree_dot,
     tree_mermaid,
     tree_repr,
     tree_repr_with_trace,
@@ -48,6 +49,7 @@ __all__ = (
     "fields",
     # pprint utils
     "tree_diagram",
+    "tree_dot",
     "tree_mermaid",
     "tree_repr",
     "tree_str",

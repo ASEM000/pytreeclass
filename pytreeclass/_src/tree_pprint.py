@@ -345,11 +345,10 @@ def tree_diagram(
         branch = (lmark if is_last else cmark) if depth > 0 else ""
 
         if (child_count := len(node.children)) == 0:
-            ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
             (key, _), value = node.data
             text = f"{indent}"
             text += f"{branch}{key}=" if key is not None else ""
-            text += pp(value, **ppspec)
+            text += tree_repr(value, depth=0)
             return text + "\n"
 
         (key, type), _ = node.data
@@ -382,33 +381,36 @@ def tree_mermaid(
     is_leaf: IsLeafType = None,
     tabwidth: int | None = 4,
 ) -> str:
-    """Generate a mermaid diagram syntax for arbitrary PyTrees.
+    """Generate a mermaid diagram syntax for arbitrary pytrees.
 
     Args:
         tree: PyTree
         depth: depth of the tree to print. default is max depth
         is_leaf: function to determine if a node is a leaf. default is None
         tabwidth: tab width of the repr string. default is 4.
+
+    Note:
+        - Copy the output and paste it in the mermaid live editor to interact with
+          the diagram. https://mermaid.live
     """
 
     def step(node: Node, depth: int = 0) -> str:
         if len(node.children) == 0:
-            ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
             (key, _), value = node.data
-            text = f"{key}=" if key is not None else ""
-            text += pp(value, **ppspec)
-            text = "<b>" + text + "</b>"
-            return f'\tid{id(node.parent)} --- id{id(node)}("{text}")\n'
+            ppstr = f"{key}=" if key is not None else ""
+            ppstr += tree_repr(value, depth=0)
+            ppstr = "<b>" + ppstr + "</b>"
+            return f'\tid{id(node.parent)} --- id{id(node)}("{ppstr}")\n'
 
         (key, type), _ = node.data
-        text = f"{key}:" if key is not None else ""
-        text += f"{type.__name__}"
-        text = "<b>" + text + "</b>"
+        ppstr = f"{key}:" if key is not None else ""
+        ppstr += f"{type.__name__}"
+        ppstr = "<b>" + ppstr + "</b>"
 
         if node.parent is None:
-            text = f'\tid{id(node)}("{text}")\n'
+            text = f'\tid{id(node)}("{ppstr}")\n'
         else:
-            text = f'\tid{id(node.parent)} --- id{id(node)}("{text}")\n'
+            text = f'\tid{id(node.parent)} --- id{id(node)}("{ppstr}")\n'
 
         for child in node.children.values():
             text += step(child, depth=depth + 1)
@@ -422,6 +424,111 @@ def tree_mermaid(
     text = "flowchart LR\n" + step(root)
 
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
+
+
+# dispatcher for dot nodestyles
+dot_dispatcher = ft.singledispatch(lambda _: dict(shape="box"))
+
+
+def tree_dot(
+    tree: PyTree,
+    depth: int | float = float("inf"),
+    is_leaf: IsLeafType = None,
+    tabwidth: int | None = 4,
+) -> str:
+    """Generate a dot diagram syntax for arbitrary pytrees.
+
+    Args:
+        tree: pytree
+        depth: depth of the tree to print. default is max depth
+        is_leaf: function to determine if a node is a leaf. default is None
+        tabwidth: tab width of the repr string. default is 4.
+
+    Returns:
+        str: dot diagram syntax
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> tree = [1, 2, dict(a=3)]
+        >>> print(pytc.tree_dot(tree))  # doctest: +SKIP
+
+        .. graphviz::
+
+            digraph G {
+                4685268864 [label="list", shape=box];
+                4685269056 [label="[0]=1", shape=box];
+                4685268864 -> 4685269056;
+                4685269120 [label="[1]=2", shape=box];
+                4685268864 -> 4685269120;
+                4685269184 [label="[2]:dict", shape=box];
+                4685268864 -> 4685269184;
+                4685269248 [label="['a']=3", shape=box];
+                4685269184 -> 4685269248;
+            }
+
+    Example:
+        >>> # define custom style for a node by dispatching on the value
+        >>> # the defined function should return a dict of attributes
+        >>> # that will be passed to graphviz.
+        >>> import pytreeclass as pytc
+        >>> tree = [1, 2, dict(a=3)]
+        >>> @tree_dot.def_nodestyle(list)
+        ... def _(_) -> dict[str, str]:
+        ...     return dict(shape="circle", style="filled", fillcolor="lightblue")
+        >>> print(pytc.tree_dot(tree))  # doctest: +SKIP
+
+        .. graphviz::
+
+            digraph G {
+                4685309312 [label="list", shape=circle, style=filled, fillcolor=lightblue];
+                4685309504 [label="[0]=1", shape=box];
+                4685309312 -> 4685309504;
+                4685309568 [label="[1]=2", shape=box];
+                4685309312 -> 4685309568;
+                4685309632 [label="[2]:dict", shape=box];
+                4685309312 -> 4685309632;
+                4685309696 [label="['a']=3", shape=box];
+                4685309632 -> 4685309696;
+            }
+    """
+
+    def step(node: Node, depth: int = 0) -> str:
+        (key, type), value = node.data
+
+        # dispatch node style
+        style = ", ".join(f"{k}={v}" for k, v in dot_dispatcher(value).items())
+
+        if len(node.children) == 0:
+            ppstr = f"{key}=" if key is not None else ""
+            ppstr += tree_repr(value, depth=0)
+            text = f'\t{id(node)} [label="{ppstr}", {style}];\n'
+            text += f"\t{id(node.parent)} -> {id(node)};\n"
+            return text
+
+        ppstr = f"{key}:" if key is not None else ""
+        ppstr += f"{type.__name__}"
+
+        if node.parent is None:
+            text = f'\t{id(node)} [label="{ppstr}", {style}];\n'
+        else:
+            text = f'\t{id(node)} [label="{ppstr}", {style}];\n'
+            text += f"\t{id(node.parent)} -> {id(node)};\n"
+
+        for child in node.children.values():
+            text += step(child, depth=depth + 1)
+        return text
+
+    root = construct_tree(
+        tree,
+        is_leaf=is_leaf,
+        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+    )
+    text = "digraph G {\n" + step(root) + "}"
+
+    return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
+
+
+tree_dot.def_nodestyle = dot_dispatcher.register
 
 
 def format_width(string, width=60):
@@ -681,17 +788,17 @@ def tree_summary(
         is_leaf: function to determine if a node is a leaf. defaults to None
 
     Returns:
-        String summary of the tree structure
-        - First column: path to the node.
-        - Second column: type of the node. to control the displayed type use
-            `tree_summary.def_type(type, func) to define a custom type display function.
-        - Third column: number of leaves in the node. for arrays the number of leaves
-            is the number of elements in the array, otherwise its 1. to control the
-            number of leaves of a node use `tree_summary.def_count(type,func)`
-        - Fourth column: size of the node in bytes. if the node is array the size
-            is the size of the array in bytes, otherwise its the size is not displayed.
-            to control the size of a node use `tree_summary.def_size(type,func)`
-        - Last row: type of parent, number of leaves of the parent
+        String summary of the tree structure:
+            - First column: path to the node.
+            - Second column: type of the node. to control the displayed type use
+                `tree_summary.def_type(type, func)` to define a custom type display function.
+            - Third column: number of leaves in the node. for arrays the number of leaves
+                is the number of elements in the array, otherwise its 1. to control the
+                number of leaves of a node use `tree_summary.def_count(type,func)`
+            - Fourth column: size of the node in bytes. if the node is array the size
+                is the size of the array in bytes, otherwise its the size is not displayed.
+                to control the size of a node use `tree_summary.def_size(type,func)`
+            - Last row: type of parent, number of leaves of the parent
 
     Example:
         >>> import pytreeclass as pytc

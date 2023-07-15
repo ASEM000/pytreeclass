@@ -54,12 +54,14 @@ class BaseKey(abc.ABC):
             - `jax.tree_util.GetAttrKey` for attributes
             - `jax.tree_util.DictKey` for mapping keys
             - `jax.tree_util.SequenceKey` for sequence indices
-            when implementing the __eq__ method you can use the `singledispatchmethod`
+
+        * when implementing the __eq__ method you can use the `singledispatchmethod`
             to unpack the path entry for example:
             - `jax.tree_util.GetAttrKey` -> `key.name`
             - `jax.tree_util.DictKey` -> `key.key`
             - `jax.tree_util.SequenceKey` -> `key.index`
-            See Examples for more details.
+
+        See Examples for more details.
 
     Example:
         >>> # define an match strategy to match a leaf with a given name and type
@@ -97,7 +99,7 @@ class BaseKey(abc.ABC):
         >>> assert jax.tree_util.tree_leaves(tree) == [1]
 
     Note:
-        - use `BaseKey.def_alias(type, func) to define an index type alias
+        - use `BaseKey.def_alias(type, func)` to define an index type alias
             for `BaseKey` subclasses. This is useful for convience when
             creating new match strategies.
 
@@ -616,11 +618,10 @@ class AtIndexer(NamedTuple):
             (Tree(a=2, b=3, c=3), State(func_evals=2))
 
         Note:
-            - `scan` applies a binary `func` to the leaf values while carrying
-                a state and returning a tree leaves with the the `func` applied to 
-                them with final state. While `reduce` applies a binary
-                `func` to the leaf values while carrying a state and returning
-                a single value.
+            `scan` applies a binary `func` to the leaf values while carrying
+            a state and returning a tree leaves with the the `func` applied to
+            them with final state. While `reduce` applies a binary `func` to the
+            leaf values while carrying a state and returning a single value.
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
 
