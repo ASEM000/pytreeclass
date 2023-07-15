@@ -702,7 +702,7 @@ def test_nested_indexing():
 def test_construct_tree():
     tree = construct_tree([1, 2, [3, 4]])
 
-    assert repr(tree) == "Node(data=((None, <class 'list'>), None))"
+    assert repr(tree) == "Node(data=((None, <class 'list'>), [1, 2, [3, 4]]))"
 
     with pytest.raises(TypeError):
         tree.add_child("a")
