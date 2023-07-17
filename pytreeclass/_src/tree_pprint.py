@@ -57,6 +57,7 @@ from_iterable = chain.from_iterable
 
 
 if os.environ.get("PYTREECLASS_ENABLE_COLOR", "FALSE") == "TRUE":
+
     class ANSI:
         END = "\033[0m"
         BOLD = "\033[1m"
@@ -74,6 +75,7 @@ if os.environ.get("PYTREECLASS_ENABLE_COLOR", "FALSE") == "TRUE":
         GRAY = "\033[37m"
         DARKGREY = "\033[90m"
         GRAY = "\033[90m"
+        NULL = ""
 
     class Sheet:
         """Minimal implementation of a highlight sheet to serve pytree pprint."""
@@ -98,25 +100,25 @@ if os.environ.get("PYTREECLASS_ENABLE_COLOR", "FALSE") == "TRUE":
     highlighter = (
         Sheet(name="default")
         # from most specific to least specific
-        .def_rule(key="SEEN", pattern=r"\033\[\d+m.*\033\[0m", code="")
+        .def_rule(key="SEEN", pattern=r"\033\[\d+m.*\033\[0m", code=ANSI.NULL)
         .def_rule(key="TRUE", pattern=r"True", code=ANSI.GREEN + ANSI.ITALIC)
         .def_rule(key="FALSE", pattern=r"False", code=ANSI.RED + ANSI.ITALIC)
-        .def_rule(key="NONE", pattern=r"None", code=ANSI.GRAY + ANSI.ITALIC)
+        .def_rule(key="NONE", pattern=r"None", code=ANSI.ITALIC)
         .def_rule(key="HASHTAG", pattern=r"#", code=ANSI.GRAY + ANSI.BOLD)
         .def_rule(key="DOTSTRING", pattern=r"\.\w+", code=ANSI.BOLD)
-        .def_rule(key="STATS", pattern=r"[μσ]=\d+.?\d*", code=ANSI.GRAY)
+        .def_rule(key="STATS", pattern=r"[μσ]=-?\d+.?\d*", code=ANSI.GRAY)
         .def_rule(key="RANGE", pattern=r"∈\[.*\]", code=ANSI.GRAY)
-        .def_rule(key="bracket", pattern=r"[\(\)\[\]\{\}]", code=ANSI.BOLD)
+        .def_rule(key="BRACKET", pattern=r"[\(\)\[\]\{\}]", code=ANSI.BOLD)
         .def_rule(key="BOX", pattern=r"[├─└│┬┴┼┤┐┘┌]", code=ANSI.GRAY)
-        .def_rule(key="EQUAL", pattern=r"=", code=ANSI.BOLD + ANSI.GRAY)
-        .def_rule(key="CLASS", pattern=r"\w+(?=\()", code=ANSI.BOLD + ANSI.BLUE)
-        .def_rule(key="ATTRIBUTE", pattern=r"\w+(?==)", code=ANSI.BOLD)
+        .def_rule(key="EQUAL", pattern=r"=", code=ANSI.GRAY)
+        .def_rule(key="CLASS", pattern=r"\w+(?=\()", code=ANSI.BLUE)
+        .def_rule(key="ATTRIBUTE", pattern=r"\w+(?==)", code=ANSI.NULL)
         .def_rule(key="KEY", pattern=r"\w+(?=:)", code=ANSI.BOLD)
-        .def_rule(key="TYPE", pattern=r"\w+(?=\[.*\])", code=ANSI.MAGENTA)
-        .def_rule(key="NUMBER", pattern=r"\d+\.?\d*j?", code="")
+        .def_rule(key="TYPE", pattern=r"\w+\[[^\]]*\]", code=ANSI.MAGENTA)
+        .def_rule(key="NUMBER", pattern=r"\d+\.?\d*j?", code=ANSI.NULL)
         .def_rule(key="STRING", pattern=r"\w+", code=ANSI.GREEN)
-        .def_rule(key="NEWLINE", pattern=r"\n", code="")
-        .def_rule(key="REST", pattern=r".", code="")
+        .def_rule(key="NEWLINE", pattern=r"\n", code=ANSI.NULL)
+        .def_rule(key="REST", pattern=r".", code=ANSI.NULL)
     )
 
 else:
