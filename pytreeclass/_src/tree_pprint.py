@@ -54,7 +54,9 @@ PyTree = Any
 Tag = str
 PP = Callable[[Any, Unpack[PPSpec]], str]
 from_iterable = chain.from_iterable
-CodeEntry = tuple[Pattern:=str, Code:=str]  # ANSI escape sequence
+Pattern = str
+Code = str
+CodeEntry = tuple[Pattern, Code]  # ANSI escape sequence
 
 if os.environ.get("PYTREECLASS_ENABLE_COLOR", "FALSE") == "TRUE":
 
