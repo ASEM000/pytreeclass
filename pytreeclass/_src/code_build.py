@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import functools as ft
 import sys
+from collections import defaultdict
 from collections.abc import Callable, MutableMapping, MutableSequence, MutableSet
 from types import FunctionType, MappingProxyType
 from typing import Any, Literal, NamedTuple, Sequence, TypeVar, get_args
@@ -25,7 +26,7 @@ from typing import Any, Literal, NamedTuple, Sequence, TypeVar, get_args
 T = TypeVar("T")
 PyTree = Any
 EllipsisType = type(Ellipsis)
-ArgKindType = Literal["POS_ONLY", "POS_OR_KW", "KW_ONLY"]
+ArgKindType = Literal["POS_ONLY", "POS_OR_KW", "VAR_POS", "KW_ONLY", "VAR_KW"]
 ArgKind = get_args(ArgKindType)
 NULL = type("NULL", (), {"__repr__": lambda _: "NULL"})()
 MUTABLE_TYPES = (MutableSequence, MutableMapping, MutableSet)
@@ -70,7 +71,7 @@ def field(
         default: The default value of the field.
         init: Whether the field is included in the object's __init__ function.
         repr: Whether the field is included in the object's __repr__ function.
-        kind: Argument kind, one of 'POS_ONLY', 'KW_ONLY', or 'POS_OR_KW'.
+        kind: Argument kind, one of 'POS_ONLY', 'VAR_POS', 'KW_ONLY', 'VAR_KW'.
         metadata: A mapping of user-defined data for the field.
         callbacks: A sequence of functions to called on `setattr` during
             initialization to modify the field value.
@@ -181,16 +182,24 @@ def fields(x: Any) -> Sequence[Field]:
 def _build_init_method(klass: type) -> FunctionType:
     # generate a code object for the __init__ method and compile it
     # for the given class and return the function object
-    body = []
-    hints = dict()
+    body: list[str] = []
+    hints: dict[str, str | type | None] = dict()
     head = ["self"]
-    heads = dict(zip(ArgKind, ([], [], [])))
+    heads: dict[str, list[str]] = defaultdict(list)
     has_post = "__post_init__" in vars(klass)
+
+    seen = set()
 
     for field in (field_map := _build_field_map(klass)).values():
         dref = "" if field.default is NULL else f"=field_map['{field.name}'].default"
 
         if field.init:
+            if field.kind in ("VAR_POS", "VAR_KW"):
+                # disallow multiple `VAR_POS` and `VAR_KW`
+                if field.kind in seen:
+                    raise TypeError(f"Duplicate {field.kind=} for {field.name=}")
+                seen.add(field.kind)
+
             alias = field.alias or field.name
             hints[field.name] = field.type
             body += [f"self.{field.name}={alias}"]
@@ -203,10 +212,15 @@ def _build_init_method(klass: type) -> FunctionType:
     # in case all fields are not initialized in the __init__ method
     body += ["self.__post_init__()"] if has_post else ["pass"]
 
-    # organize the arguments order (POS_ONLY, POS_OR_KW, KW_ONLY)
+    # organize the arguments order:
+    # (POS_ONLY, POS_OR_KW, VAR_POS, KW_ONLY, VAR_KW)
     head += (heads["POS_ONLY"] + ["/"]) if heads["POS_ONLY"] else []
     head += heads["POS_OR_KW"]
-    head += (["*"] + heads["KW_ONLY"]) if heads["KW_ONLY"] else []
+    head += ["*" + "".join(heads["VAR_POS"])] if heads["VAR_POS"] else []
+    # case for ...(*a, b) and ...(a, *, b)
+    head += ["*"] if (heads["KW_ONLY"] and not heads["VAR_POS"]) else []
+    head += heads["KW_ONLY"]
+    head += ["**" + "".join(heads["VAR_KW"])] if heads["VAR_KW"] else []
 
     # generate the code for the __init__ method
     code = "def closure(field_map):\n"

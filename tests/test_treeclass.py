@@ -14,6 +14,7 @@
 
 import copy
 import dataclasses as dc
+import inspect
 from typing import Any
 
 import jax
@@ -559,3 +560,38 @@ def test_partial():
 
     assert f_b == f_b
     assert hash(f_b) == hash(f_b)
+
+
+def test_kind():
+    class Tree(pytc.TreeClass):
+        a: int = pytc.field(kind="VAR_POS")
+        b: int = pytc.field(kind="POS_ONLY")
+        c: int = pytc.field(kind="VAR_KW")
+        d: int
+
+    params = dict(inspect.signature(Tree.__init__).parameters)
+
+    assert params["a"].kind is inspect.Parameter.VAR_POSITIONAL
+    assert params["b"].kind is inspect.Parameter.POSITIONAL_ONLY
+    assert params["c"].kind is inspect.Parameter.VAR_KEYWORD
+    assert params["d"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+
+    class Tree(pytc.TreeClass):
+        a: int = pytc.field(kind="VAR_POS")
+        b: int = pytc.field(kind="KW_ONLY")
+
+    params = dict(inspect.signature(Tree.__init__).parameters)
+    assert params["a"].kind is inspect.Parameter.VAR_POSITIONAL
+    assert params["b"].kind is inspect.Parameter.KEYWORD_ONLY
+
+    with pytest.raises(TypeError):
+
+        class Tree(pytc.TreeClass):
+            a: int = pytc.field(kind="VAR_POS")
+            b: int = pytc.field(kind="VAR_POS")
+
+    with pytest.raises(TypeError):
+
+        class Tree(pytc.TreeClass):
+            a: int = pytc.field(kind="VAR_KW")
+            b: int = pytc.field(kind="VAR_KW")
