@@ -94,7 +94,7 @@ if os.environ.get("PYTREECLASS_ENABLE_COLOR", "FALSE") == "TRUE":
 
         def __call__(self, text: str) -> str:
             return "".join(
-                self.sheet[key := match.lastgroup][1] + match.group(key) + ANSI.END
+                self.sheet[match.lastgroup][1] + match.group(match.lastgroup) + ANSI.END
                 for match in re.finditer(self.pattern, text)
             )
 
