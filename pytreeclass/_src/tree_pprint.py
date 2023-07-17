@@ -51,15 +51,12 @@ class PPSpec(TypedDict):
 
 
 PyTree = Any
-Tag = str
+
 PP = Callable[[Any, Unpack[PPSpec]], str]
 from_iterable = chain.from_iterable
-Pattern = str
-Code = str
-CodeEntry = tuple[Pattern, Code]  # ANSI escape sequence
+
 
 if os.environ.get("PYTREECLASS_ENABLE_COLOR", "FALSE") == "TRUE":
-
     class ANSI:
         END = "\033[0m"
         BOLD = "\033[1m"
@@ -83,10 +80,10 @@ if os.environ.get("PYTREECLASS_ENABLE_COLOR", "FALSE") == "TRUE":
 
         def __init__(self, *, name: str):
             self.name = name
-            self.sheet: dict[Tag, CodeEntry] = {}
-            self.pattern: Pattern = ""
+            self.sheet: dict[str, str] = {}
+            self.pattern: str = ""
 
-        def def_rule(self, *, key: str, pattern: Pattern, code: Code):
+        def def_rule(self, *, key: str, pattern: str, code: str):
             """Add a new rule to the highlight sheet."""
             self.sheet[key] = (pattern, code)
             self.pattern += ("|" if self.pattern else "") + f"(?P<{key}>{pattern})"
