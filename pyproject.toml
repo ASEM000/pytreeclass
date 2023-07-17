@@ -43,6 +43,7 @@ ignore = [
     "E731",  # do not assign a lambda expression, use a def
     "N804",  # first argument of a classmethod should be named 'cls'
     "D104",  # Missing docstring in public package
+    "D103",  # Missing docstring in public function
 ]
 
 [tool.ruff.pydocstyle]
