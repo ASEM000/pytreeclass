@@ -484,13 +484,13 @@ def tree_mermaid(
         - Copy the output and paste it in the mermaid live editor to interact with
           the diagram. https://mermaid.live
     """
-    ppspec = dict(indent=0, kind="REPR", width=80, depth=float("inf"), seen=set())
+    ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
 
     def step(node: Node, depth: int = 0) -> str:
         if len(node.children) == 0:
             (key, _), value = node.data
             ppstr = f"{key}=" if key is not None else ""
-            ppstr += pp(tree, **ppspec)
+            ppstr += pp(value, **ppspec)
             ppstr = "<b>" + ppstr + "</b>"
             return f'\tid{id(node.parent)} --- id{id(node)}("{ppstr}")\n'
 
@@ -582,7 +582,7 @@ def tree_graph(
                 4685309632 -> 4685309696;
             }
     """
-    ppspec = dict(indent=0, kind="REPR", width=80, depth=float("inf"), seen=set())
+    ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
 
     def step(node: Node, depth: int = 0) -> str:
         (key, type), value = node.data
