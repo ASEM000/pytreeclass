@@ -1,6 +1,6 @@
 name: pypi
 on:
-  release:
+  workflow_dispatch:
     types: [published]
 jobs:
   pypi:
