@@ -29,7 +29,7 @@ import pytreeclass as pytc
 from pytreeclass import (
     TreeClass,
     tree_diagram,
-    tree_dot,
+    tree_graph,
     tree_mermaid,
     tree_repr,
     tree_repr_with_trace,
@@ -260,8 +260,8 @@ def test_tree_repr_with_trace():
     )
 
 
-def test_tree_dot():
+def test_tree_graph():
     assert (
-        re.sub(r"\b\d{10,}", "***", tree_dot(r1))
+        re.sub(r"\b\d{10,}", "***", tree_graph(r1))
         == 'digraph G {\n    *** [label="Repr1", shape=box];\n    *** [label=".a=1", shape=box];\n    *** -> ***;\n    *** [label=".b=string", shape=box];\n    *** -> ***;\n    *** [label=".c=1.0", shape=box];\n    *** -> ***;\n    *** [label=".d=aaaaa", shape=box];\n    *** -> ***;\n    *** [label=".e:list", shape=box];\n    *** -> ***;\n    *** [label="[0]=10", shape=box];\n    *** -> ***;\n    *** [label="[1]=10", shape=box];\n    *** -> ***;\n    *** [label="[2]=10", shape=box];\n    *** -> ***;\n    *** [label="[3]=10", shape=box];\n    *** -> ***;\n    *** [label="[4]=10", shape=box];\n    *** -> ***;\n    *** [label=".f={...}", shape=box];\n    *** -> ***;\n    *** [label=".g:dict", shape=box];\n    *** -> ***;\n    *** [label="[\'a\']=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", shape=box];\n    *** -> ***;\n    *** [label="[\'b\']=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", shape=box];\n    *** -> ***;\n    *** [label="[\'c\']=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])", shape=box];\n    *** -> ***;\n    *** [label=".h=f32[5,1](μ=1.00, σ=0.00, ∈[1.00,1.00])", shape=box];\n    *** -> ***;\n    *** [label=".i=f32[1,6](μ=1.00, σ=0.00, ∈[1.00,1.00])", shape=box];\n    *** -> ***;\n    *** [label=".j=f32[1,1,4,5](μ=1.00, σ=0.00, ∈[1.00,1.00])", shape=box];\n    *** -> ***;\n    *** [label=".k:tuple", shape=box];\n    *** -> ***;\n    *** [label="[0]=1", shape=box];\n    *** -> ***;\n    *** [label="[1]=2", shape=box];\n    *** -> ***;\n    *** [label="[2]=3", shape=box];\n    *** -> ***;\n    *** [label=".l:a", shape=box];\n    *** -> ***;\n    *** [label=".b=1", shape=box];\n    *** -> ***;\n    *** [label=".c=2", shape=box];\n    *** -> ***;\n    *** [label=".m=f32[5,5](μ=1.00, σ=0.00, ∈[1.00,1.00])", shape=box];\n    *** -> ***;\n    *** [label=".n=bool[]", shape=box];\n    *** -> ***;\n    *** [label=".o=c64[2]", shape=box];\n    *** -> ***;\n}'
     )

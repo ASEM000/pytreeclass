@@ -106,8 +106,6 @@ if os.environ.get("PYTREECLASS_ENABLE_COLOR", "TRUE") == "TRUE":
         .def_rule(key="NONE", pattern=r"None", code=ANSI.ITALIC)
         .def_rule(key="HASHTAG", pattern=r"#", code=ANSI.GRAY + ANSI.BOLD)
         .def_rule(key="DOTSTRING", pattern=r"\.\w+", code=ANSI.BOLD)
-        .def_rule(key="STATS", pattern=r"[μσ]=-?\d+.?\d*", code=ANSI.GRAY)
-        .def_rule(key="RANGE", pattern=r"∈\[.*\]", code=ANSI.GRAY)
         .def_rule(key="BRACKET", pattern=r"[\(\)\[\]\{\}]", code=ANSI.BOLD)
         .def_rule(key="BOX", pattern=r"[├─└│┬┴┼┤┐┘┌]", code=ANSI.GRAY)
         .def_rule(key="EQUAL", pattern=r"=", code=ANSI.GRAY)
@@ -486,12 +484,13 @@ def tree_mermaid(
         - Copy the output and paste it in the mermaid live editor to interact with
           the diagram. https://mermaid.live
     """
+    ppspec = dict(indent=0, kind="REPR", width=80, depth=float("inf"), seen=set())
 
     def step(node: Node, depth: int = 0) -> str:
         if len(node.children) == 0:
             (key, _), value = node.data
             ppstr = f"{key}=" if key is not None else ""
-            ppstr += tree_repr(value, depth=0)
+            ppstr += pp(tree, **ppspec)
             ppstr = "<b>" + ppstr + "</b>"
             return f'\tid{id(node.parent)} --- id{id(node)}("{ppstr}")\n'
 
@@ -522,7 +521,7 @@ def tree_mermaid(
 dot_dispatcher = ft.singledispatch(lambda _: dict(shape="box"))
 
 
-def tree_dot(
+def tree_graph(
     tree: PyTree,
     depth: int | float = float("inf"),
     is_leaf: IsLeafType = None,
@@ -542,7 +541,7 @@ def tree_dot(
     Example:
         >>> import pytreeclass as pytc
         >>> tree = [1, 2, dict(a=3)]
-        >>> print(pytc.tree_dot(tree))  # doctest: +SKIP
+        >>> print(pytc.tree_graph(tree))  # doctest: +SKIP
 
         .. graphviz::
 
@@ -564,10 +563,10 @@ def tree_dot(
         >>> # that will be passed to graphviz.
         >>> import pytreeclass as pytc
         >>> tree = [1, 2, dict(a=3)]
-        >>> @pytc.tree_dot.def_nodestyle(list)
+        >>> @pytc.tree_graph.def_nodestyle(list)
         ... def _(_) -> dict[str, str]:
         ...     return dict(shape="circle", style="filled", fillcolor="lightblue")
-        >>> print(pytc.tree_dot(tree))  # doctest: +SKIP
+        >>> print(pytc.tree_graph(tree))  # doctest: +SKIP
 
         .. graphviz::
 
@@ -583,6 +582,7 @@ def tree_dot(
                 4685309632 -> 4685309696;
             }
     """
+    ppspec = dict(indent=0, kind="REPR", width=80, depth=float("inf"), seen=set())
 
     def step(node: Node, depth: int = 0) -> str:
         (key, type), value = node.data
@@ -592,7 +592,7 @@ def tree_dot(
 
         if len(node.children) == 0:
             ppstr = f"{key}=" if key is not None else ""
-            ppstr += tree_repr(value, depth=0)
+            ppstr += pp(value, **ppspec)
             text = f'\t{id(node)} [label="{ppstr}", {style}];\n'
             text += f"\t{id(node.parent)} -> {id(node)};\n"
             return text
@@ -619,7 +619,7 @@ def tree_dot(
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
 
 
-tree_dot.def_nodestyle = dot_dispatcher.register
+tree_graph.def_nodestyle = dot_dispatcher.register
 
 
 def format_width(string, width=60):

@@ -393,6 +393,7 @@ class AtIndexer(NamedTuple):
 
     Example:
         >>> # use `AtIndexer` on a pytree (e.g. dict,list,tuple,etc.)
+        >>> import jax
         >>> import pytreeclass as pytc
         >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
         >>> tree = pytc.AtIndexer(tree)
