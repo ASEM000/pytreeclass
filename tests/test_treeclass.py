@@ -15,7 +15,6 @@
 import copy
 import dataclasses as dc
 import inspect
-import os
 from typing import Any
 
 import jax
@@ -24,7 +23,6 @@ import numpy.testing as npt
 import pytest
 from jax import numpy as jnp
 
-os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 import pytreeclass as pytc
 
 

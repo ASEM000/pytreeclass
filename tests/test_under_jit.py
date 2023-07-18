@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 
 import jax
 from jax import numpy as jnp
 
-os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 import pytreeclass as pytc
 
 

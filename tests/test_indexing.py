@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 from collections import namedtuple
 from typing import Any, NamedTuple
@@ -25,7 +24,6 @@ import jax.tree_util as jtu
 import numpy.testing as npt
 import pytest
 
-os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 import pytreeclass as pytc
 from pytreeclass import TreeClass
 from pytreeclass._src.tree_base import _mutable_context

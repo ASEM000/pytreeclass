@@ -14,13 +14,10 @@
 
 from __future__ import annotations
 
-import os
-
 import jax
 import jax.nn.initializers as ji
 import jax.tree_util as jtu
 
-os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 from pytreeclass._src.tree_pprint import _hbox, _hstack, _table, _vbox, func_pp, pp
 
 

@@ -15,13 +15,11 @@
 from __future__ import annotations
 
 import math
-import os
 
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import pytest
 
-os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 import pytreeclass as pytc
 from pytreeclass._src.tree_util import bcmap
 

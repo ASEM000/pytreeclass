@@ -196,14 +196,6 @@
     </details>
 
 
-8) Highlight output of `tree_{repr,str,diagram,summary}` by default. to disable it set the environment variable `PYTREECLASS_ENABLE_COLOR` to `FALSE`. *no extra depedency is added*.
-    
-    <details>
-
-    Sample output :![image](https://github.com/ASEM000/PyTreeClass/assets/48389287/90213513-a6a5-4602-b988-d8993509bf81)
-    <details>
-
-
 This release introduces lots of `functools.singledispatch` usage, to enable the greater customization.
 - `{freeze,unfreeze,is_nondiff}.def_type` to define how to `freeze` a type, how to unfreeze it and whether it is considred nondiff or not. these rules are used by these functions and `tree_mask`/`tree_unmask`.
 - `tree_graph.def_nodestyle`, `tree_summary.def_{count,type,size}` for pretty printing customization

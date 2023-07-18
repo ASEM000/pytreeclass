@@ -105,7 +105,6 @@ doctest_test_doctest_blocks = "true"
 doctest_global_setup = """
 import jax
 import os
-os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 import jax.numpy as jnp
 import pytreeclass
 """

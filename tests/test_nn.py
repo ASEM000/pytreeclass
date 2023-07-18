@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-import os
-
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -23,7 +21,6 @@ import numpy as np
 import optax
 import pytest
 
-os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 import pytreeclass as pytc
 
 
