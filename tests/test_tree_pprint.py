@@ -15,9 +15,11 @@
 from __future__ import annotations
 
 import dataclasses as dc
+import os
 import re
 from collections import namedtuple
 
+os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 # import jax
 import jax.tree_util as jtu
 import pytest

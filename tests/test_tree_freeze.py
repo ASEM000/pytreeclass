@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+import os
 from typing import Any, Callable
 
 import jax
@@ -20,6 +21,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import pytest
 
+os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 import pytreeclass as pytc
 from pytreeclass._src.tree_util import tree_hash
 

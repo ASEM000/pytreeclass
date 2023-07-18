@@ -73,7 +73,7 @@ def field(
         repr: Whether the field is included in the object's __repr__ function.
         kind: Argument kind, one of 'POS_ONLY', 'VAR_POS', 'KW_ONLY', 'VAR_KW'.
         metadata: A mapping of user-defined data for the field.
-        callbacks: A sequence of functions to called on `setattr` during
+        callbacks: A sequence of functions to called on ``__setattr__`` during
             initialization to modify the field value.
         alias: An a alias for the field name in the constructor.
 
@@ -91,11 +91,11 @@ def field(
         ...        assert self.start <= x <= self.stop
         ...        return x
         >>> class Employee(pytc.TreeClass):
-        ...    # assert employee `name` is str
+        ...    # assert employee ``name`` is str
         ...    name: str = pytc.field(callbacks=[IsInstance(str)])
-        ...    # use callback compostion to assert employee `age` is int and positive
+        ...    # use callback compostion to assert employee ``age`` is int and positive
         ...    age: int = pytc.field(callbacks=[IsInstance(int), Range(1)])
-        ...    # use `id` in the constructor for `_id` attribute
+        ...    # use ``id`` in the constructor for ``_id`` attribute
         ...    # this is useful for private attributes that are not supposed
         ...    # to be accessed directly and hide it from the repr
         ...    _id: int = pytc.field(alias="id", repr=False)
@@ -166,15 +166,15 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
 
 
 def fields(x: Any) -> Sequence[Field]:
-    """Returns a tuple of `Field` objects for the given instance or class.
+    """Returns a tuple of ``Field`` objects for the given instance or class.
 
-    `Field` objects are generated from the class type hints and contains
+    ``Field`` objects are generated from the class type hints and contains
     the information about the field information.if the user uses
-    the `pytreeclass.field` to annotate.
+    the ``pytreeclass.field`` to annotate.
 
     Note:
         - If the class is not annotated, an empty tuple is returned.
-        - The `Field` generation is cached for class and its bases.
+        - The ``Field`` generation is cached for class and its bases.
     """
     return tuple(_build_field_map(x if isinstance(x, type) else type(x)).values())
 

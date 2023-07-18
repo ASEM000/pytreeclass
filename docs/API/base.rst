@@ -80,6 +80,7 @@ Advanced API
         set,
         apply,
         scan,
+        reduce
 .. autoclass:: BaseKey
     :members:
         __eq__

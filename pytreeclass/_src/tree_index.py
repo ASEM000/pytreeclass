@@ -44,22 +44,25 @@ _no_initializer = object()
 class BaseKey(abc.ABC):
     """Parent class for all match classes.
 
-    Note:
-        - Subclass this class to create custom match keys by implementing
-            the __eq__ method. The __eq__ method should return True if the
-            key matches the given path entry and False otherwise. The path entry
-            refers to the entry defined in the `tree_flatten_with_keys` method of
-            the pytree class.
-        - Typical path entries are:
-            - `jax.tree_util.GetAttrKey` for attributes
-            - `jax.tree_util.DictKey` for mapping keys
-            - `jax.tree_util.SequenceKey` for sequence indices
+    - Subclass this class to create custom match keys by implementing
+      the `__eq__` method. The ``__eq__`` method should return True if the
+      key matches the given path entry and False otherwise. The path entry
+      refers to the entry defined in the ``tree_flatten_with_keys`` method of
+      the pytree class.
 
-        * when implementing the __eq__ method you can use the `singledispatchmethod`
-            to unpack the path entry for example:
-            - `jax.tree_util.GetAttrKey` -> `key.name`
-            - `jax.tree_util.DictKey` -> `key.key`
-            - `jax.tree_util.SequenceKey` -> `key.index`
+    - Typical path entries are:
+
+        - ``jax.tree_util.GetAttrKey`` for attributes
+        - ``jax.tree_util.DictKey`` for mapping keys
+        - ``jax.tree_util.SequenceKey`` for sequence indices
+
+    - When implementing the ``__eq__`` method you can use the ``singledispatchmethod``
+      to unpack the path entry for example:
+
+        - ``jax.tree_util.GetAttrKey`` -> `key.name`
+        - ``jax.tree_util.DictKey`` -> `key.key`
+        - ``jax.tree_util.SequenceKey`` -> `key.index`
+
 
         See Examples for more details.
 
@@ -99,9 +102,9 @@ class BaseKey(abc.ABC):
         >>> assert jax.tree_util.tree_leaves(tree) == [1]
 
     Note:
-        - use `BaseKey.def_alias(type, func)` to define an index type alias
-            for `BaseKey` subclasses. This is useful for convience when
-            creating new match strategies.
+        - use ``BaseKey.def_alias(type, func)`` to define an index type alias
+          for `BaseKey` subclasses. This is useful for convience when
+          creating new match strategies.
 
             >>> import pytreeclass as pytc
             >>> import functools as ft
@@ -130,7 +133,7 @@ class BaseKey(abc.ABC):
             ...    def _(self, key: jtu.SequenceKey):
             ...        return self.func(key.index)
 
-            >>> # instead of using `FuncKey(function)` we can define an alias
+            >>> # instead of using ``FuncKey(function)`` we can define an alias
             >>> # for `FuncKey`, for this example we will define any FunctionType
             >>> # as a `FuncKey` by default.
             >>> @pytc.BaseKey.def_alias(FunctionType)
@@ -379,12 +382,13 @@ class AtIndexer(NamedTuple):
     Args:
         tree: pytree to index
         where: one of the following:
-            - `str` for mapping keys or class attributes.
-            - `int` for positional indexing for sequences.
-            - `...` to select all leaves.
+
+            - ``str`` for mapping keys or class attributes.
+            - ``int`` for positional indexing for sequences.
+            - ``...`` to select all leaves.
             - a boolean mask of the same structure as the tree
-            - `re.Pattern` to index all keys matching a regex pattern.
-            - an instance of `BaseKey` with custom logic to index a pytree.
+            - ``re.Pattern`` to index all keys matching a regex pattern.
+            - an instance of ``BaseKey`` with custom logic to index a pytree.
             - a tuple of the above to match multiple keys at the same level.
 
     Example:
@@ -403,7 +407,7 @@ class AtIndexer(NamedTuple):
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': 300}
 
     Example:
-        >>> # use `AtIndexer` in a class
+        >>> # use ``AtIndexer`` in a class
         >>> import jax.tree_util as jtu
         >>> import pytreeclass as pytc
         >>> @jax.tree_util.register_pytree_with_keys_class
@@ -464,8 +468,8 @@ class AtIndexer(NamedTuple):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
-            >>> # get `a` and return a new instance
-            >>> # with `None` for all other leaves
+            >>> # get ``a`` and return a new instance
+            >>> # with ``None`` for all other leaves
             >>> tree.at['a'].get()
             Tree(a=1, b=None)
         """
@@ -487,7 +491,7 @@ class AtIndexer(NamedTuple):
 
         Returns:
             A pytree with the leaf values at the specified location
-            set to `set_value`.
+            set to ``set_value``.
 
         Example:
             >>> import pytreeclass as pytc
@@ -502,7 +506,7 @@ class AtIndexer(NamedTuple):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
-            >>> # set `a` and return a new instance
+            >>> # set ``a`` and return a new instance
             >>> # with all other leaves unchanged
             >>> tree.at['a'].set(100)
             Tree(a=100, b=2)
@@ -519,7 +523,7 @@ class AtIndexer(NamedTuple):
             # for example tree.at[where].set(tree2) will set all tree leaves
             # to tree2 leaves if tree2 is a pytree of same structure as tree
             # instead of making each leaf of tree a copy of tree2
-            # is design is similar to `numpy` design `Array.at[...].set(Array)`
+            # is design is similar to ``numpy`` design `Array.at[...].set(Array)`
             return jtu.tree_map(leaf_set, self.tree, where, set_value, is_leaf=is_leaf)
 
         # set_value is broadcasted to tree leaves
@@ -536,7 +540,7 @@ class AtIndexer(NamedTuple):
 
         Returns:
             A pytree with the leaf values at the specified location set to
-            the result of applying `func` to the leaf values.
+            the result of applying ``func`` to the leaf values.
 
         Example:
             >>> import pytreeclass as pytc
@@ -551,7 +555,7 @@ class AtIndexer(NamedTuple):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
-            >>> # apply to `a` and return a new instance
+            >>> # apply to ``a`` and return a new instance
             >>> # with all other leaves unchanged
             >>> tree.at['a'].apply(lambda _: 100)
             Tree(a=100, b=2)
@@ -580,12 +584,12 @@ class AtIndexer(NamedTuple):
                 leaf value and the new state.
             state: the initial state to carry.
             is_leaf: a predicate function to determine if a value is a leaf. for
-                example, `lambda x: isinstance(x, list)` will treat all lists
+                example, ``lambda x: isinstance(x, list)`` will treat all lists
                 as leaves and will not recurse into list items.
 
         Returns:
             A tuple of the final state and pytree with the leaf values at the
-            specified location set to the result of applying `func` to the leaf
+            specified location set to the result of applying ``func`` to the leaf
             values.
 
         Example:
@@ -611,16 +615,16 @@ class AtIndexer(NamedTuple):
             >>> def scan_func(leaf, state: State):
             ...     state = State(state.func_evals + 1)
             ...     return leaf + 1, state
-            >>> # apply to `a` and `b` and return a new instance with all other
+            >>> # apply to ``a`` and ``b`` and return a new instance with all other
             >>> # leaves unchanged and the new state that counts the number of
             >>> # function evaluations
             >>> tree.at['a','b'].scan(scan_func, state=State())
             (Tree(a=2, b=3, c=3), State(func_evals=2))
 
         Note:
-            `scan` applies a binary `func` to the leaf values while carrying
-            a state and returning a tree leaves with the the `func` applied to
-            them with final state. While `reduce` applies a binary `func` to the
+            ``scan`` applies a binary ``func`` to the leaf values while carrying
+            a state and returning a tree leaves with the the ``func`` applied to
+            them with final state. While ``reduce`` applies a binary ``func`` to the
             leaf values while carrying a state and returning a single value.
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
@@ -658,12 +662,12 @@ class AtIndexer(NamedTuple):
             The result of reducing the leaf values at the specified location.
 
         Note:
-            - If `initializer` is not specified, the first leaf value is used as
-                the initializer.
-            - `reduce` applies a binary `func` to each leaf values while accumulating
-                a state a returns the final result. while `scan` applies `func` to each
-                leaf value while carrying a state and returns the final state and
-                the leaves of the tree with the result of applying `func` to each leaf.
+            - If ``initializer`` is not specified, the first leaf value is used as
+              the initializer.
+            - ``reduce`` applies a binary ``func`` to each leaf values while accumulating
+              a state a returns the final result. while ``scan`` applies ``func`` to each
+              leaf value while carrying a state and returns the final state and
+              the leaves of the tree with the result of applying ``func`` to each leaf.
 
         Example:
             >>> import pytreeclass as pytc

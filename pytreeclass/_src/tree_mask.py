@@ -24,7 +24,7 @@ import jax
 import jax.tree_util as jtu
 import numpy as np
 
-from pytreeclass._src.tree_pprint import tree_repr, tree_str, type_dispatcher
+from pytreeclass._src.tree_pprint import tree_repr, tree_str, tree_summary
 from pytreeclass._src.tree_util import IsLeafType, is_tree_equal, tree_copy, tree_hash
 
 T = TypeVar("T")
@@ -97,9 +97,9 @@ class _FrozenBase(Generic[T]):
     __call__ = _FrozneError("__call__")
 
 
-@type_dispatcher.register(_FrozenBase)
+@tree_summary.def_type(_FrozenBase)
 def _(node) -> str:
-    return f"#{type_dispatcher(node.__wrapped__)}"
+    return f"#{tree_summary.type_dispatcher(node.__wrapped__)}"
 
 
 class _FrozenHashable(_FrozenBase):
@@ -129,7 +129,6 @@ class _FrozenArray(_FrozenBase):
         return np.all(lhs == rhs)
 
 
-@ft.singledispatch
 def freeze(value: T) -> _FrozenHashable[T]:
     """Freeze a value to avoid updating it by `jax` transformations.
 
@@ -137,9 +136,9 @@ def freeze(value: T) -> _FrozenHashable[T]:
         value: A value to freeze.
 
     Note:
-        - `freeze` is idempotent, i.e. `freeze(freeze(x)) == freeze(x)`.
-        - `freeze` uses single dispatch to support custom types. To define a custom
-           wrapper for a certain type, use `freeze.register(type, func)`.
+        - ``freeze`` is idempotent, i.e. ``freeze(freeze(x)) == freeze(x)``.
+        - ``freeze`` uses single dispatch to support custom types. To define a custom
+          wrapper for a certain type, use ``freeze.def_type(type, func)``.
 
     Example:
         >>> import jax
@@ -160,16 +159,20 @@ def freeze(value: T) -> _FrozenHashable[T]:
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
     """
-    return _FrozenHashable(value)
+    return freeze.type_dispatcher(value)
 
 
-@freeze.register(np.ndarray)
-@freeze.register(jax.Array)
+freeze.type_dispatcher = ft.singledispatch(lambda x: _FrozenHashable(x))
+freeze.def_type = freeze.type_dispatcher.register
+
+
+@freeze.def_type(np.ndarray)
+@freeze.def_type(jax.Array)
 def _(value: T) -> _FrozenArray[T]:
     return _FrozenArray(value)
 
 
-@freeze.register(_FrozenBase)
+@freeze.def_type(_FrozenBase)
 def _(value: _FrozenBase[T]) -> _FrozenBase[T]:
     # idempotent freeze
     return value
@@ -180,7 +183,6 @@ def is_frozen(value: Any) -> bool:
     return isinstance(value, _FrozenBase)
 
 
-@ft.singledispatch
 def unfreeze(value: T) -> T:
     """Unfreeze `frozen` value, otherwise return the value itself.
 
@@ -190,7 +192,7 @@ def unfreeze(value: T) -> T:
     Note:
         - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
         - `unfreeze` uses single dispatch to support custom types. To define a custom
-          behavior for a certain type, use `unfreeze.register(type, func)`.
+          behavior for a certain type, use `unfreeze.def_type(type, func)`.
 
     Example:
         >>> import pytreeclass as pytc
@@ -204,15 +206,18 @@ def unfreeze(value: T) -> T:
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
-    return value
+    return unfreeze.type_dispatcher(value)
 
 
-@unfreeze.register(_FrozenBase)
+unfreeze.type_dispatcher = ft.singledispatch(lambda x: x)
+unfreeze.def_type = unfreeze.type_dispatcher.register
+
+
+@unfreeze.def_type(_FrozenBase)
 def _(value: _FrozenBase[T]) -> T:
     return getattr(value, "__wrapped__")
 
 
-@ft.singledispatch
 def is_nondiff(value: Any) -> bool:
     """Returns True for non-inexact types, False otherwise.
 
@@ -221,7 +226,7 @@ def is_nondiff(value: Any) -> bool:
 
     Note:
         - `is_nondiff` uses single dispatch to support custom types. To define a custom
-          behavior for a certain type, use `is_nondiff.register(type, func)`.
+          behavior for a certain type, use `is_nondiff.def_type(type, func)`.
 
     Example:
         >>> import pytreeclass as pytc
@@ -241,18 +246,22 @@ def is_nondiff(value: Any) -> bool:
         to freeze the non-differentiable nodes before passing the tree to a
         `jax` transformation.
     """
-    return True
+    return is_nondiff.type_dispatcher(value)
 
 
-@is_nondiff.register(np.ndarray)
-@is_nondiff.register(jax.Array)
+is_nondiff.type_dispatcher = ft.singledispatch(lambda x: True)
+is_nondiff.def_type = is_nondiff.type_dispatcher.register
+
+
+@is_nondiff.def_type(np.ndarray)
+@is_nondiff.def_type(jax.Array)
 def _(value: np.ndarray | jax.Array) -> bool:
     # return True if the node is non-inexact type, otherwise False
     return False if np.issubdtype(value.dtype, np.inexact) else True
 
 
-@is_nondiff.register(float)
-@is_nondiff.register(complex)
+@is_nondiff.def_type(float)
+@is_nondiff.def_type(complex)
 def _(_: float | complex) -> bool:
     return False
 
@@ -308,7 +317,7 @@ def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = Non
 
     Note:
         - Masked leaves are wrapped with a wrapper that yields no leaves when
-            `jax.tree_util.tree_flatten` is called on it.
+          ``jax.tree_util.tree_flatten`` is called on it.
         - Masking is equivalent to applying `freeze` to the masked leaves.
 
             >>> import pytreeclass as pytc
@@ -320,7 +329,7 @@ def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = Non
             >>> masked_tree = jax.tree_map(mask_if_nondiff, tree)
 
         - Use masking on tree containing non-differentiable nodes before passing
-            the tree to a `jax` transformation.
+          the tree to a ``jax`` transformation.
 
     Example:
         >>> import pytreeclass as pytc
@@ -384,7 +393,7 @@ def tree_unmask(tree: T, mask: MaskType = lambda _: True):
         (Array(2., dtype=float32, weak_type=True), #2)
 
     Note:
-        - Unmasking is equivalent to applying `unfreeze` on the masked leaves.
+        - Unmasking is equivalent to applying ``unfreeze`` on the masked leaves.
 
             >>> import pytreeclass as pytc
             >>> import jax

@@ -56,7 +56,7 @@ PP = Callable[[Any, Unpack[PPSpec]], str]
 from_iterable = chain.from_iterable
 
 
-if os.environ.get("PYTREECLASS_ENABLE_COLOR", "FALSE") == "TRUE":
+if os.environ.get("PYTREECLASS_ENABLE_COLOR", "TRUE") == "TRUE":
 
     class ANSI:
         END = "\033[0m"
@@ -319,7 +319,7 @@ def tree_repr(
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
 
     Note:
-        set environment variable `PYTREECLASS_ENABLE_COLOR` to `TRUE` to enable
+        set environment variable `PYTREECLASS_ENABLE_COLOR` to `FALSE` to disable
          color output using ANSI escape codes.
     """
     text = pp(tree, indent=0, kind="REPR", width=width, depth=depth, seen=set())
@@ -354,7 +354,7 @@ def tree_str(
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
 
     Note:
-        set environment variable `PYTREECLASS_ENABLE_COLOR` to `TRUE` to enable
+        set environment variable `PYTREECLASS_ENABLE_COLOR` to `FALSE` to disable
          color output using ANSI escape codes.
     """
     text = pp(tree, indent=0, kind="STR", width=width, depth=depth, seen=set())
@@ -419,7 +419,7 @@ def tree_diagram(
             └── [2]=A(...)
 
     Note:
-        set environment variable `PYTREECLASS_ENABLE_COLOR` to `TRUE` to enable
+        set environment variable `PYTREECLASS_ENABLE_COLOR` to `FALSE` to disable
          color output using ANSI escape codes.
     """
     vmark = ("│\t")[:tabwidth]  # vertical mark
@@ -812,59 +812,6 @@ def size_pp(size: int, **spec: Unpack[PPSpec]):
 # display e.g `f32[10,10]` instead of simply `Array`.
 
 
-@ft.singledispatch
-def type_dispatcher(node: Any) -> str:
-    return type(node).__name__
-
-
-@type_dispatcher.register(np.ndarray)
-@type_dispatcher.register(jax.Array)
-@type_dispatcher.register(jax.ShapeDtypeStruct)
-def _(node: Any) -> str:
-    """Return the type repr of the node."""
-    shape_dype = node.shape, node.dtype
-    spec = dict(indent=0, kind="REPR", width=80, depth=float("inf"), seen=set())
-    return pp(jax.ShapeDtypeStruct(*shape_dype), **spec)
-
-
-@ft.singledispatch
-def count_dispatcher(_: Any) -> int:
-    """Return the number of elements in a node."""
-    return 1
-
-
-@count_dispatcher.register(jax.Array)
-@count_dispatcher.register(np.ndarray)
-def _(node: jax.Array | np.ndarray) -> int:
-    return node.size
-
-
-@ft.singledispatch
-def size_dispatcher(node: Any) -> None:
-    """Return the size of a node in bytes."""
-    return 0
-
-
-@size_dispatcher.register(jax.Array)
-@size_dispatcher.register(np.ndarray)
-def _(node: jax.Array | np.ndarray) -> int:
-    return node.nbytes
-
-
-def tree_size(tree: PyTree) -> int:
-    def reduce_func(acc, node):
-        return acc + size_dispatcher(node)
-
-    return jtu.tree_reduce(reduce_func, tree, initializer=0)
-
-
-def tree_count(tree: PyTree) -> int:
-    def reduce_func(acc, node):
-        return acc + count_dispatcher(node)
-
-    return jtu.tree_reduce(reduce_func, tree, initializer=0)
-
-
 def tree_summary(
     tree: PyTree,
     *,
@@ -948,7 +895,7 @@ def tree_summary(
         └────┴──────────────────┴─────┴────┘
 
     Note:
-        set environment variable `PYTREECLASS_ENABLE_COLOR` to `TRUE` to enable
+        set environment variable `PYTREECLASS_ENABLE_COLOR` to `FALSE` to disable
          color output using ANSI escape codes.
     """
     rows = [["Name", "Type", "Count", "Size"]]
@@ -975,13 +922,13 @@ def tree_summary(
 
         paths, _ = trace
         pstr = jtu.keystr(paths)
-        tstr = type_dispatcher(leaf)
+        tstr = tree_summary.type_dispatcher(leaf)
         cstr = f"{count:,}" if count else ""
         sstr = size_pp(size) if size else ""
         rows += [[pstr, tstr, cstr, sstr]]
 
     pstr = "Σ"
-    tstr = type_dispatcher(tree)
+    tstr = tree_summary.type_dispatcher(tree)
     cstr = f"{tcount:,}" if tcount else ""
     sstr = size_pp(tsize) if tsize else ""
     rows += [[pstr, tstr, cstr, sstr]]
@@ -989,9 +936,48 @@ def tree_summary(
     return highlighter(text)
 
 
-tree_summary.def_count = count_dispatcher.register
-tree_summary.def_size = size_dispatcher.register
-tree_summary.def_type = type_dispatcher.register
+tree_summary.count_dispatcher = ft.singledispatch(lambda x: 1)
+tree_summary.def_count = tree_summary.count_dispatcher.register
+tree_summary.size_dispatcher = ft.singledispatch(lambda x: 0)
+tree_summary.def_size = tree_summary.size_dispatcher.register
+tree_summary.type_dispatcher = ft.singledispatch(lambda x: type(x).__name__)
+tree_summary.def_type = tree_summary.type_dispatcher.register
+
+
+@tree_summary.def_type(np.ndarray)
+@tree_summary.def_type(jax.Array)
+@tree_summary.def_type(jax.ShapeDtypeStruct)
+def _(node: Any) -> str:
+    """Return the type repr of the node."""
+    shape_dype = node.shape, node.dtype
+    spec = dict(indent=0, kind="REPR", width=80, depth=float("inf"), seen=set())
+    return pp(jax.ShapeDtypeStruct(*shape_dype), **spec)
+
+
+@tree_summary.def_count(jax.Array)
+@tree_summary.def_count(np.ndarray)
+def _(node: jax.Array | np.ndarray) -> int:
+    return node.size
+
+
+@tree_summary.def_size(jax.Array)
+@tree_summary.def_size(np.ndarray)
+def _(node: jax.Array | np.ndarray) -> int:
+    return node.nbytes
+
+
+def tree_size(tree: PyTree) -> int:
+    def reduce_func(acc, node):
+        return acc + tree_summary.size_dispatcher(node)
+
+    return jtu.tree_reduce(reduce_func, tree, initializer=0)
+
+
+def tree_count(tree: PyTree) -> int:
+    def reduce_func(acc, node):
+        return acc + tree_summary.count_dispatcher(node)
+
+    return jtu.tree_reduce(reduce_func, tree, initializer=0)
 
 
 def tree_repr_with_trace(
@@ -1053,7 +1039,7 @@ def tree_repr_with_trace(
         This function can be useful for debugging and raising descriptive errors.
 
     Note:
-        set environment variable `PYTREECLASS_ENABLE_COLOR` to `TRUE` to enable
+        set environment variable `PYTREECLASS_ENABLE_COLOR` to `FALSE` to disable
          color output using ANSI escape codes.
     """
 

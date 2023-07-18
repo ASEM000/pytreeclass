@@ -56,7 +56,7 @@ EllipsisType = type(Ellipsis)
 
 # allow methods in mutable context to be called without raising `AttributeError`
 # the instances are registered  during initialization and using `at`  property
-# with `__call__ this is done by registering the instance id in a set before
+# with `__call__` this is done by registering the instance id in a set before
 # entering the mutable context and removing it after exiting the context
 _mutable_instance_registry: set[int] = set()
 
@@ -106,7 +106,7 @@ class TreeClassIndexer(AtIndexer):
 
         Returns:
             A tuple of the result of the function call and a copy of the a
-            new instance of the tree with the modified values.
+             new instance of the tree with the modified values.
 
         Example:
             >>> import pytreeclass as pytc
@@ -283,22 +283,22 @@ class TreeClass(metaclass=TreeClassMeta):
     def at(self) -> TreeClassIndexer:
         """Immutable out-of-place indexing.
 
-        - `.at[***].get()`:
+        - ``.at[***].get()``:
             Return a new instance with the value at the index otherwise None.
-        - `.at[***].set(value)`:
+        - ``.at[***].set(value)``:
             Set the `value` and return a new instance with the updated value.
-        - `.at[***].apply(func)`:
-            Apply a `func` and return a new instance with the updated value.
-        - `.at['method'](*a, **k)`:
-            Call a `method` and return a (return value, new instance) tuple.
+        - ``.at[***].apply(func)``:
+            Apply a ``func`` and return a new instance with the updated value.
+        - ``.at['method'](*a, **k)``:
+            Call a ``method`` and return a (return value, new instance) tuple.
 
         `***` acceptable indexing types are:
-            - `str` for mapping keys or class attributes.
-            - `int` for positional indexing for sequences.
-            - `...` to select all leaves.
+            - ``str`` for mapping keys or class attributes.
+            - ``int`` for positional indexing for sequences.
+            - ``...`` to select all leaves.
             - a boolean mask of the same structure as the tree
-            - `re.Pattern` to index all keys matching a regex pattern.
-            - an instance of `BaseKey` with custom logic to index a pytree.
+            - ``re.Pattern`` to index all keys matching a regex pattern.
+            - an instance of ``BaseKey`` with custom logic to index a pytree.
             - a tuple of the above types to index multiple keys at same level.
 
         Example:
@@ -328,8 +328,8 @@ class TreeClass(metaclass=TreeClassMeta):
             (100, Tree(a=100, b=2.0))
 
         Note:
-            - `pytree.at[*].at[**]` is equivalent to selecting pytree.*.**
-            - `pytree.at[*, **]` is equivalent selecting pytree.* and pytree.**
+            - ``pytree.at[*].at[**]`` is equivalent to selecting pytree.*.**
+            - ``pytree.at[*, **]`` is equivalent selecting pytree.* and pytree.**
         """
         return TreeClassIndexer(self)
 

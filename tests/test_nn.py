@@ -13,6 +13,8 @@
 # limitations under the License.
 
 
+import os
+
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -21,6 +23,7 @@ import numpy as np
 import optax
 import pytest
 
+os.environ["PYTREECLASS_ENABLE_COLOR"] = "FALSE"
 import pytreeclass as pytc
 
 
@@ -199,7 +202,6 @@ def test_freeze_nondiff():
     unfrozen_ = jtu.tree_map(pytc.unfreeze, frozen_, is_leaf=pytc.is_frozen)
     assert jtu.tree_leaves(nn) == jtu.tree_leaves(unfrozen_)
 
-
     class Linear(pytc.TreeClass):
         def __init__(self, key, in_dim, out_dim):
             self.weight = jr.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
@@ -207,7 +209,7 @@ def test_freeze_nondiff():
 
         def __call__(self, x):
             return x @ self.weight + self.bias
-        
+
     nn = Linear(jr.PRNGKey(0), 1, 1)
     nn_ = nn
     nn = nn.at["weight"].apply(pytc.freeze)
@@ -223,9 +225,9 @@ def test_freeze_nondiff():
         return jnp.mean((nn(x) - y) ** 2)
 
     @jax.jit
-    def train_step(nn,optim_state,x,y):
+    def train_step(nn, optim_state, x, y):
         value, dnn = jax.value_and_grad(loss_func)(nn, x, y)
-        dnn, optim_state  = optim.update(dnn, optim_state)
+        dnn, optim_state = optim.update(dnn, optim_state)
         nn = optax.apply_updates(nn, dnn)
         return nn, optim_state, value
 
@@ -233,8 +235,7 @@ def test_freeze_nondiff():
         nn, optim_state, value = train_step(nn, optim_state, x, y)
 
     nn = pytc.tree_unmask(nn)
-    assert (nn_.weight == nn.weight), nn
-
+    assert nn_.weight == nn.weight, nn
 
 
 @pytest.mark.benchmark
