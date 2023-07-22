@@ -563,14 +563,14 @@ def _table(rows: list[Row]) -> str:
 
     widths = [max(map(len, "\n".join(col).split("\n"))) for col in zip(*rows)]
     spaces: Row = ["─" * width for width in widths]
-    *rows, last = rows
 
-    out: list[str] = []
-    out += ["┌" + "┬".join(spaces) + "┐"]
-    out += [line(text, widths) + "\n" + "├" + "┼".join(spaces) + "┤" for text in rows]
-    out += [line(last, widths)]
-    out += ["└" + "┴".join(spaces) + "┘"]
-    return "\n".join(out)
+    return (
+        ("┌" + "┬".join(spaces) + "┐")
+        + "\n"
+        + ("\n├" + "┼".join(spaces) + "┤\n").join(line(row, widths) for row in rows)
+        + "\n"
+        + ("└" + "┴".join(spaces) + "┘")
+    )
 
 
 def size_pp(size: int, **spec: Unpack[PPSpec]):
