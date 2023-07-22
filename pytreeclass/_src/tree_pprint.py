@@ -20,16 +20,16 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import math
-from itertools import chain
+from itertools import zip_longest
 from types import FunctionType
-from typing import Any, Callable, Iterable, Literal
+from typing import Any, Callable, Iterable, Literal, Sequence
 
 import jax
 import jax.tree_util as jtu
 import numpy as np
 from jax import custom_jvp
 from jax.util import unzip2
-from typing_extensions import TypedDict, Unpack
+from typing_extensions import TypeAlias, TypedDict, Unpack
 
 from pytreeclass._src.tree_util import (
     IsLeafType,
@@ -51,7 +51,6 @@ class PPSpec(TypedDict):
 PyTree = Any
 
 PP = Callable[[Any, Unpack[PPSpec]], str]
-from_iterable = chain.from_iterable
 
 
 @ft.singledispatch
@@ -548,167 +547,30 @@ def format_width(string, width=60):
 
 # table printing
 
-
-def _hbox(*text) -> str:
-    # Create horizontally stacked text boxes
-    # Examples:
-    #     >>> _hbox("a","b")
-    #     ┌─┬─┐
-    #     │a│b│
-    #     └─┴─┘
-
-    boxes = list(map(_vbox, text))
-    boxes = [(box).split("\n") for box in boxes]
-    max_col_height = max([len(b) for b in boxes])
-    boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
-    return "\n".join([_resolve_line(line) for line in zip(*boxes)])
+Row: TypeAlias = Sequence[str]  # list of columns
 
 
-def _vbox(*text) -> str:
-    # Create vertically stacked text boxes
-    # Example:
-    #     >>> _vbox("a","b")
-    #     ┌───┐
-    #     │a  │
-    #     ├───┤
-    #     │b  │
-    #     └───┘
+def _table(rows: list[Row]) -> str:
+    """Generate a table from a list of rows."""
 
-    #     >>> _vbox("a","","a")
-    #     ┌───┐
-    #     │a  │
-    #     ├───┤
-    #     │   │
-    #     ├───┤
-    #     │a  │
-    #     └───┘
+    def line(text: Row, widths: list[int]) -> str:
+        return "\n".join(
+            "│"
+            + "│".join(col.ljust(width) for col, width in zip(line_row, widths))
+            + "│"
+            for line_row in zip_longest(*[t.split("\n") for t in text], fillvalue="")
+        )
 
-    max_width = (
-        max(from_iterable([[len(t) for t in item.split("\n")] for item in text])) + 0
-    )
+    widths = [max(map(len, "\n".join(col).split("\n"))) for col in zip(*rows)]
+    spaces: Row = ["─" * width for width in widths]
+    *rows, last = rows
 
-    top = f"┌{'─'*max_width}┐"
-    line = f"├{'─'*max_width}┤"
-    side = [
-        "\n".join([f"│{t}{' '*(max_width-len(t))}│" for t in item.split("\n")])
-        for item in text
-    ]
-
-    btm = f"└{'─'*max_width}┘"
-
-    text = ""
-
-    for i, s in enumerate(side):
-        if i == 0:
-            text += f"{top}\n{s}\n{line if len(side)>1 else btm}"
-
-        elif i == len(side) - 1:
-            text += f"\n{s}\n{btm}"
-
-        else:
-            text += f"\n{s}\n{line}"
-
-    return text
-
-
-def _hstack(*boxes):
-    # Create horizontally stacked text boxes
-    # Example:
-    #     >>> print(_hstack(_hbox("a"),_vbox("b","c")))
-    #     ┌─┬─┐
-    #     │a│b│
-    #     └─┼─┤
-    #       │c│
-    #       └─┘
-
-    boxes = [(box).split("\n") for box in boxes]
-    max_col_height = max([len(b) for b in boxes])
-    # expand height of each col before merging
-    boxes = [b + [" " * len(b[0])] * (max_col_height - len(b)) for b in boxes]
-    text = ""
-
-    _cells = tuple(zip(*boxes))
-
-    for i, line in enumerate(_cells):
-        text += _resolve_line(line) + ("\n" if i != (len(_cells) - 1) else "")
-
-    return text
-
-
-def _resolve_line(cols: list[str]) -> str:
-    # Combine columns of single line by merging their borders
-
-    # Args:
-    #     cols (Sequence[str,...]): Sequence of single line column string
-
-    # Returns:
-    #     str: resolved column string
-
-    # Example:
-    #     >>> _resolve_line(['ab','b│','│c'])
-    #     'abb│c'
-
-    #     >>> _resolve_line(['ab','b┐','┌c'])
-    #     'abb┬c'
-
-    cols = list(map(list, cols))  # convert each col to col of chars
-    alpha = ["│", "┌", "┐", "└", "┘", "┤", "├"]
-
-    for index in range(len(cols) - 1):
-        if cols[index][-1] == "┐" and cols[index + 1][0] in ["┌", "─"]:
-            cols[index][-1] = "┬"
-            cols[index + 1].pop(0)
-
-        elif cols[index][-1] == "┘" and cols[index + 1][0] in ["└", "─"]:
-            cols[index][-1] = "┴"
-            cols[index + 1].pop(0)
-
-        elif cols[index][-1] == "┤" and cols[index + 1][0] in ["├", "─", "└"]:  #
-            cols[index][-1] = "┼"
-            cols[index + 1].pop(0)
-
-        elif cols[index][-1] in ["┘", "┐", "─"] and cols[index + 1][0] in ["├"]:
-            cols[index][-1] = "┼"
-            cols[index + 1].pop(0)
-
-        elif cols[index][-1] == " ":
-            cols[index].pop()
-
-        elif cols[index][-1] in alpha and cols[index + 1][0] in [*alpha, " "]:
-            cols[index + 1].pop(0)
-
-    return "".join(map(lambda x: "".join(x), cols))
-
-
-def _table(rows: list[list[str]], transpose: bool = False) -> str:
-    # Create a table with self aligning rows and cols
-
-    # Args:
-    #     rows: list of lists of row values
-    #     transpose: transpose the table. i.e. rows become cols and cols become rows
-
-    # Returns:
-    #     str: box string
-
-    # Example:
-    #     >>> col1 = ['1\n','2']
-    #     >>> col2 = ['3','4000']
-    #     >>> print(_table([col1,col2]))
-    #     ┌─┬────────┐
-    #     │1│3       │
-    #     │ │        │
-    #     ├─┼────────┤
-    #     │2│40000000│
-    #     └─┴────────┘
-
-    cols = rows if transpose else [list(c) for c in zip(*rows)]
-
-    for i, _cells in enumerate(zip(*cols)):
-        max_cell_height = max(map(lambda x: x.count("\n"), _cells))
-        for j in range(len(_cells)):
-            cols[j][i] += "\n" * (max_cell_height - cols[j][i].count("\n"))
-
-    return _hstack(*(_vbox(*col) for col in cols))
+    out: list[str] = []
+    out += ["┌" + "┬".join(spaces) + "┐"]
+    out += [line(text, widths) + "\n" + "├" + "┼".join(spaces) + "┤" for text in rows]
+    out += [line(last, widths)]
+    out += ["└" + "┴".join(spaces) + "┘"]
+    return "\n".join(out)
 
 
 def size_pp(size: int, **spec: Unpack[PPSpec]):
@@ -964,6 +826,7 @@ def tree_repr_with_trace(
         joiner = "\n" + "\t" * (len(trace[0]) + 1)
 
         # make a pretty table for each leaf
-        return joiner + (joiner).join(_table(rows, transpose=transpose).split("\n"))
+        rows = list(map(list, zip(*rows))) if transpose else rows
+        return joiner + (joiner).join(_table(rows).split("\n"))
 
     return tree_map_with_trace(leaf_trace_summary, tree, is_leaf=is_leaf)

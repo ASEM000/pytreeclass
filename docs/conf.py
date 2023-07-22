@@ -96,8 +96,11 @@ html_theme_options = {
     "show_toc_level": 2,
     "repository_url": "https://github.com/ASEM000/PyTreeClass",
     "use_repository_button": True,
+    "collapse_navigation": False,
+    "navigation_depth": 4,
+    "globaltoc_collapse": True,
+    "globaltoc_maxdepth": None,
 }
-
 
 # -- Options for doctest -----------------------------------------------------
 

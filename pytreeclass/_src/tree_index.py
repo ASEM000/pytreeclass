@@ -189,7 +189,7 @@ class NameKey(BaseKey):
         return self.name == other.name
 
     @__eq__.register(jtu.DictKey)
-    def _(self, other: jtu.__doc__) -> bool:
+    def _(self, other: jtu.DictKey) -> bool:
         return self.name == other.key
 
 
