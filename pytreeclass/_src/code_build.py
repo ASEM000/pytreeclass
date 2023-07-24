@@ -86,17 +86,7 @@ class Field:
 
     def replace(self, **kwargs) -> "Field":
         """Return a new Field instance with the given fields replaced."""
-        return Field(
-            name=kwargs.get("name", self.name),
-            type=kwargs.get("type", self.type),
-            default=kwargs.get("default", self.default),
-            init=kwargs.get("init", self.init),
-            repr=kwargs.get("repr", self.repr),
-            kind=kwargs.get("kind", self.kind),
-            metadata=kwargs.get("metadata", self.metadata),
-            callbacks=kwargs.get("callbacks", self.callbacks),
-            alias=kwargs.get("alias", self.alias),
-        )
+        return Field(**{k: kwargs.get(k, getattr(self, k)) for k in self.__slots__})
 
     def __get__(self, instance, owner):
         if instance is None:
