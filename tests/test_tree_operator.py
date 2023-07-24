@@ -25,12 +25,8 @@ from pytreeclass._src.tree_util import bcmap
 
 
 def test_bcmap():
-    class Test(pytc.TreeClass, leafwise=True):
-        a: tuple[int]
-        b: tuple[int]
-        c: jnp.ndarray
-        d: int
-
+    @pytc.leafwise
+    class Test(pytc.TreeClass):
         def __init__(self, a=(1, 2, 3), b=(4, 5, 6), c=jnp.array([1, 2, 3]), d=1):
             self.a = a
             self.b = b
@@ -58,7 +54,9 @@ def test_bcmap():
 
 
 def test_math_operations():
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: float
         b: float
         c: float
@@ -76,7 +74,9 @@ def test_math_operations():
     assert A.at[...].reduce(lambda x, y: x + jnp.sum(y)) == jnp.array(60)
     assert abs(A) == A
 
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: float
         b: float
         name: str
@@ -123,7 +123,9 @@ def test_math_operations():
 
 
 def test_math_operations_errors():
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: float
         b: float
         c: float

@@ -140,7 +140,8 @@ class BaseKey(abc.ABC):
             ... def _(func):
             ...    return FuncKey(func)
             >>> # create a simple pytree
-            >>> class Tree(pytc.TreeClass):
+            >>> @pytc.autoinit
+            ... class Tree(pytc.TreeClass):
             ...    a: int
             ...    b: str
             >>> tree = Tree(1, "string")
@@ -220,7 +221,8 @@ class RegexKey(BaseKey):
     Example:
         >>> import pytreeclass as pytc
         >>> import re
-        >>> class Tree(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class Tree(pytc.TreeClass):
         ...     weight_1: float = 1.0
         ...     weight_2: float = 2.0
         ...     weight_3: float = 3.0
@@ -465,7 +467,8 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
+            >>> @pytc.autoinit
+            ... class Tree(pytc.TreeClass):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
@@ -503,7 +506,8 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
+            >>> @pytc.autoinit
+            ... class Tree(pytc.TreeClass):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
@@ -552,7 +556,8 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
+            >>> @pytc.autoinit
+            ... class Tree(pytc.TreeClass):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
@@ -608,7 +613,8 @@ class AtIndexer(NamedTuple):
             >>> from typing import NamedTuple
             >>> class State(NamedTuple):
             ...     func_evals: int = 0
-            >>> class Tree(pytc.TreeClass):
+            >>> @pytc.autoinit
+            ... class Tree(pytc.TreeClass):
             ...     a: int
             ...     b: int
             ...     c: int
@@ -672,7 +678,8 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
+            >>> @pytc.autoinit
+            ... class Tree(pytc.TreeClass):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)

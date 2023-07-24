@@ -20,12 +20,16 @@ import pytreeclass as pytc
 
 
 def test_ops_with_jit():
-    class T0(pytc.TreeClass, leafwise=True):
+    @pytc.autoinit
+    @pytc.leafwise
+    class T0(pytc.TreeClass):
         a: jax.Array = jnp.array(1)
         b: jax.Array = jnp.array(2)
         c: jax.Array = jnp.array(3)
 
-    class T1(pytc.TreeClass, leafwise=True):
+    @pytc.autoinit
+    @pytc.leafwise
+    class T1(pytc.TreeClass):
         a: jax.Array = jnp.array(1)
         b: jax.Array = jnp.array(2)
         c: jax.Array = jnp.array(3)

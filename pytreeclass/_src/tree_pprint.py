@@ -20,6 +20,7 @@ import dataclasses as dc
 import functools as ft
 import inspect
 import math
+from contextlib import suppress
 from itertools import zip_longest
 from types import FunctionType
 from typing import Any, Callable, Iterable, Literal, Sequence
@@ -148,17 +149,24 @@ def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
     # this part of the function is inspired by
     # lovely-jax https://github.com/xl0/lovely-jax
 
-    # handle interval
-    low, high = np.min(node), np.max(node)
-    interval = "(" if math.isinf(low) else "["
-    is_integer = issubclass(node.dtype.type, np.integer)
-    interval += f"{low},{high}" if is_integer else f"{low:.2f},{high:.2f}"
-    interval += ")" if math.isinf(high) else "]"  # resolve closed/open interval
-    interval = interval.replace("inf", "∞")  # replace inf with infinity symbol
-    # handle mean and std
-    mean, std = f"{np.mean(node):.2f}", f"{np.std(node):.2f}"
+    with suppress(Exception):
+        # maybe the array is a jax tracers
+        low, high = np.min(node), np.max(node)
 
-    return f"{base}(μ={mean}, σ={std}, ∈{interval})"
+        interval = (
+            ("(" if math.isinf(low) else "[")
+            + (
+                f"{low},{high}"
+                if issubclass(node.dtype.type, np.integer)
+                else f"{low:.2f},{high:.2f}"
+            )
+            + (")" if math.isinf(high) else "]")
+        ).replace("inf", "∞")
+
+        mean, std = f"{np.mean(node):.2f}", f"{np.std(node):.2f}"
+        return f"{base}(μ={mean}, σ={std}, ∈{interval})"
+
+    return base
 
 
 @pp_dispatcher.register(FunctionType)
@@ -310,12 +318,14 @@ def tree_diagram(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> class A(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class A(pytc.TreeClass):
         ...        x: int = 10
         ...        y: int = (20,30)
         ...        z: int = 40
 
-        >>> class B(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class B(pytc.TreeClass):
         ...     a: int = 10
         ...     b: tuple = (20,30, A())
 
@@ -399,13 +409,12 @@ def tree_mermaid(
         - Copy the output and paste it in the mermaid live editor to interact with
           the diagram. https://mermaid.live
     """
-    ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
 
     def step(node: Node, depth: int = 0) -> str:
         if len(node.children) == 0:
             (key, _), value = node.data
             ppstr = f"{key}=" if key is not None else ""
-            ppstr += pp(value, **ppspec)
+            ppstr += tree_repr(value, depth=0)
             ppstr = "<b>" + ppstr + "</b>"
             return f'\tid{id(node.parent)} --- id{id(node)}("{ppstr}")\n'
 
@@ -497,7 +506,6 @@ def tree_graph(
                 4685309632 -> 4685309696;
             }
     """
-    ppspec = dict(indent=0, kind="REPR", width=80, depth=0, seen=set())
 
     def step(node: Node, depth: int = 0) -> str:
         (key, type), value = node.data
@@ -507,7 +515,7 @@ def tree_graph(
 
         if len(node.children) == 0:
             ppstr = f"{key}=" if key is not None else ""
-            ppstr += pp(value, **ppspec)
+            ppstr += tree_repr(value, depth=0)
             text = f'\t{id(node)} [label="{ppstr}", {style}];\n'
             text += f"\t{id(node.parent)} -> {id(node)};\n"
             return text
@@ -767,7 +775,8 @@ def tree_repr_with_trace(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> class Test(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class Test(pytc.TreeClass):
         ...    a:int = 1
         ...    b:float = 2.0
 

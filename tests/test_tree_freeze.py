@@ -25,7 +25,9 @@ from pytreeclass._src.tree_util import tree_hash
 
 
 def test_freeze_unfreeze():
-    class A(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(pytc.TreeClass):
         a: int
         b: int
 
@@ -44,15 +46,21 @@ def test_freeze_unfreeze():
 
     assert pytc.unfreeze(pytc.freeze(1.0)) == 1.0
 
-    class A(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(pytc.TreeClass):
         a: int
         b: int
 
-    class B(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class B(pytc.TreeClass):
         c: int = 3
         d: A = A(1, 2)
 
-    class A(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(pytc.TreeClass):
         a: int
         b: int
 
@@ -69,13 +77,19 @@ def test_freeze_unfreeze():
     assert jtu.tree_leaves(b) == []
     assert jtu.tree_leaves(c) == [1, 2]
 
-    class l0(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(pytc.TreeClass):
         a: int = 0
 
-    class l1(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l1(pytc.TreeClass):
         b: l0 = l0()
 
-    class l2(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l2(pytc.TreeClass):
         c: l1 = l1()
 
     t = jtu.tree_map(pytc.freeze, l2())
@@ -84,11 +98,13 @@ def test_freeze_unfreeze():
     assert jtu.tree_leaves(t.c) == []
     assert jtu.tree_leaves(t.c.b) == []
 
-    class l1(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    class l1(pytc.TreeClass):
         def __init__(self):
             self.b = l0()
 
-    class l2(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    class l2(pytc.TreeClass):
         def __init__(self):
             self.c = l1()
 
@@ -101,7 +117,9 @@ def test_freeze_errors():
     class T:
         pass
 
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: Any
 
     t = Test(T())
@@ -116,15 +134,21 @@ def test_freeze_errors():
 
 
 def test_freeze_with_ops():
-    class A(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(pytc.TreeClass):
         a: int
         b: int
 
-    class B(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class B(pytc.TreeClass):
         c: int = 3
         d: A = A(1, 2)
 
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: int = 1
         b: float = pytc.freeze(1.0)
         c: str = pytc.freeze("test")
@@ -144,7 +168,9 @@ def test_freeze_with_ops():
     jtu.tree_map(pytc.unfreeze, t, is_leaf=pytc.is_frozen)
     jtu.tree_map(pytc.freeze, t)
 
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: int
 
     t = jtu.tree_map(pytc.freeze, (Test(100)))
@@ -158,9 +184,8 @@ def test_freeze_with_ops():
     with pytest.raises(LookupError):
         pytc.is_tree_equal(t.at[...].reduce(jnp.add, initializer=0), t)
 
-    class Test(pytc.TreeClass, leafwise=True):
-        x: jnp.ndarray
-
+    @pytc.leafwise
+    class Test(pytc.TreeClass):
         def __init__(self, x):
             self.x = x
 
@@ -177,11 +202,15 @@ def test_freeze_with_ops():
 
 
 def test_freeze_diagram():
-    class A(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(pytc.TreeClass):
         a: int
         b: int
 
-    class B(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class B(pytc.TreeClass):
         c: int = 3
         d: A = A(1, 2)
 
@@ -193,7 +222,9 @@ def test_freeze_diagram():
 
 
 def test_freeze_mask():
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: int = 1
         b: int = 2
         c: float = 3.0
@@ -204,7 +235,9 @@ def test_freeze_mask():
 
 
 def test_freeze_nondiff():
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: int = pytc.freeze(1)
         b: str = "a"
 
@@ -218,7 +251,9 @@ def test_freeze_nondiff():
         .apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
     ) == ["a"]
 
-    class T0(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class T0(pytc.TreeClass):
         a: Test = Test()
 
     t = T0()
@@ -231,18 +266,24 @@ def test_freeze_nondiff():
 
 
 def test_freeze_nondiff_with_mask():
-    class L0(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L0(pytc.TreeClass):
         a: int = 1
         b: int = 2
         c: int = 3
 
-    class L1(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L1(pytc.TreeClass):
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    class L2(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L2(pytc.TreeClass):
         a: int = 10
         b: int = 20
         c: int = 30
@@ -260,11 +301,15 @@ def test_non_dataclass_input_to_freeze():
 
 
 def test_tree_mask():
-    class l0(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(pytc.TreeClass):
         x: int = 2
         y: int = 3
 
-    class l1(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l1(pytc.TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -285,11 +330,15 @@ def test_tree_mask():
 
 
 def test_tree_unmask():
-    class l0(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(pytc.TreeClass):
         x: int = 2
         y: int = 3
 
-    class l1(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l1(pytc.TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -314,11 +363,15 @@ def test_tree_unmask():
 
 
 def test_tree_mask_unfreeze():
-    class l0(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(pytc.TreeClass):
         x: int = 2
         y: int = 3
 
-    class l1(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l1(pytc.TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -335,7 +388,9 @@ def test_tree_mask_unfreeze():
 
 
 def test_freeze_nondiff_func():
-    class Test(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Test(pytc.TreeClass):
         a: int = 1.0
         b: int = 2
         c: int = 3

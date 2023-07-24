@@ -76,13 +76,13 @@ def _is_leaf_rhs_equal(leaf, rhs) -> bool | jax.Array:
 
 
 def is_tree_equal(*trees: Any) -> bool | jax.Array:
-    """Return `True` if all pytrees are equal.
+    """Return ``True`` if all pytrees are equal.
 
     Note:
         trees are compared using their leaves and treedefs.
 
     Note:
-        Under `jit` the return type is boolean `jax.Array` instead of `bool`.
+        Under ``jit`` the return type is boolean `jax.Array` instead of ``bool``.
     """
     tree0, *rest = trees
     leaves0, treedef0 = jtu.tree_flatten(tree0)
@@ -118,7 +118,7 @@ class Partial:
         6
 
     Note:
-        - The `...` is used to indicate a placeholder for positional arguments.
+        - The ``...`` is used to indicate a placeholder for positional arguments.
         - See: https://stackoverflow.com/a/7811270
         - `Partial` is used internally by `bcmap` which maps a function over pytrees
           leaves with automatic broadcasting for scalar arguments.
@@ -131,7 +131,7 @@ class Partial:
 
         Args:
             func: The function to be partially applied.
-            args: Positional arguments to be partially applied. use `...` as a
+            args: Positional arguments to be partially applied. use ``...`` as a
                 placeholder for positional arguments.
             kwargs: Keyword arguments to be partially applied.
         """
@@ -173,7 +173,9 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
         >>> import pytreeclass as pytc
         >>> import functools as ft
 
-        >>> class Test(pytc.TreeClass, leafwise=True):
+        >>> @pytc.autoinit
+        ... @pytc.leafwise
+        ... class Test(pytc.TreeClass):
         ...    a: tuple[int] = (1,2,3)
         ...    b: tuple[int] = (4,5,6)
         ...    c: jax.Array = jnp.array([1,2,3])
@@ -284,10 +286,58 @@ def swop(func):
     return ft.wraps(func)(lambda leaf, rhs: func(rhs, leaf))
 
 
-def _leafwise_transform(klass: type[T]) -> type[T]:
-    # add leafwise transform methods to the class
-    # that enable the user to apply a function to
-    # all the leaves of the tree
+def leafwise(klass: type[T]) -> type[T]:
+    """A class decorator that adds leafwise operators to a class.
+
+    Leafwise operators are operators that are applied to the leaves of a pytree.
+    For example leafwise ``__add__`` is equivalent to:
+
+    - ``jax.tree_map(lambda x: x + rhs, tree)`` if ``rhs`` is a scalar.
+    - ``jax.tree_map(lambda x, y: x + y, tree, rhs)`` if ``rhs`` is a pytree
+      with the same structure as ``tree``.
+
+    Args:
+        klass: The class to be decorated.
+
+    Returns:
+        The decorated class.
+
+    Note:
+        If a mathematically equivalent operator is already defined on the class,
+        then it is not overridden.
+
+    ==================      ============
+    Method                  Operator
+    ==================      ============
+    ``__add__``              ``+``
+    ``__and__``              ``&``
+    ``__ceil__``             ``math.ceil``
+    ``__divmod__``           ``divmod``
+    ``__eq__``               ``==``
+    ``__floor__``            ``math.floor``
+    ``__floordiv__``         ``//``
+    ``__ge__``               ``>=``
+    ``__gt__``               ``>``
+    ``__invert__``           ``~``
+    ``__le__``               ``<=``
+    ``__lshift__``           ``<<``
+    ``__lt__``               ``<``
+    ``__matmul__``           ``@``
+    ``__mod__``              ``%``
+    ``__mul__``              ``*``
+    ``__ne__``               ``!=``
+    ``__neg__``              ``-``
+    ``__or__``               ``|``
+    ``__pos__``              ``+``
+    ``__pow__``              ``**``
+    ``__round__``            ``round``
+    ``__sub__``              ``-``
+    ``__truediv__``          ``/``
+    ``__trunc__``            ``math.trunc``
+    ``__xor__``              ``^``
+    ==================      ============
+
+    """
     for key, method in (
         ("__abs__", uop(abs)),
         ("__add__", bop(op.add)),

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pytreeclass._src.code_build import field, fields
+from pytreeclass._src.code_build import autoinit, field, fields
 from pytreeclass._src.tree_base import TreeClass
 from pytreeclass._src.tree_index import AtIndexer, BaseKey
 from pytreeclass._src.tree_mask import (
@@ -36,6 +36,7 @@ from pytreeclass._src.tree_util import (
     Partial,
     bcmap,
     is_tree_equal,
+    leafwise,
     tree_flatten_with_trace,
     tree_leaves_with_trace,
     tree_map_with_trace,
@@ -47,6 +48,7 @@ __all__ = (
     "is_tree_equal",
     "field",
     "fields",
+    "autoinit",
     # pprint utils
     "tree_diagram",
     "tree_graph",
@@ -71,9 +73,10 @@ __all__ = (
     "tree_flatten_with_trace",
     "tree_repr_with_trace",
     "Partial",
+    "leafwise",
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 AtIndexer.__module__ = "pytreeclass"
 TreeClass.__module__ = "pytreeclass"

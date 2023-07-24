@@ -22,15 +22,9 @@ from typing import Any, Hashable, TypeVar
 
 import jax
 import jax.tree_util as jtu
-from typing_extensions import Unpack, dataclass_transform
+from typing_extensions import Unpack
 
-from pytreeclass._src.code_build import (
-    Field,
-    _build_field_map,
-    _build_init_method,
-    field,
-    fields,
-)
+from pytreeclass._src.code_build import fields
 from pytreeclass._src.tree_index import AtIndexer
 from pytreeclass._src.tree_pprint import (
     PPSpec,
@@ -42,7 +36,6 @@ from pytreeclass._src.tree_pprint import (
 )
 from pytreeclass._src.tree_util import (
     NamedSequenceKey,
-    _leafwise_transform,
     is_tree_equal,
     tree_copy,
     tree_hash,
@@ -69,37 +62,6 @@ def _mutable_context(tree, *, kopy: bool = False):
     _mutable_instance_registry.discard(id(tree))
 
 
-def _register_treeclass(klass: type[T]) -> type[T]:
-    # handle all registration logic for `treeclass`
-
-    def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
-        # unflatten rule to use with `jax.tree_unflatten`
-        tree = getattr(object, "__new__")(klass)
-        vars(tree).update(zip(keys, leaves))
-        return tree
-
-    def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
-        # flatten rule to use with `jax.tree_flatten`
-        dynamic = vars(tree)
-        return tuple(dynamic.values()), tuple(dynamic.keys())
-
-    def tree_flatten_with_keys(tree: T):
-        # flatten rule to use with `jax.tree_util.tree_flatten_with_path`
-        dynamic = dict(vars(tree))
-        for idx, key in enumerate(vars(tree)):
-            entry = NamedSequenceKey(idx, key)
-            dynamic[key] = (entry, dynamic[key])
-        return tuple(dynamic.values()), tuple(dynamic.keys())
-
-    jtu.register_pytree_with_keys(
-        nodetype=klass,
-        flatten_func=tree_flatten,
-        flatten_with_keys=tree_flatten_with_keys,
-        unflatten_func=tree_unflatten,
-    )
-    return klass
-
-
 class TreeClassIndexer(AtIndexer):
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         """Call a method on the tree instance and return result and new instance.
@@ -110,7 +72,8 @@ class TreeClassIndexer(AtIndexer):
 
         Example:
             >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
+            >>> @pytc.autoinit
+            ... class Tree(pytc.TreeClass):
             ...     a: int
             ...     def add(self, x:int) -> int:
             ...         self.a += x
@@ -140,29 +103,20 @@ class TreeClassIndexer(AtIndexer):
 
 class TreeClassMeta(abc.ABCMeta):
     def __call__(klass: type[T], *a, **k) -> T:
-        self = getattr(klass, "__new__")(klass, *a, **k)
-
-        with _mutable_context(self):
-            # initialize the instance under the mutable context
-            # to allow setting instance attributes without
-            # throwing an `AttributeError`
+        with _mutable_context(self := getattr(klass, "__new__")(klass, *a, **k)):
             getattr(klass, "__init__")(self, *a, **k)
-
-        if keys := set(_build_field_map(klass)) - set(vars(self)):
-            raise AttributeError(f"Found uninitialized fields {keys}.")
         return self
 
 
-@dataclass_transform(field_specifiers=(Field, field))
 class TreeClass(metaclass=TreeClassMeta):
     """Convert a class to a JAX compatible tree structure.
 
     Example:
         >>> import jax
         >>> import pytreeclass as pytc
-
         >>> # Tree leaves are instance attributes
-        >>> class Tree(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class Tree(pytc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
@@ -170,7 +124,9 @@ class TreeClass(metaclass=TreeClassMeta):
         [1, 2.0]
 
         >>> # Leaf-wise math operations are supported by setting `leafwise=True`
-        >>> class Tree(pytc.TreeClass, leafwise=True):
+        >>> @pytc.leafwise
+        ... @pytc.autoinit
+        ... class Tree(pytc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
@@ -178,7 +134,8 @@ class TreeClass(metaclass=TreeClassMeta):
         Tree(a=2, b=3.0)
 
         >>> # Advanced indexing is supported using `at` property
-        >>> class Tree(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class Tree(pytc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
@@ -186,64 +143,40 @@ class TreeClass(metaclass=TreeClassMeta):
         Tree(a=1, b=None)
         >>> tree.at[0].get()
         Tree(a=1, b=None)
-
-    Note:
-        ``leafwise=True`` adds the following methods to the class
-
-        ==================      ============
-        Method                  Operator
-        ==================      ============
-        ``__add__``              ``+``
-        ``__and__``              ``&``
-        ``__ceil__``             ``math.ceil``
-        ``__divmod__``           ``divmod``
-        ``__eq__``               ``==``
-        ``__floor__``            ``math.floor``
-        ``__floordiv__``         ``//``
-        ``__ge__``               ``>=``
-        ``__gt__``               ``>``
-        ``__invert__``           ``~``
-        ``__le__``               ``<=``
-        ``__lshift__``           ``<<``
-        ``__lt__``               ``<``
-        ``__matmul__``           ``@``
-        ``__mod__``              ``%``
-        ``__mul__``              ``*``
-        ``__ne__``               ``!=``
-        ``__neg__``              ``-``
-        ``__or__``               ``|``
-        ``__pos__``              ``+``
-        ``__pow__``              ``**``
-        ``__round__``            ``round``
-        ``__sub__``              ``-``
-        ``__truediv__``          ``/``
-        ``__trunc__``            ``math.trunc``
-        ``__xor__``              ``^``
-        ==================      ============
-
     """
 
-    def __init_subclass__(klass: type[T], *a, leafwise: bool = False, **k) -> None:
-        if "__setattr__" in vars(klass) or "__delattr__" in vars(klass):
-            raise TypeError(
-                f"Unable to transform the class `{klass.__name__}` "
-                "with resereved methods: `__setattr__` or `__delattr__` "
-                "defined.\nReserved `setters` and `deleters` implements "
-                "the immutable functionality and cannot be overriden."
-            )
+    def __init_subclass__(klass: type[T]):
+        if "__setattr__" in vars(klass):
+            raise TypeError(f"Reserved methods: `__setattr__` defined in `{klass}`.")
+        if "__delattr__" in vars(klass):
+            raise TypeError(f"Reserved methods: `__delattr__` defined in `{klass}`.")
 
-        super().__init_subclass__(*a, **k)
+        super().__init_subclass__()
 
-        if "__init__" not in vars(klass):
-            # generate the init method if not defined similar to `dataclass`
-            setattr(klass, "__init__", _build_init_method(klass))
+        def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
+            # unflatten rule to use with `jax.tree_unflatten`
+            vars(tree := getattr(object, "__new__")(klass)).update(zip(keys, leaves))
+            return tree
 
-        if leafwise:
-            # transform the class to support leafwise operations
-            # useful to use with `bcmap` and creating masks by comparisons.
-            klass = _leafwise_transform(klass)
+        def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
+            # flatten rule to use with `jax.tree_flatten`
+            dynamic = vars(tree)
+            return tuple(dynamic.values()), tuple(dynamic.keys())
 
-        klass = _register_treeclass(klass)
+        def tree_flatten_with_keys(tree: T):
+            # flatten rule to use with `jax.tree_util.tree_flatten_with_path`
+            dynamic = dict(vars(tree))
+            for idx, key in enumerate(vars(tree)):
+                entry = NamedSequenceKey(idx, key)
+                dynamic[key] = (entry, dynamic[key])
+            return tuple(dynamic.values()), tuple(dynamic.keys())
+
+        jtu.register_pytree_with_keys(
+            nodetype=klass,
+            flatten_func=tree_flatten,
+            flatten_with_keys=tree_flatten_with_keys,
+            unflatten_func=tree_unflatten,
+        )
 
     def __setattr__(self, key: str, value: Any) -> None:
         if id(self) not in _mutable_instance_registry:
@@ -262,10 +195,6 @@ class TreeClass(metaclass=TreeClassMeta):
                 f">>> tree2.{key}\n{value}"
             )
 
-        if key in (field_map := _build_field_map(type(self))):
-            # apply field callbacks on the value before setting
-            value = field_map[key](value)
-
         getattr(object, "__setattr__")(self, key, value)
 
     def __delattr__(self, key: str) -> None:
@@ -276,7 +205,6 @@ class TreeClass(metaclass=TreeClassMeta):
                 f"on immutable instance of `{type(self).__name__}`.\n"
                 f"Use `.at['{key}'].set(None)` instead."
             )
-
         getattr(object, "__delattr__")(self, key)
 
     @property
@@ -303,7 +231,8 @@ class TreeClass(metaclass=TreeClassMeta):
 
         Example:
             >>> import pytreeclass as pytc
-            >>> class Tree(pytc.TreeClass):
+            >>> @pytc.autoinit
+            ... class Tree(pytc.TreeClass):
             ...     a:int = 1
             ...     b:float = 2.0
             ...     def add(self, x:int) -> int:
