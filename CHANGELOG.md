@@ -1,5 +1,115 @@
 # Changelog
 
+## `PyTreeClass` v0.5
+
+## Breaking changes
+
+#### __Auto generation of `__init__` method from type hints is decoupled from `TreeClass`__
+
+__Alternatives__
+
+Use:
+
+1) _Preferably_ decorate with `pytreeclass.autoinit` with `pytreeclass.field` as field specifier. as `pytreeclass.field` has more features (e.g. `callbacks`, multiple argument kind selection) and the init generation is cached compared to `dataclasses`.
+2) decorate with `dataclasses.dataclass` with `dataclasses.field` as field specifier. however :
+   1) _Must_ set `fronzen=False` because the `__setattr__`, `__delattr__` is handled by `TreeClass`
+   2) _Optionally_ `repr=False` to be handled by `TreeClass`
+   3) _Optionally_ `eq=hash=False` as it is handled by `TreeClass`
+
+<div align="center">
+
+<table>
+<tr>
+
+<td>
+
+### Before
+
+```python
+import jax.tree_util as jtu
+import pytreeclass as pytc
+import dataclasses as dc
+
+class Tree(pytc.TreeClass):
+    a: int = 1
+
+jtu.tree_leaves(Tree())
+# [1]
+
+```
+
+</td>
+
+<td>
+
+### After
+Equivalent behavior when decorating with either: 
+
+1) `@pytreeclass.autoinit`
+2) `@dataclasses.dataclass` 
+
+```python
+import jax.tree_util as jtu
+import pytreeclass as pytc
+
+@pytc.autoinit
+class Tree(pytc.TreeClass):
+    a: int = 1
+
+jtu.tree_leaves(Tree())
+# [1]
+
+```
+
+</td>
+
+<tr>
+
+</table>
+
+</div>
+
+
+This change aims to fix the ambiguity of using the `dataclass` mental model in the following siutations:
+
+1) subclassing. previously, using `TreeClass` as a base class is equivalent to decorating the class with `dataclasses.dataclass`, however this is a bit challenging to understand as demonstrated in the next example:
+
+    ``` python
+    import pytreeclass as pytc
+    import dataclasses as dc
+
+    class A(pytc.TreeClass):
+        def ___init__(self, a:int):
+            self.a = a
+
+    class B(A):
+        ...
+
+    ```
+
+    When instantiating `B(a=...)`, an error will be raised, because using `TreeClass` is equivalent of decorating all classes with `@dataclass`, which synthesize the `__init__` method based on the fields.
+    Since no fields (e.g. type hinted values) then the synthesized `__init__` method .
+
+    The previous code is equivalent to this code.
+
+    ```python
+    @dc.dataclass
+    class A:
+        def __init__(self, a:int):
+            self.a = a
+    @dc.dataclass
+    class B:
+        ...
+    ```
+
+2) `dataclass_transform` does not play nicely with user created `__init__` see [1](https://github.com/microsoft/pyright/issues/4738), [2](https://github.com/python/typing/discussions/1187)
+
+
+#### `leafwise_transform` is decoupled from `TreeClass`.
+
+instead decorate the class with `pytreeclass.leafwise`.
+
+
 ## `PyTreeClass` v0.4
 
 ### Changes

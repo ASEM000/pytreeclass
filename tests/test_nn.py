@@ -94,7 +94,8 @@ def test_compact_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    class StackedLinear(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    class StackedLinear(pytc.TreeClass):
         def __init__(self, key, in_dim, out_dim, hidden_dim):
             keys = jr.split(key, 3)
 
@@ -134,7 +135,8 @@ def test_compact_nn():
 
 
 def test_freeze_nondiff():
-    class Linear(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    class Linear(pytc.TreeClass):
         def __init__(self, key, in_dim, out_dim):
             self.weight = jr.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
             self.bias = jnp.ones((1, out_dim))
@@ -144,7 +146,8 @@ def test_freeze_nondiff():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    class StackedLinear(pytc.TreeClass, leafwise=True):
+    @pytc.leafwise
+    class StackedLinear(pytc.TreeClass):
         def __init__(self, key, in_dim, out_dim, hidden_dim):
             self.name = "stack"
             keys = jr.split(key, 3)

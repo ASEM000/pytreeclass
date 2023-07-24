@@ -57,7 +57,7 @@ import jax
 import jax.numpy as jnp
 import pytreeclass as pytc
 
-
+@pytc.autoinit
 class Tree(pytc.TreeClass):
     a: float = 1.0
     b: tuple[float, float] = (2.0, 3.0)
@@ -135,7 +135,8 @@ import jax
 import pytreeclass as pytc
 
 class Counter(pytc.TreeClass):
-    calls : int = 0
+    def __init__(self, calls: int = 0):
+        self.calls = calls
 
     def increment(self):
         self.calls += 1

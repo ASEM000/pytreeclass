@@ -30,7 +30,9 @@ from pytreeclass._src.tree_base import _mutable_context
 from pytreeclass._src.tree_util import construct_tree
 
 
-class Tree(TreeClass, leafwise=True):
+@pytc.leafwise
+@pytc.autoinit
+class Tree(TreeClass):
     a: float
     b: float
     c: float
@@ -42,12 +44,16 @@ class Tree(TreeClass, leafwise=True):
 
 
 def test_getter_by_val():
-    class level1(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class level1(TreeClass):
         a: int
         b: int
         c: int
 
-    class level2(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class level2(TreeClass):
         d: level1
         e: level1
 
@@ -88,18 +94,24 @@ def test_getter_by_val():
 
 
 def test_getter_by_param():
-    class L0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L0(TreeClass):
         a: int = 1
         b: int = 2
         c: int = 3
 
-    class L1(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L1(TreeClass):
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    class L2(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L2(TreeClass):
         a: int = 10
         b: int = 20
         c: int = 30
@@ -115,12 +127,16 @@ def test_getter_by_param():
 
 
 def test_setter_by_val():
-    class level1(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class level1(TreeClass):
         a: int
         b: int
         c: int
 
-    class level2(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class level2(TreeClass):
         d: level1
         e: level1
 
@@ -144,19 +160,24 @@ def test_setter_by_val():
 
     # with pytest.raises(NotImplementedError):
     #     B = A.at[0].set(0)
-
-    class L0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L0(TreeClass):
         a: int = 1
         b: int = 2
         c: int = 3
 
-    class L1(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L1(TreeClass):
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    class L2(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L2(TreeClass):
         a: int = 10
         b: int = 20
         c: int = 30
@@ -170,7 +191,9 @@ def test_setter_by_val():
 
 
 def test_apply_and_its_derivatives():
-    class A(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(TreeClass):
         a: int
         b: int
         c: jnp.ndarray
@@ -205,18 +228,24 @@ def test_apply_and_its_derivatives():
     with pytest.raises(NotImplementedError):
         init.at[init].apply(lambda x: (x + 1) * 10)
 
-    class L0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L0(TreeClass):
         a: int = 1
         b: int = 2
         c: int = 3
 
-    class L1(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L1(TreeClass):
         a: int = 1
         b: int = 2
         c: int = 3
         d: L0 = L0()
 
-    class L2(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L2(TreeClass):
         a: int = 10
         b: int = 20
         c: int = 30
@@ -279,7 +308,9 @@ def test_apply_and_its_derivatives():
 
 
 def test_reduce():
-    class A(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(TreeClass):
         a: int
         b: int
         c: jnp.ndarray
@@ -298,7 +329,9 @@ def test_reduce():
     rhs = init.at[init > 100].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
     assert lhs == rhs
 
-    class B(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class B(TreeClass):
         a: int
         b: int
         c: jnp.ndarray
@@ -313,7 +346,9 @@ def test_reduce():
     with pytest.raises(NotImplementedError):
         init.at[init].reduce(lambda x, y: x + jnp.sum(y), initializer=0)
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: tuple[int]
 
     lhs = Tree((1, 2, 3)).at["a"].reduce(lambda x, y: x + y, initializer=0)
@@ -321,10 +356,8 @@ def test_reduce():
 
 
 def test_reduce_and_its_derivatives():
-    class Linear(TreeClass, leafwise=True):
-        weight: jnp.ndarray
-        bias: jnp.ndarray
-
+    @pytc.leafwise
+    class Linear(TreeClass):
         def __init__(self, key, in_dim, out_dim):
             self.weight = jax.random.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(
                 2 / in_dim
@@ -334,10 +367,8 @@ def test_reduce_and_its_derivatives():
         # def __call__(self, x):
         #     return x @ self.weight + self.bias
 
-    class StackedLinear(TreeClass, leafwise=True):
-        l1: Linear
-        l2: Linear
-
+    @pytc.leafwise
+    class StackedLinear(TreeClass):
         def __init__(self, key, in_dim, out_dim, hidden_dim):
             keys = jax.random.split(key, 3)
 
@@ -367,7 +398,9 @@ def test_reduce_and_its_derivatives():
 
 
 def test_is_leaf():
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int
 
     t = Tree([1, 2, 3, None])
@@ -385,10 +418,14 @@ def test_is_leaf():
 
 
 def test_attribute_get():
-    class l0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -398,10 +435,14 @@ def test_attribute_get():
 
 
 def test_attribute_set():
-    class l0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -414,10 +455,14 @@ def test_attribute_set():
 
 
 def test_attributre_apply():
-    class l0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -430,10 +475,14 @@ def test_attributre_apply():
 
 
 def test_trace_get():
-    class l0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -453,10 +502,14 @@ def test_trace_get():
 
 
 def test_trace_set():
-    class l0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -469,10 +522,14 @@ def test_trace_set():
 
 
 def test_trace_apply():
-    class l0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -485,7 +542,9 @@ def test_trace_apply():
 
 
 def test_trace_reduce():
-    class A(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(TreeClass):
         a: int
         b: int
         c: jnp.ndarray
@@ -498,11 +557,15 @@ def test_trace_reduce():
 
 
 def test_mixed_get():
-    class l0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
         b: int = 1
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -515,11 +578,15 @@ def test_mixed_get():
 
 
 def test_mixed_set():
-    class l0(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
         b: int = 1
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -536,11 +603,13 @@ def test_mixed_set():
 
 
 def test_mixed_apply():
-    class l0(TreeClass, leafwise=True):
+    @pytc.autoinit
+    class l0(TreeClass):
         a: int = 2
         b: int = 1
 
-    class Tree(TreeClass, leafwise=True):
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: l0 = l0()
 
@@ -554,7 +623,9 @@ def test_mixed_apply():
 
 
 def test_method_call():
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
 
         def increment(self):
@@ -565,6 +636,7 @@ def test_method_call():
 
     t = Tree()
 
+    @pytc.autoinit
     class Tree2(TreeClass):
         b: Tree = Tree()
 
@@ -577,7 +649,9 @@ def test_method_call():
     with pytest.raises(TypeError):
         t.at["a"]()
 
-    class A(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class A(TreeClass):
         a: int
 
         def __call__(self, x):
@@ -595,9 +669,8 @@ def test_method_call():
 
 
 def test_composed_at():
-    class Tree(TreeClass, leafwise=True):
-        a: jnp.ndarray
-
+    @pytc.leafwise
+    class Tree(TreeClass):
         def __init__(self, a=jnp.array([1, 2, 3, 4, 5])) -> None:
             self.a = a
 
@@ -615,7 +688,9 @@ def test_composed_at():
 
 
 def test_repr_str():
-    class Tree(TreeClass, leafwise=True):
+    @pytc.autoinit
+    @pytc.leafwise
+    class Tree(TreeClass):
         a: int = 1
         b: int = 2
 
@@ -627,7 +702,9 @@ def test_repr_str():
 
 
 def test_not_equal():
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int = 1
         b: float = 1.0
 
@@ -637,7 +714,9 @@ def test_not_equal():
 
 
 def test_iterable_node():
-    class Tree(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class Tree(TreeClass):
         a: int
 
     t = Tree([1, 2, 3, 4])
@@ -645,7 +724,9 @@ def test_iterable_node():
 
 
 def test_call_context():
-    class L2(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L2(TreeClass):
         a: int = 1
 
         def delete(self, name):
@@ -661,7 +742,9 @@ def test_call_context():
 
 
 def test_unsupported_indexing_type():
-    class L2(TreeClass, leafwise=True):
+    @pytc.leafwise
+    @pytc.autoinit
+    class L2(TreeClass):
         a: int = 1
 
         def delete(self, name):
@@ -691,7 +774,8 @@ def test_nested_indexing():
         # test `FlattenedIndexKey`
         pass
 
-    class Tree(pytc.TreeClass, leafwise=True):
+    @pytc.autoinit
+    class Tree(pytc.TreeClass):
         a: Any = (1, {"b": Dict({"c": 1})})
 
     tree = Tree()
@@ -709,6 +793,7 @@ def test_construct_tree():
 
 
 def test_regexkey():
+    @pytc.autoinit
     class Tree(pytc.TreeClass):
         weight_1: float = 1.0
         weight_2: float = 2.0
@@ -764,6 +849,7 @@ def test_custom_key():
 
 
 def test_multi_key():
+    @pytc.autoinit
     class Tree(pytc.TreeClass):
         a: int = 1
         b: int = 2
@@ -777,6 +863,7 @@ def test_multi_key():
 
 
 def test_scan():
+    @pytc.autoinit
     class Tree(pytc.TreeClass):
         a: int = 1
         b: int = 2

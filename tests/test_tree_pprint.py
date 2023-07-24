@@ -36,7 +36,9 @@ from pytreeclass import (
 )
 
 
-class Repr1(TreeClass, leafwise=True):
+@pytc.leafwise
+@pytc.autoinit
+class Repr1(TreeClass):
     a: int = 1
     b: str = "string"
     c: float = 1.0
@@ -198,14 +200,17 @@ def test_misc():
 
 
 def test_extra_tree_diagram():
+    @pytc.autoinit
     class L0(TreeClass):
         a: int = 1
         b: int = 2
 
+    @pytc.autoinit
     class L1(TreeClass):
         c: L0 = L0()
         d: int = 3
 
+    @pytc.autoinit
     class L2(TreeClass):
         e: int = 4
         f: L1 = L1()
@@ -218,9 +223,11 @@ def test_extra_tree_diagram():
 
     assert (tree_diagram(tree)) == out
 
+    @pytc.autoinit
     class L0(TreeClass):
         a: int = 1
 
+    @pytc.autoinit
     class L1(TreeClass):
         b: L0 = L0()
 
@@ -239,7 +246,9 @@ def test_invalid_depth():
 
 
 def test_tree_repr_with_trace():
-    class Test(TreeClass, leafwise=True):
+    @pytc.autoinit
+    @pytc.leafwise
+    class Test(TreeClass):
         a: int = 1
         b: float = 2.0
 

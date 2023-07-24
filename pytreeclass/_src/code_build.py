@@ -21,7 +21,9 @@ import sys
 from collections import defaultdict
 from collections.abc import Callable, MutableMapping, MutableSequence, MutableSet
 from types import FunctionType, MappingProxyType
-from typing import Any, Literal, NamedTuple, Sequence, TypeVar, get_args
+from typing import Any, Literal, Sequence, TypeVar, get_args
+
+from typing_extensions import dataclass_transform
 
 T = TypeVar("T")
 PyTree = Any
@@ -33,16 +35,40 @@ MUTABLE_TYPES = (MutableSequence, MutableMapping, MutableSet)
 # https://github.com/google/jax/issues/14295
 
 
-class Field(NamedTuple):
-    name: str | None = None
-    type: type | None = None
-    default: Any = NULL
-    init: bool = True
-    repr: bool = True
-    kind: ArgKindType = "POS_OR_KW"
-    metadata: dict[str, Any] | None = None
-    callbacks: Sequence[Callable[[Any], Any]] = ()
-    alias: str | None = None
+class Field:
+    __slots__ = [
+        "name",
+        "type",
+        "default",
+        "init",
+        "repr",
+        "kind",
+        "metadata",
+        "callbacks",
+        "alias",
+    ]
+
+    def __init__(
+        self,
+        name: str | None = None,
+        type: type | None = None,
+        default: Any = NULL,
+        init: bool = True,
+        repr: bool = True,
+        kind: ArgKind = "POS_OR_KW",
+        metadata: dict[str, Any] | None = None,
+        callbacks: Sequence[Callable[[Any], Any]] = (),
+        alias: str | None = None,
+    ):
+        self.name = name
+        self.type = type
+        self.default = default
+        self.init = init
+        self.repr = repr
+        self.kind = kind
+        self.metadata = metadata
+        self.callbacks = callbacks
+        self.alias = alias
 
     def __call__(self, value: Any):
         """Call the callbacks on `value`."""
@@ -53,6 +79,35 @@ class Field(NamedTuple):
                 cname = getattr(callback, "__name__", callback)
                 raise type(e)(f"On applying {cname} for field=`{self.name}`:\n{e}")
         return value
+
+    def __repr__(self):
+        """Generate a string representation of the Field instance."""
+        return f"Field({', '.join(f'{k}={getattr(self, k)}' for k in self.__slots__)})"
+
+    def replace(self, **kwargs) -> "Field":
+        """Return a new Field instance with the given fields replaced."""
+        return Field(
+            name=kwargs.get("name", self.name),
+            type=kwargs.get("type", self.type),
+            default=kwargs.get("default", self.default),
+            init=kwargs.get("init", self.init),
+            repr=kwargs.get("repr", self.repr),
+            kind=kwargs.get("kind", self.kind),
+            metadata=kwargs.get("metadata", self.metadata),
+            callbacks=kwargs.get("callbacks", self.callbacks),
+            alias=kwargs.get("alias", self.alias),
+        )
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return vars(instance)[self.name]
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __set__(self, instance, value):
+        vars(instance)[self.name] = self(value)
 
 
 def field(
@@ -69,9 +124,10 @@ def field(
 
     Args:
         default: The default value of the field.
-        init: Whether the field is included in the object's __init__ function.
-        repr: Whether the field is included in the object's __repr__ function.
-        kind: Argument kind, one of 'POS_ONLY', 'VAR_POS', 'KW_ONLY', 'VAR_KW'.
+        init: Whether the field is included in the object's ``__init__`` function.
+        repr: Whether the field is included in the object's ``__repr__`` function.
+        kind: Argument kind, one of: ``POS_ONLY``, ``VAR_POS``, ``POS_OR_KW`` ,
+            ``KW_ONLY``, ``VAR_KW``
         metadata: A mapping of user-defined data for the field.
         callbacks: A sequence of functions to called on ``__setattr__`` during
             initialization to modify the field value.
@@ -79,18 +135,21 @@ def field(
 
     Example:
         >>> import pytreeclass as pytc
-        >>> class IsInstance(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class IsInstance(pytc.TreeClass):
         ...    klass: type
         ...    def __call__(self, x):
         ...        assert isinstance(x, self.klass)
         ...        return x
-        >>> class Range(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class Range(pytc.TreeClass):
         ...    start: int|float = float("-inf")
         ...    stop: int|float = float("inf")
         ...    def __call__(self, x):
         ...        assert self.start <= x <= self.stop
         ...        return x
-        >>> class Employee(pytc.TreeClass):
+        >>> @pytc.autoinit
+        ... class Employee(pytc.TreeClass):
         ...    # assert employee ``name`` is str
         ...    name: str = pytc.field(callbacks=[IsInstance(str)])
         ...    # use callback compostion to assert employee ``age`` is int and positive
@@ -155,7 +214,7 @@ def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
                 # example case: `x: Any = field(default=[1, 2, 3])`
                 raise TypeError(f"Mutable {value.default=} is not allowed.")
             # case: `x: Any = field(default=1)`
-            field_map[name] = value._replace(name=name, type=hint)
+            field_map[name] = value.replace(name=name, type=hint)
         else:
             if isinstance(value, MUTABLE_TYPES):
                 # example case: `x: Any = [1, 2, 3]`
@@ -232,3 +291,25 @@ def _build_init_method(klass: type) -> FunctionType:
     exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
     setattr(init := namespace["closure"](field_map), "__annotations__", hints)
     return init
+
+
+@dataclass_transform(field_specifiers=(Field, field))
+def autoinit(klass: type[T]) -> type[T]:
+    """A class decorator that generates the ``__init__`` method from type hints.
+
+    Similar to ``dataclasses.dataclass``, this decorator generates the ``__init__``
+    method for the given class from the type hints or the :func:`field` objects
+    set to the class attributes.
+
+    Example:
+        >>> import pytreeclass as pytc
+        >>> @pytc.autoinit
+        ... class Tree:
+        ...     x: int
+        ...     y: int
+        >>> tree = Tree(1, 2)
+        >>> tree.x, tree.y
+        (1, 2)
+    """
+    klass.__init__ = _build_init_method(klass)
+    return klass
