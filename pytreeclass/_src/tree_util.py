@@ -308,14 +308,14 @@ def leafwise(klass: type[T]) -> type[T]:
         >>> import jax.numpy as jnp
         >>> @pytc.leafwise
         ... @pytc.autoinit
-        ... class Point(sk.TreeClass):
+        ... class Point(pytc.TreeClass):
         ...    x: float = 0.5
         ...    y: float = 1.0
         ...    description: str = "point coordinates"
         >>> # use :func:`tree_mask` to mask the non-inexact part of the tree
         >>> # i.e. mask the string leaf ``description`` to ``Point`` work
         >>> # with ``jax.numpy`` functions
-        >>> co = sk.tree_mask(Point())
+        >>> co = pytc.tree_mask(Point())
         >>> print(pytc.bcmap(jnp.where)(co > 0.5, co, 1000))
         Point(x=1000.0, y=1.0, description=#point coordinates)
 
