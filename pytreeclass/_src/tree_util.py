@@ -304,10 +304,10 @@ def leafwise(klass: type[T]) -> type[T]:
 
     Example:
         >>> # use ``numpy`` functions on :class:`TreeClass`` classes decorated with ``leafwise``
-        >>> import serket as sk
+        >>> import pytreeclass as pytc
         >>> import jax.numpy as jnp
-        >>> @sk.leafwise
-        ... @sk.autoinit
+        >>> @pytc.leafwise
+        ... @pytc.autoinit
         ... class Point(sk.TreeClass):
         ...    x: float = 0.5
         ...    y: float = 1.0
@@ -316,7 +316,7 @@ def leafwise(klass: type[T]) -> type[T]:
         >>> # i.e. mask the string leaf ``description`` to ``Point`` work
         >>> # with ``jax.numpy`` functions
         >>> co = sk.tree_mask(Point())
-        >>> print(sk.bcmap(jnp.where)(co > 0.5, co, 1000))
+        >>> print(pytc.bcmap(jnp.where)(co > 0.5, co, 1000))
         Point(x=1000.0, y=1.0, description=#point coordinates)
 
     Note:
