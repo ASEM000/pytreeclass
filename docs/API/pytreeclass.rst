@@ -5,6 +5,7 @@
    :maxdepth: 2
    :caption: API Documentation
 
-   pytreeclass_core
-   pytreeclass_advanced_api
-   pytreeclass_pretty_print
+   core
+   masking
+   advanced_api
+   pretty_print

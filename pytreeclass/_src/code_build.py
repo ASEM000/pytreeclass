@@ -291,6 +291,10 @@ def autoinit(klass: type[T]) -> type[T]:
     method for the given class from the type hints or the :func:`field` objects
     set to the class attributes.
 
+    Compared to ``dataclasses.dataclass``, ``autoinit`` with :func:`field` objects
+    can be used to apply functions on the field values during initialization,
+    and/or support multiple argument kinds.
+
     Example:
         >>> import pytreeclass as pytc
         >>> @pytc.autoinit
@@ -300,6 +304,22 @@ def autoinit(klass: type[T]) -> type[T]:
         >>> tree = Tree(1, 2)
         >>> tree.x, tree.y
         (1, 2)
+
+    Example:
+        >>> # define fields with different argument kinds
+        >>> import pytreeclass as pytc
+        >>> @pytc.autoinit
+        ... class Tree:
+        ...     kw_only_field: int = pytc.field(default=1, kind="KW_ONLY")
+        ...     pos_only_field: int = pytc.field(default=2, kind="POS_ONLY")
+
+    Example:
+        >>> # define a validator to apply ``abs`` on the field value
+        >>> @pytc.autoinit
+        ... class Tree:
+        ...     a:int = pytc.field(callbacks=[abs])
+        >>> Tree(a=-1).a
+        1
     """
     klass.__init__ = _build_init_method(klass)
     return klass

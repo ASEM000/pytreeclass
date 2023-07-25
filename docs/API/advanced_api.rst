@@ -1,4 +1,4 @@
-Advanced API
+➕ Advanced API
 ---------------------------------------
 .. currentmodule:: pytreeclass
 

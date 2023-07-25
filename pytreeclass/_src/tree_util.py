@@ -302,6 +302,23 @@ def leafwise(klass: type[T]) -> type[T]:
     Returns:
         The decorated class.
 
+    Example:
+        >>> # use ``numpy`` functions on :class:`TreeClass`` classes decorated with ``leafwise``
+        >>> import serket as sk
+        >>> import jax.numpy as jnp
+        >>> @sk.leafwise
+        ... @sk.autoinit
+        ... class Point(sk.TreeClass):
+        ...    x: float = 0.5
+        ...    y: float = 1.0
+        ...    description: str = "point coordinates"
+        >>> # use :func:`tree_mask` to mask the non-inexact part of the tree
+        >>> # i.e. mask the string leaf ``description`` to ``Point`` work
+        >>> # with ``jax.numpy`` functions
+        >>> co = sk.tree_mask(Point())
+        >>> print(sk.bcmap(jnp.where)(co > 0.5, co, 1000))
+        Point(x=1000.0, y=1.0, description=#point coordinates)
+
     Note:
         If a mathematically equivalent operator is already defined on the class,
         then it is not overridden.
@@ -336,7 +353,6 @@ def leafwise(klass: type[T]) -> type[T]:
     ``__trunc__``            ``math.trunc``
     ``__xor__``              ``^``
     ==================      ============
-
     """
     for key, method in (
         ("__abs__", uop(abs)),
