@@ -145,13 +145,13 @@ class TreeClass(metaclass=TreeClassMeta):
         Tree(a=1, b=None)
     """
 
-    def __init_subclass__(klass: type[T]):
+    def __init_subclass__(klass: type[T], **k):
         if "__setattr__" in vars(klass):
             raise TypeError(f"Reserved methods: `__setattr__` defined in `{klass}`.")
         if "__delattr__" in vars(klass):
             raise TypeError(f"Reserved methods: `__delattr__` defined in `{klass}`.")
 
-        super().__init_subclass__()
+        super().__init_subclass__(**k)
 
         def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
             # unflatten rule to use with `jax.tree_unflatten`

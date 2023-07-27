@@ -588,3 +588,14 @@ def test_kind():
         class Tree(pytc.TreeClass):
             a: int = pytc.field(kind="VAR_KW")
             b: int = pytc.field(kind="VAR_KW")
+
+
+def test_init_subclass():
+    class Test:
+        def __init_subclass__(cls, hello):
+            cls.hello = hello
+
+    class Test2(pytc.TreeClass, Test, hello=1):
+        ...
+
+    assert Test2.hello == 1

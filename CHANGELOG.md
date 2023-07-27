@@ -1,5 +1,10 @@
 # Changelog
 
+## `PyTreeClass` v0.5post0
+
+- fix `__init_subclass__`. not accepting arguments. this bug is introduced since `v0.5`
+
+
 ## `PyTreeClass` v0.5
 
 ## Breaking changes
