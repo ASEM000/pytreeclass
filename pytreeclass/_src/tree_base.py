@@ -209,7 +209,7 @@ class TreeClass(metaclass=TreeClassMeta):
         getattr(object, "__setattr__")(self, key, value)
 
     def __delattr__(self, key: str) -> None:
-        if id(getattr(self, key)) not in _mutable_instance_registry:
+        if id(self) not in _mutable_instance_registry:
             # instance is not under a mutable context
             raise AttributeError(
                 f"Cannot delete attribute `{key}` "

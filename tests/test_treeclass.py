@@ -617,5 +617,11 @@ def test_nested_mutation():
         def ff(self):
             return self.inner.f()
 
+        def df(self):
+            del self.inner.a
+
     _, v = OuterModule().at["ff"]()
     assert v.inner.a == 2
+
+    _, v = OuterModule().at["df"]()
+    assert "a" not in v.inner.__dict__
