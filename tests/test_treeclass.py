@@ -599,3 +599,29 @@ def test_init_subclass():
         ...
 
     assert Test2.hello == 1
+
+
+def test_nested_mutation():
+    @pytc.autoinit
+    class InnerModule(pytc.TreeClass):
+        a: int = 1
+
+        def f(self):
+            self.a += 1
+            return self.a
+
+    @pytc.autoinit
+    class OuterModule(pytc.TreeClass):
+        inner: InnerModule = InnerModule()
+
+        def ff(self):
+            return self.inner.f()
+
+        def df(self):
+            del self.inner.a
+
+    _, v = OuterModule().at["ff"]()
+    assert v.inner.a == 2
+
+    _, v = OuterModule().at["df"]()
+    assert "a" not in v.inner.__dict__

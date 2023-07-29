@@ -57,9 +57,20 @@ _mutable_instance_registry: set[int] = set()
 @contextmanager
 def _mutable_context(tree, *, kopy: bool = False):
     tree = tree_copy(tree) if kopy else tree
-    _mutable_instance_registry.add(id(tree))
+
+    jtu.tree_map(
+        lambda node: node,
+        tree,
+        is_leaf=lambda node: _mutable_instance_registry.add(id(node)),
+    )
+
     yield tree
-    _mutable_instance_registry.discard(id(tree))
+
+    jtu.tree_map(
+        lambda node: node,
+        tree,
+        is_leaf=lambda node: _mutable_instance_registry.discard(id(node)),
+    )
 
 
 class TreeClassIndexer(AtIndexer):
