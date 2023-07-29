@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import abc
-from contextlib import contextmanager
 from typing import Any, Hashable, TypeVar
 
 import jax
@@ -47,19 +46,24 @@ PyTree = Any
 EllipsisType = type(Ellipsis)
 
 
-# allow methods in mutable context to be called without raising `AttributeError`
-# the instances are registered  during initialization and using `at`  property
-# with `__call__` this is done by registering the instance id in a set before
-# entering the mutable context and removing it after exiting the context
+# allow methods in mutable registry to be called without raising `AttributeError`
 _mutable_instance_registry: set[int] = set()
 
 
-@contextmanager
-def _mutable_context(tree, *, kopy: bool = False):
-    tree = tree_copy(tree) if kopy else tree
-    _mutable_instance_registry.add(id(tree))
-    yield tree
-    _mutable_instance_registry.discard(id(tree))
+def add_mutable_entry(node) -> None:
+    _mutable_instance_registry.add(id(node))
+
+
+def discard_mutable_entry(node) -> None:
+    _mutable_instance_registry.discard(id(node))
+
+
+def recursive_getattr(tree: Any, where: tuple[str, ...]):
+    if not isinstance(where[0], str):
+        raise TypeError(f"Expected string, got {type(where[0])!r}.")
+    if len(where) == 1:
+        return getattr(tree, where[0])
+    return recursive_getattr(getattr(tree, where[0]), where[1:])
 
 
 class TreeClassIndexer(AtIndexer):
@@ -88,24 +92,20 @@ class TreeClassIndexer(AtIndexer):
             - `AttributeError` is raised, If the function mutates the instance.
             - Use .at["method_name"](*, **) to call a method that mutates the instance.
         """
-
-        def recursive_getattr(tree: Any, where: tuple[str, ...]):
-            if not isinstance(where[0], str):
-                raise TypeError(f"Expected string, got {type(where[0])!r}.")
-            if len(where) == 1:
-                return getattr(tree, where[0])
-            return recursive_getattr(getattr(tree, where[0]), where[1:])
-
-        with _mutable_context(self.tree, kopy=True) as tree:
-            value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
+        tree = tree_copy(self.tree)
+        jtu.tree_map(lambda _: _, tree, is_leaf=add_mutable_entry)
+        value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
+        jtu.tree_map(lambda _: _, tree, is_leaf=discard_mutable_entry)
         return value, tree
 
 
 class TreeClassMeta(abc.ABCMeta):
     def __call__(klass: type[T], *a, **k) -> T:
-        with _mutable_context(self := getattr(klass, "__new__")(klass, *a, **k)):
-            getattr(klass, "__init__")(self, *a, **k)
-        return self
+        tree = getattr(klass, "__new__")(klass, *a, **k)
+        add_mutable_entry(tree)
+        getattr(klass, "__init__")(tree, *a, **k)
+        discard_mutable_entry(tree)
+        return tree
 
 
 class TreeClass(metaclass=TreeClassMeta):

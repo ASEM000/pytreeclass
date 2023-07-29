@@ -26,7 +26,7 @@ import pytest
 
 import pytreeclass as pytc
 from pytreeclass import TreeClass
-from pytreeclass._src.tree_base import _mutable_context
+from pytreeclass._src.tree_base import add_mutable_entry, discard_mutable_entry
 from pytreeclass._src.tree_util import construct_tree
 
 
@@ -734,8 +734,9 @@ def test_call_context():
 
     t = L2()
 
-    with _mutable_context(t) as tx:
-        tx.delete("a")
+    add_mutable_entry(t)
+    t.delete("a")
+    discard_mutable_entry(t)
 
     with pytest.raises(AttributeError):
         t.delete("a")
