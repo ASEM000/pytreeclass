@@ -80,20 +80,13 @@ class Field:
                 raise type(e)(f"On applying {cname} for field=`{self.name}`:\n{e}")
         return value
 
-    def __repr__(self):
-        """Generate a string representation of the Field instance."""
-        return f"Field({', '.join(f'{k}={getattr(self, k)}' for k in self.__slots__)})"
-
     def replace(self, **kwargs) -> "Field":
-        """Return a new Field instance with the given fields replaced."""
-        return Field(**{k: kwargs.get(k, getattr(self, k)) for k in self.__slots__})
+        return Field(**{k: kwargs.get(k, getattr(self, k)) for k in Field.__slots__})
 
     def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        return vars(instance)[self.name]
+        return self if instance is None else vars(instance)[self.name]
 
-    def __set_name__(self, owner, name):
+    def __set_name__(self, _, name):
         self.name = name
 
     def __set__(self, instance, value):
@@ -177,40 +170,44 @@ def field(
 
 
 @ft.lru_cache(maxsize=128)
-def _build_field_map(klass: type) -> MappingProxyType[str, Field]:
+def build_field_map(klass: type) -> MappingProxyType[str, Field]:
     field_map: dict[str, Field] = dict()
 
     if klass is object:
         return MappingProxyType(field_map)
 
     for base in reversed(klass.__mro__[1:]):
-        field_map.update(_build_field_map(base))
+        field_map.update(build_field_map(base))
 
-    # TODO: use inspect to get annotations, once min python version >3.9
-    if "__annotations__" not in vars(klass):
+    if (hint_map := vars(klass).get("__annotations__", NULL)) is NULL:
         return MappingProxyType(field_map)
 
-    for name in (annotation_map := vars(klass)["__annotations__"]):
-        value = vars(klass).get(name, NULL)
-        hint = annotation_map[name]
+    if "self" in hint_map:
+        raise ValueError("`Field` name cannot be `self`.")
 
-        if name == "self":
-            # while `dataclasses` allows `self` as a field name, its confusing
-            # and not recommended. so raise an error
-            raise ValueError("Field name cannot be `self`.")
+    for key, hint in hint_map.items():
+        # get the current base key
+        field_value = vars(klass).get(key, NULL)
 
-        if isinstance(value, Field):
-            if isinstance(value.default, MUTABLE_TYPES):
+        if isinstance(field_value, Field):
+            # raise the error at class construction time
+            # if the field default is mutable.
+            if isinstance(field_value.default, MUTABLE_TYPES):
                 # example case: `x: Any = field(default=[1, 2, 3])`
-                raise TypeError(f"Mutable {value.default=} is not allowed.")
+                raise TypeError(f"Mutable {field_value.default=} is not allowed.")
             # case: `x: Any = field(default=1)`
-            field_map[name] = value.replace(name=name, type=hint)
+            field_map[key] = field_value.replace(name=key, type=hint)
+
         else:
-            if isinstance(value, MUTABLE_TYPES):
+            # raise the error at class construction time
+            # if the value is mutable
+            if isinstance(field_value, MUTABLE_TYPES):
                 # example case: `x: Any = [1, 2, 3]`
-                raise TypeError(f"Mutable {value=} is not allowed")
+                # possibly the user can use callback to convert a tuple to list
+                raise TypeError(f"Mutable {field_value=} is not allowed")
             # case: `x: int = 1` or `x: Any`
-            field_map[name] = Field(name=name, type=hint, default=value)
+            field_map[key] = Field(name=key, type=hint, default=field_value)
+    # return immutable map
     return MappingProxyType(field_map)
 
 
@@ -225,10 +222,10 @@ def fields(x: Any) -> Sequence[Field]:
         - If the class is not annotated, an empty tuple is returned.
         - The ``Field`` generation is cached for class and its bases.
     """
-    return tuple(_build_field_map(x if isinstance(x, type) else type(x)).values())
+    return tuple(build_field_map(x if isinstance(x, type) else type(x)).values())
 
 
-def _build_init_method(klass: type) -> FunctionType:
+def build_init_method(klass: type) -> FunctionType:
     # generate a code object for the __init__ method and compile it
     # for the given class and return the function object
     body: list[str] = []
@@ -239,7 +236,7 @@ def _build_init_method(klass: type) -> FunctionType:
 
     seen = set()
 
-    for field in (field_map := _build_field_map(klass)).values():
+    for field in (field_map := build_field_map(klass)).values():
         dref = "" if field.default is NULL else f"=field_map['{field.name}'].default"
 
         if field.init:
@@ -321,5 +318,5 @@ def autoinit(klass: type[T]) -> type[T]:
         >>> Tree(a=-1).a
         1
     """
-    klass.__init__ = _build_init_method(klass)
+    klass.__init__ = build_init_method(klass)
     return klass

@@ -1,5 +1,71 @@
 # Changelog
 
+## `PyTreeClass` v0.5.1
+- allow nested mutations using `.at[method](*args, **kwargs)`.
+  After the change, inner methods can mutate copied new instances at any level not just the top level.
+  a motivation for this is to experiment with lazy initialization scheme, where inner layers need to mutate their inner state.
+
+
+  <details>
+
+    ```python
+
+    import pytreeclass as pytc
+    import jax.random as jr
+    from typing import Any
+    import jax
+    import jax.numpy as jnp
+
+
+    @pytc.autoinit
+    class LazyLinear(pytc.TreeClass):
+        out_features: int
+
+        def param(self, name: str, value: Any):
+            if name not in vars(self):
+                setattr(self, name, value)
+            return vars(self)[name]
+
+        def __call__(self, x: jax.Array, *, key: jr.KeyArray = jr.PRNGKey(0)):
+            in_features = self.param("in_features", x.shape[-1])
+            weight = self.param("weight", jnp.ones((in_features, self.out_features)))
+            bias = self.param("bias", jnp.zeros((self.out_features,)))
+            return x @ weight + bias
+
+
+    @pytc.autoinit
+    class StackedLinear(pytc.TreeClass):
+        l1: LazyLinear = LazyLinear(10)
+        l2: LazyLinear = LazyLinear(10)
+
+        def call(self, x: jax.Array):
+            return self.l2(self.l1(x))
+
+    l = StackedLinear()
+    print(repr(l))
+    # StackedLinear(l1=LazyLinear(out_features=10), l2=LazyLinear(out_features=10))
+
+
+    _, ll = l.at["call"](jnp.ones((1, 5)))
+    ll
+    # StackedLinear(
+    #   l1=LazyLinear(
+    #     out_features=10, 
+    #     in_features=5, 
+    #     weight=f32[5,10](μ=1.00, σ=0.00, ∈[1.00,1.00]), 
+    #     bias=f32[10](μ=0.00, σ=0.00, ∈[0.00,0.00])
+    #   ), 
+    #   l2=LazyLinear(
+    #     out_features=10, 
+    #     in_features=10, 
+    #     weight=f32[10,10](μ=1.00, σ=0.00, ∈[1.00,1.00]), 
+    #     bias=f32[10](μ=0.00, σ=0.00, ∈[0.00,0.00])
+    #   )
+    # )
+
+    ```
+    </details>
+
 ## `PyTreeClass` v0.5post0
 
 - fix `__init_subclass__`. not accepting arguments. this bug is introduced since `v0.5`
