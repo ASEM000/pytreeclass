@@ -11,6 +11,7 @@ description = "Visualize, create, and operate on JAX PyTree in the most intuitiv
 authors = [{name = "Mahmoud Asem", email = "mahmoudasem00@gmail.com"}]
 keywords = ["jax", "neural-networks", "functional-programming", "machine-learning"]
 dependencies = ["jax>=0.4.7", "typing-extensions"]
+readme = "README.md"
 
 classifiers=[
     "Development Status :: 5 - Production/Stable",
