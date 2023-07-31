@@ -50,7 +50,7 @@ class Repr1(TreeClass):
     i: jnp.ndarray = None
     j: jnp.ndarray = None
     k: tuple = pytc.field(repr=False, default=(1, 2, 3))
-    l: namedtuple = namedtuple("a", ["b", "c"])(1, 2)
+    l: tuple = namedtuple("a", ["b", "c"])(1, 2)
     m: jnp.array = jnp.ones((5, 5))
     n: jnp.array = jnp.array(True)
     o: jnp.array = jnp.array([1, 2.0], dtype=jnp.complex64)

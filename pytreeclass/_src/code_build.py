@@ -20,9 +20,10 @@ import functools as ft
 import sys
 from collections import defaultdict
 from collections.abc import Callable, MutableMapping, MutableSequence, MutableSet
-from types import FunctionType, MappingProxyType
+from types import MappingProxyType
 from typing import Any, Literal, Sequence, TypeVar, get_args
 
+import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
 T = TypeVar("T")
@@ -35,7 +36,13 @@ MUTABLE_TYPES = (MutableSequence, MutableMapping, MutableSet)
 # https://github.com/google/jax/issues/14295
 
 
+def slots(klass) -> tuple[str, ...]:
+    return getattr(klass, "__slots__", ())
+
+
 class Field:
+    """Field placeholder for `autoinit`."""
+
     __slots__ = [
         "name",
         "type",
@@ -50,6 +57,7 @@ class Field:
 
     def __init__(
         self,
+        *,
         name: str | None = None,
         type: type | None = None,
         default: Any = NULL,
@@ -70,8 +78,12 @@ class Field:
         self.callbacks = callbacks
         self.alias = alias
 
+    def replace(self, **kwargs) -> Field:
+        """Replace the field attributes."""
+        return type(self)(**{k: kwargs.get(k, getattr(self, k)) for k in slots(Field)})
+
     def __call__(self, value: Any):
-        """Call the callbacks on `value`."""
+        """Apply the callbacks on `value`."""
         for callback in self.callbacks:
             try:
                 value = callback(value)
@@ -80,17 +92,27 @@ class Field:
                 raise type(e)(f"On applying {cname} for field=`{self.name}`:\n{e}")
         return value
 
-    def replace(self, **kwargs) -> "Field":
-        return Field(**{k: kwargs.get(k, getattr(self, k)) for k in Field.__slots__})
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({', '.join(f'{k}={getattr(self, k)!r}' for k in slots(Field))})"
 
-    def __get__(self, instance, owner):
-        return self if instance is None else vars(instance)[self.name]
-
-    def __set_name__(self, _, name):
+    def __set_name__(self, _, name: str) -> None:
         self.name = name
 
-    def __set__(self, instance, value):
+    def __get__(self: T, instance, _) -> T | Any:
+        return self if instance is None else vars(instance)[self.name]
+
+    def __set__(self: T, instance, value) -> None:
         vars(instance)[self.name] = self(value)
+
+    def __delete__(self: T, instance) -> None:
+        del vars(instance)[self.name]
+
+
+jtu.register_pytree_node(
+    nodetype=Field,
+    flatten_func=lambda field: ((), {k: getattr(field, k) for k in slots(Field)}),
+    unflatten_func=lambda data, _: Field(**data),
+)
 
 
 def field(
@@ -187,31 +209,23 @@ def build_field_map(klass: type) -> MappingProxyType[str, Field]:
 
     for key, hint in hint_map.items():
         # get the current base key
-        field_value = vars(klass).get(key, NULL)
+        value = vars(klass).get(key, NULL)
 
-        if isinstance(field_value, Field):
-            # raise the error at class construction time
-            # if the field default is mutable.
-            if isinstance(field_value.default, MUTABLE_TYPES):
-                # example case: `x: Any = field(default=[1, 2, 3])`
-                raise TypeError(f"Mutable {field_value.default=} is not allowed.")
-            # case: `x: Any = field(default=1)`
-            field_map[key] = field_value.replace(name=key, type=hint)
+        if not isinstance(value, Field):
+            # non-`Field` annotation is ignored
+            continue
 
-        else:
-            # raise the error at class construction time
-            # if the value is mutable
-            if isinstance(field_value, MUTABLE_TYPES):
-                # example case: `x: Any = [1, 2, 3]`
-                # possibly the user can use callback to convert a tuple to list
-                raise TypeError(f"Mutable {field_value=} is not allowed")
-            # case: `x: int = 1` or `x: Any`
-            field_map[key] = Field(name=key, type=hint, default=field_value)
-    # return immutable map
+        if isinstance(value.default, MUTABLE_TYPES):
+            # example case: `x: Any = field(default=[1, 2, 3])`
+            raise TypeError(f"Mutable {value.default=} is not allowed.")
+
+        # case: `x: Any = field(default=1)`
+        field_map[key] = value.replace(name=key, type=hint)
+
     return MappingProxyType(field_map)
 
 
-def fields(x: Any) -> Sequence[Field]:
+def fields(x: Any) -> tuple[Field, ...]:
     """Returns a tuple of ``Field`` objects for the given instance or class.
 
     ``Field`` objects are generated from the class type hints and contains
@@ -225,7 +239,18 @@ def fields(x: Any) -> Sequence[Field]:
     return tuple(build_field_map(x if isinstance(x, type) else type(x)).values())
 
 
-def build_init_method(klass: type) -> FunctionType:
+def convert_hints_to_fields(klass: type[T]) -> type[T]:
+    # convert klass hints to `Field` objects for the current decorated class
+    if (hint_map := vars(klass).get("__annotations__", NULL)) is NULL:
+        return klass
+
+    for key, hint in hint_map.items():
+        if not isinstance(value := vars(klass).get(key, NULL), Field):
+            setattr(klass, key, Field(default=value, type=hint, name=key))
+    return klass
+
+
+def build_init_method(klass: type[T]) -> type[T]:
     # generate a code object for the __init__ method and compile it
     # for the given class and return the function object
     body: list[str] = []
@@ -237,7 +262,7 @@ def build_init_method(klass: type) -> FunctionType:
     seen = set()
 
     for field in (field_map := build_field_map(klass)).values():
-        dref = "" if field.default is NULL else f"=field_map['{field.name}'].default"
+        default = "" if field.default is NULL else f"=field_map['{field.name}'].default"
 
         if field.init:
             if field.kind in ("VAR_POS", "VAR_KW"):
@@ -249,9 +274,9 @@ def build_init_method(klass: type) -> FunctionType:
             alias = field.alias or field.name
             hints[field.name] = field.type
             body += [f"self.{field.name}={alias}"]
-            heads[field.kind] += [f"{alias}{dref}"]
+            heads[field.kind] += [f"{alias}{default}"]
         else:
-            body += [f"self.{field.name}{dref}"]
+            body += [f"self.{field.name}{default}"]
 
     hints["return"] = None
     # add the post init call if the class has it, otherwise add a pass
@@ -277,7 +302,8 @@ def build_init_method(klass: type) -> FunctionType:
 
     exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
     setattr(init := namespace["closure"](field_map), "__annotations__", hints)
-    return init
+    setattr(klass, "__init__", init)
+    return klass
 
 
 @dataclass_transform(field_specifiers=(Field, field))
@@ -318,5 +344,6 @@ def autoinit(klass: type[T]) -> type[T]:
         >>> Tree(a=-1).a
         1
     """
-    klass.__init__ = build_init_method(klass)
-    return klass
+    if "__init__" in vars(klass):
+        raise TypeError(f"{klass.__qualname__} already has an '__init__' method.")
+    return build_init_method(convert_hints_to_fields(klass))

@@ -1,10 +1,9 @@
 # Changelog
 
-## `PyTreeClass` v0.5.1
-- allow nested mutations using `.at[method](*args, **kwargs)`.
-  After the change, inner methods can mutate copied new instances at any level not just the top level.
-  a motivation for this is to experiment with lazy initialization scheme, where inner layers need to mutate their inner state.
-
+## v0.6.0
+- Allow nested mutations using `.at[method](*args, **kwargs)`.
+  After the change, inner methods can mutate **_copied_** new instances at any level not just the top level.
+  a motivation for this is to experiment with _lazy initialization scheme_, where inner layers need to mutate their inner state. see the example below for `flax`-like lazy initialization as descriped [here](https://docs.google.com/presentation/d/1ngKWUwsSqAwPRvATG8sAxMzu9ujv4N__cKsUofdNno0/edit#slide=id.g8d686e6bf0_1_57)
 
   <details>
 
@@ -15,63 +14,102 @@
     from typing import Any
     import jax
     import jax.numpy as jnp
+    from typing import Callable, TypeVar
 
+    T = TypeVar("T")
 
     @pytc.autoinit
     class LazyLinear(pytc.TreeClass):
-        out_features: int
+        outdim: int
+        weight_init: Callable[..., T] = jax.nn.initializers.glorot_normal()
+        bias_init: Callable[..., T] = jax.nn.initializers.zeros
 
-        def param(self, name: str, value: Any):
+        def param(self, name: str, init_func: Callable[..., T], *args) -> T:
             if name not in vars(self):
-                setattr(self, name, value)
+                setattr(self, name, init_func(*args))
             return vars(self)[name]
 
         def __call__(self, x: jax.Array, *, key: jr.KeyArray = jr.PRNGKey(0)):
-            in_features = self.param("in_features", x.shape[-1])
-            weight = self.param("weight", jnp.ones((in_features, self.out_features)))
-            bias = self.param("bias", jnp.zeros((self.out_features,)))
-            return x @ weight + bias
+            w = self.param("weight", self.weight_init, key, (x.shape[-1], self.outdim))
+            y = x @ w
+            if self.bias_init is not None:
+                b = self.param("bias", self.bias_init, key, (self.outdim,))
+                return y + b
+            return y
 
 
     @pytc.autoinit
     class StackedLinear(pytc.TreeClass):
-        l1: LazyLinear = LazyLinear(10)
-        l2: LazyLinear = LazyLinear(10)
+        l1: LazyLinear = LazyLinear(outdim=10)
+        l2: LazyLinear = LazyLinear(outdim=1)
 
         def call(self, x: jax.Array):
-            return self.l2(self.l1(x))
+            return self.l2(jax.nn.relu(self.l1(x)))
 
-    l = StackedLinear()
-    print(repr(l))
-    # StackedLinear(l1=LazyLinear(out_features=10), l2=LazyLinear(out_features=10))
-
-
-    _, ll = l.at["call"](jnp.ones((1, 5)))
-    ll
+    lazy_layer = StackedLinear()
+    print(repr(lazy_layer))
     # StackedLinear(
     #   l1=LazyLinear(
-    #     out_features=10, 
-    #     in_features=5, 
-    #     weight=f32[5,10](μ=1.00, σ=0.00, ∈[1.00,1.00]), 
-    #     bias=f32[10](μ=0.00, σ=0.00, ∈[0.00,0.00])
+    #     outdim=10, 
+    #     weight_init=init(key, shape, dtype), 
+    #     bias_init=zeros(key, shape, dtype)
     #   ), 
     #   l2=LazyLinear(
-    #     out_features=10, 
-    #     in_features=10, 
-    #     weight=f32[10,10](μ=1.00, σ=0.00, ∈[1.00,1.00]), 
-    #     bias=f32[10](μ=0.00, σ=0.00, ∈[0.00,0.00])
+    #     outdim=1, 
+    #     weight_init=init(key, shape, dtype), 
+    #     bias_init=zeros(key, shape, dtype)
     #   )
     # )
 
+    _, materialized_layer = lazy_layer.at["call"](jnp.ones((1, 5)))
+    materialized_layer
+    # StackedLinear(
+    #   l1=LazyLinear(
+    #     outdim=10, 
+    #     weight_init=init(key, shape, dtype), 
+    #     bias_init=zeros(key, shape, dtype), 
+    #     weight=f32[5,10](μ=-0.04, σ=0.32, ∈[-0.74,0.63]), 
+    #     bias=f32[10](μ=0.00, σ=0.00, ∈[0.00,0.00])
+    #   ), 
+    #   l2=LazyLinear(
+    #     outdim=1, 
+    #     weight_init=init(key, shape, dtype), 
+    #     bias_init=zeros(key, shape, dtype), 
+    #     weight=f32[10,1](μ=-0.07, σ=0.23, ∈[-0.34,0.34]), 
+    #     bias=f32[1](μ=0.00, σ=0.00, ∈[0.00,0.00])
+    #   )
+    # )
+    
+    materialized_layer(jnp.ones((1, 5)))
+    # Array([[0.16712935]], dtype=float32)
     ```
     </details>
 
-## `PyTreeClass` v0.5post0
+- Raise an error if `autoinit` is decorating a class that has both type hints and user defined `__init__` method. this extra check to avoid confusion of which init is used.For reference, `dataclasses.dataclass` decorated classes, the user defined init method is ignored.
+
+    <details>
+
+    ```python
+    import dataclasses as dc 
+    @dc.dataclass
+    class T:
+        a:int 
+        def __init__(self):
+            self.b = 1
+
+    T.__init__
+    # <function __main__.T.__init__(self)>
+    ```
+
+    </details>
+
+
+## v0.5post0
 
 - fix `__init_subclass__`. not accepting arguments. this bug is introduced since `v0.5`
 
 
-## `PyTreeClass` v0.5
+## v0.5
 
 ## Breaking changes
 

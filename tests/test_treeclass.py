@@ -625,3 +625,14 @@ def test_nested_mutation():
 
     _, v = OuterModule().at["df"]()
     assert "a" not in v.inner.__dict__
+
+
+def test_autoinit_and_user_defined_init():
+    with pytest.raises(TypeError):
+
+        @pytc.autoinit
+        class Tree(pytc.TreeClass):
+            b: int
+
+            def __init__(self, a):
+                self.a = a
