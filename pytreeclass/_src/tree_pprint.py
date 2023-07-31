@@ -320,9 +320,9 @@ def tree_diagram(
         >>> import pytreeclass as pytc
         >>> @pytc.autoinit
         ... class A(pytc.TreeClass):
-        ...        x: int = 10
-        ...        y: int = (20,30)
-        ...        z: int = 40
+        ...     x: int = 10
+        ...     y: int = (20,30)
+        ...     z: int = 40
 
         >>> @pytc.autoinit
         ... class B(pytc.TreeClass):

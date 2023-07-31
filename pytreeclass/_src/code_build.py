@@ -31,9 +31,16 @@ PyTree = Any
 EllipsisType = type(Ellipsis)
 ArgKindType = Literal["POS_ONLY", "POS_OR_KW", "VAR_POS", "KW_ONLY", "VAR_KW"]
 ArgKind = get_args(ArgKindType)
-NULL = type("NULL", (), {"__repr__": lambda _: "NULL"})()
-MUTABLE_TYPES = (MutableSequence, MutableMapping, MutableSet)
-# https://github.com/google/jax/issues/14295
+
+
+class Null:
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "NULL"
+
+
+NULL = Null()
 
 
 def slots(klass) -> tuple[str, ...]:
@@ -224,7 +231,8 @@ def build_field_map(klass: type) -> MappingProxyType[str, Field]:
             # non-autoinit base class type hints are ignored
             continue
 
-        if isinstance(value.default, MUTABLE_TYPES):
+        if isinstance(value.default, (MutableSequence, MutableMapping, MutableSet)):
+            # https://github.com/google/jax/issues/14295
             # example case: `x: Any = field(default=[1, 2, 3])`
             raise TypeError(f"Mutable {value.default=} is not allowed.")
 
@@ -389,9 +397,9 @@ def autoinit(klass: type[T]) -> type[T]:
         <Signature (y: int) -> None>
     """
     return (
+        klass
         # if the class already has a user-defined __init__ method
         # then return the class as is without any modification
-        klass
         if "__init__" in vars(klass)
         # first convert the current class hints to fields
         # then build the __init__ method from the fields of the current class

@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses as dc
 import functools as ft
 import operator as op
+from copy import copy
 from math import ceil, floor, trunc
 from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
@@ -57,7 +58,7 @@ def tree_hash(*trees: PyTree) -> int:
 
 def tree_copy(tree: T) -> T:
     """Return a copy of the tree."""
-    return jtu.tree_unflatten(*jtu.tree_flatten(tree)[::-1])
+    return jax.tree_map(lambda x: copy(x), tree)
 
 
 def _is_leaf_rhs_equal(leaf, rhs) -> bool | jax.Array:
@@ -120,7 +121,7 @@ class Partial:
     Note:
         - The ``...`` is used to indicate a placeholder for positional arguments.
         - See: https://stackoverflow.com/a/7811270
-        - :func:`.Partial` is used internally by :func:`.bcmap` which maps a 
+        - :func:`.Partial` is used internally by :func:`.bcmap` which maps a
           function over pytrees leaves with automatic broadcasting for scalar arguments.
     """
 
