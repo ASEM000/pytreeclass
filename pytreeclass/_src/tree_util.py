@@ -97,7 +97,7 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
 
 
 class Partial:
-    """jaxable Partial function with support for positional partial application.
+    """``jax``-able ``Partial`` function with support for positional partial application.
 
     Example:
         >>> import pytreeclass as pytc
@@ -120,14 +120,14 @@ class Partial:
     Note:
         - The ``...`` is used to indicate a placeholder for positional arguments.
         - See: https://stackoverflow.com/a/7811270
-        - `Partial` is used internally by `bcmap` which maps a function over pytrees
-          leaves with automatic broadcasting for scalar arguments.
+        - :func:`.Partial` is used internally by :func:`.bcmap` which maps a 
+          function over pytrees leaves with automatic broadcasting for scalar arguments.
     """
 
     __slots__ = ["func", "args", "kwargs", "__weakref__"]  # type: ignore
 
     def __init__(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
-        """Initialize a `Partial` function.
+        """Initialize a ``Partial`` function.
 
         Args:
             func: The function to be partially applied.

@@ -232,7 +232,7 @@ def tree_repr(
     tabwidth: int = 2,
     depth: int | float = float("inf"),
 ) -> str:
-    """Prertty print arbitrary pytrees `__repr__`.
+    """Prertty print arbitrary pytrees ``__repr__``.
 
     Args:
         tree: arbitrary pytree.
@@ -265,7 +265,7 @@ def tree_str(
     tabwidth: int = 2,
     depth: int | float = float("inf"),
 ) -> str:
-    """Prertty print arbitrary pytrees `__str__`.
+    """Prertty print arbitrary pytrees ``__str__``.
 
     Args:
         tree: arbitrary pytree.
@@ -604,7 +604,7 @@ def tree_summary(
     depth: int | float = float("inf"),
     is_leaf: IsLeafType = None,
 ) -> str:
-    """Print a summary of an arbitrary PyTree.
+    """Print a summary of an arbitrary pytree.
 
     Args:
         tree: a jax registered pytree to summarize.

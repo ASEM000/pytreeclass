@@ -131,12 +131,20 @@ def field(
         default: The default value of the field.
         init: Whether the field is included in the object's ``__init__`` function.
         repr: Whether the field is included in the object's ``__repr__`` function.
-        kind: Argument kind, one of: ``POS_ONLY``, ``VAR_POS``, ``POS_OR_KW`` ,
-            ``KW_ONLY``, ``VAR_KW``
+        kind: Argument kind, one of:
+
+            - ``POS_ONLY``: positional only argument (e.g. ``x`` in ``def f(x, /):``)
+            - ``VAR_POS``: variable positional argument (e.g. ``*x`` in ``def f(*x):``)
+            - ``POS_OR_KW``: positional or keyword argument (e.g. ``x`` in ``def f(x):``)
+            - ``KW_ONLY``: keyword only argument (e.g. ``x`` in ``def f(*, x):``)
+            - ``VAR_KW``: variable keyword argument (e.g. ``**x`` in ``def f(**x):``)
+
         metadata: A mapping of user-defined data for the field.
         callbacks: A sequence of functions to called on ``__setattr__`` during
             initialization to modify the field value.
-        alias: An a alias for the field name in the constructor.
+        alias: An a alias for the field name in the constructor. e.g ``name=x``,
+            ``alias=y`` will allow ``obj = Class(y=1)`` to be equivalent to
+            ``obj = Class(x=1)``.
 
     Example:
         >>> import pytreeclass as pytc
@@ -213,6 +221,7 @@ def build_field_map(klass: type) -> MappingProxyType[str, Field]:
 
         if not isinstance(value, Field):
             # non-`Field` annotation is ignored
+            # non-autoinit base class type hints are ignored
             continue
 
         if isinstance(value.default, MUTABLE_TYPES):
@@ -337,13 +346,53 @@ def autoinit(klass: type[T]) -> type[T]:
         ...     pos_only_field: int = pytc.field(default=2, kind="POS_ONLY")
 
     Example:
-        >>> # define a validator to apply ``abs`` on the field value
+        >>> # define a converter to apply ``abs`` on the field value
         >>> @pytc.autoinit
         ... class Tree:
         ...     a:int = pytc.field(callbacks=[abs])
         >>> Tree(a=-1).a
         1
+
+    .. warning::
+        - The ``autoinit`` decorator will raise ``TypeError`` if the class is
+          has a user-defined ``__init__`` method.
+
+    Note:
+        - In case of inheritance, the ``__init__`` method is generated from the
+          the type hints of the current class and any base classes that
+          are decorated with ``autoinit``.
+
+        >>> import pytreeclass as pytc
+        >>> import inspect
+        >>> @pytc.autoinit
+        ... class Base:
+        ...     x: int
+        >>> @pytc.autoinit
+        ... class Derived(Base):
+        ...     y: int
+        >>> obj = Derived(x=1, y=2)
+        >>> inspect.signature(obj.__init__)
+        <Signature (x: int, y: int) -> None>
+
+        - Base classes that are not decorated with ``autoinit`` are ignored during
+          synthesis of the ``__init__`` method.
+
+        >>> import pytreeclass as pytc
+        >>> import inspect
+        >>> class Base:
+        ...     x: int
+        >>> @pytc.autoinit
+        ... class Derived(Base):
+        ...     y: int
+        >>> obj = Derived(y=2)
+        >>> inspect.signature(obj.__init__)
+        <Signature (y: int) -> None>
     """
     if "__init__" in vars(klass):
+        # raise TypeError if the class already has an __init__ method
+        # to avoid confusion about which __init__ method is used
         raise TypeError(f"{klass.__qualname__} already has an '__init__' method.")
+    # first convert the current class hints to fields
+    # then build the __init__ method from the fields of the current class
+    # and any base classes that are decorated with `autoinit`
     return build_init_method(convert_hints_to_fields(klass))

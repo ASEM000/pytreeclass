@@ -130,14 +130,14 @@ class _FrozenArray(_FrozenBase):
 
 
 def freeze(value: T) -> _FrozenHashable[T]:
-    """Freeze a value to avoid updating it by `jax` transformations.
+    """Freeze a value to avoid updating it by ``jax`` transformations.
 
     Args:
         value: A value to freeze.
 
     Note:
-        - ``freeze`` is idempotent, i.e. ``freeze(freeze(x)) == freeze(x)``.
-        - ``freeze`` uses single dispatch to support custom types. To define a custom
+        - :func:`.freeze` is idempotent, i.e. ``freeze(freeze(x)) == freeze(x)``.
+        - :func:`.freeze` uses single dispatch to support custom types. To define a custom
           wrapper for a certain type, use ``freeze.def_type(type, func)``.
 
     Example:
@@ -184,15 +184,15 @@ def is_frozen(value: Any) -> bool:
 
 
 def unfreeze(value: T) -> T:
-    """Unfreeze `frozen` value, otherwise return the value itself.
+    """Unfreeze :func:`.freeze` value, otherwise return the value itself.
 
     Args:
         value: A value to unfreeze.
 
     Note:
-        - use `is_leaf=pytc.is_frozen` with `jax.tree_map` to unfreeze a tree.**
-        - `unfreeze` uses single dispatch to support custom types. To define a custom
-          behavior for a certain type, use `unfreeze.def_type(type, func)`.
+        - use ``is_leaf=pytc.is_frozen`` with ``jax.tree_map`` to unfreeze a tree.**
+        - :func:`.unfreeze` uses single dispatch to support custom types. To define a custom
+          behavior for a certain type, use ``unfreeze.def_type(type, func)``.
 
     Example:
         >>> import pytreeclass as pytc
@@ -225,8 +225,8 @@ def is_nondiff(value: Any) -> bool:
         value: A value to check.
 
     Note:
-        - `is_nondiff` uses single dispatch to support custom types. To define a custom
-          behavior for a certain type, use `is_nondiff.def_type(type, func)`.
+        - :func:`.is_nondiff` uses single dispatch to support custom types. To define
+          a custom behavior for a certain type, use ``is_nondiff.def_type(type, func)``.
 
     Example:
         >>> import pytreeclass as pytc
@@ -241,10 +241,10 @@ def is_nondiff(value: Any) -> bool:
         False
 
     Note:
-        This function is meant to be used with `jax.tree_map` to
+        This function is meant to be used with ``jax.tree_map`` to
         create a mask for non-differentiable nodes in a tree, that can be used
         to freeze the non-differentiable nodes before passing the tree to a
-        `jax` transformation.
+        ``jax`` transformation.
     """
     return is_nondiff.type_dispatcher(value)
 
@@ -300,25 +300,25 @@ def _tree_mask_map(
 
 
 def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = None):
-    """Mask leaves of a pytree based on `mask` boolean pytree or callable.
+    """Mask leaves of a pytree based on ``mask`` boolean pytree or callable.
 
     Args:
         tree: A pytree of values.
         mask: A pytree of boolean values or a callable that accepts a leaf and
-            returns a boolean. If a leaf is `True` either in the mask or the
+            returns a boolean. If a leaf is ``True`` either in the mask or the
             callable, the leaf is wrapped by with a wrapper that yields no
-            leaves when `jax.tree_util.tree_flatten` is called on it, otherwise
-            it is unchanged. defaults to `is_nondiff` which returns true for
+            leaves when ``jax.tree_util.tree_flatten`` is called on it, otherwise
+            it is unchanged. defaults to :func:`.is_nondiff` which returns true for
             non-differentiable nodes.
         is_leaf: A callable that accepts a leaf and returns a boolean. If
             provided, it is used to determine if a value is a leaf. for example,
-            `is_leaf=lambda x: isinstance(x, list)` will treat lists as leaves
+            ``is_leaf=lambda x: isinstance(x, list)`` will treat lists as leaves
             and will not recurse into them.
 
     Note:
         - Masked leaves are wrapped with a wrapper that yields no leaves when
           ``jax.tree_util.tree_flatten`` is called on it.
-        - Masking is equivalent to applying `freeze` to the masked leaves.
+        - Masking is equivalent to applying :func:`.freeze` to the masked leaves.
 
             >>> import pytreeclass as pytc
             >>> import jax
@@ -359,7 +359,7 @@ def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = Non
 
 
 def tree_unmask(tree: T, mask: MaskType = lambda _: True):
-    """Undo the masking of tree leaves according to `mask`. defaults to unmasking all leaves.
+    """Undo the masking of tree leaves according to ``mask``. defaults to unmasking all leaves.
 
     Args:
         tree: A pytree of values.
@@ -393,7 +393,7 @@ def tree_unmask(tree: T, mask: MaskType = lambda _: True):
         (Array(2., dtype=float32, weak_type=True), #2)
 
     Note:
-        - Unmasking is equivalent to applying ``unfreeze`` on the masked leaves.
+        - Unmasking is equivalent to applying :func:`.unfreeze` on the masked leaves.
 
             >>> import pytreeclass as pytc
             >>> import jax

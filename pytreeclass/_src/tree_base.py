@@ -109,7 +109,7 @@ class TreeClassMeta(abc.ABCMeta):
 
 
 class TreeClass(metaclass=TreeClassMeta):
-    """Convert a class to a JAX compatible tree structure.
+    """Convert a class to a ``jax``-compatible pytree.
 
     Example:
         >>> import jax
@@ -123,7 +123,7 @@ class TreeClass(metaclass=TreeClassMeta):
         >>> jax.tree_util.tree_leaves(tree)
         [1, 2.0]
 
-        >>> # Leaf-wise math operations are supported by setting `leafwise=True`
+        >>> # Leaf-wise math operations are supported  using `leafwise` decorator
         >>> @pytc.leafwise
         ... @pytc.autoinit
         ... class Tree(pytc.TreeClass):
@@ -143,6 +143,39 @@ class TreeClass(metaclass=TreeClassMeta):
         Tree(a=1, b=None)
         >>> tree.at[0].get()
         Tree(a=1, b=None)
+
+    Note:
+        - Under ``jax.tree_util.***`` all :class:`.TreeClass` attributes are 
+          treated as leaves.
+        - To hide/ignore a specific attribute from the tree leaves, during
+          ``jax.tree_util.***`` operations, freeze the leaf using :func:`.freeze`
+          or :func:`.tree_mask`.
+
+        >>> # freeze(exclude) a leaf from the tree leaves:
+        >>> import jax
+        >>> import pytreeclass as pytc
+        >>> @pytc.autoinit
+        ... class Tree(pytc.TreeClass):
+        ...     a:int = 1
+        ...     b:float = 2.0
+        >>> tree = Tree()
+        >>> tree = tree.at["a"].apply(pytc.freeze)
+        >>> jax.tree_util.tree_leaves(tree)
+        [2.0]
+
+        >>> # undo the freeze
+        >>> tree = tree.at["a"].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+        >>> jax.tree_util.tree_leaves(tree)
+        [1, 2.0]
+
+        >>> # using `tree_mask` to exclude a leaf from the tree leaves
+        >>> freeze_mask = Tree(a=True, b=False)
+        >>> jax.tree_util.tree_leaves(pytc.tree_mask(tree, freeze_mask))
+        [2.0]
+
+    Note:
+        - :class:`.TreeClass` inherits from ``abc.ABC`` so ``@abstract...`` decorators
+          can be used to define abstract behavior.
     """
 
     def __init_subclass__(klass: type[T], **k):
