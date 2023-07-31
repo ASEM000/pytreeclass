@@ -354,8 +354,8 @@ def autoinit(klass: type[T]) -> type[T]:
         1
 
     .. warning::
-        - The ``autoinit`` decorator will raise ``TypeError`` if the class is
-          has a user-defined ``__init__`` method.
+        - The ``autoinit`` decorator will is no-op if the class already has a
+          user-defined ``__init__`` method.
 
     Note:
         - In case of inheritance, the ``__init__`` method is generated from the
@@ -388,11 +388,13 @@ def autoinit(klass: type[T]) -> type[T]:
         >>> inspect.signature(obj.__init__)
         <Signature (y: int) -> None>
     """
-    if "__init__" in vars(klass):
-        # raise TypeError if the class already has an __init__ method
-        # to avoid confusion about which __init__ method is used
-        raise TypeError(f"{klass.__qualname__} already has an '__init__' method.")
-    # first convert the current class hints to fields
-    # then build the __init__ method from the fields of the current class
-    # and any base classes that are decorated with `autoinit`
-    return build_init_method(convert_hints_to_fields(klass))
+    return (
+        # if the class already has a user-defined __init__ method
+        # then return the class as is without any modification
+        klass
+        if "__init__" in vars(klass)
+        # first convert the current class hints to fields
+        # then build the __init__ method from the fields of the current class
+        # and any base classes that are decorated with `autoinit`
+        else build_init_method(convert_hints_to_fields(klass))
+    )

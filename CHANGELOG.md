@@ -85,24 +85,6 @@
     ```
     </details>
 
-- Raise an error if `autoinit` is decorating a class that has both type hints and user defined `__init__` method. this extra check to avoid confusion of which init is used.For reference, `dataclasses.dataclass` decorated classes, the user defined init method is ignored.
-
-    <details>
-
-    ```python
-    import dataclasses as dc 
-    @dc.dataclass
-    class T:
-        a:int 
-        def __init__(self):
-            self.b = 1
-
-    T.__init__
-    # <function __main__.T.__init__(self)>
-    ```
-
-    </details>
-
 
 ## v0.5post0
 

@@ -628,11 +628,13 @@ def test_nested_mutation():
 
 
 def test_autoinit_and_user_defined_init():
-    with pytest.raises(TypeError):
+    @pytc.autoinit
+    class Tree(pytc.TreeClass):
+        b: int
 
-        @pytc.autoinit
-        class Tree(pytc.TreeClass):
-            b: int
+        def __init__(self, a):
+            self.a = a
 
-            def __init__(self, a):
-                self.a = a
+    Tree(a=1)
+
+    assert True
