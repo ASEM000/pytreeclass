@@ -880,3 +880,30 @@ def test_scan():
 
     assert pytc.is_tree_equal(tree, Tree(a=2, b=3, c=3, d=jnp.array([5, 6])))
     assert state == 4
+
+
+def test_dispatch():
+    @jtu.register_pytree_with_keys_class
+    class T:
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+        def tree_flatten_with_keys(self):
+            ka = ("a", self.a)
+            kb = (2, self.b)
+            return [ka, kb], None
+
+        @classmethod
+        def tree_unflatten(cls, aux_data, children):
+            return cls(*children)
+
+    t = T(1, 2)
+    assert pytc.AtIndexer(t)["a"].get().a == 1
+    assert pytc.AtIndexer(t)["a"].get().b is None
+
+    assert pytc.AtIndexer(t)[2].get().a is None
+    assert pytc.AtIndexer(t)[2].get().b == 2
+
+    assert pytc.AtIndexer(t)[re.compile("a")].get().a == 1
+    assert pytc.AtIndexer(t)[re.compile("a")].get().b is None

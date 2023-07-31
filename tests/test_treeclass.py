@@ -24,6 +24,7 @@ import pytest
 from jax import numpy as jnp
 
 import pytreeclass as pytc
+from pytreeclass._src.code_build import build_field_map, convert_hints_to_fields
 
 
 def test_fields():
@@ -37,6 +38,11 @@ def test_fields():
 
     with pytest.raises(ValueError):
         pytc.field(kind="WRONG")
+
+    assert (
+        repr(pytc.field(kind="KW_ONLY"))
+        == "Field(name=None, type=None, default=NULL, init=True, repr=True, kind='KW_ONLY', metadata=None, callbacks=(), alias=None)"
+    )
 
 
 def test_field():
@@ -638,3 +644,14 @@ def test_autoinit_and_user_defined_init():
     Tree(a=1)
 
     assert True
+
+
+def test_nohints():
+    assert convert_hints_to_fields(int) is int
+
+
+def non_field_builder():
+    class T:
+        ...
+
+    assert dict(build_field_map(T)) == {}
