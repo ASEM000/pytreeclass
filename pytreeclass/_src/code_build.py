@@ -182,6 +182,27 @@ def field(
         >>> print(employee)  # _id is not shown
         Employee(name=Asem, age=10)
         >>> assert employee._id == 1  # this is the private attribute
+
+    Note:
+        - :func:`field` is commonly used to annotate the class attributes to be 
+          used by the :func:`autoinit` decorator to generate the ``__init__`` 
+          method similar to ``dataclasses.dataclass``.
+
+        - :func:`field` can be used without the :func:`autoinit` as a descriptor
+          to apply functions on the field values during initialization using
+          the ``callbacks`` argument.
+
+            >>> import pytreeclass as pytc
+            >>> def print_and_return(x):
+            ...    print(f"Setting {x}")
+            ...    return x
+            >>> class Tree:
+            ...    # `a` must be defined as a class attribute for the descriptor to work
+            ...    a: int = pytc.field(callbacks=[print_and_return])
+            ...    def __init__(self, a):
+            ...        self.a = a
+            >>> tree = Tree(1)
+            Setting 1
     """
     if not isinstance(alias, (str, type(None))):
         raise TypeError(f"Non-string {alias=} argument provided to `field`")
