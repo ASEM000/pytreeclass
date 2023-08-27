@@ -501,7 +501,9 @@ def benchmark_treeclass_instance():
     count = 10
     annot = {f"leaf_{i}": int for i in range(count)}
     leaves = {f"leaf_{i}": i for i in range(count)}
-    Tree = type("Tree", (pytc.TreeClass,), {"__annotations__": annot, **leaves})
+    Tree = pytc.autoinit(
+        type("Tree", (pytc.TreeClass,), {"__annotations__": annot, **leaves})
+    )
     return Tree()
 
 

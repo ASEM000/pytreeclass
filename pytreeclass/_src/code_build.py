@@ -184,8 +184,8 @@ def field(
         >>> assert employee._id == 1  # this is the private attribute
 
     Note:
-        - :func:`field` is commonly used to annotate the class attributes to be 
-          used by the :func:`autoinit` decorator to generate the ``__init__`` 
+        - :func:`field` is commonly used to annotate the class attributes to be
+          used by the :func:`autoinit` decorator to generate the ``__init__``
           method similar to ``dataclasses.dataclass``.
 
         - :func:`field` can be used without the :func:`autoinit` as a descriptor
@@ -416,6 +416,12 @@ def autoinit(klass: type[T]) -> type[T]:
         >>> obj = Derived(y=2)
         >>> inspect.signature(obj.__init__)
         <Signature (y: int) -> None>
+
+    Note:
+        Use ``autoinit`` instead of ``dataclasses.dataclass`` if you want to
+        use ``jax.Array`` as a field default value. As ``dataclasses.dataclass``
+        will incorrectly raise an error starting from python 3.11 complaining
+        that ``jax.Array`` is not immutable.
     """
     return (
         klass

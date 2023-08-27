@@ -405,6 +405,16 @@ def tree_mermaid(
         is_leaf: function to determine if a node is a leaf. default is None
         tabwidth: tab width of the repr string. default is 4.
 
+    Example:
+        >>> import pytreeclass as pytc
+        >>> tree = [1, 2, dict(a=3)]
+        >>> # as rendered by mermaid
+        >>> print(pytc.tree_mermaid(tree))  # doctest: +SKIP
+
+        .. image:: ../_static/tree_mermaid.jpg
+            :width: 300px
+            :align: center
+
     Note:
         - Copy the output and paste it in the mermaid live editor to interact with
           the diagram. https://mermaid.live
@@ -465,21 +475,10 @@ def tree_graph(
     Example:
         >>> import pytreeclass as pytc
         >>> tree = [1, 2, dict(a=3)]
+        >>> # as rendered by graphviz
         >>> print(pytc.tree_graph(tree))  # doctest: +SKIP
 
-        .. graphviz::
-
-            digraph G {
-                4685268864 [label="list", shape=box];
-                4685269056 [label="[0]=1", shape=box];
-                4685268864 -> 4685269056;
-                4685269120 [label="[1]=2", shape=box];
-                4685268864 -> 4685269120;
-                4685269184 [label="[2]:dict", shape=box];
-                4685268864 -> 4685269184;
-                4685269248 [label="['a']=3", shape=box];
-                4685269184 -> 4685269248;
-            }
+        .. image:: ../_static/tree_graph.svg
 
     Example:
         >>> # define custom style for a node by dispatching on the value
@@ -492,19 +491,7 @@ def tree_graph(
         ...     return dict(shape="circle", style="filled", fillcolor="lightblue")
         >>> print(pytc.tree_graph(tree))  # doctest: +SKIP
 
-        .. graphviz::
-
-            digraph G {
-                4685309312 [label="list", shape=circle, style=filled, fillcolor=lightblue];
-                4685309504 [label="[0]=1", shape=box];
-                4685309312 -> 4685309504;
-                4685309568 [label="[1]=2", shape=box];
-                4685309312 -> 4685309568;
-                4685309632 [label="[2]:dict", shape=box];
-                4685309312 -> 4685309632;
-                4685309696 [label="['a']=3", shape=box];
-                4685309632 -> 4685309696;
-            }
+        .. image:: ../_static/tree_graph_stylized.svg
     """
 
     def step(node: Node, depth: int = 0) -> str:
