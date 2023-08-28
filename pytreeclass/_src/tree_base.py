@@ -109,21 +109,66 @@ class TreeClassMeta(abc.ABCMeta):
 
 
 class TreeClass(metaclass=TreeClassMeta):
-    """Convert a class to a ``jax``-compatible pytree.
+    """Convert a class to a ``jax``-compatible pytree by inheriting from :class:`.TreeClass`.
 
-    Example:
-        >>> import jax
-        >>> import pytreeclass as pytc
-        >>> # Tree leaves are instance attributes
-        >>> @pytc.autoinit
-        ... class Tree(pytc.TreeClass):
-        ...     a:int = 1
-        ...     b:float = 2.0
-        >>> tree = Tree()
-        >>> jax.tree_util.tree_leaves(tree)
-        [1, 2.0]
+    - A pytree is any nested structure that can be used with ``jax`` functions.
+      A pytree can be a container or a leaf. Container examples are: a ``tuple``,
+      ``list``, or ``dict``. A leaf is a non-container data structure like an
+      ``int``, ``float``, ``string``, or ``jax.Array``. Examples of pytrees are:
 
-        >>> # Leaf-wise math operations are supported  using `leafwise` decorator
+      >>> tree = [1, "string", 2.]  # 3 leaves and 1 container (list) # doctest: +SKIP
+      # list
+      # ├── [0]=1
+      # ├── [1]=string
+      # └── [2]=2.0
+
+      >>> tree = [dict(a=1, b=2), (1, 2, 3)]  # 5 leaves and 3 containers (list, dict, tuple) # doctest: +SKIP
+      # list
+      # ├── [0]:dict
+      # │   ├── ['a']=1
+      # │   └── ['b']=2
+      # └── [1]:tuple
+      #     ├── [0]=1
+      #     ├── [1]=2
+      #     └── [2]=3
+
+    - :class:`.TreeClass` is a container pytree that holds other pytrees in
+      its attributes.
+
+
+    Note:
+        ``pytreeclass`` offers two methods to define the ``__init__`` method:
+
+        1. Manual ``__init__`` method
+
+           >>> import pytreeclass as pytc
+           >>> class Tree(pytc.TreeClass):
+           ...     def __init__(self, a:int, b:float):
+           ...         self.a = a
+           ...         self.b = b
+           >>> tree = Tree(a=1, b=2.0)
+
+        2. Auto generated ``__init__`` method
+
+           Either by ``dataclasses.dataclasss`` or by using :func:`.autoinit` decorator
+           where the type annotations are used to generate the ``__init__`` method
+           similar to ``dataclasses.dataclass``. Compared to ``dataclasses.dataclass``,
+           ``autoinit`` with :func:`field` objects can be used to apply functions on
+           the field values during initialization, and/or support multiple argument kinds.
+           For more details see :func:`.autoinit` and :func:`.field`.
+
+           >>> import pytreeclass as pytc
+           >>> @pytc.autoinit
+           ... class Tree(pytc.TreeClass):
+           ...     a:int
+           ...     b:float
+           >>> tree = Tree(a=1, b=2.0)
+
+    Note:
+        Leaf-wise math operations are supported  using ``leafwise`` decorator.
+        ``leafwise`` decorator applies math operations to each leaf of the tree.
+        for example:
+
         >>> @pytc.leafwise
         ... @pytc.autoinit
         ... class Tree(pytc.TreeClass):
@@ -133,7 +178,11 @@ class TreeClass(metaclass=TreeClassMeta):
         >>> tree + 1
         Tree(a=2, b=3.0)
 
-        >>> # Advanced indexing is supported using `at` property
+    Note:
+        Advanced indexing is supported using ``at`` property. Indexing can be
+        used to ``get``, ``set``, or ``apply`` a function to a leaf or a group of
+        leaves using ``leaf`` name, index or by a boolean mask.
+
         >>> @pytc.autoinit
         ... class Tree(pytc.TreeClass):
         ...     a:int = 1
@@ -176,6 +225,11 @@ class TreeClass(metaclass=TreeClassMeta):
     Note:
         - :class:`.TreeClass` inherits from ``abc.ABC`` so ``@abstract...`` decorators
           can be used to define abstract behavior.
+
+    Warning:
+        The structure should be organized as a tree. In essence, *cyclic references*
+        are not allowed. The leaves of the tree are the values of the tree and
+        the branches are the containers that hold the leaves.
     """
 
     def __init_subclass__(klass: type[T], **k):

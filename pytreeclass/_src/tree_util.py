@@ -177,36 +177,36 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
         >>> @pytc.autoinit
         ... @pytc.leafwise
         ... class Test(pytc.TreeClass):
-        ...    a: tuple[int] = (1,2,3)
-        ...    b: tuple[int] = (4,5,6)
-        ...    c: jax.Array = jnp.array([1,2,3])
+        ...    a: tuple[int, int, int] = (1, 2, 3)
+        ...    b: tuple[int, int, int] = (4, 5, 6)
+        ...    c: jax.Array = jnp.array([1, 2, 3])
 
         >>> tree = Test()
 
         >>> # 0 is broadcasted to all leaves of the pytree
-        >>> print(pytc.bcmap(jnp.where)(tree>1, tree, 0))
+        >>> print(pytc.bcmap(jnp.where)(tree > 1, tree, 0))
         Test(a=(0, 2, 3), b=(4, 5, 6), c=[0 2 3])
-        >>> print(pytc.bcmap(jnp.where)(tree>1, 0, tree))
+        >>> print(pytc.bcmap(jnp.where)(tree > 1, 0, tree))
         Test(a=(1, 0, 0), b=(0, 0, 0), c=[1 0 0])
 
         >>> # 1 is broadcasted to all leaves of the list pytree
-        >>> pytc.bcmap(lambda x,y:x+y)([1,2,3],1)
+        >>> pytc.bcmap(lambda x, y: x + y)([1, 2, 3], 1)
         [2, 3, 4]
 
         >>> # trees are summed leaf-wise
-        >>> pytc.bcmap(lambda x,y:x+y)([1,2,3],[1,2,3])
+        >>> pytc.bcmap(lambda x, y: x + y)([1, 2, 3], [1, 2, 3])
         [2, 4, 6]
 
         >>> # Non scalar second args case
         >>> try:
-        ...     pytc.bcmap(lambda x,y:x+y)([1,2,3],[[1,2,3],[1,2,3]])
+        ...     pytc.bcmap(lambda x, y: x + y)([1, 2, 3], [[1, 2, 3], [1, 2, 3]])
         ... except TypeError as e:
         ...     print(e)
         unsupported operand type(s) for +: 'int' and 'list'
 
         >>> # using **numpy** functions on pytrees
         >>> import jax.numpy as jnp
-        >>> pytc.bcmap(jnp.add)([1,2,3],[1,2,3]) # doctest: +SKIP
+        >>> pytc.bcmap(jnp.add)([1, 2, 3], [1, 2, 3]) # doctest: +SKIP
         [2, 4, 6]
     """
 
