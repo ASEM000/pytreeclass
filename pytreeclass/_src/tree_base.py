@@ -117,20 +117,20 @@ class TreeClass(metaclass=TreeClassMeta):
       ``int``, ``float``, ``string``, or ``jax.Array``. Examples of pytrees are:
 
       >>> tree = [1, "string", 2.]  # 3 leaves and 1 container (list) # doctest: +SKIP
-      # list
-      # ├── [0]=1
-      # ├── [1]=string
-      # └── [2]=2.0
+      list
+      ├── [0]=1
+      ├── [1]=string
+      └── [2]=2.0
 
       >>> tree = [dict(a=1, b=2), (1, 2, 3)]  # 5 leaves and 3 containers (list, dict, tuple) # doctest: +SKIP
-      # list
-      # ├── [0]:dict
-      # │   ├── ['a']=1
-      # │   └── ['b']=2
-      # └── [1]:tuple
-      #     ├── [0]=1
-      #     ├── [1]=2
-      #     └── [2]=3
+      list
+      ├── [0]:dict
+      │   ├── ['a']=1
+      │   └── ['b']=2
+      └── [1]:tuple
+          ├── [0]=1
+          ├── [1]=2
+          └── [2]=3
 
     - :class:`.TreeClass` is a container pytree that holds other pytrees in
       its attributes.

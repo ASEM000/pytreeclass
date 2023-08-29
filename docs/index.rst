@@ -13,7 +13,7 @@ Install from pip::
 
 
 .. toctree::
-   :caption: Getting Started
+   :caption: User guides
    :maxdepth: 1
 
    notebooks/getting_started
@@ -21,6 +21,10 @@ Install from pip::
    notebooks/stateful_computations
    notebooks/dealing_with_non_jaxtype.ipynb
    notebooks/common_recipes
+
+.. toctree::
+   :caption: Examples
+   
    notebooks/build_simple_neural_network
    notebooks/build_mini_optimizer_library
 

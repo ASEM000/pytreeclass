@@ -129,7 +129,7 @@ class _FrozenArray(_FrozenBase):
         return np.all(lhs == rhs)
 
 
-def freeze(value: T) -> _FrozenHashable[T]:
+def freeze(value: T) -> _FrozenBase[T]:
     """Freeze a value to avoid updating it by ``jax`` transformations.
 
     Args:
