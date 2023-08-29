@@ -24,6 +24,7 @@ Install from pip::
 
 .. toctree::
    :caption: Examples
+   :maxdepth: 1
    
    notebooks/build_simple_neural_network
    notebooks/build_mini_optimizer_library
