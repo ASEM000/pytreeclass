@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.0post0
+- using `tree_{repr,str}` with an object containing cyclic references will raise `RecursionError` instead of displaying cyclicref.
+
+
 ## v0.6.0
 - Allow nested mutations using `.at[method](*args, **kwargs)`.
   After the change, inner methods can mutate **_copied_** new instances at any level not just the top level.

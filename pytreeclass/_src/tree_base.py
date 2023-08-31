@@ -369,5 +369,5 @@ class TreeClass(metaclass=TreeClassMeta):
 def treeclass_pp(node: TreeClass, **spec: Unpack[PPSpec]) -> str:
     name = type(node).__name__
     skip = [f.name for f in fields(node) if not f.repr]
-    kvs = ((k, v) for k, v in vars(node).items() if k not in skip)
+    kvs = tuple((k, v) for k, v in vars(node).items() if k not in skip)
     return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"

@@ -23,7 +23,7 @@ import math
 from contextlib import suppress
 from itertools import zip_longest
 from types import FunctionType
-from typing import Any, Callable, Iterable, Literal, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 import jax
 import jax.tree_util as jtu
@@ -46,7 +46,6 @@ class PPSpec(TypedDict):
     kind: Literal["REPR", "STR"]
     width: int
     depth: int | float
-    seen: set[int]
 
 
 PyTree = Any
@@ -85,21 +84,15 @@ def pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     if spec["depth"] < 0:
         return "..."
 
-    if (node_id := id(node)) in spec["seen"]:
-        # useful to avoid infinite recursion in cyclic references
-        # e.g. (a:=[1,2,3];a.append(a))
-        return f"<cyclic reference to {node_id}>"
-
     return format_width(pp_dispatcher(node, **spec), width=spec["width"])
 
 
-def pps(xs: Iterable[Any], pp: PP, **spec: Unpack[PPSpec]) -> str:
+def pps(xs: Sequence[Any], pp: PP, **spec: Unpack[PPSpec]) -> str:
     if spec["depth"] == 0:
         return "..."
 
     spec["indent"] += 1
     spec["depth"] -= 1
-    spec["seen"].add(id(xs))  # avoid infinite recursion in cyclic references
 
     text = (
         "\n"
@@ -254,7 +247,7 @@ def tree_repr(
         >>> print(pytc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
     """
-    text = pp(tree, indent=0, kind="REPR", width=width, depth=depth, seen=set())
+    text = pp(tree, indent=0, kind="REPR", width=width, depth=depth)
     return text.expandtabs(tabwidth)
 
 
@@ -284,7 +277,7 @@ def tree_str(
         >>> print(pytc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
     """
-    text = pp(tree, indent=0, kind="STR", width=width, depth=depth, seen=set())
+    text = pp(tree, indent=0, kind="STR", width=width, depth=depth)
     return text.expandtabs(tabwidth)
 
 
@@ -718,7 +711,7 @@ tree_summary.def_type = tree_summary.type_dispatcher.register
 def _(node: Any) -> str:
     """Return the type repr of the node."""
     shape_dype = node.shape, node.dtype
-    spec = dict(indent=0, kind="REPR", width=80, depth=float("inf"), seen=set())
+    spec = dict(indent=0, kind="REPR", width=80, depth=float("inf"))
     return pp(jax.ShapeDtypeStruct(*shape_dype), **spec)
 
 
