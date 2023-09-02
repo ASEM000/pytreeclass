@@ -71,7 +71,7 @@ tree = Tree()
 mask = jax.tree_map(lambda x: x > 5, tree)
 tree = tree\
        .at["a"].set(100.0)\
-       .at["b"].at[0].set(10.0)\
+       .at["b"][0].set(10.0)\
        .at[mask].set(100.0)
 
 print(tree)

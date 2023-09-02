@@ -431,7 +431,7 @@ def test_attribute_get():
 
     t = Tree()
     assert pytc.is_tree_equal(t.at["a"].get(), Tree(1, l0(None)))
-    assert pytc.is_tree_equal(t.at["b"].at["a"].get(), Tree(None, l0(2)))
+    assert pytc.is_tree_equal(t.at["b"]["a"].get(), Tree(None, l0(2)))
 
 
 def test_attribute_set():
@@ -451,7 +451,7 @@ def test_attribute_set():
 
     assert pytc.is_tree_equal(t, Tree())
     assert pytc.is_tree_equal(t.at["a"].set(10), Tree(10, l0()))
-    assert pytc.is_tree_equal(t.at["b"].at["a"].set(100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at["b"]["a"].set(100), Tree(1, l0(100)))
 
 
 def test_attributre_apply():
@@ -471,7 +471,7 @@ def test_attributre_apply():
 
     assert pytc.is_tree_equal(t, Tree())
     assert pytc.is_tree_equal(t.at["a"].apply(lambda _: 10), Tree(10))
-    assert pytc.is_tree_equal(t.at["b"].at["a"].apply(lambda _: 100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at["b"]["a"].apply(lambda _: 100), Tree(1, l0(100)))
 
 
 def test_trace_get():
@@ -488,7 +488,7 @@ def test_trace_get():
 
     t = Tree()
     assert pytc.is_tree_equal(t.at[0].get(), Tree(1, l0(None)))
-    assert pytc.is_tree_equal(t.at[1].at[0].get(), Tree(None, l0(2)))
+    assert pytc.is_tree_equal(t.at[1][0].get(), Tree(None, l0(2)))
 
     # with pytest.raises(IndexError):
     #     t.at[0].at[1].get()
@@ -518,7 +518,7 @@ def test_trace_set():
 
     assert pytc.is_tree_equal(t, Tree())
     assert pytc.is_tree_equal(t.at[0].set(10), Tree(10, l0()))
-    assert pytc.is_tree_equal(t.at[1].at[0].set(100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at[1][0].set(100), Tree(1, l0(100)))
 
 
 def test_trace_apply():
@@ -538,7 +538,7 @@ def test_trace_apply():
 
     assert pytc.is_tree_equal(t, Tree())
     assert pytc.is_tree_equal(t.at[0].apply(lambda _: 10), Tree(10))
-    assert pytc.is_tree_equal(t.at[1].at[0].apply(lambda _: 100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at[1][0].apply(lambda _: 100), Tree(1, l0(100)))
 
 
 def test_trace_reduce():
@@ -570,8 +570,8 @@ def test_mixed_get():
         b: l0 = l0()
 
     t = Tree()
-    assert pytc.is_tree_equal(t.at[1].at[t == 2].get(), Tree(None, l0(2, None)))
-    assert pytc.is_tree_equal(t.at[t == 2].at[1].get(), Tree(None, l0(2, None)))
+    assert pytc.is_tree_equal(t.at[1][t == 2].get(), Tree(None, l0(2, None)))
+    assert pytc.is_tree_equal(t.at[t == 2][1].get(), Tree(None, l0(2, None)))
 
     # with pytest.raises(IndexError):
     #     t.at[0].at[2].get()
@@ -592,11 +592,11 @@ def test_mixed_set():
 
     t = Tree()
 
-    assert pytc.is_tree_equal(t.at["b"].at[t == 2].set(100), Tree(1, l0(100)))
-    assert pytc.is_tree_equal(t.at[t == 2].at["b"].set(100), Tree(1, l0(100)))
-    assert pytc.is_tree_equal(t.at[1].at[t == 2].set(100), Tree(1, l0(100)))
-    assert pytc.is_tree_equal(t.at[t == 2].at[1].set(100), Tree(1, l0(100)))
-    assert pytc.is_tree_equal(t.at["b"].at[0].set(100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at["b"][t == 2].set(100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at[t == 2]["b"].set(100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at[1][t == 2].set(100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at[t == 2][1].set(100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at["b"][0].set(100), Tree(1, l0(100)))
 
     # with pytest.raises(IndexError):
     #     assert pytc.is_tree_equal(t.at[0].at["b"].set(100), Tree(1, l0(100, 2)))
@@ -615,8 +615,8 @@ def test_mixed_apply():
 
     t = Tree()
 
-    assert pytc.is_tree_equal(t.at[1].at[t == 2].apply(lambda _: 100), Tree(1, l0(100)))
-    assert pytc.is_tree_equal(t.at["b"].at[0].apply(lambda _: 100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at[1][t == 2].apply(lambda _: 100), Tree(1, l0(100)))
+    assert pytc.is_tree_equal(t.at["b"][0].apply(lambda _: 100), Tree(1, l0(100)))
 
     # with pytest.raises(IndexError):
     #     t.at[0].at["a"].apply(lambda _: 100), Tree(1, l0(100))
@@ -641,7 +641,7 @@ def test_method_call():
         b: Tree = Tree()
 
     assert pytc.is_tree_equal(t.at["increment"]()[1], Tree(2))
-    assert pytc.is_tree_equal(Tree2().at["b"].at["show"]()[0], 1)
+    assert pytc.is_tree_equal(Tree2().at["b"]["show"]()[0], 1)
 
     with pytest.raises(AttributeError):
         t.at["bla"]()
@@ -676,9 +676,7 @@ def test_composed_at():
 
     t = Tree()
 
-    assert pytc.is_tree_equal(
-        t.at[t > 0].at[t < 0].get(), Tree(jnp.array([], dtype=int))
-    )
+    assert pytc.is_tree_equal(t.at[t > 0][t < 0].get(), Tree(jnp.array([], dtype=int)))
 
     with pytest.raises(AttributeError):
         t.at[t > 0].bet
@@ -764,10 +762,10 @@ def test_mixed_not_implemented():
     t = T()
 
     with pytest.raises(NotImplementedError):
-        t.at["a"].at[[1]].get()
+        t.at["a"][[1]].get()
 
     with pytest.raises(NotImplementedError):
-        t.at[0].at[[1]].get()
+        t.at[0][[1]].get()
 
 
 def test_nested_indexing():
@@ -780,8 +778,8 @@ def test_nested_indexing():
         a: Any = (1, {"b": Dict({"c": 1})})
 
     tree = Tree()
-    assert jtu.tree_leaves(tree.at["a"].at[1].at["b"].get())[0] == Dict({"c": 1})
-    assert jtu.tree_leaves(tree.at[0].at[1].at["b"].get())[0] == Dict({"c": 1})
+    assert jtu.tree_leaves(tree.at["a"][1]["b"].get())[0] == Dict({"c": 1})
+    assert jtu.tree_leaves(tree.at[0][1]["b"].get())[0] == Dict({"c": 1})
 
 
 def test_construct_tree():
@@ -806,7 +804,7 @@ def test_regexkey():
     tree = tree.at[re.compile(r"weight_.*")].set(100.0)
     # Tree(weight_1=100.0, weight_2=100.0, weight_3=100.0, bias=0.0)
     assert jtu.tree_leaves(tree) == [100.0, 100.0, 100.0, 0.0]
-    tree = pytc.AtIndexer({"a": 1, "b": 2}).at[re.compile(r"a")].set(100.0)
+    tree = pytc.AtIndexer({"a": 1, "b": 2})[re.compile(r"a")].set(100.0)
     assert tree == {"a": 100.0, "b": 2}
 
 

@@ -290,8 +290,8 @@ def test_freeze_nondiff_with_mask():
         d: L1 = L1()
 
     t = L2()
-    t = t.at["d"].at["d"].at["a"].apply(pytc.freeze)
-    t = t.at["d"].at["d"].at["b"].apply(pytc.freeze)
+    t = t.at["d"]["d"]["a"].apply(pytc.freeze)
+    t = t.at["d"]["d"]["b"].apply(pytc.freeze)
 
     assert jtu.tree_leaves(t) == [10, 20, 30, 1, 2, 3, 3]
 
@@ -325,8 +325,8 @@ def test_tree_mask():
 
     assert jtu.tree_leaves(tree.at["a"].apply(pytc.freeze)) == [2, 3]
     assert jtu.tree_leaves(tree.at["b"].apply(pytc.freeze)) == [1]
-    assert jtu.tree_leaves(tree.at["b"].at["x"].apply(pytc.freeze)) == [1, 3]
-    assert jtu.tree_leaves(tree.at["b"].at["y"].apply(pytc.freeze)) == [1, 2]
+    assert jtu.tree_leaves(tree.at["b"]["x"].apply(pytc.freeze)) == [1, 3]
+    assert jtu.tree_leaves(tree.at["b"]["y"].apply(pytc.freeze)) == [1, 2]
 
 
 def test_tree_unmask():

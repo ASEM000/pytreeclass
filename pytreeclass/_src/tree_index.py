@@ -399,14 +399,14 @@ class AtIndexer(NamedTuple):
         >>> import pytreeclass as pytc
         >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
         >>> tree = pytc.AtIndexer(tree)
-        >>> tree.at["level1_0"].at["level2_0"].get()
+        >>> tree["level1_0"]["level2_0"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
         >>> # get multiple keys at once at the same level
-        >>> tree.at["level1_0"].at["level2_0", "level2_1"].get()
+        >>> tree["level1_0"]["level2_0", "level2_1"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': 200}, 'level1_1': None}
         >>> # get with a mask
         >>> mask = {"level1_0": {"level2_0": True, "level2_1": False}, "level1_1": True}
-        >>> tree.at[mask].get()
+        >>> tree[mask].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': 300}
 
     Example:
@@ -440,14 +440,6 @@ class AtIndexer(NamedTuple):
     def __getitem__(self, where: Any) -> AtIndexer:
         return type(self)(self.tree, (*self.where, where))
 
-    def __getattr__(self, name: str) -> AtIndexer:
-        """Support nested indexing."""
-        if name == "at":
-            # pass the current tree and the current path to the next `.at`
-            return type(self)(tree=self.tree, where=self.where)
-
-        raise AttributeError(f"`{self!r}` has no attribute {name!r}.")
-
     def get(self, *, is_leaf: IsLeafType = None) -> PyTree:
         """Get the leaf values at the specified location.
 
@@ -462,7 +454,7 @@ class AtIndexer(NamedTuple):
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
             >>> tree = pytc.AtIndexer(tree)
-            >>> tree.at["level1_0"].at["level2_0"].get()
+            >>> tree["level1_0"]["level2_0"].get()
             {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
 
         Example:
@@ -501,7 +493,7 @@ class AtIndexer(NamedTuple):
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
             >>> tree = pytc.AtIndexer(tree)
-            >>> tree.at["level1_0"].at["level2_0"].set('SET')
+            >>> tree["level1_0"]["level2_0"].set('SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
@@ -551,7 +543,7 @@ class AtIndexer(NamedTuple):
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
             >>> tree = pytc.AtIndexer(tree)
-            >>> tree.at["level1_0"].at["level2_0"].apply(lambda _: 'SET')
+            >>> tree["level1_0"]["level2_0"].apply(lambda _: 'SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
@@ -605,7 +597,7 @@ class AtIndexer(NamedTuple):
             ...     return 'SET', state + 1
             >>> init_state = 0
             >>> tree = pytc.AtIndexer(tree)
-            >>> tree.at["level1_0"].at["level2_0"].scan(scan_func, state=init_state)
+            >>> tree["level1_0"]["level2_0"].scan(scan_func, state=init_state)
             ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
 
         Example:
@@ -687,7 +679,7 @@ class AtIndexer(NamedTuple):
             3
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
-        tree = self.at[where].get(is_leaf=is_leaf)  # type: ignore
+        tree = self[where].get(is_leaf=is_leaf)  # type: ignore
         if initializer is _no_initializer:
             return jtu.tree_reduce(func, tree)
         return jtu.tree_reduce(func, tree, initializer)

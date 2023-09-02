@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.7
+
+- Remove `.at` as an alias for `__getitem__` when specifying a path entry for where in `AtIndexer`. This leads to less verbose style.
+
+Example:
+```python
+
+>>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
+>>> tree = pytc.AtIndexer(tree)
+
+>>> # Before:
+>>> # style 1 (with at):
+>>> tree.at["level1_0"].at["level2_0", "level2_1"].get()
+{'level1_0': {'level2_0': 100, 'level2_1': 200}, 'level1_1': None}
+>>> # style 2 (no at):
+>>> tree["level1_0"]["level2_0", "level2_1"].get()
+
+>>> # After
+>>> # only style 2 is valid
+>>> tree["level1_0"]["level2_0", "level2_1"].get()
+```
+
+For `TreeClass`
+
+`at` is specified _once_ for each change
+
+```diff
+@pytc.autoinit
+class Tree(pytc.TreeClass):
+    a: float = 1.0
+    b: tuple[float, float] = (2.0, 3.0)
+    c: jax.Array = jnp.array([4.0, 5.0, 6.0])
+
+    def __call__(self, x):
+        return self.a + self.b[0] + self.c + x
+
+
+tree = Tree()
+mask = jax.tree_map(lambda x: x > 5, tree)
+tree = tree\
+       .at["a"].set(100.0)\
+-       .at["b"].at[0].set(10.0)\
++      .at["b"][0].set(10.0)\
+       .at[mask].set(100.0)
+```
+
+
+
 ## v0.6.0post0
 - using `tree_{repr,str}` with an object containing cyclic references will raise `RecursionError` instead of displaying cyclicref.
 
