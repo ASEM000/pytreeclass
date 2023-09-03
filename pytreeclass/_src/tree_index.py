@@ -398,15 +398,15 @@ class AtIndexer(NamedTuple):
         >>> import jax
         >>> import pytreeclass as pytc
         >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-        >>> tree = pytc.AtIndexer(tree)
-        >>> tree["level1_0"]["level2_0"].get()
+        >>> indexer = pytc.AtIndexer(tree)
+        >>> indexer["level1_0"]["level2_0"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
         >>> # get multiple keys at once at the same level
-        >>> tree["level1_0"]["level2_0", "level2_1"].get()
+        >>> indexer["level1_0"]["level2_0", "level2_1"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': 200}, 'level1_1': None}
         >>> # get with a mask
         >>> mask = {"level1_0": {"level2_0": True, "level2_1": False}, "level1_1": True}
-        >>> tree[mask].get()
+        >>> indexer[mask].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': 300}
 
     Example:
@@ -453,8 +453,8 @@ class AtIndexer(NamedTuple):
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> tree = pytc.AtIndexer(tree)
-            >>> tree["level1_0"]["level2_0"].get()
+            >>> indexer = pytc.AtIndexer(tree)
+            >>> indexer["level1_0"]["level2_0"].get()
             {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
 
         Example:
@@ -492,8 +492,8 @@ class AtIndexer(NamedTuple):
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> tree = pytc.AtIndexer(tree)
-            >>> tree["level1_0"]["level2_0"].set('SET')
+            >>> indexer = pytc.AtIndexer(tree)
+            >>> indexer["level1_0"]["level2_0"].set('SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
@@ -542,8 +542,8 @@ class AtIndexer(NamedTuple):
         Example:
             >>> import pytreeclass as pytc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> tree = pytc.AtIndexer(tree)
-            >>> tree["level1_0"]["level2_0"].apply(lambda _: 'SET')
+            >>> indexer = pytc.AtIndexer(tree)
+            >>> indexer["level1_0"]["level2_0"].apply(lambda _: 'SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
@@ -596,8 +596,8 @@ class AtIndexer(NamedTuple):
             >>> def scan_func(leaf, state):
             ...     return 'SET', state + 1
             >>> init_state = 0
-            >>> tree = pytc.AtIndexer(tree)
-            >>> tree["level1_0"]["level2_0"].scan(scan_func, state=init_state)
+            >>> indexer = pytc.AtIndexer(tree)
+            >>> indexer["level1_0"]["level2_0"].scan(scan_func, state=init_state)
             ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
 
         Example:
