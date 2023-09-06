@@ -14,6 +14,8 @@ _These changes enable:_
 
 1) stricter data validation on instance values, as in the following example:
 
+    <details> 
+
     `on_setattr` ensure the value is of certain type (e.g.integer) during _initialization_, and `on_getattr`, ensure the value is of certain type (e.g. integer) whenever its accessed.
 
 
@@ -41,7 +43,11 @@ _These changes enable:_
     tree(1.0)  # AssertionError: must be an int
     ```
 
+    </details>
+
 2) Frozen field without using `tree_mask`/`tree_unmask`
+
+    <details>
 
     The following shows a pattern where the value is frozen on `__setattr__` and unfrozen whenever accessed, this ensures that `jax` transformation does not see the value. the following example showcase this functionality
 
@@ -70,7 +76,12 @@ _These changes enable:_
 
     Compared with other libraies that implements `static_field`, this pattern has *lower* overhead and does not alter `tree_flatten`/`tree_unflatten` methods of the tree.
 
+
+    </details>
+
 3) Easier way to create a buffer (non-trainable array)
+
+    <details>
 
     Just use `jax.lax.stop_gradient` in `on_getattr`
 
@@ -98,6 +109,8 @@ _These changes enable:_
     f(tree, 1.0)  # Array([1., 2., 3.], dtype=float32)
     print(jax.grad(f)(tree, 1.0))  # Tree(buffer=[0. 0. 0.])
     ```
+
+    </details>
 
 ## v0.7
 
