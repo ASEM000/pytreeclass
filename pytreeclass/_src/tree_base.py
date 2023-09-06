@@ -111,30 +111,11 @@ class TreeClassMeta(abc.ABCMeta):
 class TreeClass(metaclass=TreeClassMeta):
     """Convert a class to a ``jax``-compatible pytree by inheriting from :class:`.TreeClass`.
 
-    - A pytree is any nested structure that can be used with ``jax`` functions.
-      A pytree can be a container or a leaf. Container examples are: a ``tuple``,
-      ``list``, or ``dict``. A leaf is a non-container data structure like an
-      ``int``, ``float``, ``string``, or ``jax.Array``. Examples of pytrees are:
-
-      >>> tree = [1, "string", 2.]  # 3 leaves and 1 container (list) # doctest: +SKIP
-      list
-      ├── [0]=1
-      ├── [1]=string
-      └── [2]=2.0
-
-      >>> tree = [dict(a=1, b=2), (1, 2, 3)]  # 5 leaves and 3 containers (list, dict, tuple) # doctest: +SKIP
-      list
-      ├── [0]:dict
-      │   ├── ['a']=1
-      │   └── ['b']=2
-      └── [1]:tuple
-          ├── [0]=1
-          ├── [1]=2
-          └── [2]=3
-
-    - :class:`.TreeClass` is a container pytree that holds other pytrees in
-      its attributes.
-
+    A pytree is any nested structure that can be used with ``jax`` functions.
+    A pytree can be a container or a leaf. Container examples are: a ``tuple``,
+    ``list``, or ``dict``. A leaf is a non-container data structure like an
+    ``int``, ``float``, ``string``, or ``jax.Array``. :class:`.TreeClass` is a
+    container pytree that holds other pytrees in its attributes.
 
     Note:
         ``pytreeclass`` offers two methods to define the ``__init__`` method:

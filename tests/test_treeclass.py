@@ -41,7 +41,7 @@ def test_fields():
 
     assert (
         repr(pytc.field(kind="KW_ONLY"))
-        == "Field(name=None, type=None, default=NULL, init=True, repr=True, kind='KW_ONLY', metadata=None, callbacks=(), alias=None)"
+        == "Field(name=None, type=None, default=NULL, init=True, repr=True, kind='KW_ONLY', metadata=None, on_setattr=(), on_getattr=(), alias=None)"
     )
 
 
@@ -354,7 +354,7 @@ def test_setattr_delattr():
                 pass
 
 
-def test_callbacks():
+def test_on_setattr():
     def instance_validator(types):
         def _instance_validator(x):
             if isinstance(x, types) is False:
@@ -373,7 +373,7 @@ def test_callbacks():
 
     @pytc.autoinit
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[instance_validator(int)])
+        a: int = pytc.field(on_setattr=[instance_validator(int)])
 
     with pytest.raises(AssertionError):
         Test(a="a")
@@ -382,7 +382,7 @@ def test_callbacks():
 
     @pytc.autoinit
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[instance_validator((int, float))])
+        a: int = pytc.field(on_setattr=[instance_validator((int, float))])
 
     assert Test(a=1).a == 1
     assert Test(a=1.0).a == 1.0
@@ -392,7 +392,7 @@ def test_callbacks():
 
     @pytc.autoinit
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[range_validator(0, 10)])
+        a: int = pytc.field(on_setattr=[range_validator(0, 10)])
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -404,7 +404,9 @@ def test_callbacks():
 
     @pytc.autoinit
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[range_validator(0, 10), instance_validator(int)])
+        a: int = pytc.field(
+            on_setattr=[range_validator(0, 10), instance_validator(int)]
+        )
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -416,19 +418,19 @@ def test_callbacks():
 
         @pytc.autoinit
         class Test(pytc.TreeClass):
-            a: int = pytc.field(callbacks=1)
+            a: int = pytc.field(on_setattr=1)
 
     with pytest.raises(TypeError):
 
         @pytc.autoinit
         class Test(pytc.TreeClass):
-            a: int = pytc.field(callbacks=[1])
+            a: int = pytc.field(on_setattr=[1])
 
     with pytest.raises(TypeError):
 
         @pytc.autoinit
         class Test(pytc.TreeClass):
-            a: int = pytc.field(callbacks=[lambda: True])
+            a: int = pytc.field(on_setattr=[lambda: True])
 
         Test(a=1)
 
@@ -436,7 +438,7 @@ def test_callbacks():
 def test_treeclass_frozen_field():
     @pytc.autoinit
     class Test(pytc.TreeClass):
-        a: int = pytc.field(callbacks=[pytc.freeze])
+        a: int = pytc.field(on_setattr=[pytc.freeze])
 
     t = Test(1)
 
@@ -657,3 +659,25 @@ def non_field_builder():
         ...
 
     assert dict(build_field_map(T)) == {}
+
+
+def test_on_getattr():
+    @pytc.autoinit
+    class Tree(pytc.TreeClass):
+        a: int = pytc.field(on_getattr=[lambda x: x + 1])
+
+    assert Tree(a=1).a == 2
+
+    # with subclassing
+
+    @pytc.autoinit
+    class Parent:
+        a: int = pytc.field(on_getattr=[lambda x: x + 1])
+
+    class Child(Parent):
+        pass
+
+    child = Child(a=1)
+
+    assert child.a == 2
+    assert vars(child)["a"] == 1
