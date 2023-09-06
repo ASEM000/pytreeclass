@@ -31,7 +31,7 @@ T = TypeVar("T")
 MaskType = Union[T, Callable[[Any], bool]]
 
 
-class _FrozneError(NamedTuple):
+class _FrozenError(NamedTuple):
     opname: str
 
     def __call__(self, *a, **k):
@@ -80,21 +80,21 @@ class _FrozenBase(Generic[T]):
         )
 
     # raise helpful error message when trying to interact with frozen object
-    __add__ = __radd__ = __iadd__ = _FrozneError("+")
-    __sub__ = __rsub__ = __isub__ = _FrozneError("-")
-    __mul__ = __rmul__ = __imul__ = _FrozneError("*")
-    __matmul__ = __rmatmul__ = __imatmul__ = _FrozneError("@")
-    __truediv__ = __rtruediv__ = __itruediv__ = _FrozneError("/")
-    __floordiv__ = __rfloordiv__ = __ifloordiv__ = _FrozneError("//")
-    __mod__ = __rmod__ = __imod__ = _FrozneError("%")
-    __pow__ = __rpow__ = __ipow__ = _FrozneError("**")
-    __lshift__ = __rlshift__ = __ilshift__ = _FrozneError("<<")
-    __rshift__ = __rrshift__ = __irshift__ = _FrozneError(">>")
-    __and__ = __rand__ = __iand__ = _FrozneError("and")
-    __xor__ = __rxor__ = __ixor__ = _FrozneError("")
-    __or__ = __ror__ = __ior__ = _FrozneError("or")
-    __neg__ = __pos__ = __abs__ = __invert__ = _FrozneError("unary operation")
-    __call__ = _FrozneError("__call__")
+    __add__ = __radd__ = __iadd__ = _FrozenError("+")
+    __sub__ = __rsub__ = __isub__ = _FrozenError("-")
+    __mul__ = __rmul__ = __imul__ = _FrozenError("*")
+    __matmul__ = __rmatmul__ = __imatmul__ = _FrozenError("@")
+    __truediv__ = __rtruediv__ = __itruediv__ = _FrozenError("/")
+    __floordiv__ = __rfloordiv__ = __ifloordiv__ = _FrozenError("//")
+    __mod__ = __rmod__ = __imod__ = _FrozenError("%")
+    __pow__ = __rpow__ = __ipow__ = _FrozenError("**")
+    __lshift__ = __rlshift__ = __ilshift__ = _FrozenError("<<")
+    __rshift__ = __rrshift__ = __irshift__ = _FrozenError(">>")
+    __and__ = __rand__ = __iand__ = _FrozenError("and")
+    __xor__ = __rxor__ = __ixor__ = _FrozenError("")
+    __or__ = __ror__ = __ior__ = _FrozenError("or")
+    __neg__ = __pos__ = __abs__ = __invert__ = _FrozenError("unary operation")
+    __call__ = _FrozenError("__call__")
 
 
 @tree_summary.def_type(_FrozenBase)
@@ -137,8 +137,6 @@ def freeze(value: T) -> _FrozenBase[T]:
 
     Note:
         - :func:`.freeze` is idempotent, i.e. ``freeze(freeze(x)) == freeze(x)``.
-        - :func:`.freeze` uses single dispatch to support custom types. To define a custom
-          wrapper for a certain type, use ``freeze.def_type(type, func)``.
 
     Example:
         >>> import jax
@@ -191,8 +189,6 @@ def unfreeze(value: T) -> T:
 
     Note:
         - use ``is_leaf=pytc.is_frozen`` with ``jax.tree_map`` to unfreeze a tree.**
-        - :func:`.unfreeze` uses single dispatch to support custom types. To define a custom
-          behavior for a certain type, use ``unfreeze.def_type(type, func)``.
 
     Example:
         >>> import pytreeclass as pytc
@@ -293,7 +289,7 @@ def _tree_mask_map(
         )
 
     raise ValueError(
-        f"`mask` must be a callable that accepts a leaf a returns a boolean "
+        f"`mask` must be a callable that accepts a leaf and returns a boolean "
         f"or a tree with the same structure as tree with boolean values."
         f" Got {mask=} and {tree=}."
     )
