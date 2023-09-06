@@ -45,6 +45,7 @@ ignore = [
     "N804",  # first argument of a classmethod should be named 'cls'
     "D104",  # Missing docstring in public package
     "D103",  # Missing docstring in public function
+    "D411",
 ]
 
 [tool.ruff.pydocstyle]

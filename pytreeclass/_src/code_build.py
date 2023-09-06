@@ -187,6 +187,8 @@ def field(
             ``obj = Class(x=1)``.
 
     Example:
+        Type and range validation using :attr:`on_setattr`:
+
         >>> import pytreeclass as pytc
         >>> @pytc.autoinit
         ... class IsInstance(pytc.TreeClass):
@@ -194,6 +196,7 @@ def field(
         ...    def __call__(self, x):
         ...        assert isinstance(x, self.klass)
         ...        return x
+        <BLANKLINE>
         >>> @pytc.autoinit
         ... class Range(pytc.TreeClass):
         ...    start: int|float = float("-inf")
@@ -201,20 +204,42 @@ def field(
         ...    def __call__(self, x):
         ...        assert self.start <= x <= self.stop
         ...        return x
+        <BLANKLINE>
         >>> @pytc.autoinit
         ... class Employee(pytc.TreeClass):
         ...    # assert employee ``name`` is str
         ...    name: str = pytc.field(on_setattr=[IsInstance(str)])
         ...    # use callback compostion to assert employee ``age`` is int and positive
         ...    age: int = pytc.field(on_setattr=[IsInstance(int), Range(1)])
-        ...    # use ``id`` in the constructor for ``_id`` attribute
-        ...    # this is useful for private attributes that are not supposed
-        ...    # to be accessed directly and hide it from the repr
-        ...    _id: int = pytc.field(alias="id", repr=False)
-        >>> employee = Employee(name="Asem", age=10, id=1)
-        >>> print(employee)  # _id is not shown
+        >>> employee = Employee(name="Asem", age=10)
+        >>> print(employee)
         Employee(name=Asem, age=10)
-        >>> assert employee._id == 1  # this is the private attribute
+
+    Example:
+        Private attribute using :attr:`alias`:
+
+        >>> import pytreeclass as pytc
+        >>> @pytc.autoinit
+        ... class Employee(pytc.TreeClass):
+        ...     # `alias` is the name used in the constructor
+        ...    _name: str = pytc.field(alias="name")
+        >>> employee = Employee(name="Asem")  # use `name` in the constructor
+        >>> print(employee)  # `_name` is the private attribute name
+        Employee(_name=Asem)
+
+    Example:
+        Buffer creation using :attr:`on_getattr`:
+
+        >>> import pytreeclass as pytc
+        >>> import jax.numpy as jnp
+        >>> @pytc.autoinit
+        ... class Tree(pytc.TreeClass):
+        ...     buffer: jax.Array = pytc.field(on_getattr=[jax.lax.stop_gradient])
+        >>> tree = Tree(buffer=jnp.array((1.0, 2.0)))
+        >>> def sum_buffer(tree):
+        ...     return tree.buffer.sum()
+        >>> print(jax.grad(sum_buffer)(tree))  # no gradient on `buffer`
+        Tree(buffer=[0. 0.])
 
     Note:
         - :func:`field` is commonly used to annotate the class attributes to be
