@@ -574,7 +574,7 @@ class AtIndexer(NamedTuple):
         *,
         is_leaf: IsLeafType = None,
     ) -> tuple[PyTree, S]:
-        """Apply a function with carrtying a state.
+        """Apply a function while carrying a state.
 
         Args:
             func: the function to apply to the leaf values. the function accepts

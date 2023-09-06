@@ -58,7 +58,8 @@ class Field:
         "repr",
         "kind",
         "metadata",
-        "callbacks",
+        "on_setattr",
+        "on_getattr",
         "alias",
     ]
 
@@ -72,9 +73,31 @@ class Field:
         repr: bool = True,
         kind: ArgKind = "POS_OR_KW",
         metadata: dict[str, Any] | None = None,
-        callbacks: Sequence[Callable[[Any], Any]] = (),
+        on_setattr: Sequence[Callable[[Any], Any]] = (),
+        on_getattr: Sequence[Callable[[Any], Any]] = (),
         alias: str | None = None,
     ):
+        """Initialize the field attributes.
+
+        Args:
+            name: The field name.
+            type: The field type.
+            default: The default value of the field.
+            init: Whether the field is included in the object's ``__init__`` function.
+            repr: Whether the field is included in the object's ``__repr__`` function.
+            kind: Argument kind, one of:
+
+                - ``POS_ONLY``: positional only argument (e.g. ``x`` in ``def f(x, /):``)
+                - ``VAR_POS``: variable positional argument (e.g. ``*x`` in ``def f(*x):``)
+                - ``POS_OR_KW``: positional or keyword argument (e.g. ``x`` in ``def f(x):``)
+                - ``KW_ONLY``: keyword only argument (e.g. ``x`` in ``def f(*, x):``)
+                - ``VAR_KW``: variable keyword argument (e.g. ``**x`` in ``def f(**x):``)
+
+            metadata: A mapping of user-defined data for the field.
+            on_setattr: A sequence of functions called on ``__setattr__``.
+            on_getattr: A sequence of functions called on ``__getattr__``.
+            alias: An a alias for the field name in the constructor. e.g ``name=x``,
+        """
         self.name = name
         self.type = type
         self.default = default
@@ -82,36 +105,45 @@ class Field:
         self.repr = repr
         self.kind = kind
         self.metadata = metadata
-        self.callbacks = callbacks
+        self.on_setattr = on_setattr
+        self.on_getattr = on_getattr
         self.alias = alias
 
     def replace(self, **kwargs) -> Field:
         """Replace the field attributes."""
         return type(self)(**{k: kwargs.get(k, getattr(self, k)) for k in slots(Field)})
 
-    def __call__(self, value: Any):
-        """Apply the callbacks on `value`."""
-        for callback in self.callbacks:
+    def pipe(self, funcs: Sequence[Callable[[Any], Any]], value: Any):
+        """Apply a sequence of functions on the field value."""
+        for func in funcs:
             try:
-                value = callback(value)
+                value = func(value)
             except Exception as e:
-                cname = getattr(callback, "__name__", callback)
+                cname = getattr(func, "__name__", func)
                 raise type(e)(f"On applying {cname} for field=`{self.name}`:\n{e}")
         return value
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({', '.join(f'{k}={getattr(self, k)!r}' for k in slots(Field))})"
+        """Return the string representation of the field."""
+        attrs = [f"{k}={getattr(self, k)!r}" for k in slots(Field)]
+        return f"{type(self).__name__}({', '.join(attrs)})"
 
     def __set_name__(self, _, name: str) -> None:
+        """Set the field name."""
         self.name = name
 
     def __get__(self: T, instance, _) -> T | Any:
-        return self if instance is None else vars(instance)[self.name]
+        """Return the field value."""
+        if instance is None:
+            return self
+        return self.pipe(self.on_getattr, vars(instance)[self.name])
 
     def __set__(self: T, instance, value) -> None:
-        vars(instance)[self.name] = self(value)
+        """Set the field value."""
+        vars(instance)[self.name] = self.pipe(self.on_setattr, value)
 
     def __delete__(self: T, instance) -> None:
+        """Delete the field value."""
         del vars(instance)[self.name]
 
 
@@ -129,7 +161,8 @@ def field(
     repr: bool = True,
     kind: ArgKindType = "POS_OR_KW",
     metadata: dict[str, Any] | None = None,  # type: ignore
-    callbacks: Sequence[Any] = (),
+    on_setattr: Sequence[Any] = (),
+    on_getattr: Sequence[Any] = (),
     alias: str | None = None,
 ) -> Field:
     """Field placeholder for type hinted attributes.
@@ -147,8 +180,8 @@ def field(
             - ``VAR_KW``: variable keyword argument (e.g. ``**x`` in ``def f(**x):``)
 
         metadata: A mapping of user-defined data for the field.
-        callbacks: A sequence of functions to called on ``__setattr__`` during
-            initialization to modify the field value.
+        on_setattr: A sequence of functions to called on ``__setattr__``.
+        on_getattr: A sequence of functions to called on ``__getattr__``.
         alias: An a alias for the field name in the constructor. e.g ``name=x``,
             ``alias=y`` will allow ``obj = Class(y=1)`` to be equivalent to
             ``obj = Class(x=1)``.
@@ -171,9 +204,9 @@ def field(
         >>> @pytc.autoinit
         ... class Employee(pytc.TreeClass):
         ...    # assert employee ``name`` is str
-        ...    name: str = pytc.field(callbacks=[IsInstance(str)])
+        ...    name: str = pytc.field(on_setattr=[IsInstance(str)])
         ...    # use callback compostion to assert employee ``age`` is int and positive
-        ...    age: int = pytc.field(callbacks=[IsInstance(int), Range(1)])
+        ...    age: int = pytc.field(on_setattr=[IsInstance(int), Range(1)])
         ...    # use ``id`` in the constructor for ``_id`` attribute
         ...    # this is useful for private attributes that are not supposed
         ...    # to be accessed directly and hide it from the repr
@@ -190,7 +223,7 @@ def field(
 
         - :func:`field` can be used without the :func:`autoinit` as a descriptor
           to apply functions on the field values during initialization using
-          the ``callbacks`` argument.
+          the ``on_setattr`` / ``on_getattr`` argument.
 
             >>> import pytreeclass as pytc
             >>> def print_and_return(x):
@@ -198,7 +231,7 @@ def field(
             ...    return x
             >>> class Tree:
             ...    # `a` must be defined as a class attribute for the descriptor to work
-            ...    a: int = pytc.field(callbacks=[print_and_return])
+            ...    a: int = pytc.field(on_setattr=[print_and_return])
             ...    def __init__(self, a):
             ...        self.a = a
             >>> tree = Tree(1)
@@ -210,11 +243,16 @@ def field(
         raise TypeError(f"Non-dict {metadata=} argument provided to `field`")
     if kind not in ArgKind:
         raise ValueError(f"{kind=} not in {ArgKind}")
-    if not isinstance(callbacks, Sequence):
-        raise TypeError(f"Non-sequence {callbacks=} argument provided to `field`")
-    for callback in callbacks:
-        if not isinstance(callback, Callable):  # type: ignore
-            raise TypeError(f"Non-callable {callback=} provided to `field`")
+    if not isinstance(on_setattr, Sequence):
+        raise TypeError(f"Non-sequence {on_setattr=} argument provided to `field`")
+    if not isinstance(on_getattr, Sequence):
+        raise TypeError(f"Non-sequence {on_getattr=} argument provided to `field`")
+    for func in on_setattr:
+        if not isinstance(func, Callable):  # type: ignore
+            raise TypeError(f"Non-callable {func=} provided to `field`")
+    for func in on_getattr:
+        if not isinstance(func, Callable):
+            raise TypeError(f"Non-callable {func=} provided to `field`")
 
     return Field(
         default=default,
@@ -222,7 +260,8 @@ def field(
         repr=repr,
         kind=kind,
         metadata=metadata,  # type: ignore
-        callbacks=callbacks,
+        on_setattr=on_setattr,
+        on_getattr=on_getattr,
         alias=alias,
     )
 
@@ -378,7 +417,7 @@ def autoinit(klass: type[T]) -> type[T]:
         >>> # define a converter to apply ``abs`` on the field value
         >>> @pytc.autoinit
         ... class Tree:
-        ...     a:int = pytc.field(callbacks=[abs])
+        ...     a:int = pytc.field(on_setattr=[abs])
         >>> Tree(a=-1).a
         1
 
