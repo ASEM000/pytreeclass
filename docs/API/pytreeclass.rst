@@ -1,4 +1,4 @@
-``PyTreeClass`` API
+``pytreeclass`` API
 =============================
 
 .. toctree::

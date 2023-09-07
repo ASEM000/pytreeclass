@@ -371,7 +371,7 @@ This change aims to fix the ambiguity of using the `dataclass` mental model in t
 instead decorate the class with `pytreeclass.leafwise`.
 
 
-## `PyTreeClass` v0.4
+## `pytreeclass` v0.4
 
 ### Changes
 
@@ -543,7 +543,7 @@ instead decorate the class with `pytreeclass.leafwise`.
     dot_graph
     ```
 
-    ![image](https://github.com/ASEM000/PyTreeClass/assets/48389287/1d5168f0-2696-4d46-bdec-5338b0619605)
+    ![image](https://github.com/ASEM000/pytreeclass/assets/48389287/1d5168f0-2696-4d46-bdec-5338b0619605)
 
 7) Add variable position arguments and variable keyword arguments to `pytc.field` `kind`
 

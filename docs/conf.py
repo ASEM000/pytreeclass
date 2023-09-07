@@ -94,7 +94,7 @@ html_theme = "sphinx_book_theme"
 
 html_theme_options = {
     "show_toc_level": 2,
-    "repository_url": "https://github.com/ASEM000/PyTreeClass",
+    "repository_url": "https://github.com/ASEM000/pytreeclass",
     "use_repository_button": True,
     "collapse_navigation": False,
     "navigation_depth": 4,

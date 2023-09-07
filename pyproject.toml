@@ -33,7 +33,7 @@ version = {attr = "pytreeclass.__version__" }
 include = ["pytreeclass", "pytreeclass.*"]
 
 [project.urls]
-Source = "https://github.com/ASEM000/PyTreeClass"
+Source = "https://github.com/ASEM000/pytreeclass"
 
 
 [tool.ruff]

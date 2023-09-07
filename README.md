@@ -1,6 +1,6 @@
 <!-- <h1 align="center" style="font-family:Monospace" >Py🌲Class</h1> -->
 <h5 align="center">
-<img width="250px" src="https://user-images.githubusercontent.com/48389287/227880173-bf78c02c-d28b-4cf4-95e6-fa49b82a43a1.svg"> <br>
+<img width="250px" src="../docs/../pytreeclass/docs/_static/logo.svg"> <br>
 
 <br>
 
@@ -12,10 +12,10 @@
 |[**Acknowledgements**](#acknowledgements)
 
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
-![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11_-red)
-![pyver](https://img.shields.io/badge/jax->=0.4.7-red)
+![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11_-blue)
+![pyver](https://img.shields.io/badge/jax->=0.4.7-blue)
 ![codestyle](https://img.shields.io/badge/codestyle-black-black)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/intro.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/intro.ipynb)
 [![Downloads](https://static.pepy.tech/badge/pytreeclass)](https://pepy.tech/project/pytreeclass)
 [![codecov](https://codecov.io/gh/ASEM000/pytreeclass/branch/main/graph/badge.svg?token=TZBRMO0UQH)](https://codecov.io/gh/ASEM000/pytreeclass)
 [![Documentation Status](https://readthedocs.org/projects/pytreeclass/badge/?version=latest)](https://pytreeclass.readthedocs.io/en/latest/?badge=latest)
@@ -35,12 +35,12 @@ pip install pytreeclass
 **Install development version**
 
 ```python
-pip install git+https://github.com/ASEM000/PyTreeClass
+pip install git+https://github.com/ASEM000/pytreeclass
 ```
 
 ## 📖 Description<a id="description"></a>
 
-`PyTreeClass` is a JAX-compatible class builder to create and operate on stateful JAX PyTrees in a performant and intuitive way, by building on familiar concepts found in `numpy`, `dataclasses`, and others.
+`pytreeclass` is a JAX-compatible class builder to create and operate on stateful JAX PyTrees in a performant and intuitive way, by building on familiar concepts found in `numpy`, `dataclasses`, and others.
 
 See [documentation](https://pytreeclass.readthedocs.io/en/latest/notebooks/getting_started.html) and [🍳 Common recipes](https://pytreeclass.readthedocs.io/en/latest/notebooks/common_recipes.html) to check if this library is a good fit for your work. _If you find the package useful consider giving it a 🌟._
 
@@ -182,7 +182,7 @@ print(counter.calls) # 10
 <details>
 <summary>Benchmark flatten/unflatten compared to Flax and Equinox </summary>
 
-<a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/benchmark_flatten_unflatten.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+<a href="https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/benchmark_flatten_unflatten.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 <table>
 
@@ -208,8 +208,8 @@ Training simple sequential linear benchmark against `flax` and `equinox`
 
 <tr>
 <td align="center">Num of layers</td>
-<td align="center">Flax/PyTC time<br><a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/benchmark_nn_training_flax.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
-<td align="center">Equinox/PyTC time<br> <a href="https://colab.research.google.com/github/ASEM000/PyTreeClass/blob/main/assets/benchmark_nn_training_equinox.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
+<td align="center">Flax/PyTC time<br><a href="https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/benchmark_nn_training_flax.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
+<td align="center">Equinox/PyTC time<br> <a href="https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/benchmark_nn_training_equinox.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
 </tr>
 
 <tr>
