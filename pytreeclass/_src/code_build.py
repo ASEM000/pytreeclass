@@ -242,11 +242,12 @@ def field(
         ...     return tree.buffer.sum()
         >>> print(jax.grad(sum_buffer)(tree))  # no gradient on `buffer`
         Tree(buffer=[0. 0.])
-    
+
     Example:
         Parameterization using :attr:`on_getattr`:
 
         >>> import pytreeclass as pytc
+        >>> import jax.numpy as jnp
         >>> def symmetric(array: jax.Array) -> jax.Array:
         ...    triangle = jnp.triu(array)  # upper triangle
         ...    return triangle + triangle.transpose(-1, -2)

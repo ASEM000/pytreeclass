@@ -26,7 +26,6 @@ from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, 
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from jax._src.tree_util import _registry, _registry_with_keypaths
 from jax.util import unzip2
 
 T = TypeVar("T")
@@ -406,15 +405,22 @@ def leafwise(klass: type[T]) -> type[T]:
     return klass
 
 
+atomicdef = jtu.tree_structure(1)
+
+
+def one_level_is_leaf(tree) -> Callable[[Any], bool]:
+    def is_leaf(node: Any) -> bool:
+        return False if (id(node) == id(tree)) else True
+
+    return is_leaf
+
+
 def flatten_one_trace_level(
     trace: TraceType,
     tree: PyTree,
     is_leaf: IsLeafType,
     is_trace_leaf: Callable[[TraceType], bool] | None,
 ):
-    # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
-    # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
-    # similar to jax corresponding key path API but adds `is_trace_leaf`
     # predicate and type path
     if (is_leaf and is_leaf(tree)) or (is_trace_leaf and is_trace_leaf(trace)):
         # is_leaf is a predicate function that determines whether a value
@@ -423,29 +429,17 @@ def flatten_one_trace_level(
         yield trace, tree
         return
 
-    if type(tree) in _registry_with_keypaths:
-        keys_leaves, _ = _registry_with_keypaths[type(tree)].flatten_with_keys(tree)
-        keys, leaves = unzip2(keys_leaves)
+    kvs, treedef = jtu.tree_flatten_with_path(tree, is_leaf=one_level_is_leaf(tree))
+    ks, vs = unzip2(kvs)
 
-    elif isinstance(tree, tuple) and hasattr(tree, "_fields"):
-        # this conforms to the `jax` convention for namedtuples
-        leaves = (getattr(tree, field) for field in tree._fields)  # type: ignore
-        # use `NamedSequenceKey` to index by name and index unlike `jax` handler
-        keys = tuple(NamedSequenceKey(idx, key) for idx, key in enumerate(tree._fields))  # type: ignore
-
-    elif type(tree) in _registry:
-        # no named handler for this type in key path
-        leaves, _ = _registry[type(tree)].to_iter(tree)
-        keys = tuple(jtu.GetAttrKey(f"leaf_{i}") for i, _ in enumerate(leaves))
-
-    else:
+    if treedef == atomicdef:
         yield trace, tree
         return
 
-    for key, leaf in zip(keys, leaves):
+    for k, v in zip(ks, vs):
         yield from flatten_one_trace_level(
-            ((*trace[0], key), (*trace[1], type(leaf))),
-            leaf,
+            ((*trace[0], *k), (*trace[1], type(v))),
+            v,
             is_leaf,
             is_trace_leaf,
         )
@@ -457,93 +451,8 @@ def tree_leaves_with_trace(
     is_leaf: IsLeafType = None,
     is_trace_leaf: Callable[[TraceType], bool] | None = None,
 ) -> Sequence[tuple[TraceType, Any]]:
-    r"""Similar to jax.tree_util.tree_leaves` but returns  object, leaf pairs.
-
-    Args:
-        tree: The tree to be flattened.
-        is_leaf: A predicate function that determines whether a value is a leaf.
-        is_trace_leaf: A predicate function that determines whether a trace is a leaf.
-
-    Returns:
-        A list of (trace, leaf) pairs.
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> tree = [1, [2, [3]]]
-        >>> traces, _ = zip(*pytc.tree_leaves_with_trace(tree))
-    """
+    # mainly used for visualization
     return list(flatten_one_trace_level(((), ()), tree, is_leaf, is_trace_leaf))
-
-
-def tree_flatten_with_trace(
-    tree: PyTree,
-    *,
-    is_leaf: IsLeafType = None,
-) -> tuple[Sequence[tuple[TraceType, Any]], jtu.PyTreeDef]:
-    """Similar to jax.tree_util.tree_flatten` but returns key path, type path pairs.
-
-    Args:
-        tree: The tree to be flattened.
-        is_leaf: A predicate function that determines whether a value is a leaf.
-
-    Returns:
-        A pair (leaves, treedef) where leaves is a list of (trace, leaf) pairs and
-        treedef is a PyTreeDef object that can be used to reconstruct the tree.
-    """
-    treedef = jtu.tree_structure(tree, is_leaf=is_leaf)
-    traces_leaves = tree_leaves_with_trace(tree, is_leaf=is_leaf)
-    return traces_leaves, treedef
-
-
-def tree_map_with_trace(
-    func: Callable[..., Any],
-    tree: Any,
-    *rest: Any,
-    is_leaf: IsLeafType = None,
-) -> Any:
-    # the code style of `tree_{...} is heavilty influenced by `jax.tree_util`
-    # https://github.com/google/jax/blob/main/jax/_src/tree_util.py
-    """Map a function over a pytree, with trace and type path.
-
-    Similar to `jax.tree_util.tree_map_with_path` that accept a function
-    that takes a two-item tuple for key path and type path.
-
-    Args:
-        func: A function that takes a trace and a leaf and returns a new leaf.
-        tree: The tree to be mapped over.
-        rest: Additional trees to be mapped over.
-        is_leaf: A predicate function that determines whether a value is a leaf.
-
-    Returns:
-        A new tree with the same structure as tree.
-
-    Example:
-        >>> import jax.tree_util as jtu
-        >>> import pytreeclass as pytc
-        >>> tree = {"a": [1, 2], "b": 4, "c": [5, 6]}
-
-        >>> # apply to "a" leaf
-        >>> def map_func(trace, leaf):
-        ...     names, _= trace
-        ...     if jtu.DictKey("a") in names:
-        ...         return leaf + 100
-        ...     return leaf
-        >>> pytc.tree_map_with_trace(map_func, tree)
-        {'a': [101, 102], 'b': 4, 'c': [5, 6]}
-
-        >>> # apply to any item with list in its type path
-        >>> def map_func(trace, leaf):
-        ...     _, types = trace
-        ...     if list in types:
-        ...         return leaf + 100
-        ...     return leaf
-        >>> pytc.tree_map_with_trace(map_func, tree)
-        {'a': [101, 102], 'b': 4, 'c': [105, 106]}
-    """
-    traces_leaves, treedef = tree_flatten_with_trace(tree, is_leaf=is_leaf)
-    traces_leaves = list(zip(*traces_leaves))
-    traces_leaves += [treedef.flatten_up_to(r) for r in rest]
-    return treedef.unflatten(func(*xs) for xs in zip(*traces_leaves))
 
 
 class Node:
@@ -579,6 +488,17 @@ class Node:
 
     def __contains__(self, key: TraceEntry) -> bool:
         return key in self.children
+
+
+def is_trace_leaf_depth_factory(depth: int | float):
+    # generate `is_trace_leaf` function to stop tracing at a certain `depth`
+    # in essence, depth is the length of the trace entry
+    def is_trace_leaf(trace) -> bool:
+        keys, _ = trace
+        # stop tracing if depth is reached
+        return False if depth is None else (depth <= len(keys))
+
+    return is_trace_leaf
 
 
 def construct_tree(

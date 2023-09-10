@@ -179,3 +179,18 @@ nbsphinx_execute = "never"
 nbsphinx_codecell_lexer = "ipython"
 nbsphinx_kernel_name = "python"
 nbsphinx_timeout = 180
+
+
+# source: https://github.com/NTT123/pax/blob/main/docs/conf.py
+nbsphinx_prolog = r"""
+{% set docname = 'docs/' + env.doc2path(env.docname, base=None) %}
+
+.. only:: html
+
+    .. role:: raw-html(raw)
+        :format: html
+
+    .. nbinfo::
+        :raw-html:`<div style="text-align: left; padding: 0; margin: 0;"><a href="https://colab.research.google.com/github/asem000/pytreeclass/blob/main/{{ docname }}" style="padding: 0; margin: 0;"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom; padding: 0; margin: 0;"></a></div>`
+
+"""
