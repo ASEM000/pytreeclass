@@ -97,6 +97,8 @@ class Field:
             on_setattr: A sequence of functions called on ``__setattr__``.
             on_getattr: A sequence of functions called on ``__getattr__``.
             alias: An a alias for the field name in the constructor. e.g ``name=x``,
+                ``alias=y`` will allow ``obj = Class(y=1)`` to be equivalent to
+                ``obj = Class(x=1)``.
         """
         self.name = name
         self.type = type
@@ -240,6 +242,22 @@ def field(
         ...     return tree.buffer.sum()
         >>> print(jax.grad(sum_buffer)(tree))  # no gradient on `buffer`
         Tree(buffer=[0. 0.])
+    
+    Example:
+        Parameterization using :attr:`on_getattr`:
+
+        >>> import pytreeclass as pytc
+        >>> def symmetric(array: jax.Array) -> jax.Array:
+        ...    triangle = jnp.triu(array)  # upper triangle
+        ...    return triangle + triangle.transpose(-1, -2)
+        >>> @pytc.autoinit
+        ... class Tree(pytc.TreeClass):
+        ...    symmetric_matrix: jax.Array = pytc.field(on_getattr=[symmetric])
+        >>> tree = Tree(symmetric_matrix=jnp.arange(9).reshape(3, 3))
+        >>> print(tree.symmetric_matrix)
+        [[ 0  1  2]
+         [ 1  8  5]
+         [ 2  5 16]]
 
     Note:
         - :func:`field` is commonly used to annotate the class attributes to be
