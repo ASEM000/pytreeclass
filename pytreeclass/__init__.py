@@ -28,19 +28,10 @@ from pytreeclass._src.tree_pprint import (
     tree_graph,
     tree_mermaid,
     tree_repr,
-    tree_repr_with_trace,
     tree_str,
     tree_summary,
 )
-from pytreeclass._src.tree_util import (
-    Partial,
-    bcmap,
-    is_tree_equal,
-    leafwise,
-    tree_flatten_with_trace,
-    tree_leaves_with_trace,
-    tree_map_with_trace,
-)
+from pytreeclass._src.tree_util import Partial, bcmap, is_tree_equal, leafwise
 
 __all__ = (
     # general utils
@@ -68,15 +59,11 @@ __all__ = (
     "BaseKey",
     # tree utils
     "bcmap",
-    "tree_map_with_trace",
-    "tree_leaves_with_trace",
-    "tree_flatten_with_trace",
-    "tree_repr_with_trace",
     "Partial",
     "leafwise",
 )
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 AtIndexer.__module__ = "pytreeclass"
 TreeClass.__module__ = "pytreeclass"

@@ -36,8 +36,8 @@ from pytreeclass._src.tree_util import (
     IsLeafType,
     Node,
     construct_tree,
+    is_trace_leaf_depth_factory,
     tree_leaves_with_trace,
-    tree_map_with_trace,
 )
 
 
@@ -281,19 +281,6 @@ def tree_str(
     return text.expandtabs(tabwidth)
 
 
-def _is_trace_leaf_depth_factory(depth: int | float):
-    # generate `is_trace_leaf` function to stop tracing at a certain `depth`
-    # in essence, depth is the length of the trace entry
-    def is_trace_leaf(trace) -> bool:
-        # trace is a tuple of (names, leaves, tracers, aux_data)
-        # done like this to ensure 4-tuple unpacking
-        keys, _ = trace
-        # stop tracing if depth is reached
-        return False if depth is None else (depth <= len(keys))
-
-    return is_trace_leaf
-
-
 def tree_diagram(
     tree: Any,
     *,
@@ -378,7 +365,7 @@ def tree_diagram(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+        is_trace_leaf=is_trace_leaf_depth_factory(depth),
     )
     text = step(root, is_last=len(root.children) == 1)
     return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
@@ -438,7 +425,7 @@ def tree_mermaid(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+        is_trace_leaf=is_trace_leaf_depth_factory(depth),
     )
     text = "flowchart LR\n" + step(root)
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
@@ -516,7 +503,7 @@ def tree_graph(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+        is_trace_leaf=is_trace_leaf_depth_factory(depth),
     )
     text = "digraph G {\n" + step(root) + "}"
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
@@ -669,7 +656,7 @@ def tree_summary(
         tree_leaves_with_trace(
             tree,
             is_leaf=is_leaf,
-            is_trace_leaf=_is_trace_leaf_depth_factory(depth),
+            is_trace_leaf=is_trace_leaf_depth_factory(depth),
         )
     )
 
@@ -739,83 +726,3 @@ def tree_count(tree: PyTree) -> int:
         return acc + tree_summary.count_dispatcher(node)
 
     return jtu.tree_reduce(reduce_func, tree, initializer=0)
-
-
-def tree_repr_with_trace(
-    tree: PyTree,
-    is_leaf: IsLeafType = None,
-    transpose: bool = False,
-) -> PyTree:
-    """Return a pytree with leaf nodes replaced with their trace.
-
-    Args:
-        tree: pytree to summarize.
-        is_leaf: function to determine if a node is a leaf. defaults to None.
-        transpose: transpose the table. i.e. rows become cols and cols become rows.
-
-    Example:
-        >>> import pytreeclass as pytc
-        >>> @pytc.autoinit
-        ... class Test(pytc.TreeClass):
-        ...    a:int = 1
-        ...    b:float = 2.0
-
-        >>> tree = Test()
-        >>> print(pytc.tree_repr_with_trace(Test()))  # doctest: +NORMALIZE_WHITESPACE
-        Test(
-          a=
-            ┌─────────┬───┐
-            │Value    │1  │
-            ├─────────┼───┤
-            │Name path│.a │
-            ├─────────┼───┤
-            │Type path│int│
-            └─────────┴───┘,
-          b=
-            ┌─────────┬─────┐
-            │Value    │2.0  │
-            ├─────────┼─────┤
-            │Name path│.b   │
-            ├─────────┼─────┤
-            │Type path│float│
-            └─────────┴─────┘
-        )
-
-        >>> print(pytc.tree_repr_with_trace(Test(), transpose=True)) # doctest: +NORMALIZE_WHITESPACE
-        Test(
-          a=
-            ┌─────┬─────────┬─────────┐
-            │Value│Name path│Type path│
-            ├─────┼─────────┼─────────┤
-            │1    │.a       │int      │
-            └─────┴─────────┴─────────┘,
-          b=
-            ┌─────┬─────────┬─────────┐
-            │Value│Name path│Type path│
-            ├─────┼─────────┼─────────┤
-            │2.0  │.b       │float    │
-            └─────┴─────────┴─────────┘
-        )
-
-    Note:
-        This function can be useful for debugging and raising descriptive errors.
-    """
-
-    def leaf_trace_summary(trace, leaf) -> str:
-        # this can be useful in debugging and raising descriptive errors
-
-        rows = [["Value", tree_repr(leaf)]]
-
-        names = "->".join(str(i) for i in trace[0])
-        rows += [["Name path", names]]
-
-        types = "->".join(i.__name__ for i in trace[1])
-        rows += [["Type path", types]]
-
-        joiner = "\n" + "\t" * (len(trace[0]) + 1)
-
-        # make a pretty table for each leaf
-        rows = list(map(list, zip(*rows))) if transpose else rows
-        return joiner + (joiner).join(_table(rows).split("\n"))
-
-    return tree_map_with_trace(leaf_trace_summary, tree, is_leaf=is_leaf)

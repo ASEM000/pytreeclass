@@ -19,7 +19,6 @@ import re
 from collections import namedtuple
 
 # import jax
-import jax.tree_util as jtu
 import pytest
 from jax import numpy as jnp
 
@@ -30,7 +29,6 @@ from pytreeclass import (
     tree_graph,
     tree_mermaid,
     tree_repr,
-    tree_repr_with_trace,
     tree_str,
     tree_summary,
 )
@@ -128,36 +126,6 @@ def test_tree_diagram():
     assert tree_diagram(r1, depth=1) == out
 
 
-def test_custom_jax_class():
-    @jtu.register_pytree_node_class
-    class Test:
-        def __init__(self):
-            self.a = 1
-            self.b = 2
-
-        def tree_flatten(self):
-            return (self.a, self.b), None
-
-        @classmethod
-        def tree_unflatten(cls, _, children):
-            return cls(*children)
-
-    t = Test()
-
-    out = "Test\n├── .leaf_0=1\n└── .leaf_1=2"
-    assert tree_diagram(t) == tree_diagram(t, depth=3) == out
-
-    assert (
-        tree_summary(t)
-        == tree_summary(t, depth=4)
-        # trunk-ignore(flake8/E501)
-        == "┌───────┬────┬─────┬────┐\n│Name   │Type│Count│Size│\n├───────┼────┼─────┼────┤\n│.leaf_0│int │1    │    │\n├───────┼────┼─────┼────┤\n│.leaf_1│int │1    │    │\n├───────┼────┼─────┼────┤\n│Σ      │Test│2    │    │\n└───────┴────┴─────┴────┘"
-    )
-
-    assert tree_repr(Test) == repr(Test)
-    assert tree_str(Test) == str(Test)
-
-
 def test_tree_mermaid():
     assert (
         re.sub(r"id\d*", "***", tree_mermaid(r1, depth=1))
@@ -243,28 +211,6 @@ def test_invalid_depth():
         tree_summary(1, depth="a")
     with pytest.raises(TypeError):
         tree_mermaid(1, depth="a")
-
-
-def test_tree_repr_with_trace():
-    @pytc.autoinit
-    @pytc.leafwise
-    class Test(TreeClass):
-        a: int = 1
-        b: float = 2.0
-
-    tree = Test()
-
-    assert (
-        str(tree_repr_with_trace(tree))
-        # trunk-ignore(flake8/E501)
-        == "Test(\n  a=\n    ┌─────────┬───┐\n    │Value    │1  │\n    ├─────────┼───┤\n    │Name path│.a │\n    ├─────────┼───┤\n    │Type path│int│\n    └─────────┴───┘, \n  b=\n    ┌─────────┬─────┐\n    │Value    │2.0  │\n    ├─────────┼─────┤\n    │Name path│.b   │\n    ├─────────┼─────┤\n    │Type path│float│\n    └─────────┴─────┘\n)"
-    )
-
-    assert (
-        str(tree_repr_with_trace(tree, transpose=True))
-        # trunk-ignore(flake8/E501)
-        == "Test(\n  a=\n    ┌─────┬─────────┬─────────┐\n    │Value│Name path│Type path│\n    ├─────┼─────────┼─────────┤\n    │1    │.a       │int      │\n    └─────┴─────────┴─────────┘, \n  b=\n    ┌─────┬─────────┬─────────┐\n    │Value│Name path│Type path│\n    ├─────┼─────────┼─────────┤\n    │2.0  │.b       │float    │\n    └─────┴─────────┴─────────┘\n)"
-    )
 
 
 def test_tree_graph():

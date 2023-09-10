@@ -17,7 +17,6 @@ Install from pip::
    :maxdepth: 1
 
    notebooks/getting_started
-   notebooks/pytrees
    notebooks/stateful_computations
    notebooks/dealing_with_non_jaxtype.ipynb
    notebooks/common_recipes
@@ -25,8 +24,7 @@ Install from pip::
 .. toctree::
    :caption: Examples
    :maxdepth: 1
-   
-   notebooks/build_simple_neural_network
+
    notebooks/build_mini_optimizer_library
 
 .. toctree::
