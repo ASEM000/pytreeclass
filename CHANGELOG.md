@@ -1,21 +1,18 @@
 # Changelog
 
+## v0.9.2
+
+## Changes:
+
+-  change `threads_count`  in `apply` parallel kwargs to `max_workers`
+
+
 ## v0.9.1
 
 ### Additions:
 
 - Add parallel mapping option in `AtIndexer`. This enables myriad of tasks, like reading a pytree of image file names.
 
-```python
-import pytreeclass as tc
-from skimage import io as skio
-from matplotlib.pyplot import imread
-paths = {"classification": {"image_path": "lenna.png"}}
-indexer = tc.AtIndexer(paths)
-images = indexer[...].apply(imread, parallel=dict(threads_count=3))
-jax.tree_map(lambda x: x.shape, images)
-# {'classification': {'image_path': (512, 512, 3)}}
-```
 ```python
 # benchmarking serial vs sequential image read
 # on mac m1 cpu with image of size 512x512x3
@@ -24,7 +21,7 @@ from matplotlib.pyplot import imread
 paths = ["lenna.png"] * 10
 indexer = tc.AtIndexer(paths)
 %timeit indexer[...].apply(imread,parallel=True)  # parallel
-# # 37.6 ms ± 414 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+# 24.9 ms ± 938 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 %timeit indexer[...].apply(imread)  # not parallel
 # # 84.8 ms ± 453 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 ```

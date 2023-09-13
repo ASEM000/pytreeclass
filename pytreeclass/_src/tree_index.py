@@ -380,58 +380,21 @@ def _resolve_where(
     return mask
 
 
+class ParallelApplyKwargs(TypedDict):
+    max_workers: int | None
+    callback: Callable[[Any], Any]
+    kind: Literal["thread", "process"]
+
+
 def raise_future_execption(future):
     raise future.exception()
 
 
-def identity_callback(x):
+def identity(x):
     return x
 
 
-def tree_pmap(
-    func: Callable[..., Any],
-    tree: Any,
-    *rest: Any,
-    is_leaf: Callable[[Any], bool] | None = None,
-    threads_count: int | None = None,
-    kind: Literal["thread", "process"] = "thread",
-    callback: Callable[[Any], Any] = identity_callback,
-) -> Any:
-    """Parallel version of ``jax.tree_map``.
-
-    Args:
-        func: function to apply to leaves
-        tree: tree to apply func to
-        *rest: other trees to apply func to
-        is_leaf: function to determine if a node is a leaf. Defaults to ``None``.
-        threads_count: number of threads to use. Defaults to ``None``.
-        kind: kind of pool to use. Defaults to ``"thread"``.
-        callback: function to apply to the result of func. Defaults to identity function.
-    """
-    executor = (
-        ThreadPoolExecutor(max_workers=threads_count)
-        if kind == "thread"
-        else ProcessPoolExecutor(max_workers=threads_count)
-    )
-    leaves, treedef = jtu.tree_flatten(tree, is_leaf)
-
-    with executor as executor:
-        futures = [executor.submit(func, *args) for args in zip(leaves, *rest)]
-
-    out = [
-        callback(future.result())
-        if future.exception() is None
-        else raise_future_execption(future)
-        # NOTE: maintain order of leaves dont use `as_completed`
-        for future in futures
-    ]
-    return jtu.tree_unflatten(treedef, out)
-
-
-class ParallelApplyKwargs(TypedDict):
-    threads_count: int | None
-    callback: Callable[[Any], Any]
-    kind: Literal["thread", "process"]
+_pool_map = dict(thread=ThreadPoolExecutor, process=ProcessPoolExecutor)
 
 
 class AtIndexer(NamedTuple):
@@ -601,7 +564,7 @@ class AtIndexer(NamedTuple):
                 - ``None``: apply ``func`` to the leaves in serial.
                 - ``bool``: apply ``func`` in parallel if ``True`` otherwise in serial.
                 - ``dict``: a dict of of:
-                    - ``threads_count``: number of threads to use.
+                    - ``max_workers``: maximum number of workers to use.
                     - ``callback``: a function to apply to the result of ``func``.
                     - ``kind``: kind of pool to use, either ``"thread"`` or ``"process"``.
 
@@ -633,7 +596,7 @@ class AtIndexer(NamedTuple):
             >>> import pytreeclass as tc
             >>> from matplotlib.pyplot import imread
             >>> indexer = tc.AtIndexer({"lenna": "lenna.png", "baboon": "baboon.png"})
-            >>> images = indexer[...].apply(imread, parallel=dict(threads_count=2))  # doctest: +SKIP
+            >>> images = indexer[...].apply(imread, parallel=dict(max_workers=2))  # doctest: +SKIP
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
 
@@ -645,15 +608,22 @@ class AtIndexer(NamedTuple):
         if parallel is None or parallel is False:
             return jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
 
-        parallel = dict(
-            threads_count=None
-            if parallel is True
-            else parallel.get("threads_count", None),
-            callback=identity_callback
-            if parallel is True
-            else parallel.get("callback", identity_callback),
-        )
-        return tree_pmap(leaf_apply, self.tree, where, is_leaf=is_leaf, **parallel)
+        max_workers = None if parallel is True else parallel.get("max_workers", None)
+        kind = "thread" if parallel is True else parallel.get("kind", "thread")
+        callback = identity if parallel is True else parallel.get("callback", identity)
+        executor = _pool_map[kind](max_workers=max_workers)
+        leaves, treedef = jtu.tree_flatten(self.tree, is_leaf=is_leaf)
+
+        with executor as executor:
+            futures = [executor.submit(func, leaf) for leaf in leaves]
+
+        out = [
+            callback(future.result())
+            if future.exception() is None
+            else raise_future_execption(future)
+            for future in futures
+        ]
+        return jtu.tree_unflatten(treedef, out)
 
     def scan(
         self,

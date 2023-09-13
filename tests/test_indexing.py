@@ -911,7 +911,7 @@ def test_parallel_map():
     tree = list(range(10))
     indexer = tc.AtIndexer(tree)
 
-    assert indexer[...].apply(lambda x:x, parallel=True) == tree
-    assert indexer[...].apply(lambda x:x, parallel=False) == tree
-    assert indexer[...].apply(lambda x:x, parallel=dict(threads_count=4)) == tree
-    assert indexer[...].apply(lambda x:x, parallel=dict(threads_count=1)) == tree
+    assert indexer[...].apply(lambda x: x, parallel=True) == tree
+    assert indexer[...].apply(lambda x: x, parallel=False) == tree
+    assert indexer[...].apply(lambda x: x, parallel=dict(max_workers=4)) == tree
+    assert indexer[...].apply(lambda x: x, parallel=dict(max_workers=1)) == tree
