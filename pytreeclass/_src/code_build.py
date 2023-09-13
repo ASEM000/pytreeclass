@@ -191,28 +191,28 @@ def field(
     Example:
         Type and range validation using :attr:`on_setattr`:
 
-        >>> import pytreeclass as pytc
-        >>> @pytc.autoinit
-        ... class IsInstance(pytc.TreeClass):
+        >>> import pytreeclass as tc
+        >>> @tc.autoinit
+        ... class IsInstance(tc.TreeClass):
         ...    klass: type
         ...    def __call__(self, x):
         ...        assert isinstance(x, self.klass)
         ...        return x
         <BLANKLINE>
-        >>> @pytc.autoinit
-        ... class Range(pytc.TreeClass):
+        >>> @tc.autoinit
+        ... class Range(tc.TreeClass):
         ...    start: int|float = float("-inf")
         ...    stop: int|float = float("inf")
         ...    def __call__(self, x):
         ...        assert self.start <= x <= self.stop
         ...        return x
         <BLANKLINE>
-        >>> @pytc.autoinit
-        ... class Employee(pytc.TreeClass):
+        >>> @tc.autoinit
+        ... class Employee(tc.TreeClass):
         ...    # assert employee ``name`` is str
-        ...    name: str = pytc.field(on_setattr=[IsInstance(str)])
+        ...    name: str = tc.field(on_setattr=[IsInstance(str)])
         ...    # use callback compostion to assert employee ``age`` is int and positive
-        ...    age: int = pytc.field(on_setattr=[IsInstance(int), Range(1)])
+        ...    age: int = tc.field(on_setattr=[IsInstance(int), Range(1)])
         >>> employee = Employee(name="Asem", age=10)
         >>> print(employee)
         Employee(name=Asem, age=10)
@@ -220,11 +220,11 @@ def field(
     Example:
         Private attribute using :attr:`alias`:
 
-        >>> import pytreeclass as pytc
-        >>> @pytc.autoinit
-        ... class Employee(pytc.TreeClass):
+        >>> import pytreeclass as tc
+        >>> @tc.autoinit
+        ... class Employee(tc.TreeClass):
         ...     # `alias` is the name used in the constructor
-        ...    _name: str = pytc.field(alias="name")
+        ...    _name: str = tc.field(alias="name")
         >>> employee = Employee(name="Asem")  # use `name` in the constructor
         >>> print(employee)  # `_name` is the private attribute name
         Employee(_name=Asem)
@@ -232,11 +232,11 @@ def field(
     Example:
         Buffer creation using :attr:`on_getattr`:
 
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax.numpy as jnp
-        >>> @pytc.autoinit
-        ... class Tree(pytc.TreeClass):
-        ...     buffer: jax.Array = pytc.field(on_getattr=[jax.lax.stop_gradient])
+        >>> @tc.autoinit
+        ... class Tree(tc.TreeClass):
+        ...     buffer: jax.Array = tc.field(on_getattr=[jax.lax.stop_gradient])
         >>> tree = Tree(buffer=jnp.array((1.0, 2.0)))
         >>> def sum_buffer(tree):
         ...     return tree.buffer.sum()
@@ -246,14 +246,14 @@ def field(
     Example:
         Parameterization using :attr:`on_getattr`:
 
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax.numpy as jnp
         >>> def symmetric(array: jax.Array) -> jax.Array:
         ...    triangle = jnp.triu(array)  # upper triangle
         ...    return triangle + triangle.transpose(-1, -2)
-        >>> @pytc.autoinit
-        ... class Tree(pytc.TreeClass):
-        ...    symmetric_matrix: jax.Array = pytc.field(on_getattr=[symmetric])
+        >>> @tc.autoinit
+        ... class Tree(tc.TreeClass):
+        ...    symmetric_matrix: jax.Array = tc.field(on_getattr=[symmetric])
         >>> tree = Tree(symmetric_matrix=jnp.arange(9).reshape(3, 3))
         >>> print(tree.symmetric_matrix)
         [[ 0  1  2]
@@ -269,13 +269,13 @@ def field(
           to apply functions on the field values during initialization using
           the ``on_setattr`` / ``on_getattr`` argument.
 
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> def print_and_return(x):
             ...    print(f"Setting {x}")
             ...    return x
             >>> class Tree:
             ...    # `a` must be defined as a class attribute for the descriptor to work
-            ...    a: int = pytc.field(on_setattr=[print_and_return])
+            ...    a: int = tc.field(on_setattr=[print_and_return])
             ...    def __init__(self, a):
             ...        self.a = a
             >>> tree = Tree(1)
@@ -440,8 +440,8 @@ def autoinit(klass: type[T]) -> type[T]:
     and/or support multiple argument kinds.
 
     Example:
-        >>> import pytreeclass as pytc
-        >>> @pytc.autoinit
+        >>> import pytreeclass as tc
+        >>> @tc.autoinit
         ... class Tree:
         ...     x: int
         ...     y: int
@@ -451,17 +451,17 @@ def autoinit(klass: type[T]) -> type[T]:
 
     Example:
         >>> # define fields with different argument kinds
-        >>> import pytreeclass as pytc
-        >>> @pytc.autoinit
+        >>> import pytreeclass as tc
+        >>> @tc.autoinit
         ... class Tree:
-        ...     kw_only_field: int = pytc.field(default=1, kind="KW_ONLY")
-        ...     pos_only_field: int = pytc.field(default=2, kind="POS_ONLY")
+        ...     kw_only_field: int = tc.field(default=1, kind="KW_ONLY")
+        ...     pos_only_field: int = tc.field(default=2, kind="POS_ONLY")
 
     Example:
         >>> # define a converter to apply ``abs`` on the field value
-        >>> @pytc.autoinit
+        >>> @tc.autoinit
         ... class Tree:
-        ...     a:int = pytc.field(on_setattr=[abs])
+        ...     a:int = tc.field(on_setattr=[abs])
         >>> Tree(a=-1).a
         1
 
@@ -474,12 +474,12 @@ def autoinit(klass: type[T]) -> type[T]:
           the type hints of the current class and any base classes that
           are decorated with ``autoinit``.
 
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import inspect
-        >>> @pytc.autoinit
+        >>> @tc.autoinit
         ... class Base:
         ...     x: int
-        >>> @pytc.autoinit
+        >>> @tc.autoinit
         ... class Derived(Base):
         ...     y: int
         >>> obj = Derived(x=1, y=2)
@@ -489,11 +489,11 @@ def autoinit(klass: type[T]) -> type[T]:
         - Base classes that are not decorated with ``autoinit`` are ignored during
           synthesis of the ``__init__`` method.
 
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import inspect
         >>> class Base:
         ...     x: int
-        >>> @pytc.autoinit
+        >>> @tc.autoinit
         ... class Derived(Base):
         ...     y: int
         >>> obj = Derived(y=2)

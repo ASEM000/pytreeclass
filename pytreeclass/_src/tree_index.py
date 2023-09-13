@@ -19,12 +19,14 @@ from __future__ import annotations
 import abc
 import functools as ft
 import re
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
+from typing_extensions import Literal, TypedDict
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -68,7 +70,7 @@ class BaseKey(abc.ABC):
 
     Example:
         >>> # define an match strategy to match a leaf with a given name and type
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> from typing import NamedTuple
         >>> import jax
         >>> class NameTypeContainer(NamedTuple):
@@ -88,9 +90,9 @@ class BaseKey(abc.ABC):
         ...        return cls(*children)
         ...    @property
         ...    def at(self):
-        ...        return pytc.AtIndexer(self)
+        ...        return tc.AtIndexer(self)
         >>> tree = Tree(1, 2)
-        >>> class MatchNameType(pytc.BaseKey):
+        >>> class MatchNameType(tc.BaseKey):
         ...    def __init__(self, name, type):
         ...        self.name = name
         ...        self.type = type
@@ -106,7 +108,7 @@ class BaseKey(abc.ABC):
           for `BaseKey` subclasses. This is useful for convience when
           creating new match strategies.
 
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> import functools as ft
             >>> from types import FunctionType
             >>> import jax.tree_util as jtu
@@ -115,7 +117,7 @@ class BaseKey(abc.ABC):
             >>> # returns True and False otherwise.
             >>> # for example `FuncKey(lambda x: x.startswith("a"))` will match
             >>> # all leaves that start with "a".
-            >>> class FuncKey(pytc.BaseKey):
+            >>> class FuncKey(tc.BaseKey):
             ...    def __init__(self, func):
             ...        self.func = func
             ...    @ft.singledispatchmethod
@@ -136,12 +138,12 @@ class BaseKey(abc.ABC):
             >>> # instead of using ``FuncKey(function)`` we can define an alias
             >>> # for `FuncKey`, for this example we will define any FunctionType
             >>> # as a `FuncKey` by default.
-            >>> @pytc.BaseKey.def_alias(FunctionType)
+            >>> @tc.BaseKey.def_alias(FunctionType)
             ... def _(func):
             ...    return FuncKey(func)
             >>> # create a simple pytree
-            >>> @pytc.autoinit
-            ... class Tree(pytc.TreeClass):
+            >>> @tc.autoinit
+            ... class Tree(tc.TreeClass):
             ...    a: int
             ...    b: str
             >>> tree = Tree(1, "string")
@@ -219,10 +221,10 @@ class RegexKey(BaseKey):
         pattern: regex pattern to match.
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import re
-        >>> @pytc.autoinit
-        ... class Tree(pytc.TreeClass):
+        >>> @tc.autoinit
+        ... class Tree(tc.TreeClass):
         ...     weight_1: float = 1.0
         ...     weight_2: float = 2.0
         ...     weight_3: float = 3.0
@@ -378,6 +380,60 @@ def _resolve_where(
     return mask
 
 
+def raise_future_execption(future):
+    raise future.exception()
+
+
+def identity_callback(x):
+    return x
+
+
+def tree_pmap(
+    func: Callable[..., Any],
+    tree: Any,
+    *rest: Any,
+    is_leaf: Callable[[Any], bool] | None = None,
+    threads_count: int | None = None,
+    kind: Literal["thread", "process"] = "thread",
+    callback: Callable[[Any], Any] = identity_callback,
+) -> Any:
+    """Parallel version of ``jax.tree_map``.
+
+    Args:
+        func: function to apply to leaves
+        tree: tree to apply func to
+        *rest: other trees to apply func to
+        is_leaf: function to determine if a node is a leaf. Defaults to ``None``.
+        threads_count: number of threads to use. Defaults to ``None``.
+        kind: kind of pool to use. Defaults to ``"thread"``.
+        callback: function to apply to the result of func. Defaults to identity function.
+    """
+    executor = (
+        ThreadPoolExecutor(max_workers=threads_count)
+        if kind == "thread"
+        else ProcessPoolExecutor(max_workers=threads_count)
+    )
+    leaves, treedef = jtu.tree_flatten(tree, is_leaf)
+
+    with executor as executor:
+        futures = [executor.submit(func, *args) for args in zip(leaves, *rest)]
+
+    out = [
+        callback(future.result())
+        if future.exception() is None
+        else raise_future_execption(future)
+        # NOTE: maintain order of leaves dont use `as_completed`
+        for future in futures
+    ]
+    return jtu.tree_unflatten(treedef, out)
+
+
+class ParallelApplyKwargs(TypedDict):
+    threads_count: int | None
+    callback: Callable[[Any], Any]
+    kind: Literal["thread", "process"]
+
+
 class AtIndexer(NamedTuple):
     """Index a pytree at a given path using a path or mask.
 
@@ -396,9 +452,9 @@ class AtIndexer(NamedTuple):
     Example:
         >>> # use `AtIndexer` on a pytree (e.g. dict,list,tuple,etc.)
         >>> import jax
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-        >>> indexer = pytc.AtIndexer(tree)
+        >>> indexer = tc.AtIndexer(tree)
         >>> indexer["level1_0"]["level2_0"].get()
         {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
         >>> # get multiple keys at once at the same level
@@ -412,7 +468,7 @@ class AtIndexer(NamedTuple):
     Example:
         >>> # use ``AtIndexer`` in a class
         >>> import jax.tree_util as jtu
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> @jax.tree_util.register_pytree_with_keys_class
         ... class Tree:
         ...    def __init__(self, a, b):
@@ -427,7 +483,7 @@ class AtIndexer(NamedTuple):
         ...        return cls(*children)
         ...    @property
         ...    def at(self):
-        ...        return pytc.AtIndexer(self)
+        ...        return tc.AtIndexer(self)
         ...    def __repr__(self) -> str:
         ...        return f"{self.__class__.__name__}(a={self.a}, b={self.b})"
         >>> Tree(1, 2).at["a"].get()
@@ -451,16 +507,16 @@ class AtIndexer(NamedTuple):
             non-selected leaf values set to None if the leaf is not an array.
 
         Example:
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> indexer = pytc.AtIndexer(tree)
+            >>> indexer = tc.AtIndexer(tree)
             >>> indexer["level1_0"]["level2_0"].get()
             {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
 
         Example:
-            >>> import pytreeclass as pytc
-            >>> @pytc.autoinit
-            ... class Tree(pytc.TreeClass):
+            >>> import pytreeclass as tc
+            >>> @tc.autoinit
+            ... class Tree(tc.TreeClass):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
@@ -490,16 +546,16 @@ class AtIndexer(NamedTuple):
             set to ``set_value``.
 
         Example:
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> indexer = pytc.AtIndexer(tree)
+            >>> indexer = tc.AtIndexer(tree)
             >>> indexer["level1_0"]["level2_0"].set('SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
-            >>> import pytreeclass as pytc
-            >>> @pytc.autoinit
-            ... class Tree(pytc.TreeClass):
+            >>> import pytreeclass as tc
+            >>> @tc.autoinit
+            ... class Tree(tc.TreeClass):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
@@ -528,28 +584,42 @@ class AtIndexer(NamedTuple):
         partial_leaf_set = lambda leaf, where: leaf_set(leaf, where, set_value)
         return jtu.tree_map(partial_leaf_set, self.tree, where, is_leaf=is_leaf)
 
-    def apply(self, func: Callable[[Any], Any], *, is_leaf: IsLeafType = None):
+    def apply(
+        self,
+        func: Callable[[Any], Any],
+        *,
+        is_leaf: IsLeafType = None,
+        parallel: ParallelApplyKwargs | bool | None = None,
+    ):
         """Apply a function to the leaf values at the specified location.
 
         Args:
             func: the function to apply to the leaf values.
             is_leaf: a predicate function to determine if a value is a leaf.
+            parallel: accepts the following:
+
+                - ``None``: apply ``func`` to the leaves in serial.
+                - ``bool``: apply ``func`` in parallel if ``True`` otherwise in serial.
+                - ``dict``: a dict of of:
+                    - ``threads_count``: number of threads to use.
+                    - ``callback``: a function to apply to the result of ``func``.
+                    - ``kind``: kind of pool to use, either ``"thread"`` or ``"process"``.
 
         Returns:
             A pytree with the leaf values at the specified location set to
             the result of applying ``func`` to the leaf values.
 
         Example:
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> indexer = pytc.AtIndexer(tree)
+            >>> indexer = tc.AtIndexer(tree)
             >>> indexer["level1_0"]["level2_0"].apply(lambda _: 'SET')
             {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
 
         Example:
-            >>> import pytreeclass as pytc
-            >>> @pytc.autoinit
-            ... class Tree(pytc.TreeClass):
+            >>> import pytreeclass as tc
+            >>> @tc.autoinit
+            ... class Tree(tc.TreeClass):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)
@@ -557,6 +627,13 @@ class AtIndexer(NamedTuple):
             >>> # with all other leaves unchanged
             >>> tree.at['a'].apply(lambda _: 100)
             Tree(a=100, b=2)
+
+        Example:
+            >>> # read images in parallel
+            >>> import pytreeclass as tc
+            >>> from matplotlib.pyplot import imread
+            >>> indexer = tc.AtIndexer({"lenna": "lenna.png", "baboon": "baboon.png"})
+            >>> images = indexer[...].apply(imread, parallel=dict(threads_count=2))  # doctest: +SKIP
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
 
@@ -565,7 +642,18 @@ class AtIndexer(NamedTuple):
                 return jnp.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
 
-        return jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+        if parallel is None or parallel is False:
+            return jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+
+        parallel = dict(
+            threads_count=None
+            if parallel is True
+            else parallel.get("threads_count", None),
+            callback=identity_callback
+            if parallel is True
+            else parallel.get("callback", identity_callback),
+        )
+        return tree_pmap(leaf_apply, self.tree, where, is_leaf=is_leaf, **parallel)
 
     def scan(
         self,
@@ -591,22 +679,22 @@ class AtIndexer(NamedTuple):
             values.
 
         Example:
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
             >>> def scan_func(leaf, state):
             ...     return 'SET', state + 1
             >>> init_state = 0
-            >>> indexer = pytc.AtIndexer(tree)
+            >>> indexer = tc.AtIndexer(tree)
             >>> indexer["level1_0"]["level2_0"].scan(scan_func, state=init_state)
             ({'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}, 1)
 
         Example:
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> from typing import NamedTuple
             >>> class State(NamedTuple):
             ...     func_evals: int = 0
-            >>> @pytc.autoinit
-            ... class Tree(pytc.TreeClass):
+            >>> @tc.autoinit
+            ... class Tree(tc.TreeClass):
             ...     a: int
             ...     b: int
             ...     c: int
@@ -669,9 +757,9 @@ class AtIndexer(NamedTuple):
               the leaves of the tree with the result of applying ``func`` to each leaf.
 
         Example:
-            >>> import pytreeclass as pytc
-            >>> @pytc.autoinit
-            ... class Tree(pytc.TreeClass):
+            >>> import pytreeclass as tc
+            >>> @tc.autoinit
+            ... class Tree(tc.TreeClass):
             ...     a: int
             ...     b: int
             >>> tree = Tree(a=1, b=2)

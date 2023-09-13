@@ -55,10 +55,10 @@ See [documentation](https://pytreeclass.readthedocs.io/en/latest/notebooks/getti
 ```python
 import jax
 import jax.numpy as jnp
-import pytreeclass as pytc
+import pytreeclass as tc
 
-@pytc.autoinit
-class Tree(pytc.TreeClass):
+@tc.autoinit
+class Tree(tc.TreeClass):
     a: float = 1.0
     b: tuple[float, float] = (2.0, 3.0)
     c: jax.Array = jnp.array([4.0, 5.0, 6.0])
@@ -77,7 +77,7 @@ tree = tree\
 print(tree)
 # Tree(a=100.0, b=(10.0, 3.0), c=[  4.   5. 100.])
 
-print(pytc.tree_diagram(tree))
+print(tc.tree_diagram(tree))
 # Tree
 # ├── .a=100.0
 # ├── .b:tuple
@@ -85,7 +85,7 @@ print(pytc.tree_diagram(tree))
 # │   └── [1]=3.0
 # └── .c=f32[3](μ=36.33, σ=45.02, ∈[4.00,100.00])
 
-print(pytc.tree_summary(tree))
+print(tc.tree_summary(tree))
 # ┌─────┬──────┬─────┬──────┐
 # │Name │Type  │Count│Size  │
 # ├─────┼──────┼─────┼──────┤
@@ -132,9 +132,9 @@ Using the following pattern,Updating state **functionally** can be achieved unde
 
 ```python
 import jax
-import pytreeclass as pytc
+import pytreeclass as tc
 
-class Counter(pytc.TreeClass):
+class Counter(tc.TreeClass):
     def __init__(self, calls: int = 0):
         self.calls = calls
 
@@ -208,8 +208,8 @@ Training simple sequential linear benchmark against `flax` and `equinox`
 
 <tr>
 <td align="center">Num of layers</td>
-<td align="center">Flax/PyTC time<br><a href="https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/benchmark_nn_training_flax.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
-<td align="center">Equinox/PyTC time<br> <a href="https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/benchmark_nn_training_equinox.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
+<td align="center">Flax/tc time<br><a href="https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/benchmark_nn_training_flax.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
+<td align="center">Equinox/tc time<br> <a href="https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/benchmark_nn_training_equinox.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a></td>
 </tr>
 
 <tr>

@@ -100,19 +100,19 @@ class Partial:
     """``jax``-able ``Partial`` function with support for positional partial application.
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> def f(a, b, c):
         ...     print(f"a: {a}, b: {b}, c: {c}")
         ...     return a + b + c
 
         >>> # positional arguments using `...` placeholder
-        >>> f_a = pytc.Partial(f, ..., 2, 3)
+        >>> f_a = tc.Partial(f, ..., 2, 3)
         >>> f_a(1)
         a: 1, b: 2, c: 3
         6
 
         >>> # keyword arguments
-        >>> f_b = pytc.Partial(f, b=2, c=3)
+        >>> f_b = tc.Partial(f, b=2, c=3)
         >>> f_a(1)
         a: 1, b: 2, c: 3
         6
@@ -170,12 +170,12 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
 
     Example:
         >>> import jax
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import functools as ft
 
-        >>> @pytc.autoinit
-        ... @pytc.leafwise
-        ... class Test(pytc.TreeClass):
+        >>> @tc.autoinit
+        ... @tc.leafwise
+        ... class Test(tc.TreeClass):
         ...    a: tuple[int, int, int] = (1, 2, 3)
         ...    b: tuple[int, int, int] = (4, 5, 6)
         ...    c: jax.Array = jnp.array([1, 2, 3])
@@ -183,29 +183,29 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
         >>> tree = Test()
 
         >>> # 0 is broadcasted to all leaves of the pytree
-        >>> print(pytc.bcmap(jnp.where)(tree > 1, tree, 0))
+        >>> print(tc.bcmap(jnp.where)(tree > 1, tree, 0))
         Test(a=(0, 2, 3), b=(4, 5, 6), c=[0 2 3])
-        >>> print(pytc.bcmap(jnp.where)(tree > 1, 0, tree))
+        >>> print(tc.bcmap(jnp.where)(tree > 1, 0, tree))
         Test(a=(1, 0, 0), b=(0, 0, 0), c=[1 0 0])
 
         >>> # 1 is broadcasted to all leaves of the list pytree
-        >>> pytc.bcmap(lambda x, y: x + y)([1, 2, 3], 1)
+        >>> tc.bcmap(lambda x, y: x + y)([1, 2, 3], 1)
         [2, 3, 4]
 
         >>> # trees are summed leaf-wise
-        >>> pytc.bcmap(lambda x, y: x + y)([1, 2, 3], [1, 2, 3])
+        >>> tc.bcmap(lambda x, y: x + y)([1, 2, 3], [1, 2, 3])
         [2, 4, 6]
 
         >>> # Non scalar second args case
         >>> try:
-        ...     pytc.bcmap(lambda x, y: x + y)([1, 2, 3], [[1, 2, 3], [1, 2, 3]])
+        ...     tc.bcmap(lambda x, y: x + y)([1, 2, 3], [[1, 2, 3], [1, 2, 3]])
         ... except TypeError as e:
         ...     print(e)
         unsupported operand type(s) for +: 'int' and 'list'
 
         >>> # using **numpy** functions on pytrees
         >>> import jax.numpy as jnp
-        >>> pytc.bcmap(jnp.add)([1, 2, 3], [1, 2, 3]) # doctest: +SKIP
+        >>> tc.bcmap(jnp.add)([1, 2, 3], [1, 2, 3]) # doctest: +SKIP
         [2, 4, 6]
     """
 
@@ -304,19 +304,19 @@ def leafwise(klass: type[T]) -> type[T]:
 
     Example:
         >>> # use ``numpy`` functions on :class:`TreeClass`` classes decorated with ``leafwise``
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax.numpy as jnp
-        >>> @pytc.leafwise
-        ... @pytc.autoinit
-        ... class Point(pytc.TreeClass):
+        >>> @tc.leafwise
+        ... @tc.autoinit
+        ... class Point(tc.TreeClass):
         ...    x: float = 0.5
         ...    y: float = 1.0
         ...    description: str = "point coordinates"
         >>> # use :func:`tree_mask` to mask the non-inexact part of the tree
         >>> # i.e. mask the string leaf ``description`` to ``Point`` work
         >>> # with ``jax.numpy`` functions
-        >>> co = pytc.tree_mask(Point())
-        >>> print(pytc.bcmap(jnp.where)(co > 0.5, co, 1000))
+        >>> co = tc.tree_mask(Point())
+        >>> print(tc.bcmap(jnp.where)(co > 0.5, co, 1000))
         Point(x=1000.0, y=1.0, description=#point coordinates)
 
     Note:

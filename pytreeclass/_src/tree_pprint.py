@@ -234,17 +234,17 @@ def tree_repr(
         depth: max depth of the repr string.
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax.numpy as jnp
         >>> tree = {'a' : 1, 'b' : [2, 3], 'c' : {'d' : 4, 'e' : 5} , 'f' : jnp.array([6, 7])}
 
-        >>> print(pytc.tree_repr(tree, depth=0))
+        >>> print(tc.tree_repr(tree, depth=0))
         {...}
 
-        >>> print(pytc.tree_repr(tree, depth=1))
+        >>> print(tc.tree_repr(tree, depth=1))
         {a:1, b:[...], c:{...}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
 
-        >>> print(pytc.tree_repr(tree, depth=2))
+        >>> print(tc.tree_repr(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:i32[2](μ=6.50, σ=0.50, ∈[6,7])}
     """
     text = pp(tree, indent=0, kind="REPR", width=width, depth=depth)
@@ -267,14 +267,14 @@ def tree_str(
         depth: max depth of the repr string.
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax.numpy as jnp
         >>> tree = {'a' : 1, 'b' : [2, 3], 'c' : {'d' : 4, 'e' : 5} , 'f' : jnp.array([6, 7])}
 
-        >>> print(pytc.tree_str(tree, depth=1))
+        >>> print(tc.tree_str(tree, depth=1))
         {a:1, b:[...], c:{...}, f:[6 7]}
 
-        >>> print(pytc.tree_str(tree, depth=2))
+        >>> print(tc.tree_str(tree, depth=2))
         {a:1, b:[2, 3], c:{d:4, e:5}, f:[6 7]}
     """
     text = pp(tree, indent=0, kind="STR", width=width, depth=depth)
@@ -297,28 +297,28 @@ def tree_diagram(
         tabwidth: tab width of the repr string. default is 4.
 
     Example:
-        >>> import pytreeclass as pytc
-        >>> @pytc.autoinit
-        ... class A(pytc.TreeClass):
+        >>> import pytreeclass as tc
+        >>> @tc.autoinit
+        ... class A(tc.TreeClass):
         ...     x: int = 10
         ...     y: int = (20,30)
         ...     z: int = 40
 
-        >>> @pytc.autoinit
-        ... class B(pytc.TreeClass):
+        >>> @tc.autoinit
+        ... class B(tc.TreeClass):
         ...     a: int = 10
         ...     b: tuple = (20,30, A())
 
-        >>> print(pytc.tree_diagram(B(), depth=0))
+        >>> print(tc.tree_diagram(B(), depth=0))
         B(...)
 
-        >>> print(pytc.tree_diagram(B(), depth=1))
+        >>> print(tc.tree_diagram(B(), depth=1))
         B
         ├── .a=10
         └── .b=(...)
 
 
-        >>> print(pytc.tree_diagram(B(), depth=2))
+        >>> print(tc.tree_diagram(B(), depth=2))
         B
         ├── .a=10
         └── .b:tuple
@@ -386,10 +386,10 @@ def tree_mermaid(
         tabwidth: tab width of the repr string. default is 4.
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> tree = [1, 2, dict(a=3)]
         >>> # as rendered by mermaid
-        >>> print(pytc.tree_mermaid(tree))  # doctest: +SKIP
+        >>> print(tc.tree_mermaid(tree))  # doctest: +SKIP
 
         .. image:: ../_static/tree_mermaid.jpg
             :width: 300px
@@ -453,10 +453,9 @@ def tree_graph(
         str: dot diagram syntax
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> tree = [1, 2, dict(a=3)]
         >>> # as rendered by graphviz
-        >>> print(pytc.tree_graph(tree))  # doctest: +SKIP
 
         .. image:: ../_static/tree_graph.svg
 
@@ -464,12 +463,11 @@ def tree_graph(
         >>> # define custom style for a node by dispatching on the value
         >>> # the defined function should return a dict of attributes
         >>> # that will be passed to graphviz.
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> tree = [1, 2, dict(a=3)]
-        >>> @pytc.tree_graph.def_nodestyle(list)
+        >>> @tc.tree_graph.def_nodestyle(list)
         ... def _(_) -> dict[str, str]:
         ...     return dict(shape="circle", style="filled", fillcolor="lightblue")
-        >>> print(pytc.tree_graph(tree))  # doctest: +SKIP
 
         .. image:: ../_static/tree_graph_stylized.svg
     """
@@ -592,9 +590,9 @@ def tree_summary(
             - Last row: type of parent, number of leaves of the parent
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax.numpy as jnp
-        >>> print(pytc.tree_summary([1, [2, [3]], jnp.array([1, 2, 3])]))
+        >>> print(tc.tree_summary([1, [2, [3]], jnp.array([1, 2, 3])]))
         ┌─────────┬──────┬─────┬──────┐
         │Name     │Type  │Count│Size  │
         ├─────────┼──────┼─────┼──────┤
@@ -611,17 +609,17 @@ def tree_summary(
 
     Example:
         >>> # set python `int` to have 4 bytes using dispatching
-        >>> import pytreeclass as pytc
-        >>> print(pytc.tree_summary(1))
+        >>> import pytreeclass as tc
+        >>> print(tc.tree_summary(1))
         ┌────┬────┬─────┬────┐
         │Name│Type│Count│Size│
         ├────┼────┼─────┼────┤
         │Σ   │int │1    │    │
         └────┴────┴─────┴────┘
-        >>> @pytc.tree_summary.def_size(int)
+        >>> @tc.tree_summary.def_size(int)
         ... def _(node: int) -> int:
         ...     return 4
-        >>> print(pytc.tree_summary(1))
+        >>> print(tc.tree_summary(1))
         ┌────┬────┬─────┬─────┐
         │Name│Type│Count│Size │
         ├────┼────┼─────┼─────┤
@@ -631,16 +629,16 @@ def tree_summary(
     Example:
         >>> # set custom type display for jaxprs
         >>> import jax
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> ClosedJaxprType = type(jax.make_jaxpr(lambda x: x)(1))
-        >>> @pytc.tree_summary.def_type(ClosedJaxprType)
+        >>> @tc.tree_summary.def_type(ClosedJaxprType)
         ... def _(expr: ClosedJaxprType) -> str:
         ...     jaxpr = expr.jaxpr
         ...     return f"Jaxpr({jaxpr.invars}, {jaxpr.outvars})"
         >>> def func(x, y):
         ...     return x
         >>> jaxpr = jax.make_jaxpr(func)(1, 2)
-        >>> print(pytc.tree_summary(jaxpr))
+        >>> print(tc.tree_summary(jaxpr))
         ┌────┬──────────────────┬─────┬────┐
         │Name│Type              │Count│Size│
         ├────┼──────────────────┼─────┼────┤

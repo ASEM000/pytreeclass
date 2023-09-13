@@ -21,11 +21,11 @@ import numpy as np
 import optax
 import pytest
 
-import pytreeclass as pytc
+import pytreeclass as tc
 
 
 def test_nn():
-    class Linear(pytc.TreeClass):
+    class Linear(tc.TreeClass):
         def __init__(self, key, in_dim, out_dim):
             self.weight = jr.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
             self.bias = jnp.ones((1, out_dim))
@@ -33,7 +33,7 @@ def test_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    class StackedLinear(pytc.TreeClass):
+    class StackedLinear(tc.TreeClass):
         def __init__(self, key, layers):
             keys = jr.split(key, len(layers) - 1)
 
@@ -69,7 +69,7 @@ def test_nn():
 
 
 def test_nn_with_func_input():
-    class Linear(pytc.TreeClass):
+    class Linear(tc.TreeClass):
         def __init__(self, key, in_dim, out_dim, act_func):
             self.act_func = act_func
             self.weight = jr.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
@@ -86,7 +86,7 @@ def test_nn_with_func_input():
 
 
 def test_compact_nn():
-    class Linear(pytc.TreeClass):
+    class Linear(tc.TreeClass):
         def __init__(self, key, in_dim, out_dim):
             self.weight = jr.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
             self.bias = jnp.ones((1, out_dim))
@@ -94,8 +94,8 @@ def test_compact_nn():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @pytc.leafwise
-    class StackedLinear(pytc.TreeClass):
+    @tc.leafwise
+    class StackedLinear(tc.TreeClass):
         def __init__(self, key, in_dim, out_dim, hidden_dim):
             keys = jr.split(key, 3)
 
@@ -125,7 +125,7 @@ def test_compact_nn():
         value, grads = jax.value_and_grad(loss_func)(nn, x, y)
 
         # no need to use `jax.tree_map` to update the nn
-        #  as it nn is wrapped by @ft.partial(pytc.treeclass, leafwise=True)
+        #  as it nn is wrapped by @ft.partial(tc.treeclass, leafwise=True)
         return value, nn - 1e-3 * grads
 
     for _ in range(1, 10_001):
@@ -135,8 +135,8 @@ def test_compact_nn():
 
 
 def test_freeze_nondiff():
-    @pytc.leafwise
-    class Linear(pytc.TreeClass):
+    @tc.leafwise
+    class Linear(tc.TreeClass):
         def __init__(self, key, in_dim, out_dim):
             self.weight = jr.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
             self.bias = jnp.ones((1, out_dim))
@@ -146,8 +146,8 @@ def test_freeze_nondiff():
         def __call__(self, x):
             return x @ self.weight + self.bias
 
-    @pytc.leafwise
-    class StackedLinear(pytc.TreeClass):
+    @tc.leafwise
+    class StackedLinear(tc.TreeClass):
         def __init__(self, key, in_dim, out_dim, hidden_dim):
             self.name = "stack"
             keys = jr.split(key, 3)
@@ -188,8 +188,8 @@ def test_freeze_nondiff():
         value, grads = jax.value_and_grad(loss_func)(nn, x, y)
         return value, nn - 1e-3 * grads
 
-    mask = jtu.tree_map(pytc.is_nondiff, nn)
-    freezeed_nn = nn.at[mask].apply(pytc.freeze)
+    mask = jtu.tree_map(tc.is_nondiff, nn)
+    freezeed_nn = nn.at[mask].apply(tc.freeze)
 
     for _ in range(1, 10_001):
         value, freezeed_nn = update(freezeed_nn, x, y)
@@ -198,11 +198,11 @@ def test_freeze_nondiff():
 
     nn = StackedLinear(in_dim=1, out_dim=1, hidden_dim=10, key=jr.PRNGKey(0))
 
-    frozen_ = jtu.tree_map(pytc.freeze, nn)
-    unfrozen_ = jtu.tree_map(pytc.unfreeze, frozen_, is_leaf=pytc.is_frozen)
+    frozen_ = jtu.tree_map(tc.freeze, nn)
+    unfrozen_ = jtu.tree_map(tc.unfreeze, frozen_, is_leaf=tc.is_frozen)
     assert jtu.tree_leaves(nn) == jtu.tree_leaves(unfrozen_)
 
-    class Linear(pytc.TreeClass):
+    class Linear(tc.TreeClass):
         def __init__(self, key, in_dim, out_dim):
             self.weight = jr.normal(key, shape=(in_dim, out_dim)) * jnp.sqrt(2 / in_dim)
             self.bias = jnp.ones((1, out_dim))
@@ -212,7 +212,7 @@ def test_freeze_nondiff():
 
     nn = Linear(jr.PRNGKey(0), 1, 1)
     nn_ = nn
-    nn = nn.at["weight"].apply(pytc.freeze)
+    nn = nn.at["weight"].apply(tc.freeze)
 
     optim = optax.sgd(1e-3)
     optim_state = optim.init(nn)
@@ -221,7 +221,7 @@ def test_freeze_nondiff():
     y = x**3 + jr.uniform(jr.PRNGKey(0), (100, 1)) * 0.01
 
     def loss_func(nn, x, y):
-        nn = pytc.tree_unmask(nn)
+        nn = tc.tree_unmask(nn)
         return jnp.mean((nn(x) - y) ** 2)
 
     @jax.jit
@@ -234,7 +234,7 @@ def test_freeze_nondiff():
     for _ in range(1, 100):
         nn, optim_state, value = train_step(nn, optim_state, x, y)
 
-    nn = pytc.tree_unmask(nn)
+    nn = tc.tree_unmask(nn)
     assert nn_.weight == nn.weight, nn
 
 

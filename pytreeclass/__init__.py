@@ -63,7 +63,7 @@ __all__ = (
     "leafwise",
 )
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 AtIndexer.__module__ = "pytreeclass"
 TreeClass.__module__ = "pytreeclass"
