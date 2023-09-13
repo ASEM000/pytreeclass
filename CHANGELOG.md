@@ -16,6 +16,18 @@ images = indexer[...].apply(imread, parallel=dict(threads_count=3))
 jax.tree_map(lambda x: x.shape, images)
 # {'classification': {'image_path': (512, 512, 3)}}
 ```
+```python
+# benchmarking serial vs sequential image read
+# on mac m1 cpu with image of size 512x512x3
+import pytreeclass as tc
+from matplotlib.pyplot import imread
+paths = ["lenna.png"] * 10
+indexer = tc.AtIndexer(paths)
+%timeit indexer[...].apply(imread,parallel=True)  # parallel
+# # 37.6 ms ± 414 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+%timeit indexer[...].apply(imread)  # not parallel
+# # 84.8 ms ± 453 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+```
 
 
 ## V0.9
