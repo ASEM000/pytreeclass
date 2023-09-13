@@ -1,5 +1,7 @@
 name: pypi
-on: workflow_dispatch
+on:
+    release:
+      types: [published]
 jobs:
     deploy:
       runs-on: ubuntu-latest
