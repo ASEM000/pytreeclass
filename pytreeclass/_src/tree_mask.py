@@ -42,8 +42,8 @@ class _FrozenError(NamedTuple):
             "Unfreeze the object first by unmasking the frozen mask:\n"
             "Example:\n"
             ">>> import jax\n"
-            ">>> import pytreeclass as pytc\n"
-            ">>> tree = pytc.tree_unmask(tree)"
+            ">>> import pytreeclass as tc\n"
+            ">>> tree = tc.tree_unmask(tree)"
         )
 
 
@@ -140,20 +140,20 @@ def freeze(value: T) -> _FrozenBase[T]:
 
     Example:
         >>> import jax
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax.tree_util as jtu
         >>> # Usage with `jax.tree_util.tree_leaves`
         >>> # no leaves for a wrapped value
-        >>> jtu.tree_leaves(pytc.freeze(2.))
+        >>> jtu.tree_leaves(tc.freeze(2.))
         []
 
-        >>> # retrieve the frozen wrapper value using `is_leaf=pytc.is_frozen`
-        >>> jtu.tree_leaves(pytc.freeze(2.), is_leaf=pytc.is_frozen)
+        >>> # retrieve the frozen wrapper value using `is_leaf=tc.is_frozen`
+        >>> jtu.tree_leaves(tc.freeze(2.), is_leaf=tc.is_frozen)
         [#2.0]
 
         >>> # Usage with `jax.tree_util.tree_map`
         >>> a= [1,2,3]
-        >>> a[1] = pytc.freeze(a[1])
+        >>> a[1] = tc.freeze(a[1])
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
     """
@@ -188,17 +188,17 @@ def unfreeze(value: T) -> T:
         value: A value to unfreeze.
 
     Note:
-        - use ``is_leaf=pytc.is_frozen`` with ``jax.tree_map`` to unfreeze a tree.**
+        - use ``is_leaf=tc.is_frozen`` with ``jax.tree_map`` to unfreeze a tree.**
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax
-        >>> frozen_value = pytc.freeze(1)
-        >>> pytc.unfreeze(frozen_value)
+        >>> frozen_value = tc.freeze(1)
+        >>> tc.unfreeze(frozen_value)
         1
         >>> # usage with `jax.tree_map`
-        >>> frozen_tree = jax.tree_map(pytc.freeze, {"a": 1, "b": 2})
-        >>> unfrozen_tree = jax.tree_map(pytc.unfreeze, frozen_tree, is_leaf=pytc.is_frozen)
+        >>> frozen_tree = jax.tree_map(tc.freeze, {"a": 1, "b": 2})
+        >>> unfrozen_tree = jax.tree_map(tc.unfreeze, frozen_tree, is_leaf=tc.is_frozen)
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
@@ -225,15 +225,15 @@ def is_nondiff(value: Any) -> bool:
           a custom behavior for a certain type, use ``is_nondiff.def_type(type, func)``.
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax.numpy as jnp
-        >>> pytc.is_nondiff(jnp.array(1))  # int array is non-diff type
+        >>> tc.is_nondiff(jnp.array(1))  # int array is non-diff type
         True
-        >>> pytc.is_nondiff(jnp.array(1.))  # float array is diff type
+        >>> tc.is_nondiff(jnp.array(1.))  # float array is diff type
         False
-        >>> pytc.is_nondiff(1)  # int is non-diff type
+        >>> tc.is_nondiff(1)  # int is non-diff type
         True
-        >>> pytc.is_nondiff(1.)  # float is diff type
+        >>> tc.is_nondiff(1.)  # float is diff type
         False
 
     Note:
@@ -316,39 +316,39 @@ def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = Non
           ``jax.tree_util.tree_flatten`` is called on it.
         - Masking is equivalent to applying :func:`.freeze` to the masked leaves.
 
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> import jax
             >>> tree = [1, 2, {"a": 3, "b": 4.}]
             >>> # mask all non-differentiable nodes by default
             >>> def mask_if_nondiff(x):
-            ...     return pytc.freeze(x) if pytc.is_nondiff(x) else x
+            ...     return tc.freeze(x) if tc.is_nondiff(x) else x
             >>> masked_tree = jax.tree_map(mask_if_nondiff, tree)
 
         - Use masking on tree containing non-differentiable nodes before passing
           the tree to a ``jax`` transformation.
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> tree = [1, 2, {"a": 3, "b": 4.}]
         >>> # mask all non-differentiable nodes by default
-        >>> masked_tree = pytc.tree_mask(tree)
+        >>> masked_tree = tc.tree_mask(tree)
         >>> masked_tree
         [#1, #2, {'a': #3, 'b': 4.0}]
         >>> jax.tree_util.tree_leaves(masked_tree)
         [4.0]
-        >>> pytc.tree_unmask(masked_tree)
+        >>> tc.tree_unmask(masked_tree)
         [1, 2, {'a': 3, 'b': 4.0}]
 
     Example:
         >>> # pass non-differentiable values to `jax.grad`
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax
         >>> @jax.grad
         ... def square(tree):
-        ...     tree = pytc.tree_unmask(tree)
+        ...     tree = tc.tree_unmask(tree)
         ...     return tree[0]**2
         >>> tree = (1., 2)  # contains a non-differentiable node
-        >>> square(pytc.tree_mask(tree))
+        >>> square(tc.tree_mask(tree))
         (Array(2., dtype=float32, weak_type=True), #2)
     """
     return _tree_mask_map(tree, mask=mask, func=freeze, is_leaf=is_leaf)
@@ -365,36 +365,36 @@ def tree_unmask(tree: T, mask: MaskType = lambda _: True):
             unmasking all nodes.
 
     Example:
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> tree = [1, 2, {"a": 3, "b": 4.}]
         >>> # mask all non-differentiable nodes by default
-        >>> masked_tree = pytc.tree_mask(tree)
+        >>> masked_tree = tc.tree_mask(tree)
         >>> masked_tree
         [#1, #2, {'a': #3, 'b': 4.0}]
         >>> jax.tree_util.tree_leaves(masked_tree)
         [4.0]
-        >>> pytc.tree_unmask(masked_tree)
+        >>> tc.tree_unmask(masked_tree)
         [1, 2, {'a': 3, 'b': 4.0}]
 
     Example:
         >>> # pass non-differentiable values to `jax.grad`
-        >>> import pytreeclass as pytc
+        >>> import pytreeclass as tc
         >>> import jax
         >>> @jax.grad
         ... def square(tree):
-        ...     tree = pytc.tree_unmask(tree)
+        ...     tree = tc.tree_unmask(tree)
         ...     return tree[0]**2
         >>> tree = (1., 2)  # contains a non-differentiable node
-        >>> square(pytc.tree_mask(tree))
+        >>> square(tc.tree_mask(tree))
         (Array(2., dtype=float32, weak_type=True), #2)
 
     Note:
         - Unmasking is equivalent to applying :func:`.unfreeze` on the masked leaves.
 
-            >>> import pytreeclass as pytc
+            >>> import pytreeclass as tc
             >>> import jax
             >>> tree = [1, 2, {"a": 3, "b": 4.}]
             >>> # unmask all nodes
-            >>> tree = jax.tree_map(pytc.unfreeze, tree, is_leaf=pytc.is_frozen)
+            >>> tree = jax.tree_map(tc.unfreeze, tree, is_leaf=tc.is_frozen)
     """
     return _tree_mask_map(tree, mask=mask, func=unfreeze, is_leaf=is_frozen)

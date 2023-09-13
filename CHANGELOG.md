@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.9.1
+
+### Additions:
+
+- Add parallel mapping option in `AtIndexer`. This enables myriad of tasks, like reading a pytree of image file names.
+
+```python
+import pytreeclass as tc
+from skimage import io as skio
+from matplotlib.pyplot import imread
+paths = {"classification": {"image_path": "lenna.png"}}
+indexer = tc.AtIndexer(paths)
+images = indexer[...].apply(imread, parallel=dict(threads_count=3))
+jax.tree_map(lambda x: x.shape, images)
+# {'classification': {'image_path': (512, 512, 3)}}
+```
+
+
 ## V0.9
 
 ### Breaking changes:
@@ -30,16 +48,16 @@ _These changes enable:_
 
     ```python
 
-    import pytreeclass as pytc
+    import pytreeclass as tc
     import jax
 
     def assert_int(x):
         assert isinstance(x, int), "must be an int"
         return x
 
-    @pytc.autoinit
-    class Tree(pytc.TreeClass):
-        a: int = pytc.field(on_getattr=[assert_int], on_setattr=[assert_int])
+    @tc.autoinit
+    class Tree(tc.TreeClass):
+        a: int = tc.field(on_getattr=[assert_int], on_setattr=[assert_int])
 
         def __call__(self, x):
             # enusre `a` is an int before using it in computation by calling `assert_int`
@@ -61,12 +79,12 @@ _These changes enable:_
     The following shows a pattern where the value is frozen on `__setattr__` and unfrozen whenever accessed, this ensures that `jax` transformation does not see the value. the following example showcase this functionality
 
     ```python
-    import pytreeclass as pytc
+    import pytreeclass as tc
     import jax
 
-    @pytc.autoinit
-    class Tree(pytc.TreeClass):
-        frozen_a : int = pytc.field(on_getattr=[pytc.unfreeze], on_setattr=[pytc.freeze])
+    @tc.autoinit
+    class Tree(tc.TreeClass):
+        frozen_a : int = tc.field(on_getattr=[tc.unfreeze], on_setattr=[tc.freeze])
 
         def __call__(self, x):
             return self.frozen_a + x
@@ -95,7 +113,7 @@ _These changes enable:_
     Just use `jax.lax.stop_gradient` in `on_getattr`
 
     ```python
-    import pytreeclass as pytc
+    import pytreeclass as tc
     import jax
     import jax.numpy as jnp
 
@@ -103,9 +121,9 @@ _These changes enable:_
         assert isinstance(x, jax.Array)
         return x
 
-    @pytc.autoinit
-    class Tree(pytc.TreeClass):
-        buffer: jax.Array = pytc.field(on_getattr=[jax.lax.stop_gradient],on_setattr=[assert_array])
+    @tc.autoinit
+    class Tree(tc.TreeClass):
+        buffer: jax.Array = tc.field(on_getattr=[jax.lax.stop_gradient],on_setattr=[assert_array])
         def __call__(self, x):
             return self.buffer**x
         
@@ -130,7 +148,7 @@ Example:
 ```python
 
 >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
->>> indexer = pytc.AtIndexer(tree)
+>>> indexer = tc.AtIndexer(tree)
 
 >>> # Before:
 >>> # style 1 (with at):
@@ -154,8 +172,8 @@ For `TreeClass`
 `at` is specified _once_ for each change
 
 ```diff
-@pytc.autoinit
-class Tree(pytc.TreeClass):
+@tc.autoinit
+class Tree(tc.TreeClass):
     a: float = 1.0
     b: tuple[float, float] = (2.0, 3.0)
     c: jax.Array = jnp.array([4.0, 5.0, 6.0])
@@ -188,7 +206,7 @@ tree = tree\
 
     ```python
 
-    import pytreeclass as pytc
+    import pytreeclass as tc
     import jax.random as jr
     from typing import Any
     import jax
@@ -197,8 +215,8 @@ tree = tree\
 
     T = TypeVar("T")
 
-    @pytc.autoinit
-    class LazyLinear(pytc.TreeClass):
+    @tc.autoinit
+    class LazyLinear(tc.TreeClass):
         outdim: int
         weight_init: Callable[..., T] = jax.nn.initializers.glorot_normal()
         bias_init: Callable[..., T] = jax.nn.initializers.zeros
@@ -217,8 +235,8 @@ tree = tree\
             return y
 
 
-    @pytc.autoinit
-    class StackedLinear(pytc.TreeClass):
+    @tc.autoinit
+    class StackedLinear(tc.TreeClass):
         l1: LazyLinear = LazyLinear(outdim=10)
         l2: LazyLinear = LazyLinear(outdim=1)
 
@@ -297,10 +315,10 @@ Use:
 
 ```python
 import jax.tree_util as jtu
-import pytreeclass as pytc
+import pytreeclass as tc
 import dataclasses as dc
 
-class Tree(pytc.TreeClass):
+class Tree(tc.TreeClass):
     a: int = 1
 
 jtu.tree_leaves(Tree())
@@ -320,10 +338,10 @@ Equivalent behavior when decorating with either:
 
 ```python
 import jax.tree_util as jtu
-import pytreeclass as pytc
+import pytreeclass as tc
 
-@pytc.autoinit
-class Tree(pytc.TreeClass):
+@tc.autoinit
+class Tree(tc.TreeClass):
     a: int = 1
 
 jtu.tree_leaves(Tree())
@@ -345,10 +363,10 @@ This change aims to fix the ambiguity of using the `dataclass` mental model in t
 1) subclassing. previously, using `TreeClass` as a base class is equivalent to decorating the class with `dataclasses.dataclass`, however this is a bit challenging to understand as demonstrated in the next example:
 
     ``` python
-    import pytreeclass as pytc
+    import pytreeclass as tc
     import dataclasses as dc
 
-    class A(pytc.TreeClass):
+    class A(tc.TreeClass):
         def ___init__(self, a:int):
             self.a = a
 
@@ -391,11 +409,11 @@ instead decorate the class with `pytreeclass.leafwise`.
     Example:
 
     ```python
-    import pytreeclass as pytc
+    import pytreeclass as tc
     import re 
 
     tree = {"l1":1, "l2":2, "b":3}
-    tree = pytc.AtIndexer(tree)
+    tree = tc.AtIndexer(tree)
     tree.at[re.compile("l.*")].get()
     # {'b': None, 'l1': 1, 'l2': 2}
     ```
@@ -414,14 +432,14 @@ instead decorate the class with `pytreeclass.leafwise`.
 
     ```python
     # pass non-differentiable values to `jax.grad`
-    import pytreeclass as pytc
+    import pytreeclass as tc
     import jax
     @jax.grad
     def square(tree):
-        tree = pytc.tree_unmask(tree)
+        tree = tc.tree_unmask(tree)
         return tree[0]**2
     tree = (1., 2)  # contains a non-differentiable node
-    square(pytc.tree_mask(tree))
+    square(tc.tree_mask(tree))
     # (Array(2., dtype=float32, weak_type=True), #2)
     ```
 
@@ -441,9 +459,9 @@ instead decorate the class with `pytreeclass.leafwise`.
 
     ```python
 
-    import pytreeclass as pytc
+    import pytreeclass as tc
     tree = {"l1":1, "l2":2, "b":3}
-    tree = pytc.AtIndexer(tree)
+    tree = tc.AtIndexer(tree)
     tree.at["l1","l2"].get()
     # {'b': None, 'l1': 1, 'l2': 2}
 
@@ -459,13 +477,13 @@ instead decorate the class with `pytreeclass.leafwise`.
 
     ```python
 
-    import pytreeclass as pytc
+    import pytreeclass as tc
     def scan_func(leaf, state):
         # increase the state by 1 for each function call
         return leaf**2, state+1
 
     tree = {"l1": 1, "l2": 2, "b": 3}
-    tree = pytc.AtIndexer(tree)
+    tree = tc.AtIndexer(tree)
     tree, state = tree.at["l1", "l2"].scan(scan_func, 0)
     state
     # 2
@@ -489,12 +507,12 @@ instead decorate the class with `pytreeclass.leafwise`.
 
     ```python
 
-    import pytreeclass as pytc
+    import pytreeclass as tc
     import jax.numpy as jnp
 
     x = jnp.ones((5, 5))
 
-    print(pytc.tree_summary([1, 2, 3, x]))
+    print(tc.tree_summary([1, 2, 3, x]))
     # ┌────┬────────┬─────┬───────┐
     # │Name│Type    │Count│Size   │
     # ├────┼────────┼─────┼───────┤
@@ -511,11 +529,11 @@ instead decorate the class with `pytreeclass.leafwise`.
 
     # make list display its number of elements
     # in the type row
-    @pytc.tree_summary.def_type(list)
+    @tc.tree_summary.def_type(list)
     def _(_: list) -> str:
         return f"List[{len(_)}]"
 
-    print(pytc.tree_summary([1, 2, 3, x]))
+    print(tc.tree_summary([1, 2, 3, x]))
     # ┌────┬────────┬─────┬───────┐
     # │Name│Type    │Count│Size   │
     # ├────┼────────┼─────┼───────┤
@@ -543,31 +561,31 @@ instead decorate the class with `pytreeclass.leafwise`.
     # define custom style for a node by dispatching on the value
     # the defined function should return a dict of attributes
     # that will be passed to graphviz.
-    import pytreeclass as pytc
+    import pytreeclass as tc
     tree = [1, 2, dict(a=3)]
-    @pytc.tree_graph.def_nodestyle(list)
+    @tc.tree_graph.def_nodestyle(list)
     def _(_) -> dict[str, str]:
         return dict(shape="circle", style="filled", fillcolor="lightblue")
-    dot_graph = graphviz.Source(pytc.tree_graph(tree))
+    dot_graph = graphviz.Source(tc.tree_graph(tree))
     dot_graph
     ```
 
     ![image](https://github.com/ASEM000/pytreeclass/assets/48389287/1d5168f0-2696-4d46-bdec-5338b0619605)
 
-7) Add variable position arguments and variable keyword arguments to `pytc.field` `kind`
+7) Add variable position arguments and variable keyword arguments to `tc.field` `kind`
 
     <details>
 
     ```python
-    import pytreeclass as pytc
+    import pytreeclass as tc
 
 
-    class Tree(pytc.TreeClass):
-        a: int = pytc.field(kind="VAR_POS")
-        b: int = pytc.field(kind="POS_ONLY")
-        c: int = pytc.field(kind="VAR_KW")
+    class Tree(tc.TreeClass):
+        a: int = tc.field(kind="VAR_POS")
+        b: int = tc.field(kind="POS_ONLY")
+        c: int = tc.field(kind="VAR_KW")
         d: int
-        e: int = pytc.field(kind="KW_ONLY")
+        e: int = tc.field(kind="KW_ONLY")
 
 
     Tree.__init__

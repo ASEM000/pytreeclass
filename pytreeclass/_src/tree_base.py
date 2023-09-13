@@ -75,9 +75,9 @@ class TreeClassIndexer(AtIndexer):
              new instance of the tree with the modified values.
 
         Example:
-            >>> import pytreeclass as pytc
-            >>> @pytc.autoinit
-            ... class Tree(pytc.TreeClass):
+            >>> import pytreeclass as tc
+            >>> @tc.autoinit
+            ... class Tree(tc.TreeClass):
             ...     a: int
             ...     def add(self, x:int) -> int:
             ...         self.a += x
@@ -122,8 +122,8 @@ class TreeClass(metaclass=TreeClassMeta):
 
         1. Manual ``__init__`` method
 
-           >>> import pytreeclass as pytc
-           >>> class Tree(pytc.TreeClass):
+           >>> import pytreeclass as tc
+           >>> class Tree(tc.TreeClass):
            ...     def __init__(self, a:int, b:float):
            ...         self.a = a
            ...         self.b = b
@@ -138,9 +138,9 @@ class TreeClass(metaclass=TreeClassMeta):
            the field values during initialization, and/or support multiple argument kinds.
            For more details see :func:`.autoinit` and :func:`.field`.
 
-           >>> import pytreeclass as pytc
-           >>> @pytc.autoinit
-           ... class Tree(pytc.TreeClass):
+           >>> import pytreeclass as tc
+           >>> @tc.autoinit
+           ... class Tree(tc.TreeClass):
            ...     a:int
            ...     b:float
            >>> tree = Tree(a=1, b=2.0)
@@ -150,9 +150,9 @@ class TreeClass(metaclass=TreeClassMeta):
         ``leafwise`` decorator applies math operations to each leaf of the tree.
         for example:
 
-        >>> @pytc.leafwise
-        ... @pytc.autoinit
-        ... class Tree(pytc.TreeClass):
+        >>> @tc.leafwise
+        ... @tc.autoinit
+        ... class Tree(tc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
@@ -164,8 +164,8 @@ class TreeClass(metaclass=TreeClassMeta):
         used to ``get``, ``set``, or ``apply`` a function to a leaf or a group of
         leaves using ``leaf`` name, index or by a boolean mask.
 
-        >>> @pytc.autoinit
-        ... class Tree(pytc.TreeClass):
+        >>> @tc.autoinit
+        ... class Tree(tc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
@@ -183,24 +183,24 @@ class TreeClass(metaclass=TreeClassMeta):
 
         >>> # freeze(exclude) a leaf from the tree leaves:
         >>> import jax
-        >>> import pytreeclass as pytc
-        >>> @pytc.autoinit
-        ... class Tree(pytc.TreeClass):
+        >>> import pytreeclass as tc
+        >>> @tc.autoinit
+        ... class Tree(tc.TreeClass):
         ...     a:int = 1
         ...     b:float = 2.0
         >>> tree = Tree()
-        >>> tree = tree.at["a"].apply(pytc.freeze)
+        >>> tree = tree.at["a"].apply(tc.freeze)
         >>> jax.tree_util.tree_leaves(tree)
         [2.0]
 
         >>> # undo the freeze
-        >>> tree = tree.at["a"].apply(pytc.unfreeze, is_leaf=pytc.is_frozen)
+        >>> tree = tree.at["a"].apply(tc.unfreeze, is_leaf=tc.is_frozen)
         >>> jax.tree_util.tree_leaves(tree)
         [1, 2.0]
 
         >>> # using `tree_mask` to exclude a leaf from the tree leaves
         >>> freeze_mask = Tree(a=True, b=False)
-        >>> jax.tree_util.tree_leaves(pytc.tree_mask(tree, freeze_mask))
+        >>> jax.tree_util.tree_leaves(tc.tree_mask(tree, freeze_mask))
         [2.0]
 
     Note:
@@ -298,9 +298,9 @@ class TreeClass(metaclass=TreeClassMeta):
             - a tuple of the above types to index multiple keys at same level.
 
         Example:
-            >>> import pytreeclass as pytc
-            >>> @pytc.autoinit
-            ... class Tree(pytc.TreeClass):
+            >>> import pytreeclass as tc
+            >>> @tc.autoinit
+            ... class Tree(tc.TreeClass):
             ...     a:int = 1
             ...     b:float = 2.0
             ...     def add(self, x:int) -> int:

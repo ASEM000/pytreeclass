@@ -22,7 +22,7 @@ from collections import namedtuple
 import pytest
 from jax import numpy as jnp
 
-import pytreeclass as pytc
+import pytreeclass as tc
 from pytreeclass import (
     TreeClass,
     tree_diagram,
@@ -34,8 +34,8 @@ from pytreeclass import (
 )
 
 
-@pytc.leafwise
-@pytc.autoinit
+@tc.leafwise
+@tc.autoinit
 class Repr1(TreeClass):
     a: int = 1
     b: str = "string"
@@ -47,7 +47,7 @@ class Repr1(TreeClass):
     h: jnp.ndarray = None
     i: jnp.ndarray = None
     j: jnp.ndarray = None
-    k: tuple = pytc.field(repr=False, default=(1, 2, 3))
+    k: tuple = tc.field(repr=False, default=(1, 2, 3))
     l: tuple = namedtuple("a", ["b", "c"])(1, 2)
     m: jnp.array = jnp.ones((5, 5))
     n: jnp.array = jnp.array(True)
@@ -163,22 +163,22 @@ def test_misc():
     class Test:
         a: int = 1
 
-    assert pytc.tree_repr(Test()) == pytc.tree_str(Test()) == "Test(a=1)"
-    assert pytc.tree_repr(Test(), depth=0) == "Test(...)"
+    assert tc.tree_repr(Test()) == tc.tree_str(Test()) == "Test(a=1)"
+    assert tc.tree_repr(Test(), depth=0) == "Test(...)"
 
 
 def test_extra_tree_diagram():
-    @pytc.autoinit
+    @tc.autoinit
     class L0(TreeClass):
         a: int = 1
         b: int = 2
 
-    @pytc.autoinit
+    @tc.autoinit
     class L1(TreeClass):
         c: L0 = L0()
         d: int = 3
 
-    @pytc.autoinit
+    @tc.autoinit
     class L2(TreeClass):
         e: int = 4
         f: L1 = L1()
@@ -191,11 +191,11 @@ def test_extra_tree_diagram():
 
     assert (tree_diagram(tree)) == out
 
-    @pytc.autoinit
+    @tc.autoinit
     class L0(TreeClass):
         a: int = 1
 
-    @pytc.autoinit
+    @tc.autoinit
     class L1(TreeClass):
         b: L0 = L0()
 

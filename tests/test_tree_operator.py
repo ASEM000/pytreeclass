@@ -20,13 +20,13 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import pytest
 
-import pytreeclass as pytc
+import pytreeclass as tc
 from pytreeclass._src.tree_util import bcmap
 
 
 def test_bcmap():
-    @pytc.leafwise
-    class Test(pytc.TreeClass):
+    @tc.leafwise
+    class Test(tc.TreeClass):
         def __init__(self, a=(1, 2, 3), b=(4, 5, 6), c=jnp.array([1, 2, 3]), d=1):
             self.a = a
             self.b = b
@@ -38,32 +38,32 @@ def test_bcmap():
     rhs = jtu.tree_map(lambda x: jnp.array(x), rhs)
     # test auto broadcasting
     lhs = bcmap(jnp.where)(tree > 1, 0, tree)
-    assert pytc.is_tree_equal(lhs, rhs)
+    assert tc.is_tree_equal(lhs, rhs)
 
     lhs = bcmap(jnp.where)(tree > 1, 0, y=tree)
-    assert pytc.is_tree_equal(lhs, rhs)
+    assert tc.is_tree_equal(lhs, rhs)
 
     lhs = bcmap(jnp.where)(tree > 1, x=0, y=tree)
-    assert pytc.is_tree_equal(lhs, rhs)
+    assert tc.is_tree_equal(lhs, rhs)
 
     lhs = bcmap(jnp.where)(tree > 1, x=0, y=tree)
-    assert pytc.is_tree_equal(lhs, rhs)
+    assert tc.is_tree_equal(lhs, rhs)
 
     lhs = bcmap(jnp.where)(condition=tree > 1, x=0, y=tree)
-    assert pytc.is_tree_equal(lhs, rhs)
+    assert tc.is_tree_equal(lhs, rhs)
 
 
 def test_math_operations():
-    @pytc.leafwise
-    @pytc.autoinit
-    class Test(pytc.TreeClass):
+    @tc.leafwise
+    @tc.autoinit
+    class Test(tc.TreeClass):
         a: float
         b: float
         c: float
         name: str
 
         def __post_init__(self):
-            self.name = pytc.freeze(self.name)
+            self.name = tc.freeze(self.name)
 
     A = Test(10, 20, 30, ("A"))
     # binary operations
@@ -74,15 +74,15 @@ def test_math_operations():
     assert A.at[...].reduce(lambda x, y: x + jnp.sum(y)) == jnp.array(60)
     assert abs(A) == A
 
-    @pytc.leafwise
-    @pytc.autoinit
-    class Test(pytc.TreeClass):
+    @tc.leafwise
+    @tc.autoinit
+    class Test(tc.TreeClass):
         a: float
         b: float
         name: str
 
         def __post_init__(self):
-            self.name = pytc.freeze(self.name)
+            self.name = tc.freeze(self.name)
 
     A = Test(-10, 20, ("A"))
     B = Test(10, 20, ("B"))
@@ -123,9 +123,9 @@ def test_math_operations():
 
 
 def test_math_operations_errors():
-    @pytc.leafwise
-    @pytc.autoinit
-    class Test(pytc.TreeClass):
+    @tc.leafwise
+    @tc.autoinit
+    class Test(tc.TreeClass):
         a: float
         b: float
         c: float
@@ -133,7 +133,7 @@ def test_math_operations_errors():
         d: jnp.ndarray = None
 
         def __post_init__(self):
-            self.name = pytc.freeze(self.name)
+            self.name = tc.freeze(self.name)
             self.d = jnp.array([1, 2, 3])
 
     A = Test(10, 20, 30, ("A"))
