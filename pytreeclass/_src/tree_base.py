@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Define a class that convert a class to a JAX compatible tree structure."""
+"""Define a class that convert a class to a compatible tree structure."""
 
 from __future__ import annotations
 
 import abc
 from typing import Any, Hashable, TypeVar
 
-import jax
-import jax.tree_util as jtu
 from typing_extensions import Unpack
 
+from pytreeclass._src.backend import Backend as backend
+from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.code_build import fields
 from pytreeclass._src.tree_index import AtIndexer
 from pytreeclass._src.tree_pprint import (
@@ -33,12 +33,7 @@ from pytreeclass._src.tree_pprint import (
     tree_repr,
     tree_str,
 )
-from pytreeclass._src.tree_util import (
-    NamedSequenceKey,
-    is_tree_equal,
-    tree_copy,
-    tree_hash,
-)
+from pytreeclass._src.tree_util import is_tree_equal, tree_copy, tree_hash
 
 T = TypeVar("T", bound=Hashable)
 S = TypeVar("S")
@@ -93,9 +88,9 @@ class TreeClassIndexer(AtIndexer):
             - Use .at["method_name"](*, **) to call a method that mutates the instance.
         """
         tree = tree_copy(self.tree)
-        jtu.tree_map(lambda _: _, tree, is_leaf=add_mutable_entry)
+        tu.tree_map(lambda _: _, tree, is_leaf=add_mutable_entry)
         value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
-        jtu.tree_map(lambda _: _, tree, is_leaf=discard_mutable_entry)
+        tu.tree_map(lambda _: _, tree, is_leaf=discard_mutable_entry)
         return value, tree
 
 
@@ -109,12 +104,12 @@ class TreeClassMeta(abc.ABCMeta):
 
 
 class TreeClass(metaclass=TreeClassMeta):
-    """Convert a class to a ``jax``-compatible pytree by inheriting from :class:`.TreeClass`.
+    """Convert a class to a pytree by inheriting from :class:`.TreeClass`.
 
-    A pytree is any nested structure that can be used with ``jax`` functions.
-    A pytree can be a container or a leaf. Container examples are: a ``tuple``,
+    A pytree is any nested structure of containers and leaves. A container is
+    a pytree can be a container or a leaf. Container examples are: a ``tuple``,
     ``list``, or ``dict``. A leaf is a non-container data structure like an
-    ``int``, ``float``, ``string``, or ``jax.Array``. :class:`.TreeClass` is a
+    ``int``, ``float``, ``string``, or ``Array``. :class:`.TreeClass` is a
     container pytree that holds other pytrees in its attributes.
 
     Note:
@@ -222,24 +217,24 @@ class TreeClass(metaclass=TreeClassMeta):
         super().__init_subclass__(**k)
 
         def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
-            # unflatten rule to use with `jax.tree_unflatten`
+            # unflatten rule to use with `tree_unflatten`
             vars(tree := getattr(object, "__new__")(klass)).update(zip(keys, leaves))
             return tree
 
         def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
-            # flatten rule to use with `jax.tree_flatten`
+            # flatten rule to use with `tree_flatten`
             dynamic = vars(tree)
             return tuple(dynamic.values()), tuple(dynamic.keys())
 
         def tree_flatten_with_keys(tree: T):
-            # flatten rule to use with `jax.tree_util.tree_flatten_with_path`
+            # flatten rule to use with `tree_util.tree_flatten_with_path`
             dynamic = dict(vars(tree))
             for idx, key in enumerate(vars(tree)):
-                entry = NamedSequenceKey(idx, key)
+                entry = tu.NamedSequenceKey(idx, key)
                 dynamic[key] = (entry, dynamic[key])
             return tuple(dynamic.values()), tuple(dynamic.keys())
 
-        jtu.register_pytree_with_keys(
+        tu.register_pytree_with_keys(
             nodetype=klass,
             flatten_func=tree_flatten,
             flatten_with_keys=tree_flatten_with_keys,
@@ -342,7 +337,7 @@ class TreeClass(metaclass=TreeClassMeta):
     def __hash__(self) -> int:
         return tree_hash(self)
 
-    def __eq__(self, other: Any) -> bool | jax.Array:
+    def __eq__(self, other: Any) -> bool | backend.ndarray:
         return is_tree_equal(self, other)
 
 

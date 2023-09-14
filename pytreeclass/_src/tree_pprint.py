@@ -18,20 +18,19 @@ from __future__ import annotations
 
 import dataclasses as dc
 import functools as ft
+import importlib
 import inspect
 import math
 from contextlib import suppress
 from itertools import zip_longest
 from types import FunctionType
-from typing import Any, Callable, Literal, Sequence
+from typing import Any, Callable, Literal, NamedTuple, Sequence
 
-import jax
-import jax.tree_util as jtu
 import numpy as np
-from jax import custom_jvp
-from jax.util import unzip2
 from typing_extensions import TypeAlias, TypedDict, Unpack
 
+from pytreeclass._src.backend import Backend as backend
+from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.tree_util import (
     IsLeafType,
     Node,
@@ -51,6 +50,11 @@ class PPSpec(TypedDict):
 PyTree = Any
 
 PP = Callable[[Any, Unpack[PPSpec]], str]
+
+
+class ShapeDtypePP(NamedTuple):
+    shape: tuple[int, ...]
+    dtype: Any
 
 
 @ft.singledispatch
@@ -113,7 +117,7 @@ def attr_value_pp(x: tuple[str, Any], **spec: Unpack[PPSpec]) -> str:
     return f"{x[0]}={pp(x[1], **spec)}"
 
 
-@pp_dispatcher.register(jax.ShapeDtypeStruct)
+@pp_dispatcher.register(ShapeDtypePP)
 def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     """Pretty print a node with dtype and shape."""
     shape = f"{node.shape}".replace(",", "")
@@ -126,9 +130,9 @@ def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     return dtype + shape
 
 
+@pp_dispatcher.register(backend.ndarray)
 @pp_dispatcher.register(np.ndarray)
-@pp_dispatcher.register(jax.Array)
-def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
+def numpy_pp(node: np.ndarray | backend.ndarray, **spec: Unpack[PPSpec]) -> str:
     """Replace np.ndarray repr with short hand notation for type and shape."""
     if spec["kind"] == "STR":
         return general_pp(node, **spec)
@@ -163,7 +167,6 @@ def numpy_pp(node: np.ndarray | jax.Array, **spec: Unpack[PPSpec]) -> str:
 
 
 @pp_dispatcher.register(FunctionType)
-@pp_dispatcher.register(custom_jvp)
 def func_pp(func: Callable, **spec: Unpack[PPSpec]) -> str:
     # Pretty print function
     # Example:
@@ -572,7 +575,7 @@ def tree_summary(
     """Print a summary of an arbitrary pytree.
 
     Args:
-        tree: a jax registered pytree to summarize.
+        tree: a registered pytree to summarize.
         depth: max depth to display the tree. defaults to maximum depth.
         is_leaf: function to determine if a node is a leaf. defaults to None
 
@@ -648,17 +651,13 @@ def tree_summary(
     rows = [["Name", "Type", "Count", "Size"]]
     tcount = tsize = 0
 
-    # use `unzip2` from `jax.util` to avoid [] leaves
-    # based on this issue:
-    traces, leaves = unzip2(
-        tree_leaves_with_trace(
-            tree,
-            is_leaf=is_leaf,
-            is_trace_leaf=is_trace_leaf_depth_factory(depth),
-        )
+    traces_leaves = tree_leaves_with_trace(
+        tree,
+        is_leaf=is_leaf,
+        is_trace_leaf=is_trace_leaf_depth_factory(depth),
     )
 
-    for trace, leaf in zip(traces, leaves):
+    for trace, leaf in traces_leaves:
         tcount += (count := tree_count(leaf))
         tsize += (size := tree_size(leaf))
 
@@ -668,7 +667,7 @@ def tree_summary(
             continue
 
         paths, _ = trace
-        pstr = jtu.keystr(paths)
+        pstr = tu.keystr(paths)
         tstr = tree_summary.type_dispatcher(leaf)
         cstr = f"{count:,}" if count else ""
         sstr = size_pp(size) if size else ""
@@ -690,25 +689,24 @@ tree_summary.type_dispatcher = ft.singledispatch(lambda x: type(x).__name__)
 tree_summary.def_type = tree_summary.type_dispatcher.register
 
 
+@tree_summary.def_type(backend.ndarray)
 @tree_summary.def_type(np.ndarray)
-@tree_summary.def_type(jax.Array)
-@tree_summary.def_type(jax.ShapeDtypeStruct)
-def _(node: Any) -> str:
+def tree_summary_array(node: Any) -> str:
     """Return the type repr of the node."""
     shape_dype = node.shape, node.dtype
     spec = dict(indent=0, kind="REPR", width=80, depth=float("inf"))
-    return pp(jax.ShapeDtypeStruct(*shape_dype), **spec)
+    return pp(ShapeDtypePP(*shape_dype), **spec)
 
 
-@tree_summary.def_count(jax.Array)
+@tree_summary.def_count(backend.ndarray)
 @tree_summary.def_count(np.ndarray)
-def _(node: jax.Array | np.ndarray) -> int:
+def tree_summary_array_count(node: np.ndarray | backend.ndarray) -> int:
     return node.size
 
 
-@tree_summary.def_size(jax.Array)
+@tree_summary.def_size(backend.ndarray)
 @tree_summary.def_size(np.ndarray)
-def _(node: jax.Array | np.ndarray) -> int:
+def tree_summary_array_size(node: np.ndarray | backend.ndarray) -> int:
     return node.nbytes
 
 
@@ -716,11 +714,23 @@ def tree_size(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.size_dispatcher(node)
 
-    return jtu.tree_reduce(reduce_func, tree, initializer=0)
+    return tu.tree_reduce(reduce_func, tree, initializer=0)
 
 
 def tree_count(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.count_dispatcher(node)
 
-    return jtu.tree_reduce(reduce_func, tree, initializer=0)
+    return tu.tree_reduce(reduce_func, tree, initializer=0)
+
+
+if importlib.util.find_spec("jax"):
+    # jax pretty printing extra handlers
+    import jax
+
+    # register jax types for pretty printing
+    pp_dispatcher.register(jax.custom_jvp, func_pp)
+    pp_dispatcher.register(jax.ShapeDtypeStruct, shape_dtype_pp)
+
+    # register jax for tree_summary
+    tree_summary.def_type(jax.ShapeDtypeStruct, tree_summary_array)
