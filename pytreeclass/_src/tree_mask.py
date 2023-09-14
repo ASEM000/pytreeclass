@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utilities to work with non-jax type tree leaves across JAX transformations."""
+"""Utilities to work with non-inexact type tree leaves across function transformations."""
 
 from __future__ import annotations
 
@@ -20,10 +20,10 @@ import functools as ft
 import hashlib
 from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 
-import jax
-import jax.tree_util as jtu
 import numpy as np
 
+from pytreeclass._src.backend import Backend as backend
+from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.tree_pprint import tree_repr, tree_str, tree_summary
 from pytreeclass._src.tree_util import IsLeafType, is_tree_equal, tree_copy, tree_hash
 
@@ -73,7 +73,7 @@ class _FrozenBase(Generic[T]):
         # register subclass as an empty pytree node
         super().__init_subclass__(**k)
 
-        jtu.register_pytree_node(
+        tu.register_pytree_node(
             nodetype=klass,
             flatten_func=lambda tree: ((), tree),
             unflatten_func=lambda treedef, _: treedef,
@@ -106,7 +106,7 @@ class _FrozenHashable(_FrozenBase):
     def __hash__(self) -> int:
         return tree_hash(self.__wrapped__)
 
-    def __eq__(self, rhs: Any) -> bool | jax.Array:
+    def __eq__(self, rhs: Any) -> bool | backend.ndarray:
         if not isinstance(rhs, _FrozenHashable):
             return False
         return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
@@ -130,7 +130,7 @@ class _FrozenArray(_FrozenBase):
 
 
 def freeze(value: T) -> _FrozenBase[T]:
-    """Freeze a value to avoid updating it by ``jax`` transformations.
+    """Freeze a value to avoid updating it by through function transformations.
 
     Args:
         value: A value to freeze.
@@ -165,7 +165,7 @@ freeze.def_type = freeze.type_dispatcher.register
 
 
 @freeze.def_type(np.ndarray)
-@freeze.def_type(jax.Array)
+@freeze.def_type(backend.ndarray)
 def _(value: T) -> _FrozenArray[T]:
     return _FrozenArray(value)
 
@@ -188,7 +188,7 @@ def unfreeze(value: T) -> T:
         value: A value to unfreeze.
 
     Note:
-        - use ``is_leaf=tc.is_frozen`` with ``jax.tree_map`` to unfreeze a tree.**
+        - use ``is_leaf=tc.is_frozen`` with ``tree_map`` to unfreeze a tree.**
 
     Example:
         >>> import pytreeclass as tc
@@ -250,8 +250,8 @@ is_nondiff.def_type = is_nondiff.type_dispatcher.register
 
 
 @is_nondiff.def_type(np.ndarray)
-@is_nondiff.def_type(jax.Array)
-def _(value: np.ndarray | jax.Array) -> bool:
+@is_nondiff.def_type(backend.ndarray)
+def _(value: np.ndarray | backend.ndarray) -> bool:
     # return True if the node is non-inexact type, otherwise False
     return False if np.issubdtype(value.dtype, np.inexact) else True
 
@@ -270,11 +270,11 @@ def _tree_mask_map(
     is_leaf: IsLeafType = None,
 ):
     # apply func to leaves satisfying mask pytree/condtion
-    lhsdef = jtu.tree_structure(tree, is_leaf=is_leaf)
-    rhsdef = jtu.tree_structure(mask, is_leaf)
+    lhsdef = tu.tree_structure(tree, is_leaf=is_leaf)
+    rhsdef = tu.tree_structure(mask, is_leaf)
 
     if (lhsdef == rhsdef) and (type(mask) is type(tree)):
-        return jax.tree_map(
+        return tu.tree_map(
             lambda x, y: func(x) if y else x,
             tree,
             mask,
@@ -282,7 +282,7 @@ def _tree_mask_map(
         )
 
     if isinstance(mask, Callable):
-        return jax.tree_map(
+        return tu.tree_map(
             lambda x: func(x) if mask(x) else x,
             tree,
             is_leaf=is_leaf,
@@ -303,7 +303,7 @@ def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = Non
         mask: A pytree of boolean values or a callable that accepts a leaf and
             returns a boolean. If a leaf is ``True`` either in the mask or the
             callable, the leaf is wrapped by with a wrapper that yields no
-            leaves when ``jax.tree_util.tree_flatten`` is called on it, otherwise
+            leaves when ``tree_flatten`` is called on it, otherwise
             it is unchanged. defaults to :func:`.is_nondiff` which returns true for
             non-differentiable nodes.
         is_leaf: A callable that accepts a leaf and returns a boolean. If
@@ -313,7 +313,7 @@ def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = Non
 
     Note:
         - Masked leaves are wrapped with a wrapper that yields no leaves when
-          ``jax.tree_util.tree_flatten`` is called on it.
+          ``tree_flatten`` is called on it.
         - Masking is equivalent to applying :func:`.freeze` to the masked leaves.
 
             >>> import pytreeclass as tc

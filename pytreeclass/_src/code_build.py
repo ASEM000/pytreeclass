@@ -23,7 +23,6 @@ from collections.abc import Callable, MutableMapping, MutableSequence, MutableSe
 from types import MappingProxyType
 from typing import Any, Literal, Sequence, TypeVar, get_args
 
-import jax.tree_util as jtu
 from typing_extensions import dataclass_transform
 
 T = TypeVar("T")
@@ -34,7 +33,7 @@ ArgKind = get_args(ArgKindType)
 
 
 class Null:
-    __slots__ = ()
+    __slots__ = []
 
     def __repr__(self) -> str:
         return "NULL"
@@ -147,13 +146,6 @@ class Field:
     def __delete__(self: T, instance) -> None:
         """Delete the field value."""
         del vars(instance)[self.name]
-
-
-jtu.register_pytree_node(
-    nodetype=Field,
-    flatten_func=lambda field: ((), {k: getattr(field, k) for k in slots(Field)}),
-    unflatten_func=lambda data, _: Field(**data),
-)
 
 
 def field(

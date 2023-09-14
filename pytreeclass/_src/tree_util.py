@@ -16,19 +16,18 @@
 
 from __future__ import annotations
 
-import dataclasses as dc
 import functools as ft
 import operator as op
 from copy import copy
 from math import ceil, floor, trunc
 from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
-import jax
-import jax.numpy as jnp
-import jax.tree_util as jtu
-from jax.util import unzip2
+from pytreeclass._src.backend import Backend as backend
+from pytreeclass._src.backend import TreeUtil as tu
 
 T = TypeVar("T")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
 PyTree = Any
 # TODO: swich to EllipsisType for python 3.10
 EllipsisType = TypeVar("EllipsisType")
@@ -41,26 +40,17 @@ TraceType = Tuple[KeyPath, TypePath]
 IsLeafType = Union[None, Callable[[Any], bool]]
 
 
-@dc.dataclass(frozen=True)
-class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
-    # inherit from both `jtu.GetAttrKey` and `jtu.SequenceKey`
-    # in case the user perform isinstance check to unpack the name/index
-    # `TreeClass` is modeled as a `NamedTuple`` with both `name` and `idx` identifiers
-    def __str__(self):
-        return f".{self.name}"
-
-
 def tree_hash(*trees: PyTree) -> int:
-    leaves, treedef = jtu.tree_flatten(trees)
+    leaves, treedef = tu.tree_flatten(trees)
     return hash((*leaves, treedef))
 
 
 def tree_copy(tree: T) -> T:
     """Return a copy of the tree."""
-    return jax.tree_map(lambda x: copy(x), tree)
+    return tu.tree_map(lambda x: copy(x), tree)
 
 
-def _is_leaf_rhs_equal(leaf, rhs) -> bool | jax.Array:
+def _is_leaf_rhs_equal(leaf, rhs) -> bool | backend.ndarray:
     if hasattr(leaf, "shape") and hasattr(leaf, "dtype"):
         if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
             if leaf.shape != rhs.shape:
@@ -68,28 +58,28 @@ def _is_leaf_rhs_equal(leaf, rhs) -> bool | jax.Array:
             if leaf.dtype != rhs.dtype:
                 return False
             try:
-                return bool(verdict := jnp.all(leaf == rhs))
+                return bool(verdict := backend.numpy.all(leaf == rhs))
             except Exception:
                 return verdict  # fail under `jit`
         return False
     return leaf == rhs
 
 
-def is_tree_equal(*trees: Any) -> bool | jax.Array:
+def is_tree_equal(*trees: Any) -> bool | backend.ndarray:
     """Return ``True`` if all pytrees are equal.
 
     Note:
         trees are compared using their leaves and treedefs.
 
     Note:
-        Under ``jit`` the return type is boolean `jax.Array` instead of ``bool``.
+        Under boolean ``Array`` if compiled otherwise ``bool``.
     """
     tree0, *rest = trees
-    leaves0, treedef0 = jtu.tree_flatten(tree0)
+    leaves0, treedef0 = tu.tree_flatten(tree0)
     verdict = True
 
     for tree in rest:
-        leaves, treedef = jtu.tree_flatten(tree)
+        leaves, treedef = tu.tree_flatten(tree)
         if (treedef != treedef0) or verdict is False:
             return False
         verdict = ft.reduce(op.and_, map(_is_leaf_rhs_equal, leaves0, leaves), verdict)
@@ -97,7 +87,13 @@ def is_tree_equal(*trees: Any) -> bool | jax.Array:
 
 
 class Partial:
-    """``jax``-able ``Partial`` function with support for positional partial application.
+    """``Partial`` function with support for positional partial application.
+
+    Args:
+        func: The function to be partially applied.
+        args: Positional arguments to be partially applied. use ``...`` as a
+            placeholder for positional arguments.
+        kwargs: Keyword arguments to be partially applied.
 
     Example:
         >>> import pytreeclass as tc
@@ -119,22 +115,12 @@ class Partial:
 
     Note:
         - The ``...`` is used to indicate a placeholder for positional arguments.
-        - See: https://stackoverflow.com/a/7811270
-        - :func:`.Partial` is used internally by :func:`.bcmap` which maps a
-          function over pytrees leaves with automatic broadcasting for scalar arguments.
+        - https://stackoverflow.com/a/7811270
     """
 
     __slots__ = ["func", "args", "kwargs", "__weakref__"]  # type: ignore
 
     def __init__(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
-        """Initialize a ``Partial`` function.
-
-        Args:
-            func: The function to be partially applied.
-            args: Positional arguments to be partially applied. use ``...`` as a
-                placeholder for positional arguments.
-            kwargs: Keyword arguments to be partially applied.
-        """
         self.func = func
         self.args = args
         self.kwargs = kwargs
@@ -154,7 +140,7 @@ class Partial:
         return is_tree_equal(self, other)
 
 
-jtu.register_pytree_node(
+tu.register_pytree_node(
     nodetype=Partial,
     flatten_func=lambda x: ((x.func, x.args, x.kwargs), None),
     unflatten_func=lambda _, xs: Partial(*xs),
@@ -214,14 +200,14 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
         if len(args) > 0:
             # positional arguments are passed the argument to be compare
             # the tree structure with is the first argument
-            leaves0, treedef0 = jtu.tree_flatten(args[0], is_leaf=is_leaf)
+            leaves0, treedef0 = tu.tree_flatten(args[0], is_leaf=is_leaf)
             masked_args = [...]
             masked_kwargs = {}
             leaves = [leaves0]
             leaves_keys = []
 
             for arg in args[1:]:
-                if treedef0 == jtu.tree_structure(arg):
+                if treedef0 == tu.tree_structure(arg):
                     masked_args += [...]
                     leaves += [treedef0.flatten_up_to(arg)]
                 else:
@@ -230,14 +216,14 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
             # only kwargs are passed the argument to be compare
             # the tree structure with is the first kwarg
             key0 = next(iter(kwargs))
-            leaves0, treedef0 = jtu.tree_flatten(kwargs.pop(key0), is_leaf=is_leaf)
+            leaves0, treedef0 = tu.tree_flatten(kwargs.pop(key0), is_leaf=is_leaf)
             masked_args = []
             masked_kwargs = {key0: ...}
             leaves = [leaves0]
             leaves_keys = [key0]
 
         for key in kwargs:
-            if treedef0 == jtu.tree_structure(kwargs[key]):
+            if treedef0 == tu.tree_structure(kwargs[key]):
                 masked_kwargs[key] = ...
                 leaves += [treedef0.flatten_up_to(kwargs[key])]
                 leaves_keys += [key]
@@ -248,7 +234,7 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
 
         if len(leaves_keys) == 0:
             # no kwargs leaves are present, so we can immediately zip
-            return jtu.tree_unflatten(treedef0, [bfunc(*xs) for xs in zip(*leaves)])
+            return tu.tree_unflatten(treedef0, [bfunc(*xs) for xs in zip(*leaves)])
 
         # kwargs leaves are present, so we need to zip them
         kwargnum = len(leaves) - len(leaves_keys)
@@ -256,7 +242,7 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
         for xs in zip(*leaves):
             xs_args, xs_kwargs = xs[:kwargnum], xs[kwargnum:]
             all_leaves += [bfunc(*xs_args, **dict(zip(leaves_keys, xs_kwargs)))]
-        return jtu.tree_unflatten(treedef0, all_leaves)
+        return tu.tree_unflatten(treedef0, all_leaves)
 
     name = getattr(func, "__name__", func)
 
@@ -267,7 +253,7 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
 
 def uop(func):
     def wrapper(self):
-        return jtu.tree_map(func, self)
+        return tu.tree_map(func, self)
 
     return ft.wraps(func)(wrapper)
 
@@ -275,8 +261,8 @@ def uop(func):
 def bop(func):
     def wrapper(leaf, rhs=None):
         if isinstance(rhs, type(leaf)):
-            return jtu.tree_map(func, leaf, rhs)
-        return jtu.tree_map(lambda x: func(x, rhs), leaf)
+            return tu.tree_map(func, leaf, rhs)
+        return tu.tree_map(lambda x: func(x, rhs), leaf)
 
     return ft.wraps(func)(wrapper)
 
@@ -292,8 +278,8 @@ def leafwise(klass: type[T]) -> type[T]:
     Leafwise operators are operators that are applied to the leaves of a pytree.
     For example leafwise ``__add__`` is equivalent to:
 
-    - ``jax.tree_map(lambda x: x + rhs, tree)`` if ``rhs`` is a scalar.
-    - ``jax.tree_map(lambda x, y: x + y, tree, rhs)`` if ``rhs`` is a pytree
+    - ``tree_map(lambda x: x + rhs, tree)`` if ``rhs`` is a scalar.
+    - ``tree_map(lambda x, y: x + y, tree, rhs)`` if ``rhs`` is a pytree
       with the same structure as ``tree``.
 
     Args:
@@ -405,14 +391,7 @@ def leafwise(klass: type[T]) -> type[T]:
     return klass
 
 
-atomicdef = jtu.tree_structure(1)
-
-
-def one_level_is_leaf(tree) -> Callable[[Any], bool]:
-    def is_leaf(node: Any) -> bool:
-        return False if (id(node) == id(tree)) else True
-
-    return is_leaf
+atomicdef = tu.tree_structure(1)
 
 
 def flatten_one_trace_level(
@@ -429,17 +408,20 @@ def flatten_one_trace_level(
         yield trace, tree
         return
 
-    kvs, treedef = jtu.tree_flatten_with_path(tree, is_leaf=one_level_is_leaf(tree))
-    ks, vs = unzip2(kvs)
+    key_leaf_pairs, treedef = tu.tree_flatten_with_path(
+        tree,
+        # flatten one level
+        is_leaf=lambda node: False if (id(node) == id(tree)) else True,
+    )
 
     if treedef == atomicdef:
         yield trace, tree
         return
 
-    for k, v in zip(ks, vs):
+    for key, value in key_leaf_pairs:
         yield from flatten_one_trace_level(
-            ((*trace[0], *k), (*trace[1], type(v))),
-            v,
+            ((*trace[0], *key), (*trace[1], type(value))),
+            value,
             is_leaf,
             is_trace_leaf,
         )

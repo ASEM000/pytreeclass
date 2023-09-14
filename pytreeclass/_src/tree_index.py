@@ -22,11 +22,11 @@ import re
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Union
 
-import jax
-import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy as np
 from typing_extensions import Literal, TypedDict
+
+from pytreeclass._src.backend import Backend as backend
+from pytreeclass._src.backend import TreeUtil as tu
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -52,7 +52,7 @@ class BaseKey(abc.ABC):
       refers to the entry defined in the ``tree_flatten_with_keys`` method of
       the pytree class.
 
-    - Typical path entries are:
+    - Typical path entries in ``jax`` are:
 
         - ``jax.tree_util.GetAttrKey`` for attributes
         - ``jax.tree_util.DictKey`` for mapping keys
@@ -170,8 +170,8 @@ class IntKey(BaseKey):
     def _(self, other: int) -> bool:
         return self.idx == other
 
-    @__eq__.register(jtu.SequenceKey)
-    def _(self, other: jtu.SequenceKey) -> bool:
+    @__eq__.register(tu.SequenceKey)
+    def _(self, other: tu.SequenceKey) -> bool:
         return self.idx == other.idx
 
 
@@ -187,12 +187,12 @@ class NameKey(BaseKey):
     def _(self, other: str) -> bool:
         return self.name == other
 
-    @__eq__.register(jtu.GetAttrKey)
-    def _(self, other: jtu.GetAttrKey) -> bool:
+    @__eq__.register(tu.GetAttrKey)
+    def _(self, other: tu.GetAttrKey) -> bool:
         return self.name == other.name
 
-    @__eq__.register(jtu.DictKey)
-    def _(self, other: jtu.DictKey) -> bool:
+    @__eq__.register(tu.DictKey)
+    def _(self, other: tu.DictKey) -> bool:
         return self.name == other.key
 
 
@@ -245,11 +245,11 @@ class RegexKey(BaseKey):
     def _(self, other: str) -> bool:
         return re.fullmatch(self.pattern, other) is not None
 
-    @__eq__.register(jtu.GetAttrKey)
+    @__eq__.register(tu.GetAttrKey)
     def _(self, other) -> bool:
         return re.fullmatch(self.pattern, other.name) is not None
 
-    @__eq__.register(jtu.DictKey)
+    @__eq__.register(tu.DictKey)
     def _(self, other) -> bool:
         return re.fullmatch(self.pattern, other.key) is not None
 
@@ -303,7 +303,7 @@ def _generate_path_mask(
         match = True
         return match
 
-    mask = jtu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
+    mask = tu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
 
     if not match:
         raise LookupError(f"No leaf match is found for {where=}.")
@@ -332,7 +332,7 @@ def _resolve_where(
     mask = None
     bool_masks: list[T] = []
     path_masks: list[BaseKey] = []
-    treedef0 = jtu.tree_structure(tree, is_leaf=is_leaf)
+    treedef0 = tu.tree_structure(tree, is_leaf=is_leaf)
     seen_tuple = False  # handle multiple keys at the same level
     level_paths = []
 
@@ -341,8 +341,8 @@ def _resolve_where(
         # required for verifying if a pytree is a valid indexing pytree
         nonlocal seen_tuple, level_paths, bool_masks
         # used to check if a pytree is a valid indexing pytree
-        # used with `is_leaf` argument of any `jtu.tree_*` function
-        leaves, treedef = jtu.tree_flatten(x)
+        # used with `is_leaf` argument of any `tree_*` function
+        leaves, treedef = tu.tree_flatten(x)
 
         if treedef == treedef0 and all(map(_is_bool_leaf, leaves)):
             # boolean pytrees of same structure as `tree` is a valid indexing pytree
@@ -365,7 +365,7 @@ def _resolve_where(
 
     for level_keys in where:
         # each for loop iteration is a level in the where path
-        jtu.tree_leaves(level_keys, is_leaf=verify_and_aggregate_is_leaf)
+        tu.tree_leaves(level_keys, is_leaf=verify_and_aggregate_is_leaf)
         path_masks += [MultiKey(*level_paths)] if len(level_paths) > 1 else level_paths
         level_paths = []
         seen_tuple = False
@@ -375,7 +375,7 @@ def _resolve_where(
 
     if bool_masks:
         all_masks = [mask, *bool_masks] if mask else bool_masks
-        mask = jax.tree_map(_combine_bool_leaves, *all_masks)
+        mask = tu.tree_map(_combine_bool_leaves, *all_masks)
 
     return mask
 
@@ -491,11 +491,11 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_get(leaf: Any, where: Any):
-            if isinstance(where, (jax.Array, np.ndarray)) and where.ndim != 0:
-                return leaf[jnp.where(where)]
+            if isinstance(where, (backend.ndarray, np.ndarray)) and where.ndim != 0:
+                return leaf[backend.numpy.where(where)]
             return leaf if where else None
 
-        return jtu.tree_map(leaf_get, self.tree, where, is_leaf=is_leaf)
+        return tu.tree_map(leaf_get, self.tree, where, is_leaf=is_leaf)
 
     def set(self, set_value: Any, *, is_leaf: IsLeafType = None):
         """Set the leaf values at the specified location.
@@ -530,29 +530,29 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_set(leaf: Any, where: Any, set_value: Any):
-            if isinstance(where, (jax.Array, np.ndarray)):
-                return jnp.where(where, set_value, leaf)
+            if isinstance(where, (backend.ndarray, np.ndarray)):
+                return backend.numpy.where(where, set_value, leaf)
             return set_value if where else leaf
 
-        if jtu.tree_structure(self.tree, is_leaf) == jtu.tree_structure(set_value):
+        if tu.tree_structure(self.tree, is_leaf) == tu.tree_structure(set_value):
             # do not broadcast set_value if it is a pytree of same structure
             # for example tree.at[where].set(tree2) will set all tree leaves
             # to tree2 leaves if tree2 is a pytree of same structure as tree
             # instead of making each leaf of tree a copy of tree2
             # is design is similar to ``numpy`` design `Array.at[...].set(Array)`
-            return jtu.tree_map(leaf_set, self.tree, where, set_value, is_leaf=is_leaf)
+            return tu.tree_map(leaf_set, self.tree, where, set_value, is_leaf=is_leaf)
 
         # set_value is broadcasted to tree leaves
         # for example tree.at[where].set(1) will set all tree leaves to 1
         partial_leaf_set = lambda leaf, where: leaf_set(leaf, where, set_value)
-        return jtu.tree_map(partial_leaf_set, self.tree, where, is_leaf=is_leaf)
+        return tu.tree_map(partial_leaf_set, self.tree, where, is_leaf=is_leaf)
 
     def apply(
         self,
         func: Callable[[Any], Any],
         *,
         is_leaf: IsLeafType = None,
-        parallel: ParallelApplyKwargs | bool | None = None,
+        parallel: ParallelApplyKwargs | bool = False,
     ):
         """Apply a function to the leaf values at the specified location.
 
@@ -561,7 +561,6 @@ class AtIndexer(NamedTuple):
             is_leaf: a predicate function to determine if a value is a leaf.
             parallel: accepts the following:
 
-                - ``None``: apply ``func`` to the leaves in serial.
                 - ``bool``: apply ``func`` in parallel if ``True`` otherwise in serial.
                 - ``dict``: a dict of of:
                     - ``max_workers``: maximum number of workers to use.
@@ -601,18 +600,18 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, (jax.Array, np.ndarray)):
-                return jnp.where(where, func(leaf), leaf)
+            if isinstance(where, (backend.ndarray, np.ndarray)):
+                return backend.numpy.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
 
-        if parallel is None or parallel is False:
-            return jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+        if not parallel:
+            return tu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
 
         max_workers = None if parallel is True else parallel.get("max_workers", None)
         kind = "thread" if parallel is True else parallel.get("kind", "thread")
         callback = identity if parallel is True else parallel.get("callback", identity)
         executor = _pool_map[kind](max_workers=max_workers)
-        leaves, treedef = jtu.tree_flatten(self.tree, is_leaf=is_leaf)
+        leaves, treedef = tu.tree_flatten(self.tree, is_leaf=is_leaf)
 
         with executor as executor:
             futures = [executor.submit(func, leaf) for leaf in leaves]
@@ -623,7 +622,7 @@ class AtIndexer(NamedTuple):
             else raise_future_execption(future)
             for future in futures
         ]
-        return jtu.tree_unflatten(treedef, out)
+        return tu.tree_unflatten(treedef, out)
 
     def scan(
         self,
@@ -694,11 +693,11 @@ class AtIndexer(NamedTuple):
             return leaf
 
         def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, (jax.Array, np.ndarray)):
-                return jnp.where(where, stateless_func(leaf), leaf)
+            if isinstance(where, (backend.ndarray, np.ndarray)):
+                return backend.numpy.where(where, stateless_func(leaf), leaf)
             return stateless_func(leaf) if where else leaf
 
-        out = jtu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+        out = tu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
         return out, running_state
 
     def reduce(
@@ -739,5 +738,5 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
         tree = self[where].get(is_leaf=is_leaf)  # type: ignore
         if initializer is _no_initializer:
-            return jtu.tree_reduce(func, tree)
-        return jtu.tree_reduce(func, tree, initializer)
+            return tu.tree_reduce(func, tree)
+        return tu.tree_reduce(func, tree, initializer)
