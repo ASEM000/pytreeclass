@@ -20,8 +20,6 @@ import functools as ft
 import hashlib
 from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 
-import numpy as np
-
 from pytreeclass._src.backend import Backend as backend
 from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.tree_pprint import tree_repr, tree_str, tree_summary
@@ -114,7 +112,7 @@ class _FrozenHashable(_FrozenBase):
 
 class _FrozenArray(_FrozenBase):
     def __hash__(self) -> int:
-        bytes = np.array(self.__wrapped__).tobytes()
+        bytes = backend.numpy.array(self.__wrapped__).tobytes()
         return int(hashlib.sha256(bytes).hexdigest(), 16)
 
     def __eq__(self, other) -> bool:
@@ -126,7 +124,7 @@ class _FrozenArray(_FrozenBase):
             return False
         if lhs.dtype != rhs.dtype:
             return False
-        return np.all(lhs == rhs)
+        return backend.numpy.all(lhs == rhs)
 
 
 def freeze(value: T) -> _FrozenBase[T]:
@@ -164,7 +162,6 @@ freeze.type_dispatcher = ft.singledispatch(lambda x: _FrozenHashable(x))
 freeze.def_type = freeze.type_dispatcher.register
 
 
-@freeze.def_type(np.ndarray)
 @freeze.def_type(backend.ndarray)
 def _(value: T) -> _FrozenArray[T]:
     return _FrozenArray(value)
@@ -249,11 +246,12 @@ is_nondiff.type_dispatcher = ft.singledispatch(lambda x: True)
 is_nondiff.def_type = is_nondiff.type_dispatcher.register
 
 
-@is_nondiff.def_type(np.ndarray)
 @is_nondiff.def_type(backend.ndarray)
-def _(value: np.ndarray | backend.ndarray) -> bool:
+def _(value: backend.ndarray) -> bool:
     # return True if the node is non-inexact type, otherwise False
-    return False if np.issubdtype(value.dtype, np.inexact) else True
+    if backend.numpy.issubdtype(value.dtype, backend.numpy.inexact):
+        return False
+    return True
 
 
 @is_nondiff.def_type(float)

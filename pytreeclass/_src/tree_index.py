@@ -22,7 +22,6 @@ import re
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Union
 
-import numpy as np
 from typing_extensions import Literal, TypedDict
 
 from pytreeclass._src.backend import Backend as backend
@@ -491,7 +490,7 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_get(leaf: Any, where: Any):
-            if isinstance(where, (backend.ndarray, np.ndarray)) and where.ndim != 0:
+            if isinstance(where, backend.ndarray) and where.ndim != 0:
                 return leaf[backend.numpy.where(where)]
             return leaf if where else None
 
@@ -530,7 +529,7 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_set(leaf: Any, where: Any, set_value: Any):
-            if isinstance(where, (backend.ndarray, np.ndarray)):
+            if isinstance(where, backend.ndarray):
                 return backend.numpy.where(where, set_value, leaf)
             return set_value if where else leaf
 
@@ -600,7 +599,7 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, (backend.ndarray, np.ndarray)):
+            if isinstance(where, backend.ndarray):
                 return backend.numpy.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
 
@@ -693,7 +692,7 @@ class AtIndexer(NamedTuple):
             return leaf
 
         def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, (backend.ndarray, np.ndarray)):
+            if isinstance(where, backend.ndarray):
                 return backend.numpy.where(where, stateless_func(leaf), leaf)
             return stateless_func(leaf) if where else leaf
 

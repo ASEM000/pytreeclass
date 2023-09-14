@@ -26,7 +26,6 @@ from itertools import zip_longest
 from types import FunctionType
 from typing import Any, Callable, Literal, NamedTuple, Sequence
 
-import numpy as np
 from typing_extensions import TypeAlias, TypedDict, Unpack
 
 from pytreeclass._src.backend import Backend as backend
@@ -131,15 +130,16 @@ def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
 
 
 @pp_dispatcher.register(backend.ndarray)
-@pp_dispatcher.register(np.ndarray)
-def numpy_pp(node: np.ndarray | backend.ndarray, **spec: Unpack[PPSpec]) -> str:
-    """Replace np.ndarray repr with short hand notation for type and shape."""
+def numpy_pp(node: backend.ndarray, **spec: Unpack[PPSpec]) -> str:
+    """Replace ndarray repr with short hand notation for type and shape."""
     if spec["kind"] == "STR":
         return general_pp(node, **spec)
 
     base = shape_dtype_pp(node, **spec)
 
-    if not issubclass(node.dtype.type, (np.integer, np.floating)) or node.size == 0:
+    if not issubclass(node.dtype.type, (backend.numpy.integer, backend.numpy.floating)):
+        return base
+    if node.size == 0:
         return base
 
     # Extended repr for numpy array, with extended information
@@ -148,19 +148,17 @@ def numpy_pp(node: np.ndarray | backend.ndarray, **spec: Unpack[PPSpec]) -> str:
 
     with suppress(Exception):
         # maybe the array is a jax tracers
-        low, high = np.min(node), np.max(node)
+        low, high = backend.numpy.min(node), backend.numpy.max(node)
+        interval = "(" if math.isinf(low) else "["
+        interval += (
+            f"{low},{high}"
+            if issubclass(node.dtype.type, backend.numpy.integer)
+            else f"{low:.2f},{high:.2f}"
+        )
+        interval += ")" if math.isinf(high) else "]"
+        interval = interval.replace("inf", "∞")
 
-        interval = (
-            ("(" if math.isinf(low) else "[")
-            + (
-                f"{low},{high}"
-                if issubclass(node.dtype.type, np.integer)
-                else f"{low:.2f},{high:.2f}"
-            )
-            + (")" if math.isinf(high) else "]")
-        ).replace("inf", "∞")
-
-        mean, std = f"{np.mean(node):.2f}", f"{np.std(node):.2f}"
+        mean, std = f"{backend.numpy.mean(node):.2f}", f"{backend.numpy.std(node):.2f}"
         return f"{base}(μ={mean}, σ={std}, ∈{interval})"
 
     return base
@@ -690,7 +688,6 @@ tree_summary.def_type = tree_summary.type_dispatcher.register
 
 
 @tree_summary.def_type(backend.ndarray)
-@tree_summary.def_type(np.ndarray)
 def tree_summary_array(node: Any) -> str:
     """Return the type repr of the node."""
     shape_dype = node.shape, node.dtype
@@ -699,14 +696,12 @@ def tree_summary_array(node: Any) -> str:
 
 
 @tree_summary.def_count(backend.ndarray)
-@tree_summary.def_count(np.ndarray)
-def tree_summary_array_count(node: np.ndarray | backend.ndarray) -> int:
+def tree_summary_array_count(node: backend.ndarray) -> int:
     return node.size
 
 
 @tree_summary.def_size(backend.ndarray)
-@tree_summary.def_size(np.ndarray)
-def tree_summary_array_size(node: np.ndarray | backend.ndarray) -> int:
+def tree_summary_array_size(node: backend.ndarray) -> int:
     return node.nbytes
 
 
