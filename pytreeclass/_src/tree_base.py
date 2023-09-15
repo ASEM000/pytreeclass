@@ -21,8 +21,8 @@ from typing import Any, Hashable, TypeVar
 
 from typing_extensions import Unpack
 
-from pytreeclass._src.backend import Backend as backend
 from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import numpy as np
 from pytreeclass._src.code_build import fields
 from pytreeclass._src.tree_index import AtIndexer
 from pytreeclass._src.tree_pprint import (
@@ -226,18 +226,18 @@ class TreeClass(metaclass=TreeClassMeta):
             dynamic = vars(tree)
             return tuple(dynamic.values()), tuple(dynamic.keys())
 
-        def tree_flatten_with_keys(tree: T):
-            # flatten rule to use with `tree_util.tree_flatten_with_path`
+        def tree_flatten_with_path(tree: T):
+            # flatten rule to use with `tree_flatten_with_path`
             dynamic = dict(vars(tree))
             for idx, key in enumerate(vars(tree)):
-                entry = tu.NamedSequenceKey(idx, key)
+                entry = tu.named_sequence_key(idx, key)
                 dynamic[key] = (entry, dynamic[key])
             return tuple(dynamic.values()), tuple(dynamic.keys())
 
-        tu.register_pytree_with_keys(
+        tu.register_pytree_node_with_path(
             nodetype=klass,
             flatten_func=tree_flatten,
-            flatten_with_keys=tree_flatten_with_keys,
+            flatten_func_with_path=tree_flatten_with_path,
             unflatten_func=tree_unflatten,
         )
 
@@ -337,7 +337,7 @@ class TreeClass(metaclass=TreeClassMeta):
     def __hash__(self) -> int:
         return tree_hash(self)
 
-    def __eq__(self, other: Any) -> bool | backend.ndarray:
+    def __eq__(self, other: Any) -> bool | np.ndarray:
         return is_tree_equal(self, other)
 
 

@@ -22,8 +22,8 @@ from copy import copy
 from math import ceil, floor, trunc
 from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
-from pytreeclass._src.backend import Backend as backend
 from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import numpy as np
 
 T = TypeVar("T")
 T1 = TypeVar("T1")
@@ -50,7 +50,7 @@ def tree_copy(tree: T) -> T:
     return tu.tree_map(lambda x: copy(x), tree)
 
 
-def _is_leaf_rhs_equal(leaf, rhs) -> bool | backend.ndarray:
+def _is_leaf_rhs_equal(leaf, rhs) -> bool | np.ndarray:
     if hasattr(leaf, "shape") and hasattr(leaf, "dtype"):
         if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
             if leaf.shape != rhs.shape:
@@ -58,14 +58,14 @@ def _is_leaf_rhs_equal(leaf, rhs) -> bool | backend.ndarray:
             if leaf.dtype != rhs.dtype:
                 return False
             try:
-                return bool(verdict := backend.numpy.all(leaf == rhs))
+                return bool(verdict := np.all(leaf == rhs))
             except Exception:
                 return verdict  # fail under `jit`
         return False
     return leaf == rhs
 
 
-def is_tree_equal(*trees: Any) -> bool | backend.ndarray:
+def is_tree_equal(*trees: Any) -> bool | np.ndarray:
     """Return ``True`` if all pytrees are equal.
 
     Note:
@@ -207,7 +207,8 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
             leaves_keys = []
 
             for arg in args[1:]:
-                if treedef0 == tu.tree_structure(arg):
+                _, argdef = tu.tree_flatten(arg)
+                if treedef0 == argdef:
                     masked_args += [...]
                     leaves += [treedef0.flatten_up_to(arg)]
                 else:
@@ -223,7 +224,8 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
             leaves_keys = [key0]
 
         for key in kwargs:
-            if treedef0 == tu.tree_structure(kwargs[key]):
+            _, kwargdef = tu.tree_flatten(kwargs[key])
+            if treedef0 == kwargdef:
                 masked_kwargs[key] = ...
                 leaves += [treedef0.flatten_up_to(kwargs[key])]
                 leaves_keys += [key]
@@ -391,7 +393,7 @@ def leafwise(klass: type[T]) -> type[T]:
     return klass
 
 
-atomicdef = tu.tree_structure(1)
+_, atomicdef = tu.tree_flatten(1)
 
 
 def flatten_one_trace_level(

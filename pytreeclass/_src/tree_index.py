@@ -24,8 +24,8 @@ from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Union
 
 from typing_extensions import Literal, TypedDict
 
-from pytreeclass._src.backend import Backend as backend
 from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import numpy as np
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -40,6 +40,11 @@ TypePath = Tuple[TypeEntry, ...]
 TraceType = Tuple[KeyPath, TypePath]
 IsLeafType = Union[None, Callable[[Any], bool]]
 _no_initializer = object()
+
+SequenceKeyType = type(tu.sequence_key(0))
+DictKeyType = type(tu.dict_key("key"))
+GetAttrKeyType = type(tu.attribute_key("name"))
+NamedSequenceKeyType = type(tu.named_sequence_key("name", 0))
 
 
 class BaseKey(abc.ABC):
@@ -122,16 +127,16 @@ class BaseKey(abc.ABC):
             ...    @ft.singledispatchmethod
             ...    def __eq__(self, key):
             ...        return self.func(key)
-            ...    @__eq__.register(jtu.GetAttrKey)
-            ...    def _(self, key: jtu.GetAttrKey):
+            ...    @__eq__.register(jGetAttrKeyType)
+            ...    def _(self, key: jGetAttrKeyType):
             ...        # unpack the GetAttrKey
             ...        return self.func(key.name)
-            ...    @__eq__.register(jtu.DictKey)
-            ...    def _(self, key: jtu.DictKey):
+            ...    @__eq__.register(jDictKeyType)
+            ...    def _(self, key: jDictKeyType):
             ...        # unpack the DictKey
             ...        return self.func(key.key)
-            ...    @__eq__.register(jtu.SequenceKey)
-            ...    def _(self, key: jtu.SequenceKey):
+            ...    @__eq__.register(jSequenceKeyType)
+            ...    def _(self, key: jSequenceKeyType):
             ...        return self.func(key.index)
 
             >>> # instead of using ``FuncKey(function)`` we can define an alias
@@ -169,8 +174,8 @@ class IntKey(BaseKey):
     def _(self, other: int) -> bool:
         return self.idx == other
 
-    @__eq__.register(tu.SequenceKey)
-    def _(self, other: tu.SequenceKey) -> bool:
+    @__eq__.register(SequenceKeyType)
+    def _(self, other: SequenceKeyType) -> bool:
         return self.idx == other.idx
 
 
@@ -186,12 +191,12 @@ class NameKey(BaseKey):
     def _(self, other: str) -> bool:
         return self.name == other
 
-    @__eq__.register(tu.GetAttrKey)
-    def _(self, other: tu.GetAttrKey) -> bool:
+    @__eq__.register(GetAttrKeyType)
+    def _(self, other: GetAttrKeyType) -> bool:
         return self.name == other.name
 
-    @__eq__.register(tu.DictKey)
-    def _(self, other: tu.DictKey) -> bool:
+    @__eq__.register(DictKeyType)
+    def _(self, other: DictKeyType) -> bool:
         return self.name == other.key
 
 
@@ -244,11 +249,11 @@ class RegexKey(BaseKey):
     def _(self, other: str) -> bool:
         return re.fullmatch(self.pattern, other) is not None
 
-    @__eq__.register(tu.GetAttrKey)
+    @__eq__.register(GetAttrKeyType)
     def _(self, other) -> bool:
         return re.fullmatch(self.pattern, other.name) is not None
 
-    @__eq__.register(tu.DictKey)
+    @__eq__.register(DictKeyType)
     def _(self, other) -> bool:
         return re.fullmatch(self.pattern, other.key) is not None
 
@@ -331,7 +336,7 @@ def _resolve_where(
     mask = None
     bool_masks: list[T] = []
     path_masks: list[BaseKey] = []
-    treedef0 = tu.tree_structure(tree, is_leaf=is_leaf)
+    _, treedef0 = tu.tree_flatten(tree, is_leaf=is_leaf)
     seen_tuple = False  # handle multiple keys at the same level
     level_paths = []
 
@@ -364,7 +369,7 @@ def _resolve_where(
 
     for level_keys in where:
         # each for loop iteration is a level in the where path
-        tu.tree_leaves(level_keys, is_leaf=verify_and_aggregate_is_leaf)
+        tu.tree_flatten(level_keys, is_leaf=verify_and_aggregate_is_leaf)
         path_masks += [MultiKey(*level_paths)] if len(level_paths) > 1 else level_paths
         level_paths = []
         seen_tuple = False
@@ -437,8 +442,8 @@ class AtIndexer(NamedTuple):
         ...        self.a = a
         ...        self.b = b
         ...    def tree_flatten_with_keys(self):
-        ...        kva = (jtu.GetAttrKey("a"), self.a)
-        ...        kvb = (jtu.GetAttrKey("b"), self.b)
+        ...        kva = (jGetAttrKeyType("a"), self.a)
+        ...        kvb = (jGetAttrKeyType("b"), self.b)
         ...        return (kva, kvb), None
         ...    @classmethod
         ...    def tree_unflatten(cls, aux_data, children):
@@ -466,7 +471,7 @@ class AtIndexer(NamedTuple):
 
         Returns:
             A _new_ pytree of leaf values at the specified location, with the
-            non-selected leaf values set to None if the leaf is not an array.
+            non-selected leaf values set to None if the leaf is not an np.
 
         Example:
             >>> import pytreeclass as tc
@@ -490,8 +495,8 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_get(leaf: Any, where: Any):
-            if isinstance(where, backend.ndarray) and where.ndim != 0:
-                return leaf[backend.numpy.where(where)]
+            if isinstance(where, np.ndarray) and where.ndim != 0:
+                return leaf[np.where(where)]
             return leaf if where else None
 
         return tu.tree_map(leaf_get, self.tree, where, is_leaf=is_leaf)
@@ -529,16 +534,19 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_set(leaf: Any, where: Any, set_value: Any):
-            if isinstance(where, backend.ndarray):
-                return backend.numpy.where(where, set_value, leaf)
+            if isinstance(where, np.ndarray):
+                return np.where(where, set_value, leaf)
             return set_value if where else leaf
 
-        if tu.tree_structure(self.tree, is_leaf) == tu.tree_structure(set_value):
+        _, lhsdef = tu.tree_flatten(self.tree, is_leaf=is_leaf)
+        _, rhsdef = tu.tree_flatten(set_value, is_leaf=is_leaf)
+
+        if lhsdef == rhsdef:
             # do not broadcast set_value if it is a pytree of same structure
             # for example tree.at[where].set(tree2) will set all tree leaves
             # to tree2 leaves if tree2 is a pytree of same structure as tree
             # instead of making each leaf of tree a copy of tree2
-            # is design is similar to ``numpy`` design `Array.at[...].set(Array)`
+            # is design is similar to ``numpy`` design `np.at[...].set(Array)`
             return tu.tree_map(leaf_set, self.tree, where, set_value, is_leaf=is_leaf)
 
         # set_value is broadcasted to tree leaves
@@ -599,8 +607,8 @@ class AtIndexer(NamedTuple):
         where = _resolve_where(self.tree, self.where, is_leaf)
 
         def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, backend.ndarray):
-                return backend.numpy.where(where, func(leaf), leaf)
+            if isinstance(where, np.ndarray):
+                return np.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
 
         if not parallel:
@@ -692,8 +700,8 @@ class AtIndexer(NamedTuple):
             return leaf
 
         def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, backend.ndarray):
-                return backend.numpy.where(where, stateless_func(leaf), leaf)
+            if isinstance(where, np.ndarray):
+                return np.where(where, stateless_func(leaf), leaf)
             return stateless_func(leaf) if where else leaf
 
         out = tu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
@@ -736,6 +744,7 @@ class AtIndexer(NamedTuple):
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
         tree = self[where].get(is_leaf=is_leaf)  # type: ignore
+        leaves, _ = tu.tree_flatten(tree, is_leaf=is_leaf)
         if initializer is _no_initializer:
-            return tu.tree_reduce(func, tree)
-        return tu.tree_reduce(func, tree, initializer)
+            return ft.reduce(func, leaves)
+        return ft.reduce(func, leaves, initializer)
