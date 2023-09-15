@@ -618,10 +618,15 @@ class AtIndexer(NamedTuple):
         kind = "thread" if parallel is True else parallel.get("kind", "thread")
         callback = identity if parallel is True else parallel.get("callback", identity)
         executor = _pool_map[kind](max_workers=max_workers)
+
         leaves, treedef = tu.tree_flatten(self.tree, is_leaf=is_leaf)
+        wheres, _ = tu.tree_flatten(where, is_leaf=is_leaf)
 
         with executor as executor:
-            futures = [executor.submit(func, leaf) for leaf in leaves]
+            futures = [
+                executor.submit(leaf_apply, leaf, where)
+                for (leaf, where) in zip(leaves, wheres)
+            ]
 
         out = [
             callback(future.result())
