@@ -34,7 +34,7 @@ class Tree(TreeClass):
     a: float
     b: float
     c: float
-    name: str = field(on_setattr=[freeze])
+    name: str = field(on_setattr=[freeze])  # exclude it from math operations
 
 
 tree1 = Tree(-10, 20, 30, "A")

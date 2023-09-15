@@ -50,9 +50,13 @@ def tree_copy(tree: T) -> T:
     return tu.tree_map(lambda x: copy(x), tree)
 
 
+def has_shape_dtype(node: Any) -> bool:
+    return hasattr(node, "shape") and hasattr(node, "dtype")
+
+
 def _is_leaf_rhs_equal(leaf, rhs) -> bool | np.ndarray:
-    if hasattr(leaf, "shape") and hasattr(leaf, "dtype"):
-        if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
+    if has_shape_dtype(leaf):
+        if has_shape_dtype(rhs):
             if leaf.shape != rhs.shape:
                 return False
             if leaf.dtype != rhs.dtype:
