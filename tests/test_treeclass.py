@@ -17,43 +17,50 @@ import dataclasses as dc
 import inspect
 from typing import Any
 
-import jax
-import jax.tree_util as jtu
 import numpy.testing as npt
 import pytest
-from jax import numpy as jnp
 
-import pytreeclass as tc
-from pytreeclass._src.code_build import build_field_map, convert_hints_to_fields
+from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.code_build import (
+    autoinit,
+    build_field_map,
+    convert_hints_to_fields,
+    field,
+    fields,
+)
+from pytreeclass._src.tree_base import TreeClass
+from pytreeclass._src.tree_mask import freeze
+from pytreeclass._src.tree_util import Partial, is_tree_equal
 
 
 def test_fields():
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(default=1, metadata={"meta": 1})
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(default=1, metadata={"meta": 1})
         b: int = 2
 
-    assert len(tc.fields(Test)) == 2
-    assert tc.fields(Test)[0].metadata == {"meta": 1}
+    assert len(fields(Test)) == 2
+    assert fields(Test)[0].metadata == {"meta": 1}
 
     with pytest.raises(ValueError):
-        tc.field(kind="WRONG")
+        field(kind="WRONG")
 
     assert (
-        repr(tc.field(kind="KW_ONLY"))
+        repr(field(kind="KW_ONLY"))
         == "Field(name=None, type=None, default=NULL, init=True, repr=True, kind='KW_ONLY', metadata=None, on_setattr=(), on_getattr=(), alias=None)"
     )
 
 
 def test_field():
-    assert tc.field(default=1).default == 1
+    assert field(default=1).default == 1
 
     with pytest.raises(TypeError):
-        tc.field(metadata=1)
+        field(metadata=1)
 
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(default=1, kind="POS_ONLY")
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(default=1, kind="POS_ONLY")
         b: int = 2
 
     with pytest.raises(TypeError):
@@ -63,18 +70,18 @@ def test_field():
     assert Test(1, b=2).a == 1
     assert Test(1, 2).b == 2
 
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(default=1, kind="POS_ONLY")
-        b: int = tc.field(default=2, kind="POS_ONLY")
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(default=1, kind="POS_ONLY")
+        b: int = field(default=2, kind="POS_ONLY")
 
     assert Test(1, 2).a == 1
     assert Test(1, 2).b == 2
 
     # keyword only
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(default=1, kind="KW_ONLY")
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(default=1, kind="KW_ONLY")
         b: int = 2
 
     with pytest.raises(TypeError):
@@ -85,10 +92,10 @@ def test_field():
 
     assert Test(a=1, b=2).a == 1
 
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(default=1, kind="POS_ONLY")
-        b: int = tc.field(default=2, kind="KW_ONLY")
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(default=1, kind="POS_ONLY")
+        b: int = field(default=2, kind="KW_ONLY")
 
     with pytest.raises(TypeError):
         Test(1, 2)
@@ -99,9 +106,9 @@ def test_field():
         Test(a=1, b=2)
 
     # test when init is False
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(default=1, init=False, kind="KW_ONLY")
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(default=1, init=False, kind="KW_ONLY")
         b: int = 2
 
     with pytest.raises(TypeError):
@@ -111,51 +118,43 @@ def test_field():
 
 
 def test_field_alias():
-    @tc.autoinit
-    class Tree(tc.TreeClass):
-        _name: str = tc.field(alias="name")
+    @autoinit
+    class Tree(TreeClass):
+        _name: str = field(alias="name")
 
     tree = Tree(name="test")
     assert tree._name == "test"
 
     with pytest.raises(TypeError):
-        tc.field(alias=1)
+        field(alias=1)
 
 
 def test_field_nondiff():
-    class Test(tc.TreeClass):
+    class Test(TreeClass):
         def __init__(
             self,
-            a=tc.freeze(jnp.array([1, 2, 3])),
-            b=tc.freeze(jnp.array([4, 5, 6])),
+            a=freeze(np.array([1, 2, 3])),
+            b=freeze(np.array([4, 5, 6])),
         ):
             self.a = a
             self.b = b
 
     test = Test()
 
-    assert jtu.tree_leaves(test) == []
+    assert tu.tree_flatten(test)[0] == []
 
-    class Test(tc.TreeClass):
-        def __init__(self, a=jnp.array([1, 2, 3]), b=jnp.array([4, 5, 6])):
-            self.a = tc.freeze(a)
+    class Test(TreeClass):
+        def __init__(self, a=np.array([1, 2, 3]), b=np.array([4, 5, 6])):
+            self.a = freeze(a)
             self.b = b
 
     test = Test()
-    npt.assert_allclose(jtu.tree_leaves(test)[0], jnp.array([4, 5, 6]))
-
-
-# def test_hash():
-#     class T(tc.TreeClass):
-#         a: jax.Array
-
-#     # with pytest.raises(TypeError):
-#     hash(T(jnp.array([1, 2, 3])))
+    npt.assert_allclose(tu.tree_flatten(test)[0][0], np.array([4, 5, 6]))
 
 
 def test_post_init():
-    @tc.autoinit
-    class Test(tc.TreeClass):
+    @autoinit
+    class Test(TreeClass):
         a: int = 1
 
         def __post_init__(self):
@@ -167,8 +166,8 @@ def test_post_init():
 
 
 def test_subclassing():
-    @tc.autoinit
-    class L0(tc.TreeClass):
+    @autoinit
+    class L0(TreeClass):
         a: int = 1
         b: int = 3
         c: int = 5
@@ -182,7 +181,7 @@ def test_subclassing():
         def __post_init__(self):
             self.c = 5
 
-    @tc.autoinit
+    @autoinit
     class L1(L0):
         a: int = 2
         b: int = 4
@@ -195,23 +194,23 @@ def test_subclassing():
 
     l1 = L1()
 
-    assert jtu.tree_leaves(l1) == [2, 4, 5, 5]
+    assert tu.tree_flatten(l1)[0] == [2, 4, 5, 5]
     assert l1.inc(10) == 20
     assert l1.sub(10) == 0
     assert l1.d == 5
 
-    @tc.autoinit
+    @autoinit
     class L1(L0):
         a: int = 2
         b: int = 4
 
     l1 = L1()
 
-    assert jtu.tree_leaves(l1) == [2, 4, 5]
+    assert tu.tree_flatten(l1)[0] == [2, 4, 5]
 
 
 def test_registering_state():
-    class L0(tc.TreeClass):
+    class L0(TreeClass):
         def __init__(self):
             self.a = 10
             self.b = 20
@@ -224,8 +223,8 @@ def test_registering_state():
 
 
 def test_copy():
-    @tc.autoinit
-    class L0(tc.TreeClass):
+    @autoinit
+    class L0(TreeClass):
         a: int = 1
         b: int = 3
         c: int = 5
@@ -238,8 +237,8 @@ def test_copy():
 
 
 def test_delattr():
-    @tc.autoinit
-    class L0(tc.TreeClass):
+    @autoinit
+    class L0(TreeClass):
         a: int = 1
         b: int = 3
         c: int = 5
@@ -249,8 +248,8 @@ def test_delattr():
     with pytest.raises(AttributeError):
         del t.a
 
-    @tc.autoinit
-    class L2(tc.TreeClass):
+    @autoinit
+    class L2(TreeClass):
         a: int = 1
 
         def delete(self, name):
@@ -262,94 +261,61 @@ def test_delattr():
         t.delete("a")
 
 
-# def test_getattr():
-#     with pytest.raises(AttributeError):
-
-#
-#         class L2:
-#             a: int = 1
-
-#             def __getattribute__(self, __name: str):
-#                 pass
-
-#     with pytest.raises(AttributeError):
-
-#
-#         class L3:
-#             a: int = 1
-
-#             def __getattribute__(self, __name: str):
-#                 pass
-
-
-# def test_treeclass_decorator_arguments():
-#   (order=False)
-#     class Test:
-#         a: int = 1
-#         b: int = 2
-#         c: int = 3
-
-#     with pytest.raises(TypeError):
-#         Test() + 1
-
-
 def test_is_tree_equal():
-    assert tc.is_tree_equal(1, 1)
-    assert tc.is_tree_equal(1, 2) is False
-    assert tc.is_tree_equal(1, 2.0) is False
-    assert tc.is_tree_equal([1, 2], [1, 2])
+    assert is_tree_equal(1, 1)
+    assert is_tree_equal(1, 2) is False
+    assert is_tree_equal(1, 2.0) is False
+    assert is_tree_equal([1, 2], [1, 2])
 
-    @tc.autoinit
-    class Test1(tc.TreeClass):
+    @autoinit
+    class Test1(TreeClass):
         a: int = 1
 
-    class Test2(tc.TreeClass):
-        a: jax.Array
+    @autoinit
+    class Test2(TreeClass):
+        a: np.ndarray = np.array([1, 2, 3])
 
-        def __init__(self) -> None:
-            self.a = jnp.array([1, 2, 3])
+    assert is_tree_equal(Test1(), Test2()) is False
 
-    assert tc.is_tree_equal(Test1(), Test2()) is False
+    assert is_tree_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
+    assert is_tree_equal(np.array([1, 2, 3]), np.array([1, 3, 3])) is False
 
-    assert tc.is_tree_equal(jnp.array([1, 2, 3]), jnp.array([1, 2, 3]))
-    assert tc.is_tree_equal(jnp.array([1, 2, 3]), jnp.array([1, 3, 3])) is False
-
-    @tc.autoinit
-    class Test3(tc.TreeClass):
+    @autoinit
+    class Test3(TreeClass):
         a: int = 1
         b: int = 2
 
-    assert tc.is_tree_equal(Test1(), Test3()) is False
+    assert is_tree_equal(Test1(), Test3()) is False
 
-    assert tc.is_tree_equal(jnp.array([1, 2, 3]), 1) is False
+    assert is_tree_equal(np.array([1, 2, 3]), 1) is False
 
 
 def test_mutable_field():
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class Test(tc.TreeClass):
+        @autoinit
+        class Test(TreeClass):
             a: list = [1, 2, 3]
 
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class Test2(tc.TreeClass):
-            a: list = tc.field(default=[1, 2, 3])
+        @autoinit
+        class Test2(TreeClass):
+            a: list = field(default=[1, 2, 3])
 
 
 def test_setattr_delattr():
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class Test(tc.TreeClass):
+        @autoinit
+        class Test(TreeClass):
             def __setattr__(self, k, v):
                 pass
 
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class _(tc.TreeClass):
+        @autoinit
+        class _(TreeClass):
             def __delattr__(self, k):
                 pass
 
@@ -371,18 +337,18 @@ def test_on_setattr():
 
         return _range_validator
 
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(on_setattr=[instance_validator(int)])
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(on_setattr=[instance_validator(int)])
 
     with pytest.raises(AssertionError):
         Test(a="a")
 
     assert Test(a=1).a == 1
 
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(on_setattr=[instance_validator((int, float))])
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(on_setattr=[instance_validator((int, float))])
 
     assert Test(a=1).a == 1
     assert Test(a=1.0).a == 1.0
@@ -390,9 +356,9 @@ def test_on_setattr():
     with pytest.raises(AssertionError):
         Test(a="a")
 
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(on_setattr=[range_validator(0, 10)])
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(on_setattr=[range_validator(0, 10)])
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -402,9 +368,9 @@ def test_on_setattr():
     with pytest.raises(AssertionError):
         Test(a=11)
 
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(on_setattr=[range_validator(0, 10), instance_validator(int)])
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(on_setattr=[range_validator(0, 10), instance_validator(int)])
 
     with pytest.raises(AssertionError):
         Test(a=-1)
@@ -414,38 +380,38 @@ def test_on_setattr():
 
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class Test(tc.TreeClass):
-            a: int = tc.field(on_setattr=1)
+        @autoinit
+        class Test(TreeClass):
+            a: int = field(on_setattr=1)
 
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class Test(tc.TreeClass):
-            a: int = tc.field(on_setattr=[1])
+        @autoinit
+        class Test(TreeClass):
+            a: int = field(on_setattr=[1])
 
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class Test(tc.TreeClass):
-            a: int = tc.field(on_setattr=[lambda: True])
+        @autoinit
+        class Test(TreeClass):
+            a: int = field(on_setattr=[lambda: True])
 
         Test(a=1)
 
 
 def test_treeclass_frozen_field():
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(on_setattr=[tc.freeze])
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(on_setattr=[freeze])
 
     t = Test(1)
 
-    assert t.a == tc.freeze(1)
-    assert jtu.tree_leaves(t) == []
+    assert t.a == freeze(1)
+    assert tu.tree_flatten(t)[0] == []
 
 
 def test_super():
-    class Test(tc.TreeClass):
+    class Test(TreeClass):
         # a:int
         def __init__(self) -> None:
             super().__init__()
@@ -454,7 +420,7 @@ def test_super():
 
 
 def test_optional_attrs():
-    class Test(tc.TreeClass):
+    class Test(TreeClass):
         def __repr__(self):
             return "a"
 
@@ -468,7 +434,7 @@ def test_optional_attrs():
 
 
 def test_override_repr():
-    class Test(tc.TreeClass):
+    class Test(TreeClass):
         def __repr__(self):
             return "a"
 
@@ -480,9 +446,9 @@ def test_override_repr():
 
 
 def test_optional_param():
-    @tc.autoinit
-    class Test(tc.TreeClass):
-        a: int = tc.field(default=1)
+    @autoinit
+    class Test(TreeClass):
+        a: int = field(default=1)
 
     with pytest.raises(TypeError):
         Test() < Test()
@@ -501,9 +467,7 @@ def benchmark_treeclass_instance():
     count = 10
     annot = {f"leaf_{i}": int for i in range(count)}
     leaves = {f"leaf_{i}": i for i in range(count)}
-    Tree = tc.autoinit(
-        type("Tree", (tc.TreeClass,), {"__annotations__": annot, **leaves})
-    )
+    Tree = autoinit(type("Tree", (TreeClass,), {"__annotations__": annot, **leaves}))
     return Tree()
 
 
@@ -520,18 +484,18 @@ def test_benchmark_dataclass_class(benchmark):
 def test_self_field_name():
     with pytest.raises(ValueError):
 
-        @tc.autoinit
-        class Tree(tc.TreeClass):
-            self: int = tc.field()
+        @autoinit
+        class Tree(TreeClass):
+            self: int = field()
 
 
 def test_instance_field_map():
-    @tc.autoinit
-    class Parameter(tc.TreeClass):
+    @autoinit
+    class Parameter(TreeClass):
         value: Any
 
-    @tc.autoinit
-    class Tree(tc.TreeClass):
+    @autoinit
+    class Tree(TreeClass):
         bias: int = 0
 
         def add_param(self, name, param):
@@ -549,10 +513,10 @@ def test_partial():
     def f(a, b, c):
         return a + b + c
 
-    f_a = tc.Partial(f, ..., 2, 3)
+    f_a = Partial(f, ..., 2, 3)
     assert f_a(1) == 6
 
-    f_b = tc.Partial(f, 1, ..., 3)
+    f_b = Partial(f, 1, ..., 3)
     assert f_b(2) == 6
 
     assert f_b == f_b
@@ -560,11 +524,11 @@ def test_partial():
 
 
 def test_kind():
-    @tc.autoinit
-    class Tree(tc.TreeClass):
-        a: int = tc.field(kind="VAR_POS")
-        b: int = tc.field(kind="POS_ONLY")
-        c: int = tc.field(kind="VAR_KW")
+    @autoinit
+    class Tree(TreeClass):
+        a: int = field(kind="VAR_POS")
+        b: int = field(kind="POS_ONLY")
+        c: int = field(kind="VAR_KW")
         d: int
 
     params = dict(inspect.signature(Tree.__init__).parameters)
@@ -574,10 +538,10 @@ def test_kind():
     assert params["c"].kind is inspect.Parameter.VAR_KEYWORD
     assert params["d"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
 
-    @tc.autoinit
-    class Tree(tc.TreeClass):
-        a: int = tc.field(kind="VAR_POS")
-        b: int = tc.field(kind="KW_ONLY")
+    @autoinit
+    class Tree(TreeClass):
+        a: int = field(kind="VAR_POS")
+        b: int = field(kind="KW_ONLY")
 
     params = dict(inspect.signature(Tree.__init__).parameters)
     assert params["a"].kind is inspect.Parameter.VAR_POSITIONAL
@@ -585,17 +549,17 @@ def test_kind():
 
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class Tree(tc.TreeClass):
-            a: int = tc.field(kind="VAR_POS")
-            b: int = tc.field(kind="VAR_POS")
+        @autoinit
+        class Tree(TreeClass):
+            a: int = field(kind="VAR_POS")
+            b: int = field(kind="VAR_POS")
 
     with pytest.raises(TypeError):
 
-        @tc.autoinit
-        class Tree(tc.TreeClass):
-            a: int = tc.field(kind="VAR_KW")
-            b: int = tc.field(kind="VAR_KW")
+        @autoinit
+        class Tree(TreeClass):
+            a: int = field(kind="VAR_KW")
+            b: int = field(kind="VAR_KW")
 
 
 def test_init_subclass():
@@ -603,23 +567,23 @@ def test_init_subclass():
         def __init_subclass__(cls, hello):
             cls.hello = hello
 
-    class Test2(tc.TreeClass, Test, hello=1):
+    class Test2(TreeClass, Test, hello=1):
         ...
 
     assert Test2.hello == 1
 
 
 def test_nested_mutation():
-    @tc.autoinit
-    class InnerModule(tc.TreeClass):
+    @autoinit
+    class InnerModule(TreeClass):
         a: int = 1
 
         def f(self):
             self.a += 1
             return self.a
 
-    @tc.autoinit
-    class OuterModule(tc.TreeClass):
+    @autoinit
+    class OuterModule(TreeClass):
         inner: InnerModule = InnerModule()
 
         def ff(self):
@@ -636,8 +600,8 @@ def test_nested_mutation():
 
 
 def test_autoinit_and_user_defined_init():
-    @tc.autoinit
-    class Tree(tc.TreeClass):
+    @autoinit
+    class Tree(TreeClass):
         b: int
 
         def __init__(self, a):
@@ -660,17 +624,17 @@ def non_field_builder():
 
 
 def test_on_getattr():
-    @tc.autoinit
-    class Tree(tc.TreeClass):
-        a: int = tc.field(on_getattr=[lambda x: x + 1])
+    @autoinit
+    class Tree(TreeClass):
+        a: int = field(on_getattr=[lambda x: x + 1])
 
     assert Tree(a=1).a == 2
 
     # with subclassing
 
-    @tc.autoinit
+    @autoinit
     class Parent:
-        a: int = tc.field(on_getattr=[lambda x: x + 1])
+        a: int = field(on_getattr=[lambda x: x + 1])
 
     class Child(Parent):
         pass
