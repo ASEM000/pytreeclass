@@ -18,13 +18,14 @@ import dataclasses as dc
 import re
 from collections import namedtuple
 
-# import jax
 import pytest
-from jax import numpy as jnp
 
 import pytreeclass as tc
-from pytreeclass import (
-    TreeClass,
+from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.tree_base import TreeClass
+from pytreeclass._src.tree_pprint import (
+    _table,
+    func_pp,
     tree_diagram,
     tree_graph,
     tree_mermaid,
@@ -34,9 +35,30 @@ from pytreeclass import (
 )
 
 
+def test_table():
+    col1 = ["1\n", "3"]
+    col2 = ["2", "4000"]
+    assert (
+        _table([col1, col2])
+        == "┌─┬────┐\n│1│3   │\n│ │    │\n├─┼────┤\n│2│4000│\n└─┴────┘"
+    )
+
+
+def test_func_pp():
+    def example(a: int, b=1, *c, d, e=2, **f) -> str:
+        ...  # fmt: skip
+
+    assert (
+        func_pp(example, indent=0, kind="str", width=60, depth=0, seen=set())
+        == "example(a, b, *c, d, e, **f)"
+    )
+
+
 @tc.leafwise
 @tc.autoinit
 class Repr1(TreeClass):
+    """A simple tree class for repr testing."""
+
     a: int = 1
     b: str = "string"
     c: float = 1.0
@@ -44,23 +66,23 @@ class Repr1(TreeClass):
     e: list = None
     f: set = None
     g: dict = None
-    h: jnp.ndarray = None
-    i: jnp.ndarray = None
-    j: jnp.ndarray = None
+    h: np.ndarray = None
+    i: np.ndarray = None
+    j: np.ndarray = None
     k: tuple = tc.field(repr=False, default=(1, 2, 3))
     l: tuple = namedtuple("a", ["b", "c"])(1, 2)
-    m: jnp.array = jnp.ones((5, 5))
-    n: jnp.array = jnp.array(True)
-    o: jnp.array = jnp.array([1, 2.0], dtype=jnp.complex64)
+    m: np.array = np.ones((5, 5))
+    n: np.array = np.array(True)
+    o: np.array = np.array([1, 2.0], dtype=np.complex64)
 
     def __post_init__(self):
-        self.h = jnp.ones((5, 1))
-        self.i = jnp.ones((1, 6))
-        self.j = jnp.ones((1, 1, 4, 5))
+        self.h = np.ones((5, 1))
+        self.i = np.ones((1, 6))
+        self.j = np.ones((1, 1, 4, 5))
 
         self.e = [10] * 5
         self.f = {1, 2, 3}
-        self.g = {"a": "a" * 50, "b": "b" * 50, "c": jnp.ones([5, 5])}
+        self.g = {"a": "a" * 50, "b": "b" * 50, "c": np.ones([5, 5])}
 
 
 r1 = Repr1()
@@ -155,7 +177,7 @@ def test_misc():
     # )
 
     assert (
-        tree_repr(jnp.ones([1, 2], dtype=jnp.uint16))
+        tree_repr(np.ones([1, 2], dtype=np.uint16))
         == "ui16[1,2](μ=1.00, σ=0.00, ∈[1,1])"
     )
 
