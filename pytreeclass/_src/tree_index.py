@@ -124,18 +124,17 @@ class BaseKey(abc.ABC):
             ...    @ft.singledispatchmethod
             ...    def __eq__(self, key):
             ...        return self.func(key)
-            ...    @__eq__.register(jGetAttrKeyType)
-            ...    def _(self, key: jGetAttrKeyType):
+            ...    @__eq__.register(jtu.GetAttrKey)
+            ...    def _(self, key: jtu.GetAttrKey):
             ...        # unpack the GetAttrKey
             ...        return self.func(key.name)
-            ...    @__eq__.register(jDictKeyType)
-            ...    def _(self, key: jDictKeyType):
+            ...    @__eq__.register(jtu.DictKey)
+            ...    def _(self, key: jtu.DictKey):
             ...        # unpack the DictKey
             ...        return self.func(key.key)
-            ...    @__eq__.register(jSequenceKeyType)
-            ...    def _(self, key: jSequenceKeyType):
+            ...    @__eq__.register(jtu.SequenceKey)
+            ...    def _(self, key: jtu.SequenceKey):
             ...        return self.func(key.index)
-
             >>> # instead of using ``FuncKey(function)`` we can define an alias
             >>> # for `FuncKey`, for this example we will define any FunctionType
             >>> # as a `FuncKey` by default.
@@ -422,8 +421,8 @@ class AtIndexer(NamedTuple):
         ...        self.a = a
         ...        self.b = b
         ...    def tree_flatten_with_keys(self):
-        ...        kva = (jGetAttrKeyType("a"), self.a)
-        ...        kvb = (jGetAttrKeyType("b"), self.b)
+        ...        kva = (jtu.GetAttrKey("a"), self.a)
+        ...        kvb = (jtu.GetAttrKey("b"), self.b)
         ...        return (kva, kvb), None
         ...    @classmethod
         ...    def tree_unflatten(cls, aux_data, children):
