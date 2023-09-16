@@ -46,6 +46,13 @@ T = TypeVar("T")
 pool_map = dict(thread=ThreadPoolExecutor, process=ProcessPoolExecutor)
 
 
+if backend not in BACKENDS:
+    raise ImportError(
+        f"Invalid backend {backend=}. Must be one of {BACKENDS=}."
+        f"Set the environment variable PYTREECLASS_BACKEND to one of {BACKENDS=}."
+    )
+
+
 class IsParallel(TypedDict):
     max_workers: int | None
     kind: Literal["thread", "process"]
@@ -338,10 +345,7 @@ elif backend == "numpy":
 
         @staticmethod
         def keystr(keys: Any) -> str:
-            return ".".join(str(key) for key in keys)
+            return "".join(str(key) for key in keys)
 
     tree_util = OpTreeTreeUtil()
     numpy = np
-
-else:
-    raise ImportError(f"None of the {BACKENDS=} are installed.")

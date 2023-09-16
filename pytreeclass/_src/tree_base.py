@@ -39,9 +39,6 @@ T = TypeVar("T", bound=Hashable)
 S = TypeVar("S")
 PyTree = Any
 EllipsisType = type(Ellipsis)
-
-
-# allow methods in mutable registry to be called without raising `AttributeError`
 _mutable_instance_registry: set[int] = set()
 
 

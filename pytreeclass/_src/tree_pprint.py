@@ -35,7 +35,7 @@ from pytreeclass._src.tree_util import (
     Node,
     construct_tree,
     is_path_leaf_depth_factory,
-    tree_leaves_with_typedpath,
+    tree_leaves_with_typed_path,
 )
 
 
@@ -555,15 +555,6 @@ def size_pp(size: int, **spec: Unpack[PPSpec]):
     return text
 
 
-# `tree_summary`` display dispatchers to make `tree_summary` more customizable
-# for type, count, and size display.
-# for example, array count uses the array size instead, where as some other
-# custom object might make use of this feature to display the number of elements
-# differently. for size, only arrays can have a size, as other type sizes are
-# not meaningful. user can define their own dispatchers for their custom types
-# display e.g `f32[10,10]` instead of simply `Array`.
-
-
 def tree_summary(
     tree: PyTree,
     *,
@@ -649,7 +640,7 @@ def tree_summary(
     rows = [["Name", "Type", "Count", "Size"]]
     tcount = tsize = 0
 
-    traces_leaves = tree_leaves_with_typedpath(
+    traces_leaves = tree_leaves_with_typed_path(
         tree,
         is_leaf=is_leaf,
         is_path_leaf=is_path_leaf_depth_factory(depth),

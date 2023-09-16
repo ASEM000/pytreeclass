@@ -28,7 +28,6 @@ from pytreeclass._src.backend import tree_util as tu
 T = TypeVar("T")
 S = TypeVar("S")
 PyTree = Any
-# TODO: swich to EllipsisType for python 3.10
 EllipsisType = TypeVar("EllipsisType")
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
 TypeEntry = TypeVar("TypeEntry", bound=type)

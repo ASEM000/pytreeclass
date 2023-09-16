@@ -395,7 +395,7 @@ def leafwise(klass: type[T]) -> type[T]:
 _, atomicdef = tu.tree_flatten(1)
 
 
-def flatten_one_typedpath_level(
+def flatten_one_typed_path_level(
     typedpath: KeyTypePath,
     tree: PyTree,
     is_leaf: IsLeafType,
@@ -403,36 +403,30 @@ def flatten_one_typedpath_level(
 ):
     # predicate and type path
     if (is_leaf and is_leaf(tree)) or (is_path_leaf and is_path_leaf(typedpath)):
-        # is_leaf is a predicate function that determines whether a value
-        # is a leaf is_path_leaf is a predicate function that determines
-        # whether a path is a leaf
         yield typedpath, tree
         return
 
-    path_leaf_pair, treedef = tu.tree_flatten(
-        tree,
-        is_leaf=lambda node: False if (id(node) == id(tree)) else True,
-        is_path=True,
-    )
+    one_level_is_leaf = lambda node: False if (id(node) == id(tree)) else True
+    path_leaf, treedef = tu.tree_flatten(tree, is_leaf=one_level_is_leaf, is_path=True)
 
     if treedef == atomicdef:
         yield typedpath, tree
         return
 
-    for key, value in path_leaf_pair:
+    for key, value in path_leaf:
         keys, types = typedpath
         path = ((*keys, *key), (*types, type(value)))
-        yield from flatten_one_typedpath_level(path, value, is_leaf, is_path_leaf)
+        yield from flatten_one_typed_path_level(path, value, is_leaf, is_path_leaf)
 
 
-def tree_leaves_with_typedpath(
+def tree_leaves_with_typed_path(
     tree: PyTree,
     *,
     is_leaf: IsLeafType = None,
     is_path_leaf: Callable[[KeyTypePath], bool] | None = None,
 ) -> Sequence[tuple[KeyTypePath, Any]]:
     # mainly used for visualization
-    return list(flatten_one_typedpath_level(((), ()), tree, is_leaf, is_path_leaf))
+    return list(flatten_one_typed_path_level(((), ()), tree, is_leaf, is_path_leaf))
 
 
 class Node:
@@ -486,10 +480,10 @@ def construct_tree(
     is_leaf: IsLeafType = None,
     is_path_leaf: IsLeafType = None,
 ) -> Node:
-    # construct a tree with `Node` objects using `tree_leaves_with_typedpath`
+    # construct a tree with `Node` objects using `tree_leaves_with_typed_path`
     # to establish parent-child relationship between nodes
 
-    traces_leaves = tree_leaves_with_typedpath(
+    traces_leaves = tree_leaves_with_typed_path(
         tree,
         is_leaf=is_leaf,
         is_path_leaf=is_path_leaf,
