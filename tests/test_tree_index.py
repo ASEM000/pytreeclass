@@ -208,7 +208,7 @@ def test_indexer_apply(tree, expected, where):
     indexer = AtIndexer(tree, where=where)
     assert is_tree_equal(indexer.apply(lambda _: _X), expected)
     assert is_tree_equal(
-        indexer.apply(lambda _: _X, parallel=True),
+        indexer.apply(lambda _: _X, is_parallel=True),
         expected,
     )
 
