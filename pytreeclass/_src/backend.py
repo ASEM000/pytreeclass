@@ -45,7 +45,7 @@ class BackendTreeUtil(abc.ABC):
         tree: Any,
         *rest: Any,
         is_leaf: Callable[[Any], bool] | None = None,
-        with_path: bool = False,
+        is_path: bool = False,
     ) -> Any:
         ...
 
@@ -56,7 +56,7 @@ class BackendTreeUtil(abc.ABC):
         tree: Any,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
-        with_path: bool = False,
+        is_path: bool = False,
     ) -> tuple[Iterable[Leaf], TreeDef]:
         ...
 
@@ -116,11 +116,11 @@ if backend == "jax":
             tree: Any,
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
-            with_path: bool = False,
+            is_path: bool = False,
         ) -> Any:
             return (
                 jtu.tree_map_with_path(func, tree, *rest, is_leaf=is_leaf)
-                if with_path
+                if is_path
                 else jtu.tree_map(func, tree, *rest, is_leaf=is_leaf)
             )
 
@@ -129,11 +129,11 @@ if backend == "jax":
             tree: Any,
             *,
             is_leaf: Callable[[Any], bool] | None = None,
-            with_path: bool = False,
+            is_path: bool = False,
         ) -> tuple[Iterable[Leaf], TreeDef]:
             return (
                 jtu.tree_flatten_with_path(tree, is_leaf=is_leaf)
-                if with_path
+                if is_path
                 else jtu.tree_flatten(tree, is_leaf=is_leaf)
             )
 
@@ -239,11 +239,11 @@ elif backend == "numpy":
             tree: Any,
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
-            with_path: bool = False,
+            is_path: bool = False,
         ) -> Any:
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
             args = [leaves] + [treedef.flatten_up_to(r) for r in rest]
-            args = (ot.treespec_paths(treedef), *args) if with_path else args
+            args = (ot.treespec_paths(treedef), *args) if is_path else args
             return ot.tree_unflatten(treedef, map(func, *args))
 
         @staticmethod
@@ -251,12 +251,12 @@ elif backend == "numpy":
             tree: Any,
             *,
             is_leaf: Callable[[Any], bool] | None = None,
-            with_path: bool = False,
+            is_path: bool = False,
         ) -> tuple[Iterable[Leaf], TreeDef]:
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
             return (
                 (list(zip(ot.treespec_paths(treedef), leaves)), treedef)
-                if with_path
+                if is_path
                 else (leaves, treedef)
             )
 

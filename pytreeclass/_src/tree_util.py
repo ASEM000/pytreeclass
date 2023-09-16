@@ -413,7 +413,7 @@ def flatten_one_typedpath_level(
     path_leaf_pair, treedef = tu.tree_flatten(
         tree,
         is_leaf=lambda node: False if (id(node) == id(tree)) else True,
-        with_path=True,
+        is_path=True,
     )
 
     if treedef == atomicdef:
