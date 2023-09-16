@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.10.0
+
+- Supports multibackend:
+  - `numpy` + `optree` via `export PYTREECLASS_BACKEND=numpy` (lightweight option)
+  - `jax` via `export PYTREECLASS_BACKEND=jax` - The default -
+
+- drop `callback` option in parallel options in `is_parallel`
+
+
 ## v0.9.2
 
 ## Changes:

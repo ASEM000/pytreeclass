@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import abc
 import dataclasses as dc
-import importlib
 import os
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from importlib.util import find_spec
 from typing import (
     Any,
     Callable,
@@ -121,9 +121,20 @@ class BackendTreeUtil(abc.ABC):
 
 
 if backend == "jax":
-    if importlib.util.find_spec("jax") is None:
-        raise ImportError("`jax` backend requires `jax` to be installed.")
+    if find_spec("jax") is None:
+        import logging
 
+        logging.info("[PYTREECLASS]: switching to `numpy` backend.")
+        backend = "numpy"
+
+if backend == "numpy":
+    if find_spec("numpy") is None:
+        raise ImportError("`numpy` backend requires `numpy` to be installed.")
+    if find_spec("optree") is None:
+        raise ImportError("`numpy` backend requires `optree` to be installed.")
+
+
+if backend == "jax":
     # tree utils and array utils
     import jax.numpy as jnp
     import jax.tree_util as jtu
@@ -244,10 +255,6 @@ if backend == "jax":
 elif backend == "numpy":
     # numpy backend for array utils
     # and optree backend for tree utils
-    if importlib.util.find_spec("numpy") is None:
-        raise ImportError("`numpy` backend requires `numpy` to be installed.")
-    if importlib.util.find_spec("optree") is None:
-        raise ImportError("`numpy` backend requires `optree` to be installed.")
 
     import numpy
     import optree as ot
