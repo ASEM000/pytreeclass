@@ -11,7 +11,8 @@
 |[**Benchamrks**](#more)
 |[**Acknowledgements**](#acknowledgements)
 
-![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/tests.yml/badge.svg)
+![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_jax.yml/badge.svg)
+![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_numpy.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11_-blue)
 ![pyver](https://img.shields.io/badge/jax->=0.4.7-blue)
 ![codestyle](https://img.shields.io/badge/codestyle-black-black)
