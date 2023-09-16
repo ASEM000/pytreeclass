@@ -84,21 +84,12 @@ class BackendTreeUtil(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def register_pytree_node(
-        nodetype: type[T],
-        flatten_func: Callable[[T], tuple[Iterable[Leaf], TreeDef]],
-        unflatten_func: Callable[[TreeDef, Iterable[Leaf]], T],
-    ) -> None:
+    def register_treeclass(klass: type[T]) -> None:
         ...
 
     @staticmethod
     @abc.abstractmethod
-    def register_pytree_node_with_path(
-        nodetype: type[T],
-        flatten_func_with_path: Callable[[T], tuple[Iterable[KeyPathLeaf], TreeDef]],
-        unflatten_func: Callable[[TreeDef, Iterable[KeyPathLeaf]], T],
-        flatten_func: Callable[[T], tuple[Iterable[Leaf], TreeDef]],
-    ) -> None:
+    def register_static(klass: type[T]) -> None:
         ...
 
     @staticmethod
@@ -114,11 +105,6 @@ class BackendTreeUtil(abc.ABC):
     @staticmethod
     @abc.abstractmethod
     def dict_key(key: Hashable) -> Any:
-        ...
-
-    @staticmethod
-    @abc.abstractmethod
-    def named_sequence_key(name: str, index: int) -> Any:
         ...
 
     @staticmethod
@@ -180,24 +166,39 @@ if backend == "jax":
             return jtu.tree_unflatten(treedef, leaves)
 
         @staticmethod
-        def register_pytree_node(
-            nodetype: type[T],
-            flatten_func: Callable[[T], tuple[Iterable[Leaf], TreeDef]],
-            unflatten_func: Callable[[TreeDef, Iterable[Leaf]], T],
-        ) -> None:
-            jtu.register_pytree_node(nodetype, flatten_func, unflatten_func)
+        def register_treeclass(klass: type[T]) -> None:
+            def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
+                # unflatten rule to use with `tree_unflatten`
+                tree = getattr(object, "__new__")(klass)
+                vars(tree).update(zip(keys, leaves))
+                return tree
+
+            def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
+                # flatten rule to use with `tree_flatten`
+                dynamic = vars(tree)
+                return tuple(dynamic.values()), tuple(dynamic.keys())
+
+            def tree_flatten_with_keys(tree: T):
+                # flatten rule to use with `tree_flatten_with_path`
+                dynamic = dict(vars(tree))
+                for idx, key in enumerate(vars(tree)):
+                    dynamic[key] = (NamedSequenceKey(idx, key), dynamic[key])
+                return tuple(dynamic.values()), tuple(dynamic.keys())
+
+            jtu.register_pytree_with_keys(
+                nodetype=klass,
+                flatten_func=tree_flatten,
+                flatten_with_keys=tree_flatten_with_keys,
+                unflatten_func=tree_unflatten,
+            )
 
         @staticmethod
-        def register_pytree_node_with_path(
-            nodetype: type[T],
-            flatten_func_with_path: Callable[
-                [T], tuple[Iterable[KeyPathLeaf], TreeDef]
-            ],
-            unflatten_func: Callable[[TreeDef, Iterable[KeyPathLeaf]], T],
-            flatten_func: Callable[[T], tuple[Iterable[Leaf], TreeDef]],
-        ) -> None:
-            args = (nodetype, flatten_func_with_path, unflatten_func, flatten_func)
-            jtu.register_pytree_with_keys(*args)
+        def register_static(klass: type[T]) -> None:
+            jtu.register_pytree_node(
+                nodetype=klass,
+                flatten_func=lambda tree: ((), tree),
+                unflatten_func=lambda treedef, _: treedef,
+            )
 
         @staticmethod
         def attribute_key(name: str) -> jtu.GetAttrKey:
@@ -212,13 +213,10 @@ if backend == "jax":
             return jtu.DictKey(key)
 
         @staticmethod
-        def named_sequence_key(name: str, index: int) -> NamedSequenceKey:
-            return NamedSequenceKey(name, index)
-
-        @staticmethod
         def keystr(keys: Any) -> str:
             return jtu.keystr(keys)
 
+    tree_util = TreeUtil()
     numpy = jnp
 
 elif backend == "numpy":
@@ -232,14 +230,30 @@ elif backend == "numpy":
     import numpy
     import optree as ot
 
-    numpy = numpy
-
     @dc.dataclass(frozen=True)
-    class NamedSequenceKey:
-        name: str
+    class SequenceKey:
         idx: int
 
-        def pprint(self):
+        def __str__(self):
+            return f"[{repr(self.idx)}]"
+
+    @dc.dataclass(frozen=True)
+    class DictKey:
+        key: Hashable
+
+        def __str__(self):
+            return f"[{repr(self.key)}]"
+
+    @dc.dataclass(frozen=True)
+    class GetAttrKey:
+        name: str
+
+        def __str__(self):
+            return f".{self.name}"
+
+    @dc.dataclass(frozen=True)
+    class NamedSequenceKey(GetAttrKey, SequenceKey):
+        def __str__(self) -> str:
             return f".{self.name}"
 
     class TreeUtil(BackendTreeUtil):
@@ -259,19 +273,15 @@ elif backend == "numpy":
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
         ) -> Any:
-            return ot.tree_map_with_path(
-                func,
-                tree,
-                *rest,
-                is_leaf=is_leaf,
-                namespace=namespace,
-            )
+            leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
+            paths = ot.treespec_paths(treedef)
+            flat_args = [leaves] + [treedef.flatten_up_to(r) for r in rest]
+            flat_results = map(func, paths, *flat_args)
+            return treedef.unflatten(flat_results)
 
         @staticmethod
         def tree_flatten(
-            tree: Any,
-            *,
-            is_leaf: Callable[[Any], bool] | None = None,
+            tree: Any, *, is_leaf: Callable[[Any], bool] | None = None
         ) -> tuple[Iterable[Leaf], TreeDef]:
             return ot.tree_flatten(tree, is_leaf=is_leaf, namespace=namespace)
 
@@ -281,57 +291,61 @@ elif backend == "numpy":
         ) -> tuple[Iterable[KeyPathLeaf], TreeDef]:
             # optree returns a tuple of (leaves, paths, treedef) while jax returns
             # a tuple of (keys_leaves, treedef)
-            out = ot.tree_flatten_with_path(tree, is_leaf=is_leaf, namespace=namespace)
-            paths, leaves, treedef = out
-            return list(zip(paths, leaves)), treedef
+            leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
+            return list(zip(ot.treespec_paths(treedef), leaves)), treedef
 
         @staticmethod
         def tree_unflatten(treedef: TreeDef, leaves: Iterable[Any]) -> Any:
             return ot.tree_unflatten(treedef, leaves)
 
         @staticmethod
-        def register_pytree_node(
-            nodetype: type[T],
-            flatten_func: Callable[[T], tuple[Iterable[Leaf], TreeDef]],
-            unflatten_func: Callable[[TreeDef, Iterable[Leaf]], T],
-        ) -> None:
-            ot.register_pytree_node(nodetype, flatten_func, unflatten_func, namespace)
+        def register_treeclass(klass: type[T]) -> None:
+            def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
+                # unflatten rule to use with `tree_unflatten`
+                tree = getattr(object, "__new__")(klass)
+                vars(tree).update(zip(keys, leaves))
+                return tree
+
+            def tree_flatten(tree: T):
+                dynamic = dict(vars(tree))
+                keys = tuple(dynamic.keys())
+                entries = tuple(NamedSequenceKey(*ik) for ik in enumerate(keys))
+                return (tuple(dynamic.values()), keys, entries)
+
+            ot.register_pytree_node(
+                klass,
+                flatten_func=tree_flatten,
+                unflatten_func=tree_unflatten,
+                namespace=namespace,
+            )
 
         @staticmethod
-        def register_pytree_node_with_path(
-            nodetype: type[T],
-            flatten_func_with_path: Callable[
-                [T], tuple[Iterable[KeyPathLeaf], TreeDef]
-            ],
-            unflatten_func: Callable[[TreeDef, Iterable[KeyPathLeaf]], T],
-            flatten_func: Callable[[T], tuple[Iterable[Leaf], TreeDef]],
-        ) -> None:
-            def keypath_func(tree):
-                keys_leaves, treedef = flatten_func_with_path(tree)
-                return [k for k, _ in keys_leaves]
-
-            ot.register_keypaths(nodetype, keypath_func)
-            ot.register_pytree_node(nodetype, flatten_func, unflatten_func, namespace)
+        def register_static(klass: type[T]) -> None:
+            ot.register_pytree_node(
+                klass,
+                flatten_func=lambda tree: ((), tree),
+                unflatten_func=lambda treedef, _: treedef,
+                namespace=namespace,
+            )
 
         @staticmethod
-        def attribute_key(name: str) -> ot.GetitemKeyPathEntry:
-            return ot.GetitemKeyPathEntry(name)
+        def attribute_key(name: str) -> GetAttrKey:
+            return GetAttrKey(name)
 
         @staticmethod
-        def sequence_key(index: int) -> ot.GetitemKeyPathEntry:
-            return ot.GetitemKeyPathEntry(index)
+        def sequence_key(index: int) -> SequenceKey:
+            return SequenceKey(index)
 
         @staticmethod
-        def dict_key(key: Hashable) -> ot.GetitemKeyPathEntry:
-            return ot.GetitemKeyPathEntry(key)
-
-        @staticmethod
-        def named_sequence_key(name: str, index: int) -> NamedSequenceKey:
-            return NamedSequenceKey(name, index)
+        def dict_key(key: Hashable) -> DictKey:
+            return DictKey(key)
 
         @staticmethod
         def keystr(keys: Any) -> str:
-            return "".join([k.pprint() for k in keys])
+            return ".".join(str(key) for key in keys)
+
+    tree_util = TreeUtil()
+    numpy = numpy
 
 else:
     raise ImportError(f"None of the {BACKENDS=} are installed.")

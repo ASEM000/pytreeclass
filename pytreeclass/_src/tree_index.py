@@ -44,7 +44,6 @@ _no_initializer = object()
 SequenceKeyType = type(tu.sequence_key(0))
 DictKeyType = type(tu.dict_key("key"))
 GetAttrKeyType = type(tu.attribute_key("name"))
-NamedSequenceKeyType = type(tu.named_sequence_key("name", 0))
 
 
 class BaseKey(abc.ABC):
@@ -294,6 +293,7 @@ def _generate_path_mask(
     match = False
 
     def map_func(path, _: Any):
+        print("here", _)
         if len(where) > len(path):
             # path is shorter than `where` path. for example
             # where=("a", "b") and the current path is ("a",) then

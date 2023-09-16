@@ -28,14 +28,14 @@ from typing import Any, Callable, Literal, NamedTuple, Sequence
 
 from typing_extensions import TypeAlias, TypedDict, Unpack
 
-from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.tree_util import (
     IsLeafType,
     Node,
     construct_tree,
-    is_trace_leaf_depth_factory,
-    tree_leaves_with_trace,
+    is_path_leaf_depth_factory,
+    tree_leaves_with_typedpath,
 )
 
 
@@ -366,7 +366,7 @@ def tree_diagram(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf_depth_factory(depth),
+        is_path_leaf=is_path_leaf_depth_factory(depth),
     )
     text = step(root, is_last=len(root.children) == 1)
     return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
@@ -426,7 +426,7 @@ def tree_mermaid(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf_depth_factory(depth),
+        is_path_leaf=is_path_leaf_depth_factory(depth),
     )
     text = "flowchart LR\n" + step(root)
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
@@ -502,7 +502,7 @@ def tree_graph(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf_depth_factory(depth),
+        is_path_leaf=is_path_leaf_depth_factory(depth),
     )
     text = "digraph G {\n" + step(root) + "}"
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
@@ -649,10 +649,10 @@ def tree_summary(
     rows = [["Name", "Type", "Count", "Size"]]
     tcount = tsize = 0
 
-    traces_leaves = tree_leaves_with_trace(
+    traces_leaves = tree_leaves_with_typedpath(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf_depth_factory(depth),
+        is_path_leaf=is_path_leaf_depth_factory(depth),
     )
 
     for trace, leaf in traces_leaves:

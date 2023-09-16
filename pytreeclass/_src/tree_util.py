@@ -36,7 +36,7 @@ TypeEntry = TypeVar("TypeEntry", bound=type)
 TraceEntry = Tuple[KeyEntry, TypeEntry]
 KeyPath = Tuple[KeyEntry, ...]
 TypePath = Tuple[TypeEntry, ...]
-TraceType = Tuple[KeyPath, TypePath]
+KeyTypePath = Tuple[KeyPath, TypePath]
 IsLeafType = Union[None, Callable[[Any], bool]]
 
 
@@ -144,11 +144,7 @@ class Partial:
         return is_tree_equal(self, other)
 
 
-tu.register_pytree_node(
-    nodetype=Partial,
-    flatten_func=lambda x: ((x.func, x.args, x.kwargs), None),
-    unflatten_func=lambda _, xs: Partial(*xs),
-)
+tu.register_static(Partial)
 
 
 def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
@@ -400,47 +396,44 @@ def leafwise(klass: type[T]) -> type[T]:
 _, atomicdef = tu.tree_flatten(1)
 
 
-def flatten_one_trace_level(
-    trace: TraceType,
+def flatten_one_typedpath_level(
+    typedpath: KeyTypePath,
     tree: PyTree,
     is_leaf: IsLeafType,
-    is_trace_leaf: Callable[[TraceType], bool] | None,
+    is_path_leaf: Callable[[KeyTypePath], bool] | None,
 ):
     # predicate and type path
-    if (is_leaf and is_leaf(tree)) or (is_trace_leaf and is_trace_leaf(trace)):
+    if (is_leaf and is_leaf(tree)) or (is_path_leaf and is_path_leaf(typedpath)):
         # is_leaf is a predicate function that determines whether a value
-        # is a leaf is_trace_leaf is a predicate function that determines
-        # whether a trace is a leaf
-        yield trace, tree
+        # is a leaf is_path_leaf is a predicate function that determines
+        # whether a path is a leaf
+        yield typedpath, tree
         return
 
-    key_leaf_pairs, treedef = tu.tree_flatten_with_path(
+    path_leaf_pair, treedef = tu.tree_flatten_with_path(
         tree,
         # flatten one level
         is_leaf=lambda node: False if (id(node) == id(tree)) else True,
     )
 
     if treedef == atomicdef:
-        yield trace, tree
+        yield typedpath, tree
         return
 
-    for key, value in key_leaf_pairs:
-        yield from flatten_one_trace_level(
-            ((*trace[0], *key), (*trace[1], type(value))),
-            value,
-            is_leaf,
-            is_trace_leaf,
-        )
+    for key, value in path_leaf_pair:
+        keys, types = typedpath
+        path = ((*keys, *key), (*types, type(value)))
+        yield from flatten_one_typedpath_level(path, value, is_leaf, is_path_leaf)
 
 
-def tree_leaves_with_trace(
+def tree_leaves_with_typedpath(
     tree: PyTree,
     *,
     is_leaf: IsLeafType = None,
-    is_trace_leaf: Callable[[TraceType], bool] | None = None,
-) -> Sequence[tuple[TraceType, Any]]:
+    is_path_leaf: Callable[[KeyTypePath], bool] | None = None,
+) -> Sequence[tuple[KeyTypePath, Any]]:
     # mainly used for visualization
-    return list(flatten_one_trace_level(((), ()), tree, is_leaf, is_trace_leaf))
+    return list(flatten_one_typedpath_level(((), ()), tree, is_leaf, is_path_leaf))
 
 
 class Node:
@@ -478,29 +471,29 @@ class Node:
         return key in self.children
 
 
-def is_trace_leaf_depth_factory(depth: int | float):
-    # generate `is_trace_leaf` function to stop tracing at a certain `depth`
+def is_path_leaf_depth_factory(depth: int | float):
+    # generate `is_path_leaf` function to stop tracing at a certain `depth`
     # in essence, depth is the length of the trace entry
-    def is_trace_leaf(trace) -> bool:
+    def is_path_leaf(trace) -> bool:
         keys, _ = trace
         # stop tracing if depth is reached
         return False if depth is None else (depth <= len(keys))
 
-    return is_trace_leaf
+    return is_path_leaf
 
 
 def construct_tree(
     tree: PyTree,
     is_leaf: IsLeafType = None,
-    is_trace_leaf: IsLeafType = None,
+    is_path_leaf: IsLeafType = None,
 ) -> Node:
-    # construct a tree with `Node` objects using `tree_leaves_with_trace`
+    # construct a tree with `Node` objects using `tree_leaves_with_typedpath`
     # to establish parent-child relationship between nodes
 
-    traces_leaves = tree_leaves_with_trace(
+    traces_leaves = tree_leaves_with_typedpath(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf,
+        is_path_leaf=is_path_leaf,
     )
 
     ti = (None, type(tree))

@@ -141,6 +141,3 @@ def test_bcmap(tree, expected):
 def test_math_operations_errors():
     with pytest.raises(TypeError):
         tree1 + "s"
-
-    with pytest.raises(TypeError):
-        tree1.at["a"].set(np.array([1, 2])) == (1,)

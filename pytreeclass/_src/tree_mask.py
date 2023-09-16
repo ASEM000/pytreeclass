@@ -70,12 +70,8 @@ class _FrozenBase(Generic[T]):
     def __init_subclass__(klass, **k) -> None:
         # register subclass as an empty pytree node
         super().__init_subclass__(**k)
-
-        tu.register_pytree_node(
-            nodetype=klass,
-            flatten_func=lambda tree: ((), tree),
-            unflatten_func=lambda treedef, _: treedef,
-        )
+        # register with the proper backend
+        tu.register_static(klass)
 
     # raise helpful error message when trying to interact with frozen object
     __add__ = __radd__ = __iadd__ = _FrozenError("+")

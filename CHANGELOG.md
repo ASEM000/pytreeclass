@@ -34,7 +34,7 @@ indexer = tc.AtIndexer(paths)
   1) `tree_repr_with_trace`
   2) `tree_map_with_trace`
   3) `tree_flatten_with_trace`
-  4) `tree_leaves_with_trace`
+  4) `tree_leaves_with_typedpath`
 
 ## V0.8
 
