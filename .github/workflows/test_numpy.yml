@@ -1,4 +1,4 @@
-name: Test numpy+optree backend
+name: numpy+optree backend
 
 on:
   - push
