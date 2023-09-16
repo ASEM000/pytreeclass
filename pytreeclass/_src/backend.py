@@ -20,7 +20,18 @@ import abc
 import dataclasses as dc
 import importlib
 import os
-from typing import Any, Callable, Hashable, Iterable, Literal, Tuple, TypeVar, get_args
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from typing import (
+    Any,
+    Callable,
+    Hashable,
+    Iterable,
+    Literal,
+    Tuple,
+    TypedDict,
+    TypeVar,
+    get_args,
+)
 
 BackendsLiteral = Literal["jax", "numpy"]
 backend: BackendsLiteral = os.environ.get("PYTREECLASS_BACKEND", "jax").lower()
@@ -33,6 +44,18 @@ KeyEntry = TypeVar("KeyEntry", bound=Hashable)
 KeyPath = Tuple[KeyEntry, ...]
 KeyPathLeaf = Tuple[KeyPath, Leaf]
 T = TypeVar("T")
+
+
+class ParallelApplyKwargs(TypedDict):
+    max_workers: int | None
+    kind: Literal["thread", "process"]
+
+
+def raise_future_execption(future):
+    raise future.exception()
+
+
+pool_map = dict(thread=ThreadPoolExecutor, process=ProcessPoolExecutor)
 
 
 class BackendTreeUtil(abc.ABC):
@@ -117,12 +140,34 @@ if backend == "jax":
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
             is_path: bool = False,
+            is_parallel: bool | ParallelApplyKwargs = False,
         ) -> Any:
-            return (
-                jtu.tree_map_with_path(func, tree, *rest, is_leaf=is_leaf)
-                if is_path
-                else jtu.tree_map(func, tree, *rest, is_leaf=is_leaf)
-            )
+            if is_path:
+                keypath_leaves, treedef = jtu.tree_flatten_with_path(tree, is_leaf)
+                keypath_leaves = list(zip(*keypath_leaves))
+                flat = keypath_leaves + [treedef.flatten_up_to(r) for r in rest]
+            else:
+                leaves, treedef = jtu.tree_flatten(tree, is_leaf)
+                flat = [leaves] + [treedef.flatten_up_to(r) for r in rest]
+
+            if not is_parallel:
+                return jtu.tree_unflatten(treedef, [func(*args) for args in zip(*flat)])
+
+            is_parallel = dict() if is_parallel is True else is_parallel
+            max_workers = is_parallel.get("max_workers", None)
+            kind = is_parallel.get("kind", "thread")
+
+            with (executor := pool_map[kind](max_workers=max_workers)) as executor:
+                futures = [executor.submit(func, *args) for args in zip(*flat)]
+
+            out = [
+                future.result()
+                if future.exception() is None
+                else raise_future_execption(future)
+                for future in futures
+            ]
+
+            return jtu.tree_unflatten(treedef, out)
 
         @staticmethod
         def tree_flatten(
@@ -240,11 +285,30 @@ elif backend == "numpy":
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
             is_path: bool = False,
+            is_parallel: bool | ParallelApplyKwargs = False,
         ) -> Any:
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
-            args = [leaves] + [treedef.flatten_up_to(r) for r in rest]
-            args = (ot.treespec_paths(treedef), *args) if is_path else args
-            return ot.tree_unflatten(treedef, map(func, *args))
+            flat = [leaves] + [treedef.flatten_up_to(r) for r in rest]
+            flat = (ot.treespec_paths(treedef), *flat) if is_path else flat
+
+            if not is_parallel:
+                return ot.tree_unflatten(treedef, [func(*args) for args in zip(*flat)])
+
+            is_parallel = dict() if is_parallel is True else is_parallel
+            max_workers = is_parallel.get("max_workers", None)
+            kind = is_parallel.get("kind", "thread")
+
+            with (executor := pool_map[kind](max_workers=max_workers)) as executor:
+                futures = [executor.submit(func, *args) for args in zip(*flat)]
+
+            out = [
+                future.result()
+                if future.exception() is None
+                else raise_future_execption(future)
+                for future in futures
+            ]
+
+            return ot.tree_unflatten(treedef, out)
 
         @staticmethod
         def tree_flatten(

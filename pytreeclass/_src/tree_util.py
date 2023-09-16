@@ -29,7 +29,6 @@ T = TypeVar("T")
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")
 PyTree = Any
-# TODO: swich to EllipsisType for python 3.10
 EllipsisType = TypeVar("EllipsisType")
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
 TypeEntry = TypeVar("TypeEntry", bound=type)

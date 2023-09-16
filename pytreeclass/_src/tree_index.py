@@ -19,11 +19,9 @@ from __future__ import annotations
 import abc
 import functools as ft
 import re
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Union
 
-from typing_extensions import Literal, TypedDict
-
+from pytreeclass._src.backend import ParallelApplyKwargs
 from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.backend import numpy as np
 
@@ -293,7 +291,6 @@ def _generate_path_mask(
     match = False
 
     def map_func(path, _: Any):
-        print("here", _)
         if len(where) > len(path):
             # path is shorter than `where` path. for example
             # where=("a", "b") and the current path is ("a",) then
@@ -382,23 +379,6 @@ def _resolve_where(
         mask = tu.tree_map(_combine_bool_leaves, *all_masks)
 
     return mask
-
-
-class ParallelApplyKwargs(TypedDict):
-    max_workers: int | None
-    callback: Callable[[Any], Any]
-    kind: Literal["thread", "process"]
-
-
-def raise_future_execption(future):
-    raise future.exception()
-
-
-def identity(x):
-    return x
-
-
-_pool_map = dict(thread=ThreadPoolExecutor, process=ProcessPoolExecutor)
 
 
 class AtIndexer(NamedTuple):
@@ -559,20 +539,19 @@ class AtIndexer(NamedTuple):
         func: Callable[[Any], Any],
         *,
         is_leaf: IsLeafType = None,
-        parallel: ParallelApplyKwargs | bool = False,
+        is_parallel: ParallelApplyKwargs | bool = False,
     ):
         """Apply a function to the leaf values at the specified location.
 
         Args:
             func: the function to apply to the leaf values.
             is_leaf: a predicate function to determine if a value is a leaf.
-            parallel: accepts the following:
+            is_parallel: accepts the following:
 
                 - ``bool``: apply ``func`` in parallel if ``True`` otherwise in serial.
                 - ``dict``: a dict of of:
                     - ``max_workers``: maximum number of workers to use.
-                    - ``callback``: a function to apply to the result of ``func``.
-                    - ``kind``: kind of pool to use, either ``"thread"`` or ``"process"``.
+                    - ``kind``: kind of pool to use, either ``thread`` or ``process``.
 
         Returns:
             A pytree with the leaf values at the specified location set to
@@ -611,30 +590,13 @@ class AtIndexer(NamedTuple):
                 return np.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
 
-        if not parallel:
-            return tu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
-
-        max_workers = None if parallel is True else parallel.get("max_workers", None)
-        kind = "thread" if parallel is True else parallel.get("kind", "thread")
-        callback = identity if parallel is True else parallel.get("callback", identity)
-        executor = _pool_map[kind](max_workers=max_workers)
-
-        leaves, treedef = tu.tree_flatten(self.tree, is_leaf=is_leaf)
-        wheres, _ = tu.tree_flatten(where, is_leaf=is_leaf)
-
-        with executor as executor:
-            futures = [
-                executor.submit(leaf_apply, leaf, where)
-                for (leaf, where) in zip(leaves, wheres)
-            ]
-
-        out = [
-            callback(future.result())
-            if future.exception() is None
-            else raise_future_execption(future)
-            for future in futures
-        ]
-        return tu.tree_unflatten(treedef, out)
+        return tu.tree_map(
+            leaf_apply,
+            self.tree,
+            where,
+            is_leaf=is_leaf,
+            is_parallel=is_parallel,
+        )
 
     def scan(
         self,
