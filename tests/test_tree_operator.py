@@ -113,25 +113,29 @@ class Tree(TreeClass):
 tree = Tree(a=(10, 20, 30), b=(40, 50, 60), c=(70, 80, 90), d=(100, 110, 120))
 
 
+def where(condition, x, y):
+    return np.where(condition, x, y)
+
+
 @pytest.mark.parametrize(
     ["tree", "expected"],
     [
         [
-            bcmap(np.where)(tree > 10, 0, tree),
+            bcmap(where)(tree > 10, 0, tree),
             bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
         ],
-        # [
-        #     bcmap(np.where)(tree > 10, 0, y=tree),
-        #     bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
-        # ],
-        # [
-        #     bcmap(np.where)(tree > 10, x=0, y=tree),
-        #     bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
-        # ],
-        # [
-        #     bcmap(np.where)(condition=tree > 10, x=0, y=tree),
-        #     bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
-        # ],
+        [
+            bcmap(where)(tree > 10, 0, y=tree),
+            bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
+        ],
+        [
+            bcmap(where)(tree > 10, x=0, y=tree),
+            bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
+        ],
+        [
+            bcmap(where)(condition=tree > 10, x=0, y=tree),
+            bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
+        ],
     ],
 )
 def test_bcmap(tree, expected):

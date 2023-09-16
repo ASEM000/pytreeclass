@@ -121,48 +121,64 @@ def test_indexer_get(tree, expected, where):
 
 
 @pytest.mark.parametrize(
-    ["tree", "expected", "where"],
+    ["tree", "expected", "where", "set_value"],
     [
         # by name
-        [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", "c")],
-        [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", "c")],
-        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", "c")],
+        [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", "c"), _X],
+        [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", "c"), _X],
+        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", "c"), _X],
         # by index
-        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), (1, 0)],
-        [tree4, [1, [_X, 3], 4], (1, 0)],
-        [tree5, (1, (_X, 3), 4), (1, 0)],
-        [tree6, [1, ClassSubTree(_X, 3), 4], (1, 0)],
+        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), (1, 0), _X],
+        [tree4, [1, [_X, 3], 4], (1, 0), _X],
+        [tree5, (1, (_X, 3), 4), (1, 0), _X],
+        [tree6, [1, ClassSubTree(_X, 3), 4], (1, 0), _X],
         # mixed
-        [tree7, dict(a=1, b=[2, _X], c=4), ("b", 1)],
-        [tree8, dict(a=1, b=ClassSubTree(c=2, d=_X), e=4), ("b", 1)],
+        [tree7, dict(a=1, b=[2, _X], c=4), ("b", 1), _X],
+        [tree8, dict(a=1, b=ClassSubTree(c=2, d=_X), e=4), ("b", 1), _X],
         # by regex
-        [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", re.compile("c"))],
-        [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", re.compile("c"))],
-        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", re.compile("c"))],
+        [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", re.compile("c")), _X],
+        [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", re.compile("c")), _X],
+        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", re.compile("c")), _X],
         # by boolean mask
-        [tree9, ClassTree(1, dict(c=2, d=_X), np.array([_X, _X, _X])), (tree9 > 2,)],
-        [tree9, ClassTree(1, dict(c=2, d=3), np.array([4, _X, _X])), (tree9 > 4,)],
+        [
+            tree9,
+            ClassTree(1, dict(c=2, d=_X), np.array([_X, _X, _X])),
+            (tree9 > 2,),
+            _X,
+        ],
+        [tree9, ClassTree(1, dict(c=2, d=3), np.array([4, _X, _X])), (tree9 > 4,), _X],
         [
             tree9,
             ClassTree(_X, dict(c=_X, d=_X), np.array([_X, _X, _X])),
             (tree9 == tree9,),
+            _X,
         ],
-        [tree9, tree9, (tree9 != tree9,)],
+        [tree9, tree9, (tree9 != tree9,), _X],
         # by ellipsis
-        [tree1, dict(a=_X, b=dict(c=_X, d=_X), e=_X), (...,)],
-        [tree2, ClassTree(_X, dict(c=_X, d=_X), _X), (...,)],
-        [tree3, ClassTree(_X, ClassSubTree(_X, _X), _X), (...,)],
-        [tree4, [_X, [_X, _X], _X], (...,)],
-        [tree5, (_X, (_X, _X), _X), (...,)],
-        [tree6, [_X, ClassSubTree(_X, _X), _X], (...,)],
-        [tree7, dict(a=_X, b=[_X, _X], c=_X), (...,)],
-        [tree8, dict(a=_X, b=ClassSubTree(c=_X, d=_X), e=_X), (...,)],
-        [tree9, ClassTree(_X, dict(c=_X, d=_X), _X), (...,)],
+        [
+            tree1,
+            dict(a=_X, b=dict(c=_X, d=_X), e=_X),
+            (...,),
+            dict(a=_X, b=dict(c=_X, d=_X), e=_X),
+        ],
+        [tree2, ClassTree(_X, dict(c=_X, d=_X), _X), (...,), _X],
+        [tree3, ClassTree(_X, ClassSubTree(_X, _X), _X), (...,), _X],
+        [tree4, [_X, [_X, _X], _X], (...,), _X],
+        [tree5, (_X, (_X, _X), _X), (...,), _X],
+        [tree6, [_X, ClassSubTree(_X, _X), _X], (...,), _X],
+        [tree7, dict(a=_X, b=[_X, _X], c=_X), (...,), _X],
+        [tree8, dict(a=_X, b=ClassSubTree(c=_X, d=_X), e=_X), (...,), _X],
+        [
+            tree9,
+            ClassTree(_X, dict(c=_X, d=_X), _X),
+            (...,),
+            ClassTree(_X, dict(c=_X, d=_X), _X),  # broadcastable option
+        ],
     ],
 )
-def test_indexer_set(tree, expected, where):
+def test_indexer_set(tree, expected, where, set_value):
     indexer = AtIndexer(tree, where=where)
-    assert is_tree_equal(indexer.set(_X), expected)
+    assert is_tree_equal(indexer.set(set_value), expected)
 
 
 @pytest.mark.parametrize(
