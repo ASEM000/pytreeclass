@@ -20,8 +20,8 @@ import functools as ft
 import hashlib
 from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 
-from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.tree_pprint import tree_repr, tree_str, tree_summary
 from pytreeclass._src.tree_util import IsLeafType, is_tree_equal, tree_copy, tree_hash
 

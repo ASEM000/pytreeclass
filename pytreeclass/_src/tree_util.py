@@ -22,8 +22,8 @@ from copy import copy
 from math import ceil, floor, trunc
 from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
-from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import tree_util as tu
 
 T = TypeVar("T")
 T1 = TypeVar("T1")

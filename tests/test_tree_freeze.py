@@ -17,8 +17,8 @@ from typing import Any
 
 import pytest
 
-from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.code_build import autoinit
 from pytreeclass._src.tree_base import TreeClass
 from pytreeclass._src.tree_mask import (

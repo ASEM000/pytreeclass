@@ -37,16 +37,16 @@ BackendsLiteral = Literal["jax", "numpy"]
 backend: BackendsLiteral = os.environ.get("PYTREECLASS_BACKEND", "jax").lower()
 namespace: str = os.environ.get("PYTREECLASS_NAMESPACE", "PYTREECLASS")
 BACKENDS = get_args(BackendsLiteral)
-
 TreeDef = TypeVar("TreeDef")
 Leaf = TypeVar("Leaf", bound=Any)
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
 KeyPath = Tuple[KeyEntry, ...]
 KeyPathLeaf = Tuple[KeyPath, Leaf]
 T = TypeVar("T")
+pool_map = dict(thread=ThreadPoolExecutor, process=ProcessPoolExecutor)
 
 
-class ParallelApplyKwargs(TypedDict):
+class IsParallel(TypedDict):
     max_workers: int | None
     kind: Literal["thread", "process"]
 
@@ -55,10 +55,27 @@ def raise_future_execption(future):
     raise future.exception()
 
 
-pool_map = dict(thread=ThreadPoolExecutor, process=ProcessPoolExecutor)
+def concurrent_map(
+    func: Callable[..., Any],
+    flat: Iterable[Any],
+    is_parallel: bool | IsParallel,
+) -> Iterable[Any]:
+    is_parallel = dict() if is_parallel is True else is_parallel
+    workers = is_parallel.get("max_workers", None)
+    kind = is_parallel.get("kind", "thread")
+
+    with (executor := pool_map[kind](workers)) as executor:
+        futures = [executor.submit(func, *args) for args in zip(*flat)]
+
+    return [
+        future.result()
+        if future.exception() is None
+        else raise_future_execption(future)
+        for future in futures
+    ]
 
 
-class BackendTreeUtil(abc.ABC):
+class AbstractTreeUtil(abc.ABC):
     """The minimal interface for tree operations used by pytreeclass."""
 
     @staticmethod
@@ -69,7 +86,7 @@ class BackendTreeUtil(abc.ABC):
         *rest: Any,
         is_leaf: Callable[[Any], bool] | None = None,
         is_path: bool = False,
-        is_parallel: bool | ParallelApplyKwargs = False,
+        is_parallel: bool | IsParallel = False,
     ) -> Any:
         ...
 
@@ -81,7 +98,7 @@ class BackendTreeUtil(abc.ABC):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
         is_path: bool = False,
-    ) -> tuple[Iterable[Leaf], TreeDef]:
+    ) -> tuple[Iterable[Leaf], TreeDef] | tuple[Iterable[KeyPathLeaf], TreeDef]:
         ...
 
     @staticmethod
@@ -144,7 +161,7 @@ if backend == "jax":
         def __str__(self):
             return f".{self.name}"
 
-    class TreeUtil(BackendTreeUtil):
+    class JaxTreeUtil(AbstractTreeUtil):
         @staticmethod
         def tree_map(
             func: Callable[..., Any],
@@ -152,34 +169,17 @@ if backend == "jax":
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
             is_path: bool = False,
-            is_parallel: bool | ParallelApplyKwargs = False,
+            is_parallel: bool | IsParallel = True,
         ) -> Any:
             if is_path:
-                keypath_leaves, treedef = jtu.tree_flatten_with_path(tree, is_leaf)
-                keypath_leaves = list(zip(*keypath_leaves))
-                flat = keypath_leaves + [treedef.flatten_up_to(r) for r in rest]
+                leaves, treedef = jtu.tree_flatten_with_path(tree, is_leaf)
+                flat = list(zip(*leaves)) + [treedef.flatten_up_to(r) for r in rest]
             else:
                 leaves, treedef = jtu.tree_flatten(tree, is_leaf)
                 flat = [leaves] + [treedef.flatten_up_to(r) for r in rest]
-
             if not is_parallel:
                 return jtu.tree_unflatten(treedef, [func(*args) for args in zip(*flat)])
-
-            is_parallel = dict() if is_parallel is True else is_parallel
-            max_workers = is_parallel.get("max_workers", None)
-            kind = is_parallel.get("kind", "thread")
-
-            with (executor := pool_map[kind](max_workers=max_workers)) as executor:
-                futures = [executor.submit(func, *args) for args in zip(*flat)]
-
-            out = [
-                future.result()
-                if future.exception() is None
-                else raise_future_execption(future)
-                for future in futures
-            ]
-
-            return jtu.tree_unflatten(treedef, out)
+            return jtu.tree_unflatten(treedef, concurrent_map(func, flat, is_parallel))
 
         @staticmethod
         def tree_flatten(
@@ -249,7 +249,7 @@ if backend == "jax":
         def keystr(keys: Any) -> str:
             return jtu.keystr(keys)
 
-    tree_util = TreeUtil()
+    tree_util = JaxTreeUtil()
     numpy = jnp
 
 elif backend == "numpy":
@@ -285,7 +285,7 @@ elif backend == "numpy":
         def __str__(self) -> str:
             return f".{self.name}"
 
-    class TreeUtil(BackendTreeUtil):
+    class OpTreeTreeUtil(AbstractTreeUtil):
         @staticmethod
         def tree_map(
             func: Callable[..., Any],
@@ -293,30 +293,14 @@ elif backend == "numpy":
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
             is_path: bool = False,
-            is_parallel: bool | ParallelApplyKwargs = False,
+            is_parallel: bool | IsParallel = False,
         ) -> Any:
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
             flat = [leaves] + [treedef.flatten_up_to(r) for r in rest]
             flat = (ot.treespec_paths(treedef), *flat) if is_path else flat
-
             if not is_parallel:
                 return ot.tree_unflatten(treedef, [func(*args) for args in zip(*flat)])
-
-            is_parallel = dict() if is_parallel is True else is_parallel
-            max_workers = is_parallel.get("max_workers", None)
-            kind = is_parallel.get("kind", "thread")
-
-            with (executor := pool_map[kind](max_workers=max_workers)) as executor:
-                futures = [executor.submit(func, *args) for args in zip(*flat)]
-
-            out = [
-                future.result()
-                if future.exception() is None
-                else raise_future_execption(future)
-                for future in futures
-            ]
-
-            return ot.tree_unflatten(treedef, out)
+            return ot.tree_unflatten(treedef, concurrent_map(func, flat, is_parallel))
 
         @staticmethod
         def tree_flatten(
@@ -324,7 +308,7 @@ elif backend == "numpy":
             *,
             is_leaf: Callable[[Any], bool] | None = None,
             is_path: bool = False,
-        ) -> tuple[Iterable[Leaf], TreeDef]:
+        ) -> tuple[Iterable[Leaf], TreeDef] | tuple[Iterable[KeyPathLeaf], TreeDef]:
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
             return (
                 (list(zip(ot.treespec_paths(treedef), leaves)), treedef)
@@ -382,7 +366,7 @@ elif backend == "numpy":
         def keystr(keys: Any) -> str:
             return ".".join(str(key) for key in keys)
 
-    tree_util = TreeUtil()
+    tree_util = OpTreeTreeUtil()
     numpy = numpy
 
 else:

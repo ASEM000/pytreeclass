@@ -20,8 +20,8 @@ from typing import Any
 import numpy.testing as npt
 import pytest
 
-from pytreeclass._src.backend import TreeUtil as tu
 from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.code_build import (
     autoinit,
     build_field_map,

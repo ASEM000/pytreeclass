@@ -21,9 +21,9 @@ import functools as ft
 import re
 from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Union
 
-from pytreeclass._src.backend import ParallelApplyKwargs
-from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import IsParallel
 from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import tree_util as tu
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -538,7 +538,7 @@ class AtIndexer(NamedTuple):
         func: Callable[[Any], Any],
         *,
         is_leaf: IsLeafType = None,
-        is_parallel: ParallelApplyKwargs | bool = False,
+        is_parallel: IsParallel | bool = False,
     ):
         """Apply a function to the leaf values at the specified location.
 
