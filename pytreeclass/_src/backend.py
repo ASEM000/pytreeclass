@@ -45,16 +45,7 @@ class BackendTreeUtil(abc.ABC):
         tree: Any,
         *rest: Any,
         is_leaf: Callable[[Any], bool] | None = None,
-    ) -> Any:
-        ...
-
-    @staticmethod
-    @abc.abstractmethod
-    def tree_map_with_path(
-        func: Callable[..., Any],
-        tree: Any,
-        *rest: Any,
-        is_leaf: Callable[[Any], bool] | None = None,
+        with_path: bool = False,
     ) -> Any:
         ...
 
@@ -65,16 +56,8 @@ class BackendTreeUtil(abc.ABC):
         tree: Any,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
+        with_path: bool = False,
     ) -> tuple[Iterable[Leaf], TreeDef]:
-        ...
-
-    @staticmethod
-    @abc.abstractmethod
-    def tree_flatten_with_path(
-        tree: Any,
-        *,
-        is_leaf: Callable[[Any], bool] | None = None,
-    ) -> tuple[Iterable[KeyPathLeaf], TreeDef]:
         ...
 
     @staticmethod
@@ -133,33 +116,26 @@ if backend == "jax":
             tree: Any,
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
+            with_path: bool = False,
         ) -> Any:
-            return jtu.tree_map(func, tree, *rest, is_leaf=is_leaf)
-
-        @staticmethod
-        def tree_map_with_path(
-            func: Callable[..., Any],
-            tree: Any,
-            *rest: Any,
-            is_leaf: Callable[[Any], bool] | None = None,
-        ) -> Any:
-            return jtu.tree_map_with_path(func, tree, *rest, is_leaf=is_leaf)
+            return (
+                jtu.tree_map_with_path(func, tree, *rest, is_leaf=is_leaf)
+                if with_path
+                else jtu.tree_map(func, tree, *rest, is_leaf=is_leaf)
+            )
 
         @staticmethod
         def tree_flatten(
             tree: Any,
             *,
             is_leaf: Callable[[Any], bool] | None = None,
+            with_path: bool = False,
         ) -> tuple[Iterable[Leaf], TreeDef]:
-            return jtu.tree_flatten(tree, is_leaf=is_leaf)
-
-        @staticmethod
-        def tree_flatten_with_path(
-            tree: Any,
-            *,
-            is_leaf: Callable[[Any], bool] | None = None,
-        ) -> tuple[Iterable[KeyPathLeaf], TreeDef]:
-            return jtu.tree_flatten_with_path(tree, is_leaf=is_leaf)
+            return (
+                jtu.tree_flatten_with_path(tree, is_leaf=is_leaf)
+                if with_path
+                else jtu.tree_flatten(tree, is_leaf=is_leaf)
+            )
 
         @staticmethod
         def tree_unflatten(treedef: TreeDef, leaves: Iterable[Any]) -> Any:
@@ -263,36 +239,26 @@ elif backend == "numpy":
             tree: Any,
             *rest: Any,
             is_leaf: Callable[[Any], bool] | None = None,
-        ) -> Any:
-            return ot.tree_map(func, tree, *rest, is_leaf=is_leaf, namespace=namespace)
-
-        @staticmethod
-        def tree_map_with_path(
-            func: Callable[..., Any],
-            tree: Any,
-            *rest: Any,
-            is_leaf: Callable[[Any], bool] | None = None,
+            with_path: bool = False,
         ) -> Any:
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
-            paths = ot.treespec_paths(treedef)
-            flat_args = [leaves] + [treedef.flatten_up_to(r) for r in rest]
-            flat_results = map(func, paths, *flat_args)
-            return treedef.unflatten(flat_results)
+            args = [leaves] + [treedef.flatten_up_to(r) for r in rest]
+            args = (ot.treespec_paths(treedef), *args) if with_path else args
+            return ot.tree_unflatten(treedef, map(func, *args))
 
         @staticmethod
         def tree_flatten(
-            tree: Any, *, is_leaf: Callable[[Any], bool] | None = None
+            tree: Any,
+            *,
+            is_leaf: Callable[[Any], bool] | None = None,
+            with_path: bool = False,
         ) -> tuple[Iterable[Leaf], TreeDef]:
-            return ot.tree_flatten(tree, is_leaf=is_leaf, namespace=namespace)
-
-        @staticmethod
-        def tree_flatten_with_path(
-            tree: Any, *, is_leaf: Callable[[Any], bool] | None = None
-        ) -> tuple[Iterable[KeyPathLeaf], TreeDef]:
-            # optree returns a tuple of (leaves, paths, treedef) while jax returns
-            # a tuple of (keys_leaves, treedef)
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
-            return list(zip(ot.treespec_paths(treedef), leaves)), treedef
+            return (
+                (list(zip(ot.treespec_paths(treedef), leaves)), treedef)
+                if with_path
+                else (leaves, treedef)
+            )
 
         @staticmethod
         def tree_unflatten(treedef: TreeDef, leaves: Iterable[Any]) -> Any:

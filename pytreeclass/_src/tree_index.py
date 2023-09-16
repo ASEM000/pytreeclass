@@ -307,7 +307,7 @@ def _generate_path_mask(
         match = True
         return match
 
-    mask = tu.tree_map_with_path(map_func, tree, is_leaf=is_leaf)
+    mask = tu.tree_map(map_func, tree, is_leaf=is_leaf, with_path=True)
 
     if not match:
         raise LookupError(f"No leaf match is found for {where=}.")
