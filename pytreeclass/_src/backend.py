@@ -199,38 +199,26 @@ if backend == "jax":
 
         @staticmethod
         def register_treeclass(klass: type[T]) -> None:
-            def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
-                # unflatten rule to use with `tree_unflatten`
+            def unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
                 tree = getattr(object, "__new__")(klass)
                 vars(tree).update(zip(keys, leaves))
                 return tree
 
-            def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
-                # flatten rule to use with `tree_flatten`
+            def flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
                 dynamic = vars(tree)
                 return tuple(dynamic.values()), tuple(dynamic.keys())
 
-            def tree_flatten_with_keys(tree: T):
-                # flatten rule to use with `tree_flatten_with_path`
+            def flatten_with_keys(tree: T):
                 dynamic = dict(vars(tree))
                 for idx, key in enumerate(vars(tree)):
                     dynamic[key] = (NamedSequenceKey(idx, key), dynamic[key])
                 return tuple(dynamic.values()), tuple(dynamic.keys())
 
-            jtu.register_pytree_with_keys(
-                nodetype=klass,
-                flatten_func=tree_flatten,
-                flatten_with_keys=tree_flatten_with_keys,
-                unflatten_func=tree_unflatten,
-            )
+            jtu.register_pytree_with_keys(klass, flatten_with_keys, unflatten, flatten)
 
         @staticmethod
         def register_static(klass: type[T]) -> None:
-            jtu.register_pytree_node(
-                nodetype=klass,
-                flatten_func=lambda tree: ((), tree),
-                unflatten_func=lambda treedef, _: treedef,
-            )
+            jtu.register_pytree_node(klass, lambda x: ((), x), lambda x, _: x)
 
         @staticmethod
         def attribute_key(name: str) -> jtu.GetAttrKey:
@@ -319,33 +307,22 @@ elif backend == "numpy":
 
         @staticmethod
         def register_treeclass(klass: type[T]) -> None:
-            def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
-                # unflatten rule to use with `tree_unflatten`
+            def unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
                 tree = getattr(object, "__new__")(klass)
                 vars(tree).update(zip(keys, leaves))
                 return tree
 
-            def tree_flatten(tree: T):
+            def flatten(tree: T):
                 dynamic = dict(vars(tree))
                 keys = tuple(dynamic.keys())
                 entries = tuple(NamedSequenceKey(*ik) for ik in enumerate(keys))
                 return (tuple(dynamic.values()), keys, entries)
 
-            ot.register_pytree_node(
-                klass,
-                flatten_func=tree_flatten,
-                unflatten_func=tree_unflatten,
-                namespace=namespace,
-            )
+            ot.register_pytree_node(klass, flatten, unflatten, namespace)
 
         @staticmethod
         def register_static(klass: type[T]) -> None:
-            ot.register_pytree_node(
-                klass,
-                flatten_func=lambda tree: ((), tree),
-                unflatten_func=lambda treedef, _: treedef,
-                namespace=namespace,
-            )
+            ot.register_pytree_node(klass, lambda x: ((), x), lambda x, _: x, namespace)
 
         @staticmethod
         def attribute_key(name: str) -> GetAttrKey:
