@@ -152,7 +152,6 @@ if backend == "numpy":
 
 
 if backend == "jax":
-    # tree utils and array utils
     import jax.numpy as jnp
     import jax.tree_util as jtu
 
@@ -187,7 +186,7 @@ if backend == "jax":
             *,
             is_leaf: Callable[[Any], bool] | None = None,
             is_path: bool = False,
-        ) -> tuple[Iterable[Leaf], TreeDef]:
+        ) -> tuple[Iterable[Leaf], TreeDef] | tuple[Iterable[KeyPathLeaf], TreeDef]:
             return (
                 jtu.tree_flatten_with_path(tree, is_leaf=is_leaf)
                 if is_path
@@ -252,11 +251,9 @@ if backend == "jax":
     tree_util = JaxTreeUtil()
     numpy = jnp
 
-elif backend == "numpy":
-    # numpy backend for array utils
-    # and optree backend for tree utils
 
-    import numpy
+elif backend == "numpy":
+    import numpy as np
     import optree as ot
 
     @dc.dataclass(frozen=True)
@@ -367,7 +364,7 @@ elif backend == "numpy":
             return ".".join(str(key) for key in keys)
 
     tree_util = OpTreeTreeUtil()
-    numpy = numpy
+    numpy = np
 
 else:
     raise ImportError(f"None of the {BACKENDS=} are installed.")
