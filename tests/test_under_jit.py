@@ -13,16 +13,13 @@
 # limitations under the License.
 
 
-import os
-
 import pytest
 
+from pytreeclass._src.backend import backend
 from pytreeclass._src.backend import numpy as np
 from pytreeclass._src.code_build import autoinit
 from pytreeclass._src.tree_base import TreeClass
 from pytreeclass._src.tree_util import is_tree_equal, leafwise
-
-backend = os.environ.get("PYTREECLASS_BACKEND", "jax")
 
 
 @pytest.mark.skipif(backend != "jax", reason="jax backend is not installed")

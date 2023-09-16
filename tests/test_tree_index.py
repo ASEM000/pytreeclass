@@ -118,6 +118,7 @@ default_int = np.int32 if backend == "jax" else np.int64
 def test_indexer_get(tree, expected, where):
     indexer = AtIndexer(tree, where=where)
     assert is_tree_equal(indexer.get(), expected)
+    assert is_tree_equal(indexer.get(is_parallel=True), expected)
 
 
 @pytest.mark.parametrize(
@@ -179,6 +180,7 @@ def test_indexer_get(tree, expected, where):
 def test_indexer_set(tree, expected, where, set_value):
     indexer = AtIndexer(tree, where=where)
     assert is_tree_equal(indexer.set(set_value), expected)
+    assert is_tree_equal(indexer.set(set_value, is_parallel=True), expected)
 
 
 @pytest.mark.parametrize(

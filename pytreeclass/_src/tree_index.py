@@ -441,11 +441,22 @@ class AtIndexer(NamedTuple):
     def __getitem__(self, where: Any) -> AtIndexer:
         return type(self)(self.tree, (*self.where, where))
 
-    def get(self, *, is_leaf: IsLeafType = None) -> PyTree:
+    def get(
+        self,
+        *,
+        is_leaf: IsLeafType = None,
+        is_parallel: IsParallel | bool = False,
+    ) -> PyTree:
         """Get the leaf values at the specified location.
 
         Args:
             is_leaf: a predicate function to determine if a value is a leaf.
+            is_parallel: accepts the following:
+
+                - ``bool``: apply ``func`` in parallel if ``True`` otherwise in serial.
+                - ``dict``: a dict of of:
+                    - ``max_workers``: maximum number of workers to use.
+                    - ``kind``: kind of pool to use, either ``thread`` or ``process``.
 
         Returns:
             A _new_ pytree of leaf values at the specified location, with the
@@ -471,20 +482,33 @@ class AtIndexer(NamedTuple):
             Tree(a=1, b=None)
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
+        kwargs = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_get(leaf: Any, where: Any):
             if isinstance(where, np.ndarray) and where.ndim != 0:
                 return leaf[np.where(where)]
             return leaf if where else None
 
-        return tu.tree_map(leaf_get, self.tree, where, is_leaf=is_leaf)
+        return tu.tree_map(leaf_get, self.tree, where, **kwargs)
 
-    def set(self, set_value: Any, *, is_leaf: IsLeafType = None):
+    def set(
+        self,
+        set_value: Any,
+        *,
+        is_leaf: IsLeafType = None,
+        is_parallel: bool = False,
+    ) -> PyTree:
         """Set the leaf values at the specified location.
 
         Args:
             set_value: the value to set at the specified location.
             is_leaf: a predicate function to determine if a value is a leaf.
+            is_parallel: accepts the following:
+
+                - ``bool``: apply ``func`` in parallel if ``True`` otherwise in serial.
+                - ``dict``: a dict of of:
+                    - ``max_workers``: maximum number of workers to use.
+                    - ``kind``: kind of pool to use, either ``thread`` or ``process``.
 
         Returns:
             A pytree with the leaf values at the specified location
@@ -510,6 +534,7 @@ class AtIndexer(NamedTuple):
             Tree(a=100, b=2)
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
+        kwargs = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_set(leaf: Any, where: Any, set_value: Any):
             if isinstance(where, np.ndarray):
@@ -525,12 +550,12 @@ class AtIndexer(NamedTuple):
             # to tree2 leaves if tree2 is a pytree of same structure as tree
             # instead of making each leaf of tree a copy of tree2
             # is design is similar to ``numpy`` design `np.at[...].set(Array)`
-            return tu.tree_map(leaf_set, self.tree, where, set_value, is_leaf=is_leaf)
+            return tu.tree_map(leaf_set, self.tree, where, set_value, **kwargs)
 
         # set_value is broadcasted to tree leaves
         # for example tree.at[where].set(1) will set all tree leaves to 1
         partial_leaf_set = lambda leaf, where: leaf_set(leaf, where, set_value)
-        return tu.tree_map(partial_leaf_set, self.tree, where, is_leaf=is_leaf)
+        return tu.tree_map(partial_leaf_set, self.tree, where, **kwargs)
 
     def apply(
         self,
@@ -538,7 +563,7 @@ class AtIndexer(NamedTuple):
         *,
         is_leaf: IsLeafType = None,
         is_parallel: IsParallel | bool = False,
-    ):
+    ) -> PyTree:
         """Apply a function to the leaf values at the specified location.
 
         Args:
@@ -582,19 +607,14 @@ class AtIndexer(NamedTuple):
             >>> images = indexer[...].apply(imread, parallel=dict(max_workers=2))  # doctest: +SKIP
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
+        kwargs = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_apply(leaf: Any, where: bool):
             if isinstance(where, np.ndarray):
                 return np.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
 
-        return tu.tree_map(
-            leaf_apply,
-            self.tree,
-            where,
-            is_leaf=is_leaf,
-            is_parallel=is_parallel,
-        )
+        return tu.tree_map(leaf_apply, self.tree, where, **kwargs)
 
     def scan(
         self,

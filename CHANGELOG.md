@@ -7,6 +7,7 @@
   - `jax` via `export PYTREECLASS_BACKEND=jax` - The default -
 
 - drop `callback` option in parallel options in `is_parallel`
+- Add parallel processing via `is_parallel` to `.{get,set}`
 
 
 ## v0.9.2
@@ -29,7 +30,7 @@ import pytreeclass as tc
 from matplotlib.pyplot import imread
 paths = ["lenna.png"] * 10
 indexer = tc.AtIndexer(paths)
-%timeit indexer[...].apply(imread,parallel=True)  # parallel
+%timeit indexer[...].apply(imread,is_parallel=True)  # parallel
 # 24.9 ms ± 938 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 %timeit indexer[...].apply(imread)  # not parallel
 # # 84.8 ms ± 453 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
@@ -43,7 +44,10 @@ indexer = tc.AtIndexer(paths)
   1) `tree_repr_with_trace`
   2) `tree_map_with_trace`
   3) `tree_flatten_with_trace`
-  4) `tree_leaves_with_typed_path`
+  4) `tree_leaves_with_trace`
+
+    A variant of these will be included in the common recipes.
+
 
 ## V0.8
 
