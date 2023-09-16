@@ -28,14 +28,14 @@ from typing import Any, Callable, Literal, NamedTuple, Sequence
 
 from typing_extensions import TypeAlias, TypedDict, Unpack
 
-from pytreeclass._src.backend import Backend as backend
-from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.tree_util import (
     IsLeafType,
     Node,
     construct_tree,
-    is_trace_leaf_depth_factory,
-    tree_leaves_with_trace,
+    is_path_leaf_depth_factory,
+    tree_leaves_with_typedpath,
 )
 
 
@@ -129,15 +129,15 @@ def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     return dtype + shape
 
 
-@pp_dispatcher.register(backend.ndarray)
-def numpy_pp(node: backend.ndarray, **spec: Unpack[PPSpec]) -> str:
+@pp_dispatcher.register(np.ndarray)
+def numpy_pp(node: np.ndarray, **spec: Unpack[PPSpec]) -> str:
     """Replace ndarray repr with short hand notation for type and shape."""
     if spec["kind"] == "STR":
         return general_pp(node, **spec)
 
     base = shape_dtype_pp(node, **spec)
 
-    if not issubclass(node.dtype.type, (backend.numpy.integer, backend.numpy.floating)):
+    if not issubclass(node.dtype.type, (np.integer, np.floating)):
         return base
     if node.size == 0:
         return base
@@ -148,17 +148,17 @@ def numpy_pp(node: backend.ndarray, **spec: Unpack[PPSpec]) -> str:
 
     with suppress(Exception):
         # maybe the array is a jax tracers
-        low, high = backend.numpy.min(node), backend.numpy.max(node)
+        low, high = np.min(node), np.max(node)
         interval = "(" if math.isinf(low) else "["
         interval += (
             f"{low},{high}"
-            if issubclass(node.dtype.type, backend.numpy.integer)
+            if issubclass(node.dtype.type, np.integer)
             else f"{low:.2f},{high:.2f}"
         )
         interval += ")" if math.isinf(high) else "]"
         interval = interval.replace("inf", "∞")
 
-        mean, std = f"{backend.numpy.mean(node):.2f}", f"{backend.numpy.std(node):.2f}"
+        mean, std = f"{np.mean(node):.2f}", f"{np.std(node):.2f}"
         return f"{base}(μ={mean}, σ={std}, ∈{interval})"
 
     return base
@@ -366,7 +366,7 @@ def tree_diagram(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf_depth_factory(depth),
+        is_path_leaf=is_path_leaf_depth_factory(depth),
     )
     text = step(root, is_last=len(root.children) == 1)
     return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
@@ -426,7 +426,7 @@ def tree_mermaid(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf_depth_factory(depth),
+        is_path_leaf=is_path_leaf_depth_factory(depth),
     )
     text = "flowchart LR\n" + step(root)
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
@@ -502,7 +502,7 @@ def tree_graph(
     root = construct_tree(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf_depth_factory(depth),
+        is_path_leaf=is_path_leaf_depth_factory(depth),
     )
     text = "digraph G {\n" + step(root) + "}"
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
@@ -649,10 +649,10 @@ def tree_summary(
     rows = [["Name", "Type", "Count", "Size"]]
     tcount = tsize = 0
 
-    traces_leaves = tree_leaves_with_trace(
+    traces_leaves = tree_leaves_with_typedpath(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf_depth_factory(depth),
+        is_path_leaf=is_path_leaf_depth_factory(depth),
     )
 
     for trace, leaf in traces_leaves:
@@ -687,7 +687,7 @@ tree_summary.type_dispatcher = ft.singledispatch(lambda x: type(x).__name__)
 tree_summary.def_type = tree_summary.type_dispatcher.register
 
 
-@tree_summary.def_type(backend.ndarray)
+@tree_summary.def_type(np.ndarray)
 def tree_summary_array(node: Any) -> str:
     """Return the type repr of the node."""
     shape_dype = node.shape, node.dtype
@@ -695,13 +695,13 @@ def tree_summary_array(node: Any) -> str:
     return pp(ShapeDtypePP(*shape_dype), **spec)
 
 
-@tree_summary.def_count(backend.ndarray)
-def tree_summary_array_count(node: backend.ndarray) -> int:
+@tree_summary.def_count(np.ndarray)
+def tree_summary_array_count(node: np.ndarray) -> int:
     return node.size
 
 
-@tree_summary.def_size(backend.ndarray)
-def tree_summary_array_size(node: backend.ndarray) -> int:
+@tree_summary.def_size(np.ndarray)
+def tree_summary_array_size(node: np.ndarray) -> int:
     return node.nbytes
 
 
@@ -709,14 +709,16 @@ def tree_size(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.size_dispatcher(node)
 
-    return tu.tree_reduce(reduce_func, tree, initializer=0)
+    leaves, _ = tu.tree_flatten(tree)
+    return ft.reduce(reduce_func, leaves, 0)
 
 
 def tree_count(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.count_dispatcher(node)
 
-    return tu.tree_reduce(reduce_func, tree, initializer=0)
+    leaves, _ = tu.tree_flatten(tree)
+    return ft.reduce(reduce_func, leaves, 0)
 
 
 if importlib.util.find_spec("jax"):

@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import functools as ft
 import sys
 from collections import defaultdict
 from collections.abc import Callable, MutableMapping, MutableSequence, MutableSet
@@ -302,7 +301,6 @@ def field(
     )
 
 
-@ft.lru_cache(maxsize=128)
 def build_field_map(klass: type) -> MappingProxyType[str, Field]:
     field_map: dict[str, Field] = dict()
 
@@ -412,9 +410,8 @@ def build_init_method(klass: type[T]) -> type[T]:
     code += f"\n\t\t{';'.join(body)}"
     code += f"\n\t__init__.__qualname__ = '{klass.__qualname__}.__init__'"
     code += "\n\treturn __init__"
-
-    exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
-    setattr(init := namespace["closure"](field_map), "__annotations__", hints)
+    exec(code, vars(sys.modules[klass.__module__]), ns := dict())
+    setattr(init := ns["closure"](field_map), "__annotations__", hints)
     setattr(klass, "__init__", init)
     return klass
 

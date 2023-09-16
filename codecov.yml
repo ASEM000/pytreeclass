@@ -13,3 +13,5 @@ coverage:
     patch:
       default:
         target: 0%
+ignore:
+  - "pytreeclass/_src/backend.py"

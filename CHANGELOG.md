@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.10.0
+
+- Supports multibackend:
+  - `numpy` + `optree` via `export PYTREECLASS_BACKEND=numpy` (lightweight option)
+  - `jax` via `export PYTREECLASS_BACKEND=jax` - The default -
+
+- drop `callback` option in parallel options in `is_parallel`
+
+
 ## v0.9.2
 
 ## Changes:
@@ -34,7 +43,7 @@ indexer = tc.AtIndexer(paths)
   1) `tree_repr_with_trace`
   2) `tree_map_with_trace`
   3) `tree_flatten_with_trace`
-  4) `tree_leaves_with_trace`
+  4) `tree_leaves_with_typedpath`
 
 ## V0.8
 

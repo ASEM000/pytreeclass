@@ -18,13 +18,15 @@ import dataclasses as dc
 import re
 from collections import namedtuple
 
-# import jax
 import pytest
-from jax import numpy as jnp
 
-import pytreeclass as tc
-from pytreeclass import (
-    TreeClass,
+from pytreeclass._src.backend import backend
+from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.code_build import autoinit, field
+from pytreeclass._src.tree_base import TreeClass
+from pytreeclass._src.tree_pprint import (
+    _table,
+    func_pp,
     tree_diagram,
     tree_graph,
     tree_mermaid,
@@ -32,11 +34,33 @@ from pytreeclass import (
     tree_str,
     tree_summary,
 )
+from pytreeclass._src.tree_util import leafwise
 
 
-@tc.leafwise
-@tc.autoinit
+def test_table():
+    col1 = ["1\n", "3"]
+    col2 = ["2", "4000"]
+    assert (
+        _table([col1, col2])
+        == "┌─┬────┐\n│1│3   │\n│ │    │\n├─┼────┤\n│2│4000│\n└─┴────┘"
+    )
+
+
+def test_func_pp():
+    def example(a: int, b=1, *c, d, e=2, **f) -> str:
+        ...  # fmt: skip
+
+    assert (
+        func_pp(example, indent=0, kind="str", width=60, depth=0, seen=set())
+        == "example(a, b, *c, d, e, **f)"
+    )
+
+
+@leafwise
+@autoinit
 class Repr1(TreeClass):
+    """A simple tree class for repr testing."""
+
     a: int = 1
     b: str = "string"
     c: float = 1.0
@@ -44,28 +68,29 @@ class Repr1(TreeClass):
     e: list = None
     f: set = None
     g: dict = None
-    h: jnp.ndarray = None
-    i: jnp.ndarray = None
-    j: jnp.ndarray = None
-    k: tuple = tc.field(repr=False, default=(1, 2, 3))
+    h: np.ndarray = None
+    i: np.ndarray = None
+    j: np.ndarray = None
+    k: tuple = field(repr=False, default=(1, 2, 3))
     l: tuple = namedtuple("a", ["b", "c"])(1, 2)
-    m: jnp.array = jnp.ones((5, 5))
-    n: jnp.array = jnp.array(True)
-    o: jnp.array = jnp.array([1, 2.0], dtype=jnp.complex64)
+    m: np.array = np.ones((5, 5), dtype=np.float32)
+    n: np.array = np.array(True)
+    o: np.array = np.array([1, 2.0], dtype=np.complex64)
 
     def __post_init__(self):
-        self.h = jnp.ones((5, 1))
-        self.i = jnp.ones((1, 6))
-        self.j = jnp.ones((1, 1, 4, 5))
+        self.h = np.ones((5, 1), dtype=np.float32)
+        self.i = np.ones((1, 6), dtype=np.float32)
+        self.j = np.ones((1, 1, 4, 5), dtype=np.float32)
 
         self.e = [10] * 5
         self.f = {1, 2, 3}
-        self.g = {"a": "a" * 50, "b": "b" * 50, "c": jnp.ones([5, 5])}
+        self.g = {"a": "a" * 50, "b": "b" * 50, "c": np.ones([5, 5], dtype=np.float32)}
 
 
 r1 = Repr1()
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_repr():
     assert (
         tree_repr(r1)
@@ -82,6 +107,7 @@ def test_repr():
     assert tree_repr(r1, depth=0) == "Repr1(...)"
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_str():
     assert (
         tree_str(r1)
@@ -96,6 +122,7 @@ def test_str():
     )
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_tree_summary():
     assert (
         tree_summary(r1, depth=0)
@@ -117,6 +144,7 @@ def test_tree_summary():
     )
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_tree_diagram():
     assert tree_diagram(r1, depth=0) == "Repr1(...)"
 
@@ -126,6 +154,7 @@ def test_tree_diagram():
     assert tree_diagram(r1, depth=1) == out
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_tree_mermaid():
     assert (
         re.sub(r"id\d*", "***", tree_mermaid(r1, depth=1))
@@ -139,6 +168,7 @@ def test_tree_mermaid():
     )
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_misc():
     x = (1, 2, 3)
     assert tree_repr(x) == tree_str(x) == "(1, 2, 3)"
@@ -155,7 +185,7 @@ def test_misc():
     # )
 
     assert (
-        tree_repr(jnp.ones([1, 2], dtype=jnp.uint16))
+        tree_repr(np.ones([1, 2], dtype=np.uint16))
         == "ui16[1,2](μ=1.00, σ=0.00, ∈[1,1])"
     )
 
@@ -163,22 +193,23 @@ def test_misc():
     class Test:
         a: int = 1
 
-    assert tc.tree_repr(Test()) == tc.tree_str(Test()) == "Test(a=1)"
-    assert tc.tree_repr(Test(), depth=0) == "Test(...)"
+    assert tree_repr(Test()) == tree_str(Test()) == "Test(a=1)"
+    assert tree_repr(Test(), depth=0) == "Test(...)"
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_extra_tree_diagram():
-    @tc.autoinit
+    @autoinit
     class L0(TreeClass):
         a: int = 1
         b: int = 2
 
-    @tc.autoinit
+    @autoinit
     class L1(TreeClass):
         c: L0 = L0()
         d: int = 3
 
-    @tc.autoinit
+    @autoinit
     class L2(TreeClass):
         e: int = 4
         f: L1 = L1()
@@ -191,11 +222,11 @@ def test_extra_tree_diagram():
 
     assert (tree_diagram(tree)) == out
 
-    @tc.autoinit
+    @autoinit
     class L0(TreeClass):
         a: int = 1
 
-    @tc.autoinit
+    @autoinit
     class L1(TreeClass):
         b: L0 = L0()
 
@@ -204,6 +235,7 @@ def test_extra_tree_diagram():
     assert tree_diagram(tree) == "L1\n└── .b:L0\n    └── .a=1"
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_invalid_depth():
     with pytest.raises(TypeError):
         tree_diagram(1, depth="a")
@@ -213,6 +245,7 @@ def test_invalid_depth():
         tree_mermaid(1, depth="a")
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax is not installed")
 def test_tree_graph():
     assert (
         re.sub(r"\b\d{10,}", "***", tree_graph(r1))

@@ -20,8 +20,8 @@ import functools as ft
 import hashlib
 from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 
-from pytreeclass._src.backend import Backend as backend
 from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import numpy as np
 from pytreeclass._src.tree_pprint import tree_repr, tree_str, tree_summary
 from pytreeclass._src.tree_util import IsLeafType, is_tree_equal, tree_copy, tree_hash
 
@@ -70,12 +70,8 @@ class _FrozenBase(Generic[T]):
     def __init_subclass__(klass, **k) -> None:
         # register subclass as an empty pytree node
         super().__init_subclass__(**k)
-
-        tu.register_pytree_node(
-            nodetype=klass,
-            flatten_func=lambda tree: ((), tree),
-            unflatten_func=lambda treedef, _: treedef,
-        )
+        # register with the proper backend
+        tu.register_static(klass)
 
     # raise helpful error message when trying to interact with frozen object
     __add__ = __radd__ = __iadd__ = _FrozenError("+")
@@ -104,7 +100,7 @@ class _FrozenHashable(_FrozenBase):
     def __hash__(self) -> int:
         return tree_hash(self.__wrapped__)
 
-    def __eq__(self, rhs: Any) -> bool | backend.ndarray:
+    def __eq__(self, rhs: Any) -> bool | np.ndarray:
         if not isinstance(rhs, _FrozenHashable):
             return False
         return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
@@ -112,7 +108,7 @@ class _FrozenHashable(_FrozenBase):
 
 class _FrozenArray(_FrozenBase):
     def __hash__(self) -> int:
-        bytes = backend.numpy.array(self.__wrapped__).tobytes()
+        bytes = np.array(self.__wrapped__).tobytes()
         return int(hashlib.sha256(bytes).hexdigest(), 16)
 
     def __eq__(self, other) -> bool:
@@ -124,7 +120,7 @@ class _FrozenArray(_FrozenBase):
             return False
         if lhs.dtype != rhs.dtype:
             return False
-        return backend.numpy.all(lhs == rhs)
+        return np.all(lhs == rhs)
 
 
 def freeze(value: T) -> _FrozenBase[T]:
@@ -162,7 +158,7 @@ freeze.type_dispatcher = ft.singledispatch(lambda x: _FrozenHashable(x))
 freeze.def_type = freeze.type_dispatcher.register
 
 
-@freeze.def_type(backend.ndarray)
+@freeze.def_type(np.ndarray)
 def _(value: T) -> _FrozenArray[T]:
     return _FrozenArray(value)
 
@@ -246,10 +242,10 @@ is_nondiff.type_dispatcher = ft.singledispatch(lambda x: True)
 is_nondiff.def_type = is_nondiff.type_dispatcher.register
 
 
-@is_nondiff.def_type(backend.ndarray)
-def _(value: backend.ndarray) -> bool:
+@is_nondiff.def_type(np.ndarray)
+def _(value: np.ndarray) -> bool:
     # return True if the node is non-inexact type, otherwise False
-    if backend.numpy.issubdtype(value.dtype, backend.numpy.inexact):
+    if np.issubdtype(value.dtype, np.inexact):
         return False
     return True
 
@@ -268,8 +264,8 @@ def _tree_mask_map(
     is_leaf: IsLeafType = None,
 ):
     # apply func to leaves satisfying mask pytree/condtion
-    lhsdef = tu.tree_structure(tree, is_leaf=is_leaf)
-    rhsdef = tu.tree_structure(mask, is_leaf)
+    _, lhsdef = tu.tree_flatten(tree, is_leaf=is_leaf)
+    _, rhsdef = tu.tree_flatten(mask, is_leaf=is_leaf)
 
     if (lhsdef == rhsdef) and (type(mask) is type(tree)):
         return tu.tree_map(

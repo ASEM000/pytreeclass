@@ -21,8 +21,8 @@ from typing import Any, Hashable, TypeVar
 
 from typing_extensions import Unpack
 
-from pytreeclass._src.backend import Backend as backend
-from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.code_build import fields
 from pytreeclass._src.tree_index import AtIndexer
 from pytreeclass._src.tree_pprint import (
@@ -215,31 +215,8 @@ class TreeClass(metaclass=TreeClassMeta):
             raise TypeError(f"Reserved methods: `__delattr__` defined in `{klass}`.")
 
         super().__init_subclass__(**k)
-
-        def tree_unflatten(keys: tuple[str, ...], leaves: tuple[Any, ...]) -> T:
-            # unflatten rule to use with `tree_unflatten`
-            vars(tree := getattr(object, "__new__")(klass)).update(zip(keys, leaves))
-            return tree
-
-        def tree_flatten(tree: T) -> tuple[tuple[Any, ...], tuple[str, ...]]:
-            # flatten rule to use with `tree_flatten`
-            dynamic = vars(tree)
-            return tuple(dynamic.values()), tuple(dynamic.keys())
-
-        def tree_flatten_with_keys(tree: T):
-            # flatten rule to use with `tree_util.tree_flatten_with_path`
-            dynamic = dict(vars(tree))
-            for idx, key in enumerate(vars(tree)):
-                entry = tu.NamedSequenceKey(idx, key)
-                dynamic[key] = (entry, dynamic[key])
-            return tuple(dynamic.values()), tuple(dynamic.keys())
-
-        tu.register_pytree_with_keys(
-            nodetype=klass,
-            flatten_func=tree_flatten,
-            flatten_with_keys=tree_flatten_with_keys,
-            unflatten_func=tree_unflatten,
-        )
+        # register with the proper backend
+        tu.register_treeclass(klass)
 
     def __setattr__(self, key: str, value: Any) -> None:
         if id(self) not in _mutable_instance_registry:
@@ -337,7 +314,7 @@ class TreeClass(metaclass=TreeClassMeta):
     def __hash__(self) -> int:
         return tree_hash(self)
 
-    def __eq__(self, other: Any) -> bool | backend.ndarray:
+    def __eq__(self, other: Any) -> bool | np.ndarray:
         return is_tree_equal(self, other)
 
 

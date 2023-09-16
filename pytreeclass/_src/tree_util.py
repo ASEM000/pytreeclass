@@ -22,21 +22,20 @@ from copy import copy
 from math import ceil, floor, trunc
 from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
-from pytreeclass._src.backend import Backend as backend
 from pytreeclass._src.backend import TreeUtil as tu
+from pytreeclass._src.backend import numpy as np
 
 T = TypeVar("T")
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")
 PyTree = Any
-# TODO: swich to EllipsisType for python 3.10
 EllipsisType = TypeVar("EllipsisType")
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
 TypeEntry = TypeVar("TypeEntry", bound=type)
 TraceEntry = Tuple[KeyEntry, TypeEntry]
 KeyPath = Tuple[KeyEntry, ...]
 TypePath = Tuple[TypeEntry, ...]
-TraceType = Tuple[KeyPath, TypePath]
+KeyTypePath = Tuple[KeyPath, TypePath]
 IsLeafType = Union[None, Callable[[Any], bool]]
 
 
@@ -50,22 +49,26 @@ def tree_copy(tree: T) -> T:
     return tu.tree_map(lambda x: copy(x), tree)
 
 
-def _is_leaf_rhs_equal(leaf, rhs) -> bool | backend.ndarray:
-    if hasattr(leaf, "shape") and hasattr(leaf, "dtype"):
-        if hasattr(rhs, "shape") and hasattr(rhs, "dtype"):
+def has_shape_dtype(node: Any) -> bool:
+    return hasattr(node, "shape") and hasattr(node, "dtype")
+
+
+def _is_leaf_rhs_equal(leaf, rhs) -> bool | np.ndarray:
+    if has_shape_dtype(leaf):
+        if has_shape_dtype(rhs):
             if leaf.shape != rhs.shape:
                 return False
             if leaf.dtype != rhs.dtype:
                 return False
             try:
-                return bool(verdict := backend.numpy.all(leaf == rhs))
+                return bool(verdict := np.all(leaf == rhs))
             except Exception:
                 return verdict  # fail under `jit`
         return False
     return leaf == rhs
 
 
-def is_tree_equal(*trees: Any) -> bool | backend.ndarray:
+def is_tree_equal(*trees: Any) -> bool | np.ndarray:
     """Return ``True`` if all pytrees are equal.
 
     Note:
@@ -140,11 +143,7 @@ class Partial:
         return is_tree_equal(self, other)
 
 
-tu.register_pytree_node(
-    nodetype=Partial,
-    flatten_func=lambda x: ((x.func, x.args, x.kwargs), None),
-    unflatten_func=lambda _, xs: Partial(*xs),
-)
+tu.register_static(Partial)
 
 
 def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
@@ -207,7 +206,8 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
             leaves_keys = []
 
             for arg in args[1:]:
-                if treedef0 == tu.tree_structure(arg):
+                _, argdef = tu.tree_flatten(arg)
+                if treedef0 == argdef:
                     masked_args += [...]
                     leaves += [treedef0.flatten_up_to(arg)]
                 else:
@@ -223,7 +223,8 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
             leaves_keys = [key0]
 
         for key in kwargs:
-            if treedef0 == tu.tree_structure(kwargs[key]):
+            _, kwargdef = tu.tree_flatten(kwargs[key])
+            if treedef0 == kwargdef:
                 masked_kwargs[key] = ...
                 leaves += [treedef0.flatten_up_to(kwargs[key])]
                 leaves_keys += [key]
@@ -391,50 +392,47 @@ def leafwise(klass: type[T]) -> type[T]:
     return klass
 
 
-atomicdef = tu.tree_structure(1)
+_, atomicdef = tu.tree_flatten(1)
 
 
-def flatten_one_trace_level(
-    trace: TraceType,
+def flatten_one_typedpath_level(
+    typedpath: KeyTypePath,
     tree: PyTree,
     is_leaf: IsLeafType,
-    is_trace_leaf: Callable[[TraceType], bool] | None,
+    is_path_leaf: Callable[[KeyTypePath], bool] | None,
 ):
     # predicate and type path
-    if (is_leaf and is_leaf(tree)) or (is_trace_leaf and is_trace_leaf(trace)):
+    if (is_leaf and is_leaf(tree)) or (is_path_leaf and is_path_leaf(typedpath)):
         # is_leaf is a predicate function that determines whether a value
-        # is a leaf is_trace_leaf is a predicate function that determines
-        # whether a trace is a leaf
-        yield trace, tree
+        # is a leaf is_path_leaf is a predicate function that determines
+        # whether a path is a leaf
+        yield typedpath, tree
         return
 
-    key_leaf_pairs, treedef = tu.tree_flatten_with_path(
+    path_leaf_pair, treedef = tu.tree_flatten(
         tree,
-        # flatten one level
         is_leaf=lambda node: False if (id(node) == id(tree)) else True,
+        is_path=True,
     )
 
     if treedef == atomicdef:
-        yield trace, tree
+        yield typedpath, tree
         return
 
-    for key, value in key_leaf_pairs:
-        yield from flatten_one_trace_level(
-            ((*trace[0], *key), (*trace[1], type(value))),
-            value,
-            is_leaf,
-            is_trace_leaf,
-        )
+    for key, value in path_leaf_pair:
+        keys, types = typedpath
+        path = ((*keys, *key), (*types, type(value)))
+        yield from flatten_one_typedpath_level(path, value, is_leaf, is_path_leaf)
 
 
-def tree_leaves_with_trace(
+def tree_leaves_with_typedpath(
     tree: PyTree,
     *,
     is_leaf: IsLeafType = None,
-    is_trace_leaf: Callable[[TraceType], bool] | None = None,
-) -> Sequence[tuple[TraceType, Any]]:
+    is_path_leaf: Callable[[KeyTypePath], bool] | None = None,
+) -> Sequence[tuple[KeyTypePath, Any]]:
     # mainly used for visualization
-    return list(flatten_one_trace_level(((), ()), tree, is_leaf, is_trace_leaf))
+    return list(flatten_one_typedpath_level(((), ()), tree, is_leaf, is_path_leaf))
 
 
 class Node:
@@ -472,29 +470,29 @@ class Node:
         return key in self.children
 
 
-def is_trace_leaf_depth_factory(depth: int | float):
-    # generate `is_trace_leaf` function to stop tracing at a certain `depth`
+def is_path_leaf_depth_factory(depth: int | float):
+    # generate `is_path_leaf` function to stop tracing at a certain `depth`
     # in essence, depth is the length of the trace entry
-    def is_trace_leaf(trace) -> bool:
+    def is_path_leaf(trace) -> bool:
         keys, _ = trace
         # stop tracing if depth is reached
         return False if depth is None else (depth <= len(keys))
 
-    return is_trace_leaf
+    return is_path_leaf
 
 
 def construct_tree(
     tree: PyTree,
     is_leaf: IsLeafType = None,
-    is_trace_leaf: IsLeafType = None,
+    is_path_leaf: IsLeafType = None,
 ) -> Node:
-    # construct a tree with `Node` objects using `tree_leaves_with_trace`
+    # construct a tree with `Node` objects using `tree_leaves_with_typedpath`
     # to establish parent-child relationship between nodes
 
-    traces_leaves = tree_leaves_with_trace(
+    traces_leaves = tree_leaves_with_typedpath(
         tree,
         is_leaf=is_leaf,
-        is_trace_leaf=is_trace_leaf,
+        is_path_leaf=is_path_leaf,
     )
 
     ti = (None, type(tree))

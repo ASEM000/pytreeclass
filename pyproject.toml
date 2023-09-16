@@ -28,6 +28,7 @@ classifiers=[
 
 [project.optional-dependencies]
 jax = ["jax>=0.4.7"]
+numpy = ["numpy", "optree"]
 
 [tool.setuptools.dynamic]
 version = {attr = "pytreeclass.__version__" }
@@ -50,6 +51,7 @@ ignore = [
     "D103",  # Missing docstring in public function
     "D411",
     "N813",
+    "D105",
 ]
 
 [tool.ruff.pydocstyle]

@@ -13,27 +13,36 @@
 # limitations under the License.
 
 
-import jax
-from jax import numpy as jnp
+import os
 
-import pytreeclass as tc
+import pytest
+
+from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.code_build import autoinit
+from pytreeclass._src.tree_base import TreeClass
+from pytreeclass._src.tree_util import is_tree_equal, leafwise
+
+backend = os.environ.get("PYTREECLASS_BACKEND", "jax")
 
 
+@pytest.mark.skipif(backend != "jax", reason="jax backend is not installed")
 def test_ops_with_jit():
-    @tc.autoinit
-    @tc.leafwise
-    class T0(tc.TreeClass):
-        a: jax.Array = jnp.array(1)
-        b: jax.Array = jnp.array(2)
-        c: jax.Array = jnp.array(3)
+    import jax
 
-    @tc.autoinit
-    @tc.leafwise
-    class T1(tc.TreeClass):
-        a: jax.Array = jnp.array(1)
-        b: jax.Array = jnp.array(2)
-        c: jax.Array = jnp.array(3)
-        d: jax.Array = jnp.array([1, 2, 3])
+    @autoinit
+    @leafwise
+    class T0(TreeClass):
+        a: jax.Array = np.array(1)
+        b: jax.Array = np.array(2)
+        c: jax.Array = np.array(3)
+
+    @autoinit
+    @leafwise
+    class T1(TreeClass):
+        a: jax.Array = np.array(1)
+        b: jax.Array = np.array(2)
+        c: jax.Array = np.array(3)
+        d: jax.Array = np.array([1, 2, 3])
 
     @jax.jit
     def getter(tree):
@@ -47,18 +56,10 @@ def test_ops_with_jit():
     def applier(tree):
         return tree.at[...].apply(lambda _: 0)
 
-    # with pytest.raises(jax.errors.ConcretizationTypeError):
-    tc.is_tree_equal(getter(T0()), T0())
-
-    assert tc.is_tree_equal(T0(0, 0, 0), setter(T0()))
-
-    assert tc.is_tree_equal(T0(0, 0, 0), applier(T0()))
-
-    # with pytest.raises(jax.errors.ConcretizationTypeError):
-    tc.is_tree_equal(getter(T1()), T1())
-
-    assert tc.is_tree_equal(T1(0, 0, 0, 0), setter(T1()))
-
-    assert tc.is_tree_equal(T1(0, 0, 0, 0), applier(T1()))
-
-    assert jax.jit(tc.is_tree_equal)(T1(0, 0, 0, 0), applier(T1()))
+    assert is_tree_equal(getter(T0()), T0())
+    assert is_tree_equal(T0(0, 0, 0), setter(T0()))
+    assert is_tree_equal(T0(0, 0, 0), applier(T0()))
+    assert is_tree_equal(getter(T1()), T1())
+    assert is_tree_equal(T1(0, 0, 0, 0), setter(T1()))
+    assert is_tree_equal(T1(0, 0, 0, 0), applier(T1()))
+    assert jax.jit(is_tree_equal)(T1(0, 0, 0, 0), applier(T1()))
