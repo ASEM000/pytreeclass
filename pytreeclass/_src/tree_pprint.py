@@ -363,11 +363,8 @@ def tree_diagram(
             )
         return text
 
-    root = construct_tree(
-        tree,
-        is_leaf=is_leaf,
-        is_path_leaf=is_path_leaf_depth_factory(depth),
-    )
+    is_path_leaf = is_path_leaf_depth_factory(depth)
+    root = construct_tree(tree, is_leaf=is_leaf, is_path_leaf=is_path_leaf)
     text = step(root, is_last=len(root.children) == 1)
     return (text if tabwidth is None else text.expandtabs(tabwidth)).rstrip()
 
@@ -423,11 +420,8 @@ def tree_mermaid(
             text += step(child, depth=depth + 1)
         return text
 
-    root = construct_tree(
-        tree,
-        is_leaf=is_leaf,
-        is_path_leaf=is_path_leaf_depth_factory(depth),
-    )
+    is_path_leaf = is_path_leaf_depth_factory(depth)
+    root = construct_tree(tree, is_leaf=is_leaf, is_path_leaf=is_path_leaf)
     text = "flowchart LR\n" + step(root)
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
 
@@ -499,11 +493,8 @@ def tree_graph(
             text += step(child, depth=depth + 1)
         return text
 
-    root = construct_tree(
-        tree,
-        is_leaf=is_leaf,
-        is_path_leaf=is_path_leaf_depth_factory(depth),
-    )
+    is_path_leaf = is_path_leaf_depth_factory(depth)
+    root = construct_tree(tree, is_leaf=is_leaf, is_path_leaf=is_path_leaf)
     text = "digraph G {\n" + step(root) + "}"
     return (text.expandtabs(tabwidth) if tabwidth is not None else text).rstrip()
 

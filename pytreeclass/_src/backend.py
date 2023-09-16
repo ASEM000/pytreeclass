@@ -30,6 +30,7 @@ from typing import (
     Tuple,
     TypedDict,
     TypeVar,
+    Union,
     get_args,
 )
 
@@ -42,6 +43,9 @@ Leaf = TypeVar("Leaf", bound=Any)
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
 KeyPath = Tuple[KeyEntry, ...]
 KeyPathLeaf = Tuple[KeyPath, Leaf]
+IsLeaf = Union[Callable[[Any], bool], None]
+FlattenOut = Tuple[Iterable[Leaf], TreeDef]
+PathFlattenOut = Tuple[Iterable[KeyPathLeaf], TreeDef]
 T = TypeVar("T")
 pool_map = dict(thread=ThreadPoolExecutor, process=ProcessPoolExecutor)
 
@@ -91,21 +95,30 @@ class AbstractTreeUtil(abc.ABC):
         func: Callable[..., Any],
         tree: Any,
         *rest: Any,
-        is_leaf: Callable[[Any], bool] | None = None,
-        is_path: bool = False,
+        is_leaf: IsLeaf = None,
         is_parallel: bool | IsParallel = False,
     ) -> Any:
         ...
 
     @staticmethod
     @abc.abstractmethod
-    def tree_flatten(
-        self,
+    def tree_path_map(
+        func: Callable[..., Any],
         tree: Any,
-        *,
-        is_leaf: Callable[[Any], bool] | None = None,
-        is_path: bool = False,
-    ) -> tuple[Iterable[Leaf], TreeDef] | tuple[Iterable[KeyPathLeaf], TreeDef]:
+        *rest: Any,
+        is_leaf: IsLeaf = None,
+        is_parallel: bool | IsParallel = False,
+    ) -> Any:
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def tree_flatten(self, tree: Any, *, is_leaf: IsLeaf = None) -> FlattenOut:
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def tree_path_flatten(self, tree: Any, *, is_leaf: IsLeaf = None) -> PathFlattenOut:
         ...
 
     @staticmethod
@@ -173,32 +186,36 @@ if backend == "jax":
             func: Callable[..., Any],
             tree: Any,
             *rest: Any,
-            is_leaf: Callable[[Any], bool] | None = None,
-            is_path: bool = False,
+            is_leaf: IsLeaf = None,
             is_parallel: bool | IsParallel = True,
         ) -> Any:
-            if is_path:
-                leaves, treedef = jtu.tree_flatten_with_path(tree, is_leaf)
-                flat = list(zip(*leaves)) + [treedef.flatten_up_to(r) for r in rest]
-            else:
-                leaves, treedef = jtu.tree_flatten(tree, is_leaf)
-                flat = [leaves] + [treedef.flatten_up_to(r) for r in rest]
+            leaves, treedef = jtu.tree_flatten(tree, is_leaf)
+            flat = [leaves] + [treedef.flatten_up_to(r) for r in rest]
             if not is_parallel:
                 return jtu.tree_unflatten(treedef, [func(*args) for args in zip(*flat)])
             return jtu.tree_unflatten(treedef, concurrent_map(func, flat, is_parallel))
 
         @staticmethod
-        def tree_flatten(
+        def tree_path_map(
+            func: Callable[..., Any],
             tree: Any,
-            *,
-            is_leaf: Callable[[Any], bool] | None = None,
-            is_path: bool = False,
-        ) -> tuple[Iterable[Leaf], TreeDef] | tuple[Iterable[KeyPathLeaf], TreeDef]:
-            return (
-                jtu.tree_flatten_with_path(tree, is_leaf=is_leaf)
-                if is_path
-                else jtu.tree_flatten(tree, is_leaf=is_leaf)
-            )
+            *rest: Any,
+            is_leaf: IsLeaf = None,
+            is_parallel: bool | IsParallel = True,
+        ) -> Any:
+            leaves, treedef = jtu.tree_flatten_with_path(tree, is_leaf)
+            flat = list(zip(*leaves)) + [treedef.flatten_up_to(r) for r in rest]
+            if not is_parallel:
+                return jtu.tree_unflatten(treedef, [func(*args) for args in zip(*flat)])
+            return jtu.tree_unflatten(treedef, concurrent_map(func, flat, is_parallel))
+
+        @staticmethod
+        def tree_flatten(tree: Any, *, is_leaf: IsLeaf = None) -> FlattenOut:
+            return jtu.tree_flatten(tree, is_leaf=is_leaf)
+
+        @staticmethod
+        def tree_path_flatten(tree: Any, *, is_leaf: IsLeaf = None) -> PathFlattenOut:
+            return jtu.tree_flatten_with_path(tree, is_leaf=is_leaf)
 
         @staticmethod
         def tree_unflatten(treedef: TreeDef, leaves: Iterable[Any]) -> Any:
@@ -283,30 +300,39 @@ elif backend == "numpy":
             func: Callable[..., Any],
             tree: Any,
             *rest: Any,
-            is_leaf: Callable[[Any], bool] | None = None,
-            is_path: bool = False,
+            is_leaf: IsLeaf = None,
             is_parallel: bool | IsParallel = False,
         ) -> Any:
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
             flat = [leaves] + [treedef.flatten_up_to(r) for r in rest]
-            flat = (ot.treespec_paths(treedef), *flat) if is_path else flat
             if not is_parallel:
                 return ot.tree_unflatten(treedef, [func(*args) for args in zip(*flat)])
             return ot.tree_unflatten(treedef, concurrent_map(func, flat, is_parallel))
 
         @staticmethod
-        def tree_flatten(
+        def tree_path_map(
+            func: Callable[..., Any],
             tree: Any,
-            *,
-            is_leaf: Callable[[Any], bool] | None = None,
-            is_path: bool = False,
-        ) -> tuple[Iterable[Leaf], TreeDef] | tuple[Iterable[KeyPathLeaf], TreeDef]:
+            *rest: Any,
+            is_leaf: IsLeaf = None,
+            is_parallel: bool | IsParallel = False,
+        ) -> Any:
             leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
-            return (
-                (list(zip(ot.treespec_paths(treedef), leaves)), treedef)
-                if is_path
-                else (leaves, treedef)
-            )
+            flat = [leaves] + [treedef.flatten_up_to(r) for r in rest]
+            flat = (ot.treespec_paths(treedef), *flat)
+            if not is_parallel:
+                return ot.tree_unflatten(treedef, [func(*args) for args in zip(*flat)])
+            return ot.tree_unflatten(treedef, concurrent_map(func, flat, is_parallel))
+
+        @staticmethod
+        def tree_flatten(tree: Any, *, is_leaf: IsLeaf = None) -> FlattenOut:
+            leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
+            return (leaves, treedef)
+
+        @staticmethod
+        def tree_path_flatten(tree: Any, *, is_leaf: IsLeaf = None) -> PathFlattenOut:
+            leaves, treedef = ot.tree_flatten(tree, is_leaf, namespace=namespace)
+            return (list(zip(ot.treespec_paths(treedef), leaves)), treedef)
 
         @staticmethod
         def tree_unflatten(treedef: TreeDef, leaves: Iterable[Any]) -> Any:
