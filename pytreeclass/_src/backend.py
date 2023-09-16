@@ -80,6 +80,7 @@ class BackendTreeUtil(abc.ABC):
         *,
         is_leaf: Callable[[Any], bool] | None = None,
         is_path: bool = False,
+        is_parallel: bool | ParallelApplyKwargs = False,
     ) -> tuple[Iterable[Leaf], TreeDef]:
         ...
 
