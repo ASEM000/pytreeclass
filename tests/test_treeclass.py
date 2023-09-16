@@ -48,7 +48,7 @@ def test_fields():
 
     assert (
         repr(field(kind="KW_ONLY"))
-        == "Field(name=None, type=None, default=NULL, init=True, repr=True, kind='KW_ONLY', metadata=None, on_setattr=(), on_getattr=(), alias=None)"
+        == "Field(name=NULL, type=NULL, default=NULL, init=True, repr=True, kind='KW_ONLY', metadata=None, on_setattr=(), on_getattr=(), alias=None)"
     )
 
 

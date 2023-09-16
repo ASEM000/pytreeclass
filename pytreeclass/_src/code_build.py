@@ -64,8 +64,8 @@ class Field:
     def __init__(
         self,
         *,
-        name: str | None = None,
-        type: type | None = None,
+        name: str | Null = NULL,
+        type: type | Null = NULL,
         default: Any = NULL,
         init: bool = True,
         repr: bool = True,
@@ -128,9 +128,10 @@ class Field:
         attrs = [f"{k}={getattr(self, k)!r}" for k in slots(Field)]
         return f"{type(self).__name__}({', '.join(attrs)})"
 
-    def __set_name__(self, _, name: str) -> None:
+    def __set_name__(self, owner, name: str) -> None:
         """Set the field name."""
         self.name = name
+        self.type = vars(owner)["__annotations__"].get(name, NULL)
 
     def __get__(self: T, instance, _) -> T | Any:
         """Return the field value."""
