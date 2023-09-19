@@ -80,3 +80,6 @@ elif backend == "torch":
 
     arraylib = TorchArray()
     treelib = OpTreeTreeLib()
+
+else:
+    raise ValueError(f"Unknown backend: {backend!r}")
