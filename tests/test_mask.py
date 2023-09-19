@@ -405,6 +405,7 @@ def test_wrapper():
 
     assert wrapped != 1
 
+
 @pytest.mark.skipif(backend == "default", reason="no array backend installed")
 def test_tree_mask_tree_unmask():
     tree = [1, 2, 3.0]
@@ -425,7 +426,6 @@ def test_tree_mask_tree_unmask():
 
     with pytest.raises(NotImplementedError):
         freeze(1) + 1
-
 
 
 @pytest.mark.skipif(backend == "default", reason="no array backend installed")

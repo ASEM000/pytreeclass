@@ -156,7 +156,6 @@ def test_array_indexer_get(tree, expected, where):
     assert is_tree_equal(indexer.get(is_parallel=True), expected)
 
 
-
 @pytest.mark.parametrize(
     ["tree", "expected", "where", "set_value"],
     [
@@ -276,6 +275,7 @@ def test_indexer_apply(tree, expected, where):
         indexer.apply(lambda _: _X, is_parallel=True),
         expected,
     )
+
 
 @pytest.mark.skipif(backend == "default", reason="no array backend installed")
 @pytest.mark.parametrize(
