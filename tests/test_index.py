@@ -410,7 +410,8 @@ def test_unsupported_where(where):
         AtIndexer(t, where=where).get()
 
 
-def test_custom_key():
+@pytest.mark.skipif(backend != "jax", reason="jax backend needed")
+def test_custom_key_jax():
     class NameTypeContainer(NamedTuple):
         name: str
         type: type
@@ -444,23 +445,39 @@ def test_custom_key():
             flatten_with_keys=tree_flatten_with_keys,
             unflatten_func=tree_unflatten,
         )
-    elif backend in ["numpy", "torch"]:
-        import optree as ot
 
-        def tree_flatten(tree):
-            ka = NameTypeContainer("a", type(tree.a))
-            kb = NameTypeContainer("b", type(tree.b))
-            return (tree.a, tree.b), None, (ka, kb)
 
-        def tree_unflatten(aux_data, children):
-            return Tree(*children)
+@pytest.mark.skipif(backend not in ["torch", "numpy"], reason="optree backend needed")
+def test_custom_key_optreee():
+    class NameTypeContainer(NamedTuple):
+        name: str
+        type: type
 
-        ot.register_pytree_node(
-            Tree,
-            flatten_func=tree_flatten,
-            unflatten_func=tree_unflatten,
-            namespace="PYTREECLASS",
-        )
+    class Tree:
+        def __init__(self, a, b) -> None:
+            self.a = a
+            self.b = b
+
+        @property
+        def at(self):
+            return AtIndexer(self)
+
+    import optree as ot
+
+    def tree_flatten(tree):
+        ka = NameTypeContainer("a", type(tree.a))
+        kb = NameTypeContainer("b", type(tree.b))
+        return (tree.a, tree.b), None, (ka, kb)
+
+    def tree_unflatten(aux_data, children):
+        return Tree(*children)
+
+    ot.register_pytree_node(
+        Tree,
+        flatten_func=tree_flatten,
+        unflatten_func=tree_unflatten,
+        namespace="PYTREECLASS",
+    )
 
     tree = Tree(1, 2)
 
