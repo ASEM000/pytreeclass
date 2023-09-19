@@ -27,6 +27,7 @@ jobs:
           python -m pip install pytest pytest-benchmark wheel coverage
       - name: Pytest Check
         run: |
+          export PYTREECLASS_BACKEND=jax
           python -m pip install .
           coverage run -m pytest tests
 

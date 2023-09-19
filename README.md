@@ -11,6 +11,7 @@
 |[**Benchamrks**](#more)
 |[**Acknowledgements**](#acknowledgements)
 
+![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_default.yml/badge.svg)
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_jax.yml/badge.svg)
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_numpy.yml/badge.svg)
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_torch.yml/badge.svg)

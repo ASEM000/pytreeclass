@@ -25,7 +25,7 @@ if backend == "jax":
         import logging
 
         logging.info("[PYTREECLASS]: switching to `numpy` backend.")
-        backend = "numpy"
+        backend = "default"
     else:
         from pytreeclass._src.backend.arraylib.jax import JaxArray
         from pytreeclass._src.backend.treelib.jax import JaxTreeLib
@@ -56,4 +56,14 @@ elif backend == "torch":
     from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
 
     arraylib = TorchArray()
+    treelib = OpTreeTreeLib()
+
+elif backend == "default":
+    if find_spec("optree") is None:
+        raise ImportError("`default` backend requires `optree` to be installed.")
+
+    from pytreeclass._src.backend.arraylib.noarray import NoArray
+    from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
+
+    arraylib = NoArray()
     treelib = OpTreeTreeLib()

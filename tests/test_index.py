@@ -33,7 +33,7 @@ if backend == "jax":
     import jax.numpy as arraylib
 
     default_int = arraylib.int32
-elif backend == "numpy":
+elif backend in ["numpy", "default"]:
     import numpy as arraylib
 
     default_int = arraylib.int64
