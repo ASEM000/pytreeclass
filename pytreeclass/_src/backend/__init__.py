@@ -21,7 +21,7 @@ from importlib.util import find_spec
 backend = os.environ.get("PYTREECLASS_BACKEND", "default").lower()
 
 
-@ft.lrucache(maxsize=None)
+@ft.lru_cache(maxsize=None)
 def is_available(backend):
     return find_spec(backend) is not None
 
