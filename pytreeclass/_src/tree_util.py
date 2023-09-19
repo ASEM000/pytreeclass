@@ -20,14 +20,16 @@ import functools as ft
 import operator as op
 from copy import copy
 from math import ceil, floor, trunc
-from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
+from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar
 
-from pytreeclass._src.backend import arraylib
-from pytreeclass._src.backend import tree_util as tu
+from typing_extensions import ParamSpec
+
+from pytreeclass._src.backend import arraylib, treelib
 
 T = TypeVar("T")
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")
+P = ParamSpec("P")
 PyTree = Any
 EllipsisType = TypeVar("EllipsisType")
 KeyEntry = TypeVar("KeyEntry", bound=Hashable)
@@ -36,17 +38,16 @@ TraceEntry = Tuple[KeyEntry, TypeEntry]
 KeyPath = Tuple[KeyEntry, ...]
 TypePath = Tuple[TypeEntry, ...]
 KeyTypePath = Tuple[KeyPath, TypePath]
-IsLeafType = Union[None, Callable[[Any], bool]]
 
 
 def tree_hash(*trees: PyTree) -> int:
-    leaves, treedef = tu.tree_flatten(trees)
+    leaves, treedef = treelib.flatten(trees)
     return hash((*leaves, treedef))
 
 
 def tree_copy(tree: T) -> T:
     """Return a copy of the tree."""
-    return tu.tree_map(lambda x: copy(x), tree)
+    return treelib.map(lambda x: copy(x), tree)
 
 
 def has_shape_dtype(node: Any) -> bool:
@@ -78,11 +79,11 @@ def is_tree_equal(*trees: Any) -> bool | arraylib.ndarray:
         Under boolean ``Array`` if compiled otherwise ``bool``.
     """
     tree0, *rest = trees
-    leaves0, treedef0 = tu.tree_flatten(tree0)
+    leaves0, treedef0 = treelib.flatten(tree0)
     verdict = True
 
     for tree in rest:
-        leaves, treedef = tu.tree_flatten(tree)
+        leaves, treedef = treelib.flatten(tree)
         if (treedef != treedef0) or verdict is False:
             return False
         verdict = ft.reduce(op.and_, map(_is_leaf_rhs_equal, leaves0, leaves), verdict)
@@ -143,10 +144,14 @@ class Partial:
         return is_tree_equal(self, other)
 
 
-tu.register_static(Partial)
+treelib.register_static(Partial)
 
 
-def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
+def bcmap(
+    func: Callable[P, T],
+    *,
+    is_leaf: Callable[[Any], bool] | None = None,
+) -> Callable[P, T]:
     """Map a function over pytree leaves with automatic broadcasting for scalar arguments.
 
     Args:
@@ -199,14 +204,14 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
         if len(args) > 0:
             # positional arguments are passed the argument to be compare
             # the tree structure with is the first argument
-            leaves0, treedef0 = tu.tree_flatten(args[0], is_leaf=is_leaf)
+            leaves0, treedef0 = treelib.flatten(args[0], is_leaf=is_leaf)
             masked_args = [...]
             masked_kwargs = {}
             leaves = [leaves0]
             leaves_keys = []
 
             for arg in args[1:]:
-                _, argdef = tu.tree_flatten(arg)
+                _, argdef = treelib.flatten(arg)
                 if treedef0 == argdef:
                     masked_args += [...]
                     leaves += [treedef0.flatten_up_to(arg)]
@@ -216,14 +221,14 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
             # only kwargs are passed the argument to be compare
             # the tree structure with is the first kwarg
             key0 = next(iter(kwargs))
-            leaves0, treedef0 = tu.tree_flatten(kwargs.pop(key0), is_leaf=is_leaf)
+            leaves0, treedef0 = treelib.flatten(kwargs.pop(key0), is_leaf=is_leaf)
             masked_args = []
             masked_kwargs = {key0: ...}
             leaves = [leaves0]
             leaves_keys = [key0]
 
         for key in kwargs:
-            _, kwargdef = tu.tree_flatten(kwargs[key])
+            _, kwargdef = treelib.flatten(kwargs[key])
             if treedef0 == kwargdef:
                 masked_kwargs[key] = ...
                 leaves += [treedef0.flatten_up_to(kwargs[key])]
@@ -235,7 +240,7 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
 
         if len(leaves_keys) == 0:
             # no kwargs leaves are present, so we can immediately zip
-            return tu.tree_unflatten(treedef0, [bfunc(*xs) for xs in zip(*leaves)])
+            return treelib.unflatten(treedef0, [bfunc(*xs) for xs in zip(*leaves)])
 
         # kwargs leaves are present, so we need to zip them
         kwargnum = len(leaves) - len(leaves_keys)
@@ -243,7 +248,7 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
         for xs in zip(*leaves):
             xs_args, xs_kwargs = xs[:kwargnum], xs[kwargnum:]
             all_leaves += [bfunc(*xs_args, **dict(zip(leaves_keys, xs_kwargs)))]
-        return tu.tree_unflatten(treedef0, all_leaves)
+        return treelib.unflatten(treedef0, all_leaves)
 
     name = getattr(func, "__name__", func)
 
@@ -254,7 +259,7 @@ def bcmap(func: Callable, *, is_leaf: IsLeafType = None) -> Callable:
 
 def uop(func):
     def wrapper(self):
-        return tu.tree_map(func, self)
+        return treelib.map(func, self)
 
     return ft.wraps(func)(wrapper)
 
@@ -262,8 +267,8 @@ def uop(func):
 def bop(func):
     def wrapper(leaf, rhs=None):
         if isinstance(rhs, type(leaf)):
-            return tu.tree_map(func, leaf, rhs)
-        return tu.tree_map(lambda x: func(x, rhs), leaf)
+            return treelib.map(func, leaf, rhs)
+        return treelib.map(lambda x: func(x, rhs), leaf)
 
     return ft.wraps(func)(wrapper)
 
@@ -392,13 +397,13 @@ def leafwise(klass: type[T]) -> type[T]:
     return klass
 
 
-_, atomicdef = tu.tree_flatten(1)
+_, atomicdef = treelib.flatten(1)
 
 
 def flatten_one_typed_path_level(
     typedpath: KeyTypePath,
     tree: PyTree,
-    is_leaf: IsLeafType,
+    is_leaf: Callable[[Any], bool] | None,
     is_path_leaf: Callable[[KeyTypePath], bool] | None,
 ):
     # predicate and type path
@@ -407,7 +412,7 @@ def flatten_one_typed_path_level(
         return
 
     one_level_is_leaf = lambda node: False if (id(node) == id(tree)) else True
-    path_leaf, treedef = tu.tree_path_flatten(tree, is_leaf=one_level_is_leaf)
+    path_leaf, treedef = treelib.path_flatten(tree, is_leaf=one_level_is_leaf)
 
     if treedef == atomicdef:
         yield typedpath, tree
@@ -422,7 +427,7 @@ def flatten_one_typed_path_level(
 def tree_leaves_with_typed_path(
     tree: PyTree,
     *,
-    is_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], bool] | None = None,
     is_path_leaf: Callable[[KeyTypePath], bool] | None = None,
 ) -> Sequence[tuple[KeyTypePath, Any]]:
     # mainly used for visualization
@@ -477,8 +482,8 @@ def is_path_leaf_depth_factory(depth: int | float):
 
 def construct_tree(
     tree: PyTree,
-    is_leaf: IsLeafType = None,
-    is_path_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], bool] | None = None,
+    is_path_leaf: Callable[[KeyTypePath], bool] | None = None,
 ) -> Node:
     # construct a tree with `Node` objects using `tree_leaves_with_typed_path`
     # to establish parent-child relationship between nodes

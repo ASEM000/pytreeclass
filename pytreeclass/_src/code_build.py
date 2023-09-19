@@ -509,9 +509,9 @@ def autoinit(klass: type[T]) -> type[T]:
         that ``jax.Array`` is not immutable.
 
     Note:
-        By default ``autoinit`` will raise an error if the user uses mutable defaults
-        in the field annotations. To register an additional type to be excluded from
-        ``autoinit``, use :func:`register_excluded_type`, with an optional reason
+        By default ``autoinit`` will raise an error if the user uses mutable defaults.
+        To register an additional type to be excluded from ``autoinit``, use 
+        :func:`autoinit.register_excluded_type`, with an optional ``reason``
         for excluding the type.
 
         >>> import pytreeclass as tc

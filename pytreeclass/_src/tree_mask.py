@@ -20,8 +20,7 @@ import functools as ft
 import hashlib
 from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 
-from pytreeclass._src.backend import arraylib
-from pytreeclass._src.backend import tree_util as tu
+from pytreeclass._src.backend import arraylib, treelib
 from pytreeclass._src.tree_pprint import tree_repr, tree_str, tree_summary
 from pytreeclass._src.tree_util import is_tree_equal, tree_copy, tree_hash
 
@@ -71,7 +70,7 @@ class _FrozenBase(Generic[T]):
         # register subclass as an empty pytree node
         super().__init_subclass__(**k)
         # register with the proper backend
-        tu.register_static(klass)
+        treelib.register_static(klass)
 
     # raise helpful error message when trying to interact with frozen object
     __add__ = __radd__ = __iadd__ = _FrozenError("+")
@@ -264,23 +263,22 @@ def _tree_mask_map(
     is_leaf: Callable[[Any], None] | None = None,
 ):
     # apply func to leaves satisfying mask pytree/condtion
-    _, lhsdef = tu.tree_flatten(tree, is_leaf=is_leaf)
-    _, rhsdef = tu.tree_flatten(mask, is_leaf=is_leaf)
+    _, lhsdef = treelib.flatten(tree, is_leaf=is_leaf)
+    _, rhsdef = treelib.flatten(mask, is_leaf=is_leaf)
 
     if (lhsdef == rhsdef) and (type(mask) is type(tree)):
-        return tu.tree_map(
-            lambda x, y: func(x) if y else x,
-            tree,
-            mask,
-            is_leaf=is_leaf,
-        )
+
+        def map_func(x, y):
+            return func(x) if y else x
+
+        return treelib.map(map_func, tree, mask, is_leaf=is_leaf)
 
     if isinstance(mask, Callable):
-        return tu.tree_map(
-            lambda x: func(x) if mask(x) else x,
-            tree,
-            is_leaf=is_leaf,
-        )
+
+        def map_func(x):
+            return func(x) if mask(x) else x
+
+        return treelib.map(map_func, tree, is_leaf=is_leaf)
 
     raise ValueError(
         f"`mask` must be a callable that accepts a leaf and returns a boolean "

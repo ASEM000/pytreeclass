@@ -25,7 +25,7 @@ class NumpyArray(AbstractArray):
         return np.array(array).tobytes()
 
     @property
-    def ndarray(self):
+    def ndarray(self) -> type[np.ndarray]:
         return np.ndarray
 
     @staticmethod

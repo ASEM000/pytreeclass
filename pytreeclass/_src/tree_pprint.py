@@ -28,8 +28,7 @@ from typing import Any, Callable, Literal, NamedTuple, Sequence
 
 from typing_extensions import TypeAlias, TypedDict, Unpack
 
-from pytreeclass._src.backend import arraylib
-from pytreeclass._src.backend import tree_util as tu
+from pytreeclass._src.backend import arraylib, treelib
 from pytreeclass._src.tree_util import (
     Node,
     construct_tree,
@@ -644,7 +643,7 @@ def tree_summary(
             continue
 
         paths, _ = trace
-        pstr = tu.keystr(paths)
+        pstr = treelib.keystr(paths)
         tstr = tree_summary.type_dispatcher(leaf)
         cstr = f"{count:,}" if count else ""
         sstr = size_pp(size) if size else ""
@@ -688,7 +687,7 @@ def tree_size(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.size_dispatcher(node)
 
-    leaves, _ = tu.tree_flatten(tree)
+    leaves, _ = treelib.flatten(tree)
     return ft.reduce(reduce_func, leaves, 0)
 
 
@@ -696,7 +695,7 @@ def tree_count(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.count_dispatcher(node)
 
-    leaves, _ = tu.tree_flatten(tree)
+    leaves, _ = treelib.flatten(tree)
     return ft.reduce(reduce_func, leaves, 0)
 
 

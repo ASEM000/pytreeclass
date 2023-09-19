@@ -28,10 +28,10 @@ if backend == "jax":
         backend = "numpy"
     else:
         from pytreeclass._src.backend.arraylib.jax import JaxArray
-        from pytreeclass._src.backend.treelib.jax import JaxTreeUtil
+        from pytreeclass._src.backend.treelib.jax import JaxTreeLib
 
         arraylib = JaxArray()
-        tree_util = JaxTreeUtil()
+        treelib = JaxTreeLib()
 
 
 if backend == "numpy":
@@ -41,10 +41,10 @@ if backend == "numpy":
         raise ImportError("`numpy` backend requires `optree` to be installed.")
 
     from pytreeclass._src.backend.arraylib.numpy import NumpyArray
-    from pytreeclass._src.backend.treelib.optree import OpTreeTreeUtil
+    from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
 
     arraylib = NumpyArray()
-    tree_util = OpTreeTreeUtil()
+    treelib = OpTreeTreeLib()
 
 elif backend == "torch":
     if find_spec("torch") is None:
@@ -53,7 +53,7 @@ elif backend == "torch":
         raise ImportError("`torch` backend requires `optree` to be installed.")
 
     from pytreeclass._src.backend.arraylib.torch import TorchArray
-    from pytreeclass._src.backend.treelib.optree import OpTreeTreeUtil
+    from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
 
     arraylib = TorchArray()
-    tree_util = OpTreeTreeUtil()
+    treelib = OpTreeTreeLib()

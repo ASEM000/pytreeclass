@@ -20,7 +20,7 @@ from typing import Any, Callable, Hashable, Iterable
 import jax.tree_util as jtu
 
 from pytreeclass._src.backend.treelib.base import (
-    AbstractTreeUtil,
+    AbstractTreeLib,
     KeyPathLeaf,
     ParallelConfig,
     Tree,
@@ -34,9 +34,9 @@ class NamedSequenceKey(jtu.GetAttrKey, jtu.SequenceKey):
         return f".{self.name}"
 
 
-class JaxTreeUtil(AbstractTreeUtil):
+class JaxTreeLib(AbstractTreeLib):
     @staticmethod
-    def tree_map(
+    def map(
         func: Callable[..., Any],
         tree: Any,
         *rest: Any,
@@ -51,7 +51,7 @@ class JaxTreeUtil(AbstractTreeUtil):
         return jtu.tree_unflatten(treedef, concurrent_map(func, flat, **config))
 
     @staticmethod
-    def tree_path_map(
+    def path_map(
         func: Callable[..., Any],
         tree: Any,
         *rest: Any,
@@ -66,7 +66,7 @@ class JaxTreeUtil(AbstractTreeUtil):
         return jtu.tree_unflatten(treedef, concurrent_map(func, flat, **config))
 
     @staticmethod
-    def tree_flatten(
+    def flatten(
         tree: Any,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
@@ -74,7 +74,7 @@ class JaxTreeUtil(AbstractTreeUtil):
         return jtu.tree_flatten(tree, is_leaf=is_leaf)
 
     @staticmethod
-    def tree_path_flatten(
+    def path_flatten(
         tree: Any,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
@@ -82,7 +82,7 @@ class JaxTreeUtil(AbstractTreeUtil):
         return jtu.tree_flatten_with_path(tree, is_leaf=is_leaf)
 
     @staticmethod
-    def tree_unflatten(treedef: jtu.PyTreeDef, leaves: Iterable[Any]) -> Any:
+    def unflatten(treedef: jtu.PyTreeDef, leaves: Iterable[Any]) -> Any:
         return jtu.tree_unflatten(treedef, leaves)
 
     @staticmethod

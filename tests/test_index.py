@@ -19,8 +19,7 @@ from typing import NamedTuple
 
 import pytest
 
-from pytreeclass._src.backend import arraylib, backend
-from pytreeclass._src.backend import tree_util as tu
+from pytreeclass._src.backend import arraylib, backend, treelib
 from pytreeclass._src.code_build import autoinit
 from pytreeclass._src.tree_base import (
     TreeClass,
@@ -378,8 +377,8 @@ def test_method_call():
     a = A(1)
     _, b = a.at["__call__"](2)
 
-    assert tu.tree_flatten(a)[0] == [1]
-    assert tu.tree_flatten(b)[0] == [3]
+    assert treelib.flatten(a)[0] == [1]
+    assert treelib.flatten(b)[0] == [3]
 
     with pytest.raises(TypeError):
         a.at[0](1)
@@ -491,7 +490,7 @@ def test_custom_key_optreee():
                 return other == (self.name, self.type)
             return False
 
-    assert tu.tree_flatten(tree.at[MatchNameType("a", int)].get())[0] == [1]
+    assert treelib.flatten(tree.at[MatchNameType("a", int)].get())[0] == [1]
 
 
 def test_repr_str():
