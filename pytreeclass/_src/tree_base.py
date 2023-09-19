@@ -84,9 +84,9 @@ class TreeClassIndexer(AtIndexer):
             - Use .at["method_name"](*, **) to call a method that mutates the instance.
         """
         tree = tree_copy(self.tree)
-        treelib.map(lambda _: _, tree, is_leaf=add_mutable_entry)
+        treelib.tree_map(lambda _: _, tree, is_leaf=add_mutable_entry)
         value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
-        treelib.map(lambda _: _, tree, is_leaf=discard_mutable_entry)
+        treelib.tree_map(lambda _: _, tree, is_leaf=discard_mutable_entry)
         return value, tree
 
 

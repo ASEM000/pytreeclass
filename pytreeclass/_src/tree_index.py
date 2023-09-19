@@ -300,7 +300,7 @@ def _generate_path_mask(
         match = True
         return match
 
-    mask = treelib.path_map(map_func, tree, is_leaf=is_leaf)
+    mask = treelib.tree_path_map(map_func, tree, is_leaf=is_leaf)
 
     if not match:
         raise LookupError(f"No leaf match is found for {where=}.")
@@ -329,7 +329,7 @@ def _resolve_where(
     mask = None
     bool_masks: list[T] = []
     path_masks: list[BaseKey] = []
-    _, treedef0 = treelib.flatten(tree, is_leaf=is_leaf)
+    _, treedef0 = treelib.tree_flatten(tree, is_leaf=is_leaf)
     seen_tuple = False  # handle multiple keys at the same level
     level_paths = []
 
@@ -339,7 +339,7 @@ def _resolve_where(
         nonlocal seen_tuple, level_paths, bool_masks
         # used to check if a pytree is a valid indexing pytree
         # used with `is_leaf` argument of any `tree_*` function
-        leaves, treedef = treelib.flatten(x)
+        leaves, treedef = treelib.tree_flatten(x)
 
         if treedef == treedef0 and all(map(_is_bool_leaf, leaves)):
             # boolean pytrees of same structure as `tree` is a valid indexing pytree
@@ -362,7 +362,7 @@ def _resolve_where(
 
     for level_keys in where:
         # each for loop iteration is a level in the where path
-        treelib.flatten(level_keys, is_leaf=verify_and_aggregate_is_leaf)
+        treelib.tree_flatten(level_keys, is_leaf=verify_and_aggregate_is_leaf)
         path_masks += [MultiKey(*level_paths)] if len(level_paths) > 1 else level_paths
         level_paths = []
         seen_tuple = False
@@ -372,7 +372,7 @@ def _resolve_where(
 
     if bool_masks:
         all_masks = [mask, *bool_masks] if mask else bool_masks
-        mask = treelib.map(_combine_bool_leaves, *all_masks)
+        mask = treelib.tree_map(_combine_bool_leaves, *all_masks)
 
     return mask
 
@@ -487,7 +487,7 @@ class AtIndexer(NamedTuple):
                 return leaf[where]
             return leaf if where else None
 
-        return treelib.map(leaf_get, self.tree, where, **config)
+        return treelib.tree_map(leaf_get, self.tree, where, **config)
 
     def set(
         self,
@@ -539,8 +539,8 @@ class AtIndexer(NamedTuple):
                 return arraylib.where(where, set_value, leaf)
             return set_value if where else leaf
 
-        _, lhsdef = treelib.flatten(self.tree, is_leaf=is_leaf)
-        _, rhsdef = treelib.flatten(set_value, is_leaf=is_leaf)
+        _, lhsdef = treelib.tree_flatten(self.tree, is_leaf=is_leaf)
+        _, rhsdef = treelib.tree_flatten(set_value, is_leaf=is_leaf)
 
         if lhsdef == rhsdef:
             # do not broadcast set_value if it is a pytree of same structure
@@ -548,12 +548,12 @@ class AtIndexer(NamedTuple):
             # to tree2 leaves if tree2 is a pytree of same structure as tree
             # instead of making each leaf of tree a copy of tree2
             # is design is similar to ``numpy`` design `np.at[...].set(Array)`
-            return treelib.map(leaf_set, self.tree, where, set_value, **config)
+            return treelib.tree_map(leaf_set, self.tree, where, set_value, **config)
 
         # set_value is broadcasted to tree leaves
         # for example tree.at[where].set(1) will set all tree leaves to 1
         leaf_set_ = lambda leaf, where: leaf_set(leaf, where, set_value)
-        return treelib.map(leaf_set_, self.tree, where, **config)
+        return treelib.tree_map(leaf_set_, self.tree, where, **config)
 
     def apply(
         self,
@@ -612,7 +612,7 @@ class AtIndexer(NamedTuple):
                 return arraylib.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
 
-        return treelib.map(leaf_apply, self.tree, where, **config)
+        return treelib.tree_map(leaf_apply, self.tree, where, **config)
 
     def scan(
         self,
@@ -687,7 +687,7 @@ class AtIndexer(NamedTuple):
                 return arraylib.where(where, stateless_func(leaf), leaf)
             return stateless_func(leaf) if where else leaf
 
-        out = treelib.map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+        out = treelib.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
         return out, running_state
 
     def reduce(
@@ -727,7 +727,7 @@ class AtIndexer(NamedTuple):
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
         tree = self[where].get(is_leaf=is_leaf)  # type: ignore
-        leaves, _ = treelib.flatten(tree, is_leaf=is_leaf)
+        leaves, _ = treelib.tree_flatten(tree, is_leaf=is_leaf)
         if initializer is _no_initializer:
             return ft.reduce(func, leaves)
         return ft.reduce(func, leaves, initializer)

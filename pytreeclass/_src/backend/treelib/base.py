@@ -62,7 +62,7 @@ class AbstractTreeLib(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def map(
+    def tree_map(
         func: Callable[..., Any],
         tree: Any,
         *rest: Any,
@@ -73,7 +73,7 @@ class AbstractTreeLib(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def path_map(
+    def tree_path_map(
         func: Callable[..., Any],
         tree: Any,
         *rest: Any,
@@ -84,7 +84,7 @@ class AbstractTreeLib(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def flatten(
+    def tree_flatten(
         tree: Any,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
@@ -93,7 +93,7 @@ class AbstractTreeLib(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def path_flatten(
+    def tree_path_flatten(
         tree: Any,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
@@ -102,7 +102,7 @@ class AbstractTreeLib(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def unflatten(treedef: Any, leaves: Iterable[Any]) -> Any:
+    def tree_unflatten(treedef: Any, leaves: Iterable[Any]) -> Any:
         ...
 
     @staticmethod

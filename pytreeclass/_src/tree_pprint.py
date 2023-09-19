@@ -687,7 +687,7 @@ def tree_size(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.size_dispatcher(node)
 
-    leaves, _ = treelib.flatten(tree)
+    leaves, _ = treelib.tree_flatten(tree)
     return ft.reduce(reduce_func, leaves, 0)
 
 
@@ -695,7 +695,7 @@ def tree_count(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.count_dispatcher(node)
 
-    leaves, _ = treelib.flatten(tree)
+    leaves, _ = treelib.tree_flatten(tree)
     return ft.reduce(reduce_func, leaves, 0)
 
 

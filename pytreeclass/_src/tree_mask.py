@@ -263,22 +263,22 @@ def _tree_mask_map(
     is_leaf: Callable[[Any], None] | None = None,
 ):
     # apply func to leaves satisfying mask pytree/condtion
-    _, lhsdef = treelib.flatten(tree, is_leaf=is_leaf)
-    _, rhsdef = treelib.flatten(mask, is_leaf=is_leaf)
+    _, lhsdef = treelib.tree_flatten(tree, is_leaf=is_leaf)
+    _, rhsdef = treelib.tree_flatten(mask, is_leaf=is_leaf)
 
     if (lhsdef == rhsdef) and (type(mask) is type(tree)):
 
         def map_func(x, y):
             return func(x) if y else x
 
-        return treelib.map(map_func, tree, mask, is_leaf=is_leaf)
+        return treelib.tree_map(map_func, tree, mask, is_leaf=is_leaf)
 
     if isinstance(mask, Callable):
 
         def map_func(x):
             return func(x) if mask(x) else x
 
-        return treelib.map(map_func, tree, is_leaf=is_leaf)
+        return treelib.tree_map(map_func, tree, is_leaf=is_leaf)
 
     raise ValueError(
         f"`mask` must be a callable that accepts a leaf and returns a boolean "

@@ -61,7 +61,7 @@ class NamedSequenceKey(GetAttrKey, SequenceKey):
 
 class OpTreeTreeLib(AbstractTreeLib):
     @staticmethod
-    def map(
+    def tree_map(
         func: Callable[..., Any],
         tree: Any,
         *rest: Any,
@@ -76,7 +76,7 @@ class OpTreeTreeLib(AbstractTreeLib):
         return ot.tree_unflatten(treedef, concurrent_map(func, flat, **config))
 
     @staticmethod
-    def path_map(
+    def tree_path_map(
         func: Callable[..., Any],
         tree: Any,
         *rest: Any,
@@ -92,7 +92,7 @@ class OpTreeTreeLib(AbstractTreeLib):
         return ot.tree_unflatten(treedef, concurrent_map(func, flat, **config))
 
     @staticmethod
-    def flatten(
+    def tree_flatten(
         tree: Any,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
@@ -101,7 +101,7 @@ class OpTreeTreeLib(AbstractTreeLib):
         return (leaves, treedef)
 
     @staticmethod
-    def path_flatten(
+    def tree_path_flatten(
         tree: Any,
         *,
         is_leaf: Callable[[Any], bool] | None = None,
@@ -110,7 +110,7 @@ class OpTreeTreeLib(AbstractTreeLib):
         return (list(zip(ot.treespec_paths(treedef), leaves)), treedef)
 
     @staticmethod
-    def unflatten(treedef: ot.PyTreeDef, leaves: Iterable[Any]) -> Any:
+    def tree_unflatten(treedef: ot.PyTreeDef, leaves: Iterable[Any]) -> Any:
         return ot.tree_unflatten(treedef, leaves)
 
     @staticmethod
