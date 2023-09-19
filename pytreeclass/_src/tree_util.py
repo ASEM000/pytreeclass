@@ -396,7 +396,7 @@ def leafwise(klass: type[T]) -> type[T]:
 _, atomicdef = treelib.tree_flatten(1)
 
 
-def tree_flatten_one_typed_path_level(
+def flatten_one_typed_path_level(
     typedpath: KeyTypePath,
     tree: PyTree,
     is_leaf: Callable[[Any], bool] | None,
