@@ -19,11 +19,22 @@ from typing import Any
 
 import pytest
 
-from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import backend
 from pytreeclass._src.code_build import autoinit, field
 from pytreeclass._src.tree_base import TreeClass
 from pytreeclass._src.tree_mask import freeze
 from pytreeclass._src.tree_util import bcmap, is_tree_equal, leafwise
+
+if backend == "jax":
+    import jax.numpy as arraylib
+elif backend == "numpy":
+    import numpy as arraylib
+elif backend == "torch":
+    import torch as arraylib
+
+    arraylib.array = arraylib.tensor
+else:
+    raise ImportError("no backend installed")
 
 
 @leafwise
@@ -38,7 +49,7 @@ class Tree(TreeClass):
 
 
 tree1 = Tree(-10, 20, 30, "A")
-tree2 = Tree(np.array([-10]), np.array([20]), np.array([30]), "A")
+tree2 = Tree(arraylib.array([-10]), arraylib.array([20]), arraylib.array([30]), "A")
 
 
 @pytest.mark.parametrize(
@@ -86,9 +97,9 @@ tree2 = Tree(np.array([-10]), np.array([20]), np.array([30]), "A")
         [
             tree2 @ tree2,
             Tree(
-                np.array([10]) @ np.array([10]),
-                np.array([20]) @ np.array([20]),
-                np.array([30]) @ np.array([30]),
+                arraylib.array([10]) @ arraylib.array([10]),
+                arraylib.array([20]) @ arraylib.array([20]),
+                arraylib.array([30]) @ arraylib.array([30]),
                 "A",
             ),
         ],
@@ -114,27 +125,40 @@ tree = Tree(a=(10, 20, 30), b=(40, 50, 60), c=(70, 80, 90), d=(100, 110, 120))
 
 
 def where(condition, x, y):
-    return np.where(condition, x, y)
+    # torch expects tensors
+    condition = arraylib.array(condition)
+    x = arraylib.array(x)
+    y = arraylib.array(y)
+    return arraylib.where(condition, x, y)
 
 
+@pytest.mark.skipif(backend == "torch", reason="where needs tensor arguments")
 @pytest.mark.parametrize(
     ["tree", "expected"],
     [
         [
             bcmap(where)(tree > 10, 0, tree),
-            bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
+            bcmap(arraylib.array)(
+                Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))
+            ),
         ],
         [
             bcmap(where)(tree > 10, 0, y=tree),
-            bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
+            bcmap(arraylib.array)(
+                Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))
+            ),
         ],
         [
             bcmap(where)(tree > 10, x=0, y=tree),
-            bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
+            bcmap(arraylib.array)(
+                Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))
+            ),
         ],
         [
             bcmap(where)(condition=tree > 10, x=0, y=tree),
-            bcmap(np.array)(Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))),
+            bcmap(arraylib.array)(
+                Tree(a=(10, 0, 0), b=(0, 0, 0), c=(0, 0, 0), d=(0, 0, 0))
+            ),
         ],
     ],
 )

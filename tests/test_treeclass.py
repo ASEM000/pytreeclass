@@ -20,8 +20,7 @@ from typing import Any
 import numpy.testing as npt
 import pytest
 
-from pytreeclass._src.backend import numpy as np
-from pytreeclass._src.backend import tree_util as tu
+from pytreeclass._src.backend import backend, treelib
 from pytreeclass._src.code_build import (
     autoinit,
     build_field_map,
@@ -32,6 +31,17 @@ from pytreeclass._src.code_build import (
 from pytreeclass._src.tree_base import TreeClass
 from pytreeclass._src.tree_mask import freeze
 from pytreeclass._src.tree_util import Partial, is_tree_equal
+
+if backend == "jax":
+    import jax.numpy as arraylib
+elif backend == "numpy":
+    import numpy as arraylib
+elif backend == "torch":
+    import torch as arraylib
+
+    arraylib.array = arraylib.tensor
+else:
+    raise ImportError("no backend installed")
 
 
 def test_fields():
@@ -133,23 +143,23 @@ def test_field_nondiff():
     class Test(TreeClass):
         def __init__(
             self,
-            a=freeze(np.array([1, 2, 3])),
-            b=freeze(np.array([4, 5, 6])),
+            a=freeze(arraylib.array([1, 2, 3])),
+            b=freeze(arraylib.array([4, 5, 6])),
         ):
             self.a = a
             self.b = b
 
     test = Test()
 
-    assert tu.tree_flatten(test)[0] == []
+    assert treelib.flatten(test)[0] == []
 
     class Test(TreeClass):
-        def __init__(self, a=np.array([1, 2, 3]), b=np.array([4, 5, 6])):
+        def __init__(self, a=arraylib.array([1, 2, 3]), b=arraylib.array([4, 5, 6])):
             self.a = freeze(a)
             self.b = b
 
     test = Test()
-    npt.assert_allclose(tu.tree_flatten(test)[0][0], np.array([4, 5, 6]))
+    npt.assert_allclose(treelib.flatten(test)[0][0], arraylib.array([4, 5, 6]))
 
 
 def test_post_init():
@@ -194,7 +204,7 @@ def test_subclassing():
 
     l1 = L1()
 
-    assert tu.tree_flatten(l1)[0] == [2, 4, 5, 5]
+    assert treelib.flatten(l1)[0] == [2, 4, 5, 5]
     assert l1.inc(10) == 20
     assert l1.sub(10) == 0
     assert l1.d == 5
@@ -206,7 +216,7 @@ def test_subclassing():
 
     l1 = L1()
 
-    assert tu.tree_flatten(l1)[0] == [2, 4, 5]
+    assert treelib.flatten(l1)[0] == [2, 4, 5]
 
 
 def test_registering_state():
@@ -273,12 +283,12 @@ def test_is_tree_equal():
 
     @autoinit
     class Test2(TreeClass):
-        a: np.ndarray = np.array([1, 2, 3])
+        a: Any = arraylib.array([1, 2, 3])
 
     assert is_tree_equal(Test1(), Test2()) is False
 
-    assert is_tree_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
-    assert is_tree_equal(np.array([1, 2, 3]), np.array([1, 3, 3])) is False
+    assert is_tree_equal(arraylib.array([1, 2, 3]), arraylib.array([1, 2, 3]))
+    assert is_tree_equal(arraylib.array([1, 2, 3]), arraylib.array([1, 3, 3])) is False
 
     @autoinit
     class Test3(TreeClass):
@@ -287,7 +297,7 @@ def test_is_tree_equal():
 
     assert is_tree_equal(Test1(), Test3()) is False
 
-    assert is_tree_equal(np.array([1, 2, 3]), 1) is False
+    assert is_tree_equal(arraylib.array([1, 2, 3]), 1) is False
 
 
 def test_mutable_field():
@@ -407,7 +417,7 @@ def test_treeclass_frozen_field():
     t = Test(1)
 
     assert t.a == freeze(1)
-    assert tu.tree_flatten(t)[0] == []
+    assert treelib.flatten(t)[0] == []
 
 
 def test_super():

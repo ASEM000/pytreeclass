@@ -19,11 +19,10 @@ from __future__ import annotations
 import abc
 import functools as ft
 import re
-from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Union
+from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar
 
-from pytreeclass._src.backend import IsParallel
-from pytreeclass._src.backend import numpy as np
-from pytreeclass._src.backend import tree_util as tu
+from pytreeclass._src.backend import arraylib, treelib
+from pytreeclass._src.backend.treelib.base import ParallelConfig
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -35,12 +34,11 @@ TraceEntry = Tuple[KeyEntry, TypeEntry]
 KeyPath = Tuple[KeyEntry, ...]
 TypePath = Tuple[TypeEntry, ...]
 TraceType = Tuple[KeyPath, TypePath]
-IsLeafType = Union[None, Callable[[Any], bool]]
 _no_initializer = object()
 
-SequenceKeyType = type(tu.sequence_key(0))
-DictKeyType = type(tu.dict_key("key"))
-GetAttrKeyType = type(tu.attribute_key("name"))
+SequenceKeyType = type(treelib.sequence_key(0))
+DictKeyType = type(treelib.dict_key("key"))
+GetAttrKeyType = type(treelib.attribute_key("name"))
 
 
 class BaseKey(abc.ABC):
@@ -280,7 +278,7 @@ _NOT_IMPLEMENTED_INDEXING = """Indexing with {} is not implemented, supported in
 def _generate_path_mask(
     tree: PyTree,
     where: tuple[BaseKey, ...],
-    is_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], None] | None = None,
 ) -> PyTree:
     # generate a boolean mask for `where` path in `tree`
     # where path is a tuple of indices or keys, for example
@@ -302,7 +300,7 @@ def _generate_path_mask(
         match = True
         return match
 
-    mask = tu.tree_path_map(map_func, tree, is_leaf=is_leaf)
+    mask = treelib.path_map(map_func, tree, is_leaf=is_leaf)
 
     if not match:
         raise LookupError(f"No leaf match is found for {where=}.")
@@ -318,20 +316,20 @@ def _combine_bool_leaves(*leaves):
 
 
 def _is_bool_leaf(leaf: Any) -> bool:
-    if hasattr(leaf, "dtype"):
-        return leaf.dtype == "bool"
+    if isinstance(leaf, arraylib.ndarray):
+        return arraylib.is_bool(leaf)
     return isinstance(leaf, bool)
 
 
 def _resolve_where(
     tree: T,
     where: tuple[Any, ...],  # type: ignore
-    is_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], None] | None = None,
 ) -> T | None:
     mask = None
     bool_masks: list[T] = []
     path_masks: list[BaseKey] = []
-    _, treedef0 = tu.tree_flatten(tree, is_leaf=is_leaf)
+    _, treedef0 = treelib.flatten(tree, is_leaf=is_leaf)
     seen_tuple = False  # handle multiple keys at the same level
     level_paths = []
 
@@ -341,7 +339,7 @@ def _resolve_where(
         nonlocal seen_tuple, level_paths, bool_masks
         # used to check if a pytree is a valid indexing pytree
         # used with `is_leaf` argument of any `tree_*` function
-        leaves, treedef = tu.tree_flatten(x)
+        leaves, treedef = treelib.flatten(x)
 
         if treedef == treedef0 and all(map(_is_bool_leaf, leaves)):
             # boolean pytrees of same structure as `tree` is a valid indexing pytree
@@ -364,7 +362,7 @@ def _resolve_where(
 
     for level_keys in where:
         # each for loop iteration is a level in the where path
-        tu.tree_flatten(level_keys, is_leaf=verify_and_aggregate_is_leaf)
+        treelib.flatten(level_keys, is_leaf=verify_and_aggregate_is_leaf)
         path_masks += [MultiKey(*level_paths)] if len(level_paths) > 1 else level_paths
         level_paths = []
         seen_tuple = False
@@ -374,7 +372,7 @@ def _resolve_where(
 
     if bool_masks:
         all_masks = [mask, *bool_masks] if mask else bool_masks
-        mask = tu.tree_map(_combine_bool_leaves, *all_masks)
+        mask = treelib.map(_combine_bool_leaves, *all_masks)
 
     return mask
 
@@ -444,8 +442,8 @@ class AtIndexer(NamedTuple):
     def get(
         self,
         *,
-        is_leaf: IsLeafType = None,
-        is_parallel: IsParallel | bool = False,
+        is_leaf: Callable[[Any], None] | None = None,
+        is_parallel: bool | ParallelConfig = False,
     ) -> PyTree:
         """Get the leaf values at the specified location.
 
@@ -460,7 +458,7 @@ class AtIndexer(NamedTuple):
 
         Returns:
             A _new_ pytree of leaf values at the specified location, with the
-            non-selected leaf values set to None if the leaf is not an np.
+            non-selected leaf values set to None if the leaf is not an array.
 
         Example:
             >>> import pytreeclass as tc
@@ -482,21 +480,21 @@ class AtIndexer(NamedTuple):
             Tree(a=1, b=None)
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
-        kwargs = dict(is_leaf=is_leaf, is_parallel=is_parallel)
+        config = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_get(leaf: Any, where: Any):
-            if isinstance(where, np.ndarray) and where.ndim != 0:
-                return leaf[np.where(where)]
+            if isinstance(where, arraylib.ndarray) and arraylib.ndim(where) != 0:
+                return leaf[where]
             return leaf if where else None
 
-        return tu.tree_map(leaf_get, self.tree, where, **kwargs)
+        return treelib.map(leaf_get, self.tree, where, **config)
 
     def set(
         self,
         set_value: Any,
         *,
-        is_leaf: IsLeafType = None,
-        is_parallel: bool = False,
+        is_leaf: Callable[[Any], None] | None = None,
+        is_parallel: bool | ParallelConfig = False,
     ) -> PyTree:
         """Set the leaf values at the specified location.
 
@@ -534,15 +532,15 @@ class AtIndexer(NamedTuple):
             Tree(a=100, b=2)
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
-        kwargs = dict(is_leaf=is_leaf, is_parallel=is_parallel)
+        config = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_set(leaf: Any, where: Any, set_value: Any):
-            if isinstance(where, np.ndarray):
-                return np.where(where, set_value, leaf)
+            if isinstance(where, arraylib.ndarray):
+                return arraylib.where(where, set_value, leaf)
             return set_value if where else leaf
 
-        _, lhsdef = tu.tree_flatten(self.tree, is_leaf=is_leaf)
-        _, rhsdef = tu.tree_flatten(set_value, is_leaf=is_leaf)
+        _, lhsdef = treelib.flatten(self.tree, is_leaf=is_leaf)
+        _, rhsdef = treelib.flatten(set_value, is_leaf=is_leaf)
 
         if lhsdef == rhsdef:
             # do not broadcast set_value if it is a pytree of same structure
@@ -550,19 +548,19 @@ class AtIndexer(NamedTuple):
             # to tree2 leaves if tree2 is a pytree of same structure as tree
             # instead of making each leaf of tree a copy of tree2
             # is design is similar to ``numpy`` design `np.at[...].set(Array)`
-            return tu.tree_map(leaf_set, self.tree, where, set_value, **kwargs)
+            return treelib.map(leaf_set, self.tree, where, set_value, **config)
 
         # set_value is broadcasted to tree leaves
         # for example tree.at[where].set(1) will set all tree leaves to 1
-        partial_leaf_set = lambda leaf, where: leaf_set(leaf, where, set_value)
-        return tu.tree_map(partial_leaf_set, self.tree, where, **kwargs)
+        leaf_set_ = lambda leaf, where: leaf_set(leaf, where, set_value)
+        return treelib.map(leaf_set_, self.tree, where, **config)
 
     def apply(
         self,
         func: Callable[[Any], Any],
         *,
-        is_leaf: IsLeafType = None,
-        is_parallel: IsParallel | bool = False,
+        is_leaf: Callable[[Any], None] | None = None,
+        is_parallel: bool | ParallelConfig = False,
     ) -> PyTree:
         """Apply a function to the leaf values at the specified location.
 
@@ -607,21 +605,21 @@ class AtIndexer(NamedTuple):
             >>> images = indexer[...].apply(imread, parallel=dict(max_workers=2))  # doctest: +SKIP
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
-        kwargs = dict(is_leaf=is_leaf, is_parallel=is_parallel)
+        config = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, np.ndarray):
-                return np.where(where, func(leaf), leaf)
+            if isinstance(where, arraylib.ndarray):
+                return arraylib.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
 
-        return tu.tree_map(leaf_apply, self.tree, where, **kwargs)
+        return treelib.map(leaf_apply, self.tree, where, **config)
 
     def scan(
         self,
         func: Callable[[Any, S], tuple[Any, S]],
         state: S,
         *,
-        is_leaf: IsLeafType = None,
+        is_leaf: Callable[[Any], None] | None = None,
     ) -> tuple[PyTree, S]:
         """Apply a function while carrying a state.
 
@@ -685,11 +683,11 @@ class AtIndexer(NamedTuple):
             return leaf
 
         def leaf_apply(leaf: Any, where: bool):
-            if isinstance(where, np.ndarray):
-                return np.where(where, stateless_func(leaf), leaf)
+            if isinstance(where, arraylib.ndarray):
+                return arraylib.where(where, stateless_func(leaf), leaf)
             return stateless_func(leaf) if where else leaf
 
-        out = tu.tree_map(leaf_apply, self.tree, where, is_leaf=is_leaf)
+        out = treelib.map(leaf_apply, self.tree, where, is_leaf=is_leaf)
         return out, running_state
 
     def reduce(
@@ -697,7 +695,7 @@ class AtIndexer(NamedTuple):
         func: Callable[[Any, Any], Any],
         *,
         initializer: Any = _no_initializer,
-        is_leaf: IsLeafType = None,
+        is_leaf: Callable[[Any], None] | None = None,
     ) -> Any:
         """Reduce the leaf values at the specified location.
 
@@ -729,7 +727,7 @@ class AtIndexer(NamedTuple):
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
         tree = self[where].get(is_leaf=is_leaf)  # type: ignore
-        leaves, _ = tu.tree_flatten(tree, is_leaf=is_leaf)
+        leaves, _ = treelib.flatten(tree, is_leaf=is_leaf)
         if initializer is _no_initializer:
             return ft.reduce(func, leaves)
         return ft.reduce(func, leaves, initializer)

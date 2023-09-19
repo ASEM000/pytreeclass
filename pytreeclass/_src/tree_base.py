@@ -21,8 +21,7 @@ from typing import Any, Hashable, TypeVar
 
 from typing_extensions import Unpack
 
-from pytreeclass._src.backend import numpy as np
-from pytreeclass._src.backend import tree_util as tu
+from pytreeclass._src.backend import arraylib, treelib
 from pytreeclass._src.code_build import fields
 from pytreeclass._src.tree_index import AtIndexer
 from pytreeclass._src.tree_pprint import (
@@ -85,9 +84,9 @@ class TreeClassIndexer(AtIndexer):
             - Use .at["method_name"](*, **) to call a method that mutates the instance.
         """
         tree = tree_copy(self.tree)
-        tu.tree_map(lambda _: _, tree, is_leaf=add_mutable_entry)
+        treelib.map(lambda _: _, tree, is_leaf=add_mutable_entry)
         value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
-        tu.tree_map(lambda _: _, tree, is_leaf=discard_mutable_entry)
+        treelib.map(lambda _: _, tree, is_leaf=discard_mutable_entry)
         return value, tree
 
 
@@ -213,7 +212,7 @@ class TreeClass(metaclass=TreeClassMeta):
 
         super().__init_subclass__(**k)
         # register with the proper backend
-        tu.register_treeclass(klass)
+        treelib.register_treeclass(klass)
 
     def __setattr__(self, key: str, value: Any) -> None:
         if id(self) not in _mutable_instance_registry:
@@ -306,7 +305,7 @@ class TreeClass(metaclass=TreeClassMeta):
     def __hash__(self) -> int:
         return tree_hash(self)
 
-    def __eq__(self, other: Any) -> bool | np.ndarray:
+    def __eq__(self, other: Any) -> bool | arraylib.ndarray:
         return is_tree_equal(self, other)
 
 

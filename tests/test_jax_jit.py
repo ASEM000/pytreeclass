@@ -16,7 +16,6 @@
 import pytest
 
 from pytreeclass._src.backend import backend
-from pytreeclass._src.backend import numpy as np
 from pytreeclass._src.code_build import autoinit
 from pytreeclass._src.tree_base import TreeClass
 from pytreeclass._src.tree_util import is_tree_equal, leafwise
@@ -25,21 +24,22 @@ from pytreeclass._src.tree_util import is_tree_equal, leafwise
 @pytest.mark.skipif(backend != "jax", reason="jax backend is not installed")
 def test_ops_with_jit():
     import jax
+    import jax.numpy as arraylib
 
     @autoinit
     @leafwise
     class T0(TreeClass):
-        a: jax.Array = np.array(1)
-        b: jax.Array = np.array(2)
-        c: jax.Array = np.array(3)
+        a: jax.Array = arraylib.array(1)
+        b: jax.Array = arraylib.array(2)
+        c: jax.Array = arraylib.array(3)
 
     @autoinit
     @leafwise
     class T1(TreeClass):
-        a: jax.Array = np.array(1)
-        b: jax.Array = np.array(2)
-        c: jax.Array = np.array(3)
-        d: jax.Array = np.array([1, 2, 3])
+        a: jax.Array = arraylib.array(1)
+        b: jax.Array = arraylib.array(2)
+        c: jax.Array = arraylib.array(3)
+        d: jax.Array = arraylib.array([1, 2, 3])
 
     @jax.jit
     def getter(tree):

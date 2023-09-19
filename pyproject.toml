@@ -6,32 +6,38 @@ build-backend = "setuptools.build_meta"
 name = "pytreeclass"
 dynamic = ["version"]
 requires-python = ">=3.8"
-license = {file = "LICENSE"}
-description = "Visualize, create, and operate on JAX PyTree in the most intuitive way possible."
-authors = [{name = "Mahmoud Asem", email = "mahmoudasem00@gmail.com"}]
-keywords = ["jax", "neural-networks", "functional-programming", "machine-learning"]
+license = { file = "LICENSE" }
+description = "Visualize, create, and operate on pytrees in the most intuitive way possible."
+authors = [{ name = "Mahmoud Asem", email = "mahmoudasem00@gmail.com" }]
+keywords = [
+  "jax",
+  "neural-networks",
+  "functional-programming",
+  "machine-learning",
+]
 dependencies = ["typing-extensions"]
 readme = "README.md"
 
-classifiers=[
-    "Development Status :: 5 - Production/Stable",
-    "Environment :: Console",
-    "Intended Audience :: Science/Research",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 [project.optional-dependencies]
 jax = ["jax>=0.4.7"]
 numpy = ["numpy", "optree"]
+torch = ["torch", "optree"]
 
 [tool.setuptools.dynamic]
-version = {attr = "pytreeclass.__version__" }
+version = { attr = "pytreeclass.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["pytreeclass", "pytreeclass.*"]
@@ -45,13 +51,13 @@ select = ["F", "E", "I", "W", "C90", "N", "D"]
 line-length = 120
 fixable = ["ALL"]
 ignore = [
-    "E731",  # do not assign a lambda expression, use a def
-    "N804",  # first argument of a classmethod should be named 'cls'
-    "D104",  # Missing docstring in public package
-    "D103",  # Missing docstring in public function
-    "D411",
-    "N813",
-    "D105",
+  "E731", # do not assign a lambda expression, use a def
+  "N804", # first argument of a classmethod should be named 'cls'
+  "D104", # Missing docstring in public package
+  "D103", # Missing docstring in public function
+  "D411",
+  "N813",
+  "D105",
 ]
 
 [tool.ruff.pydocstyle]

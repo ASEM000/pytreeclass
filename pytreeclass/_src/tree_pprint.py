@@ -28,10 +28,8 @@ from typing import Any, Callable, Literal, NamedTuple, Sequence
 
 from typing_extensions import TypeAlias, TypedDict, Unpack
 
-from pytreeclass._src.backend import numpy as np
-from pytreeclass._src.backend import tree_util as tu
+from pytreeclass._src.backend import arraylib, treelib
 from pytreeclass._src.tree_util import (
-    IsLeafType,
     Node,
     construct_tree,
     is_path_leaf_depth_factory,
@@ -119,27 +117,27 @@ def attr_value_pp(x: tuple[str, Any], **spec: Unpack[PPSpec]) -> str:
 @pp_dispatcher.register(ShapeDtypePP)
 def shape_dtype_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     """Pretty print a node with dtype and shape."""
-    shape = f"{node.shape}".replace(",", "")
+    shape = f"{arraylib.shape(node)}".replace(",", "")
     shape = shape.replace("(", "[")
     shape = shape.replace(")", "]")
     shape = shape.replace(" ", ",")
-    dtype = f"{node.dtype}".replace("int", "i")
+    dtype = f"{arraylib.dtype(node)}".replace("int", "i")
     dtype = dtype.replace("float", "f")
     dtype = dtype.replace("complex", "c")
     return dtype + shape
 
 
-@pp_dispatcher.register(np.ndarray)
-def numpy_pp(node: np.ndarray, **spec: Unpack[PPSpec]) -> str:
+@pp_dispatcher.register(arraylib.ndarray)
+def array_pp(node: arraylib.ndarray, **spec: Unpack[PPSpec]) -> str:
     """Replace ndarray repr with short hand notation for type and shape."""
     if spec["kind"] == "STR":
         return general_pp(node, **spec)
 
     base = shape_dtype_pp(node, **spec)
 
-    if not issubclass(node.dtype.type, (np.integer, np.floating)):
+    if not (arraylib.is_floating(node) or arraylib.is_integer(node)):
         return base
-    if node.size == 0:
+    if arraylib.size(node) == 0:
         return base
 
     # Extended repr for numpy array, with extended information
@@ -148,17 +146,15 @@ def numpy_pp(node: np.ndarray, **spec: Unpack[PPSpec]) -> str:
 
     with suppress(Exception):
         # maybe the array is a jax tracers
-        low, high = np.min(node), np.max(node)
+        low, high = arraylib.min(node), arraylib.max(node)
         interval = "(" if math.isinf(low) else "["
         interval += (
-            f"{low},{high}"
-            if issubclass(node.dtype.type, np.integer)
-            else f"{low:.2f},{high:.2f}"
+            f"{low},{high}" if arraylib.is_integer(node) else f"{low:.2f},{high:.2f}"
         )
         interval += ")" if math.isinf(high) else "]"
         interval = interval.replace("inf", "∞")
 
-        mean, std = f"{np.mean(node):.2f}", f"{np.std(node):.2f}"
+        mean, std = f"{arraylib.mean(node):.2f}", f"{arraylib.std(node):.2f}"
         return f"{base}(μ={mean}, σ={std}, ∈{interval})"
 
     return base
@@ -286,7 +282,7 @@ def tree_diagram(
     tree: Any,
     *,
     depth: int | float = float("inf"),
-    is_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], None] | None = None,
     tabwidth: int = 4,
 ):
     """Pretty print arbitrary pytrees tree with tree structure diagram.
@@ -372,7 +368,7 @@ def tree_diagram(
 def tree_mermaid(
     tree: PyTree,
     depth: int | float = float("inf"),
-    is_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], None] | None = None,
     tabwidth: int | None = 4,
 ) -> str:
     """Generate a mermaid diagram syntax for arbitrary pytrees.
@@ -433,7 +429,7 @@ dot_dispatcher = ft.singledispatch(lambda _: dict(shape="box"))
 def tree_graph(
     tree: PyTree,
     depth: int | float = float("inf"),
-    is_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], None] | None = None,
     tabwidth: int | None = 4,
 ) -> str:
     """Generate a dot diagram syntax for arbitrary pytrees.
@@ -550,7 +546,7 @@ def tree_summary(
     tree: PyTree,
     *,
     depth: int | float = float("inf"),
-    is_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], None] | None = None,
 ) -> str:
     """Print a summary of an arbitrary pytree.
 
@@ -647,7 +643,7 @@ def tree_summary(
             continue
 
         paths, _ = trace
-        pstr = tu.keystr(paths)
+        pstr = treelib.keystr(paths)
         tstr = tree_summary.type_dispatcher(leaf)
         cstr = f"{count:,}" if count else ""
         sstr = size_pp(size) if size else ""
@@ -669,7 +665,7 @@ tree_summary.type_dispatcher = ft.singledispatch(lambda x: type(x).__name__)
 tree_summary.def_type = tree_summary.type_dispatcher.register
 
 
-@tree_summary.def_type(np.ndarray)
+@tree_summary.def_type(arraylib.ndarray)
 def tree_summary_array(node: Any) -> str:
     """Return the type repr of the node."""
     shape_dype = node.shape, node.dtype
@@ -677,13 +673,13 @@ def tree_summary_array(node: Any) -> str:
     return pp(ShapeDtypePP(*shape_dype), **spec)
 
 
-@tree_summary.def_count(np.ndarray)
-def tree_summary_array_count(node: np.ndarray) -> int:
+@tree_summary.def_count(arraylib.ndarray)
+def tree_summary_array_count(node: arraylib.ndarray) -> int:
     return node.size
 
 
-@tree_summary.def_size(np.ndarray)
-def tree_summary_array_size(node: np.ndarray) -> int:
+@tree_summary.def_size(arraylib.ndarray)
+def tree_summary_array_size(node: arraylib.ndarray) -> int:
     return node.nbytes
 
 
@@ -691,7 +687,7 @@ def tree_size(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.size_dispatcher(node)
 
-    leaves, _ = tu.tree_flatten(tree)
+    leaves, _ = treelib.flatten(tree)
     return ft.reduce(reduce_func, leaves, 0)
 
 
@@ -699,7 +695,7 @@ def tree_count(tree: PyTree) -> int:
     def reduce_func(acc, node):
         return acc + tree_summary.count_dispatcher(node)
 
-    leaves, _ = tu.tree_flatten(tree)
+    leaves, _ = treelib.flatten(tree)
     return ft.reduce(reduce_func, leaves, 0)
 
 

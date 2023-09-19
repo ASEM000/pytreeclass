@@ -20,10 +20,9 @@ import functools as ft
 import hashlib
 from typing import Any, Callable, Generic, NamedTuple, TypeVar, Union
 
-from pytreeclass._src.backend import numpy as np
-from pytreeclass._src.backend import tree_util as tu
+from pytreeclass._src.backend import arraylib, treelib
 from pytreeclass._src.tree_pprint import tree_repr, tree_str, tree_summary
-from pytreeclass._src.tree_util import IsLeafType, is_tree_equal, tree_copy, tree_hash
+from pytreeclass._src.tree_util import is_tree_equal, tree_copy, tree_hash
 
 T = TypeVar("T")
 MaskType = Union[T, Callable[[Any], bool]]
@@ -71,7 +70,7 @@ class _FrozenBase(Generic[T]):
         # register subclass as an empty pytree node
         super().__init_subclass__(**k)
         # register with the proper backend
-        tu.register_static(klass)
+        treelib.register_static(klass)
 
     # raise helpful error message when trying to interact with frozen object
     __add__ = __radd__ = __iadd__ = _FrozenError("+")
@@ -100,7 +99,7 @@ class _FrozenHashable(_FrozenBase):
     def __hash__(self) -> int:
         return tree_hash(self.__wrapped__)
 
-    def __eq__(self, rhs: Any) -> bool | np.ndarray:
+    def __eq__(self, rhs: Any) -> bool | arraylib.ndarray:
         if not isinstance(rhs, _FrozenHashable):
             return False
         return is_tree_equal(self.__wrapped__, rhs.__wrapped__)
@@ -108,7 +107,7 @@ class _FrozenHashable(_FrozenBase):
 
 class _FrozenArray(_FrozenBase):
     def __hash__(self) -> int:
-        bytes = np.array(self.__wrapped__).tobytes()
+        bytes = arraylib.tobytes(self.__wrapped__)
         return int(hashlib.sha256(bytes).hexdigest(), 16)
 
     def __eq__(self, other) -> bool:
@@ -116,11 +115,11 @@ class _FrozenArray(_FrozenBase):
             return False
 
         lhs, rhs = self.__wrapped__, other.__wrapped__
-        if lhs.shape != rhs.shape:
+        if arraylib.shape(lhs) != arraylib.shape(rhs):
             return False
-        if lhs.dtype != rhs.dtype:
+        if arraylib.dtype(lhs) != arraylib.dtype(rhs):
             return False
-        return np.all(lhs == rhs)
+        return arraylib.all(lhs == rhs)
 
 
 def freeze(value: T) -> _FrozenBase[T]:
@@ -158,7 +157,7 @@ freeze.type_dispatcher = ft.singledispatch(lambda x: _FrozenHashable(x))
 freeze.def_type = freeze.type_dispatcher.register
 
 
-@freeze.def_type(np.ndarray)
+@freeze.def_type(arraylib.ndarray)
 def _(value: T) -> _FrozenArray[T]:
     return _FrozenArray(value)
 
@@ -242,10 +241,10 @@ is_nondiff.type_dispatcher = ft.singledispatch(lambda x: True)
 is_nondiff.def_type = is_nondiff.type_dispatcher.register
 
 
-@is_nondiff.def_type(np.ndarray)
-def _(value: np.ndarray) -> bool:
+@is_nondiff.def_type(arraylib.ndarray)
+def _(value: arraylib.ndarray) -> bool:
     # return True if the node is non-inexact type, otherwise False
-    if np.issubdtype(value.dtype, np.inexact):
+    if arraylib.is_inexact(value):
         return False
     return True
 
@@ -261,26 +260,25 @@ def _tree_mask_map(
     mask: MaskType,
     func: type | Callable[[Any], Any],
     *,
-    is_leaf: IsLeafType = None,
+    is_leaf: Callable[[Any], None] | None = None,
 ):
     # apply func to leaves satisfying mask pytree/condtion
-    _, lhsdef = tu.tree_flatten(tree, is_leaf=is_leaf)
-    _, rhsdef = tu.tree_flatten(mask, is_leaf=is_leaf)
+    _, lhsdef = treelib.flatten(tree, is_leaf=is_leaf)
+    _, rhsdef = treelib.flatten(mask, is_leaf=is_leaf)
 
     if (lhsdef == rhsdef) and (type(mask) is type(tree)):
-        return tu.tree_map(
-            lambda x, y: func(x) if y else x,
-            tree,
-            mask,
-            is_leaf=is_leaf,
-        )
+
+        def map_func(x, y):
+            return func(x) if y else x
+
+        return treelib.map(map_func, tree, mask, is_leaf=is_leaf)
 
     if isinstance(mask, Callable):
-        return tu.tree_map(
-            lambda x: func(x) if mask(x) else x,
-            tree,
-            is_leaf=is_leaf,
-        )
+
+        def map_func(x):
+            return func(x) if mask(x) else x
+
+        return treelib.map(map_func, tree, is_leaf=is_leaf)
 
     raise ValueError(
         f"`mask` must be a callable that accepts a leaf and returns a boolean "
@@ -289,7 +287,12 @@ def _tree_mask_map(
     )
 
 
-def tree_mask(tree: T, mask: MaskType = is_nondiff, *, is_leaf: IsLeafType = None):
+def tree_mask(
+    tree: T,
+    mask: MaskType = is_nondiff,
+    *,
+    is_leaf: Callable[[Any], None] | None = None,
+):
     """Mask leaves of a pytree based on ``mask`` boolean pytree or callable.
 
     Args:
