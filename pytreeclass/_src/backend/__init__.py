@@ -14,31 +14,54 @@
 
 from __future__ import annotations
 
+import functools as ft
 import os
 from importlib.util import find_spec
 
-backend = os.environ.get("PYTREECLASS_BACKEND", "jax").lower()
+backend = os.environ.get("PYTREECLASS_BACKEND", "default").lower()
+
+
+@ft.lrucache(maxsize=1)
+def is_available(backend):
+    return find_spec(backend) is not None
+
+
+if backend == "default":
+    # do backend promotion if possible
+    if is_available("jax"):
+        backend = "jax"
+    elif is_available("torch"):
+        backend = "torch"
+    elif is_available("numpy"):
+        backend = "numpy"
+    else:
+        # no backend is available
+        if not is_available("optree"):
+            raise ImportError("No backend is available. Please install `optree`.")
+
+        from pytreeclass._src.backend.arraylib.noarray import NoArray
+        from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
+
+        arraylib = NoArray()
+        treelib = OpTreeTreeLib()
 
 
 if backend == "jax":
-    if find_spec("jax") is None:
-        import logging
+    if not is_available("jax"):
+        raise ImportError("`jax` backend requires `jax` to be installed.")
 
-        logging.info("[PYTREECLASS]: switching to `numpy` backend.")
-        backend = "default"
-    else:
-        from pytreeclass._src.backend.arraylib.jax import JaxArray
-        from pytreeclass._src.backend.treelib.jax import JaxTreeLib
+    from pytreeclass._src.backend.arraylib.jax import JaxArray
+    from pytreeclass._src.backend.treelib.jax import JaxTreeLib
 
-        arraylib = JaxArray()
-        treelib = JaxTreeLib()
+    arraylib = JaxArray()
+    treelib = JaxTreeLib()
 
-
-if backend == "numpy":
-    if find_spec("numpy") is None:
-        raise ImportError("`numpy` backend requires `numpy` to be installed.")
-    if find_spec("optree") is None:
+elif backend == "numpy":
+    if not is_available("optree"):
         raise ImportError("`numpy` backend requires `optree` to be installed.")
+
+    if not is_available("numpy"):
+        raise ImportError("`numpy` backend requires `numpy` to be installed.")
 
     from pytreeclass._src.backend.arraylib.numpy import NumpyArray
     from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
@@ -47,23 +70,13 @@ if backend == "numpy":
     treelib = OpTreeTreeLib()
 
 elif backend == "torch":
-    if find_spec("torch") is None:
+    if not is_available("torch"):
         raise ImportError("`torch` backend requires `torch` to be installed.")
-    if find_spec("optree") is None:
+    if not is_available("optree"):
         raise ImportError("`torch` backend requires `optree` to be installed.")
 
     from pytreeclass._src.backend.arraylib.torch import TorchArray
     from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
 
     arraylib = TorchArray()
-    treelib = OpTreeTreeLib()
-
-elif backend == "default":
-    if find_spec("optree") is None:
-        raise ImportError("`default` backend requires `optree` to be installed.")
-
-    from pytreeclass._src.backend.arraylib.noarray import NoArray
-    from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
-
-    arraylib = NoArray()
     treelib = OpTreeTreeLib()
