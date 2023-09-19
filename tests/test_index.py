@@ -33,7 +33,7 @@ if backend == "jax":
     import jax.numpy as arraylib
 
     default_int = arraylib.int32
-elif backend == "numpy":
+elif backend in ["numpy", "default"]:
     import numpy as arraylib
 
     default_int = arraylib.int64
@@ -106,6 +106,27 @@ _X = 1_000
         [tree1, dict(a=None, b=dict(c=2, d=None), e=None), ("b", re.compile("c"))],
         [tree2, ClassTree(None, dict(c=2, d=None), None), ("b", re.compile("c"))],
         [tree3, ClassTree(None, ClassSubTree(2, None), None), ("b", re.compile("c"))],
+        # by ellipsis
+        [tree1, tree1, (...,)],
+        [tree2, tree2, (...,)],
+        [tree3, tree3, (...,)],
+        [tree4, tree4, (...,)],
+        [tree5, tree5, (...,)],
+        [tree6, tree6, (...,)],
+        [tree7, tree7, (...,)],
+        [tree8, tree8, (...,)],
+    ],
+)
+def test_indexer_get(tree, expected, where):
+    indexer = AtIndexer(tree, where=where)
+    assert is_tree_equal(indexer.get(), expected)
+    assert is_tree_equal(indexer.get(is_parallel=True), expected)
+
+
+@pytest.mark.skipif(backend == "default", reason="no array backend installed")
+@pytest.mark.parametrize(
+    ["tree", "expected", "where"],
+    [
         # by boolean mask
         [
             tree9,
@@ -126,18 +147,10 @@ _X = 1_000
             (tree9 != tree9,),
         ],
         # by ellipsis
-        [tree1, tree1, (...,)],
-        [tree2, tree2, (...,)],
-        [tree3, tree3, (...,)],
-        [tree4, tree4, (...,)],
-        [tree5, tree5, (...,)],
-        [tree6, tree6, (...,)],
-        [tree7, tree7, (...,)],
-        [tree8, tree8, (...,)],
         [tree9, tree9, (...,)],
     ],
 )
-def test_indexer_get(tree, expected, where):
+def test_array_indexer_get(tree, expected, where):
     indexer = AtIndexer(tree, where=where)
     assert is_tree_equal(indexer.get(), expected)
     assert is_tree_equal(indexer.get(is_parallel=True), expected)
@@ -162,26 +175,6 @@ def test_indexer_get(tree, expected, where):
         [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", re.compile("c")), _X],
         [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", re.compile("c")), _X],
         [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", re.compile("c")), _X],
-        # by boolean mask
-        [
-            tree9,
-            ClassTree(1, dict(c=2, d=_X), arraylib.array([_X, _X, _X])),
-            (tree9 > 2,),
-            _X,
-        ],
-        [
-            tree9,
-            ClassTree(1, dict(c=2, d=3), arraylib.array([4, _X, _X])),
-            (tree9 > 4,),
-            _X,
-        ],
-        [
-            tree9,
-            ClassTree(_X, dict(c=_X, d=_X), arraylib.array([_X, _X, _X])),
-            (tree9 == tree9,),
-            _X,
-        ],
-        [tree9, tree9, (tree9 != tree9,), _X],
         # by ellipsis
         [
             tree1,
@@ -196,15 +189,51 @@ def test_indexer_get(tree, expected, where):
         [tree6, [_X, ClassSubTree(_X, _X), _X], (...,), _X],
         [tree7, dict(a=_X, b=[_X, _X], c=_X), (...,), _X],
         [tree8, dict(a=_X, b=ClassSubTree(c=_X, d=_X), e=_X), (...,), _X],
-        [
-            tree9,
-            ClassTree(_X, dict(c=_X, d=_X), _X),
-            (...,),
-            ClassTree(_X, dict(c=_X, d=_X), _X),  # broadcastable option
-        ],
     ],
 )
 def test_indexer_set(tree, expected, where, set_value):
+    indexer = AtIndexer(tree, where=where)
+    assert is_tree_equal(indexer.set(set_value), expected)
+    assert is_tree_equal(indexer.set(set_value, is_parallel=True), expected)
+
+
+@pytest.mark.skipif(backend == "default", reason="no array backend installed")
+@pytest.mark.parametrize(
+    ["tree", "expected", "where", "set_value"],
+    [
+        # by name
+        [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", "c"), _X],
+        [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", "c"), _X],
+        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", "c"), _X],
+        # by index
+        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), (1, 0), _X],
+        [tree4, [1, [_X, 3], 4], (1, 0), _X],
+        [tree5, (1, (_X, 3), 4), (1, 0), _X],
+        [tree6, [1, ClassSubTree(_X, 3), 4], (1, 0), _X],
+        # mixed
+        [tree7, dict(a=1, b=[2, _X], c=4), ("b", 1), _X],
+        [tree8, dict(a=1, b=ClassSubTree(c=2, d=_X), e=4), ("b", 1), _X],
+        # by regex
+        [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", re.compile("c")), _X],
+        [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", re.compile("c")), _X],
+        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", re.compile("c")), _X],
+        # by ellipsis
+        [
+            tree1,
+            dict(a=_X, b=dict(c=_X, d=_X), e=_X),
+            (...,),
+            dict(a=_X, b=dict(c=_X, d=_X), e=_X),
+        ],
+        [tree2, ClassTree(_X, dict(c=_X, d=_X), _X), (...,), _X],
+        [tree3, ClassTree(_X, ClassSubTree(_X, _X), _X), (...,), _X],
+        [tree4, [_X, [_X, _X], _X], (...,), _X],
+        [tree5, (_X, (_X, _X), _X), (...,), _X],
+        [tree6, [_X, ClassSubTree(_X, _X), _X], (...,), _X],
+        [tree7, dict(a=_X, b=[_X, _X], c=_X), (...,), _X],
+        [tree8, dict(a=_X, b=ClassSubTree(c=_X, d=_X), e=_X), (...,), _X],
+    ],
+)
+def test_array_indexer_set(tree, expected, where, set_value):
     indexer = AtIndexer(tree, where=where)
     assert is_tree_equal(indexer.set(set_value), expected)
     assert is_tree_equal(indexer.set(set_value, is_parallel=True), expected)
@@ -228,23 +257,6 @@ def test_indexer_set(tree, expected, where, set_value):
         [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", re.compile("c"))],
         [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", re.compile("c"))],
         [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", re.compile("c"))],
-        # by boolean mask
-        [
-            tree9,
-            ClassTree(1, dict(c=2, d=_X), arraylib.array([_X, _X, _X])),
-            (tree9 > 2,),
-        ],
-        [
-            tree9,
-            ClassTree(1, dict(c=2, d=3), arraylib.array([4, _X, _X])),
-            (tree9 > 4,),
-        ],
-        [
-            tree9,
-            ClassTree(_X, dict(c=_X, d=_X), arraylib.array([_X, _X, _X])),
-            (tree9 == tree9,),
-        ],
-        [tree9, tree9, (tree9 != tree9,)],
         # by ellipsis
         [tree1, dict(a=_X, b=dict(c=_X, d=_X), e=_X), (...,)],
         [tree2, ClassTree(_X, dict(c=_X, d=_X), _X), (...,)],
@@ -254,10 +266,48 @@ def test_indexer_set(tree, expected, where, set_value):
         [tree6, [_X, ClassSubTree(_X, _X), _X], (...,)],
         [tree7, dict(a=_X, b=[_X, _X], c=_X), (...,)],
         [tree8, dict(a=_X, b=ClassSubTree(c=_X, d=_X), e=_X), (...,)],
-        [tree9, ClassTree(_X, dict(c=_X, d=_X), _X), (...,)],
     ],
 )
 def test_indexer_apply(tree, expected, where):
+    indexer = AtIndexer(tree, where=where)
+    assert is_tree_equal(indexer.apply(lambda _: _X), expected)
+    assert is_tree_equal(
+        indexer.apply(lambda _: _X, is_parallel=True),
+        expected,
+    )
+
+
+@pytest.mark.skipif(backend == "default", reason="no array backend installed")
+@pytest.mark.parametrize(
+    ["tree", "expected", "where"],
+    [
+        # by name
+        [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", "c")],
+        [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", "c")],
+        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", "c")],
+        # by index
+        [tree4, [1, [_X, 3], 4], (1, 0)],
+        [tree5, (1, (_X, 3), 4), (1, 0)],
+        [tree6, [1, ClassSubTree(_X, 3), 4], (1, 0)],
+        # mixed
+        [tree7, dict(a=1, b=[2, _X], c=4), ("b", 1)],
+        [tree8, dict(a=1, b=ClassSubTree(c=2, d=_X), e=4), ("b", 1)],
+        # by regex
+        [tree1, dict(a=1, b=dict(c=_X, d=3), e=4), ("b", re.compile("c"))],
+        [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", re.compile("c"))],
+        [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", re.compile("c"))],
+        # by ellipsis
+        [tree1, dict(a=_X, b=dict(c=_X, d=_X), e=_X), (...,)],
+        [tree2, ClassTree(_X, dict(c=_X, d=_X), _X), (...,)],
+        [tree3, ClassTree(_X, ClassSubTree(_X, _X), _X), (...,)],
+        [tree4, [_X, [_X, _X], _X], (...,)],
+        [tree5, (_X, (_X, _X), _X), (...,)],
+        [tree6, [_X, ClassSubTree(_X, _X), _X], (...,)],
+        [tree7, dict(a=_X, b=[_X, _X], c=_X), (...,)],
+        [tree8, dict(a=_X, b=ClassSubTree(c=_X, d=_X), e=_X), (...,)],
+    ],
+)
+def test_array_indexer_apply(tree, expected, where):
     indexer = AtIndexer(tree, where=where)
     assert is_tree_equal(indexer.apply(lambda _: _X), expected)
     assert is_tree_equal(
@@ -282,15 +332,6 @@ def test_indexer_apply(tree, expected, where):
         [tree1, 5, ("b", re.compile("c|d"))],
         [tree2, 5, ("b", re.compile("c|d"))],
         [tree3, 5, ("b", re.compile("c|d"))],
-        # by boolean mask
-        [tree9, 3 + arraylib.array([4, 5, 6]), (tree9 > 2,)],
-        [tree9, arraylib.array([5, 6]), (tree9 > 4,)],
-        [tree9, 1 + 2 + 3 + arraylib.array([4, 5, 6]), (tree9 == tree9,)],
-        [
-            tree9,
-            0 + arraylib.array([], dtype=default_int),
-            (tree9 != tree9,),
-        ],
         # by ellipsis
         [tree1, 1 + 2 + 3 + 4, (...,)],
         [tree2, 1 + 2 + 3 + 4, (...,)],
@@ -300,10 +341,44 @@ def test_indexer_apply(tree, expected, where):
         [tree6, 1 + 2 + 3 + 4, (...,)],
         [tree7, 1 + 2 + 3 + 4, (...,)],
         [tree8, 1 + 2 + 3 + 4, (...,)],
-        [tree9, 1 + 2 + 3 + arraylib.array([4, 5, 6]), (...,)],
     ],
 )
 def test_indexer_reduce(tree, expected, where):
+    indexer = AtIndexer(tree, where=where)
+    assert is_tree_equal(
+        indexer.reduce(lambda x, y: x + y, initializer=0),
+        expected,
+    )
+
+
+@pytest.mark.parametrize(
+    ["tree", "expected", "where"],
+    [
+        # by name
+        [tree1, 5, ("b", ("c", "d"))],
+        [tree2, 5, ("b", ("c", "d"))],
+        [tree3, 5, ("b", ("c", "d"))],
+        # by index
+        [tree4, 5, (1, (0, 1))],
+        [tree5, 5, (1, (0, 1))],
+        # mixed
+        [tree7, 5, ("b", (0, 1))],
+        # by regex
+        [tree1, 5, ("b", re.compile("c|d"))],
+        [tree2, 5, ("b", re.compile("c|d"))],
+        [tree3, 5, ("b", re.compile("c|d"))],
+        # by ellipsis
+        [tree1, 1 + 2 + 3 + 4, (...,)],
+        [tree2, 1 + 2 + 3 + 4, (...,)],
+        [tree3, 1 + 2 + 3 + 4, (...,)],
+        [tree4, 1 + 2 + 3 + 4, (...,)],
+        [tree5, 1 + 2 + 3 + 4, (...,)],
+        [tree6, 1 + 2 + 3 + 4, (...,)],
+        [tree7, 1 + 2 + 3 + 4, (...,)],
+        [tree8, 1 + 2 + 3 + 4, (...,)],
+    ],
+)
+def test_array_indexer_reduce(tree, expected, where):
     indexer = AtIndexer(tree, where=where)
     assert is_tree_equal(
         indexer.reduce(lambda x, y: x + y, initializer=0),

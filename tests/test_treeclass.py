@@ -34,7 +34,7 @@ from pytreeclass._src.tree_util import Partial, is_tree_equal
 
 if backend == "jax":
     import jax.numpy as arraylib
-elif backend == "numpy":
+elif backend in ["numpy", "default"]:
     import numpy as arraylib
 elif backend == "torch":
     import torch as arraylib
@@ -271,6 +271,7 @@ def test_delattr():
         t.delete("a")
 
 
+@pytest.mark.skipif(backend == "default", reason="no array")
 def test_is_tree_equal():
     assert is_tree_equal(1, 1)
     assert is_tree_equal(1, 2) is False

@@ -32,6 +32,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+default=["optree"]
 jax = ["jax>=0.4.7"]
 numpy = ["numpy", "optree"]
 torch = ["torch", "optree"]

@@ -38,7 +38,7 @@ from pytreeclass._src.tree_util import leafwise
 
 if backend == "jax":
     import jax.numpy as arraylib
-elif backend == "numpy":
+elif backend in ["numpy", "default"]:
     import numpy as arraylib
 elif backend == "torch":
     import torch as arraylib

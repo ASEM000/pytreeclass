@@ -31,7 +31,7 @@ from pytreeclass._src.tree_util import is_tree_equal, leafwise, tree_hash
 
 if backend == "jax":
     import jax.numpy as arraylib
-elif backend == "numpy":
+elif backend in ["numpy", "default"]:
     import numpy as arraylib
 elif backend == "torch":
     import torch as arraylib
@@ -406,6 +406,7 @@ def test_wrapper():
     assert wrapped != 1
 
 
+@pytest.mark.skipif(backend == "default", reason="no array backend installed")
 def test_tree_mask_tree_unmask():
     tree = [1, 2, 3.0]
     assert treelib.flatten(tree_mask(tree))[0] == [3.0]
@@ -413,13 +414,6 @@ def test_tree_mask_tree_unmask():
 
     mask_func = lambda x: x < 2
     assert treelib.flatten(tree_mask(tree, mask_func))[0] == [2, 3.0]
-
-    frozen_array = tree_mask(arraylib.ones((5, 5)), mask=lambda _: True)
-
-    assert frozen_array == frozen_array
-    assert not (frozen_array == freeze(arraylib.ones((5, 6))))
-    # assert not (frozen_array == freeze(arraylib.ones((5, 5)).astype(arraylib.uint8)))
-    assert hash(frozen_array) == hash(frozen_array)
 
     assert freeze(freeze(1)) == freeze(1)
 
@@ -432,3 +426,13 @@ def test_tree_mask_tree_unmask():
 
     with pytest.raises(NotImplementedError):
         freeze(1) + 1
+
+
+@pytest.mark.skipif(backend == "default", reason="no array backend installed")
+def test_array_tree_mask_tree_unmask():
+    frozen_array = tree_mask(arraylib.ones((5, 5)), mask=lambda _: True)
+
+    assert frozen_array == frozen_array
+    assert not (frozen_array == freeze(arraylib.ones((5, 6))))
+    # assert not (frozen_array == freeze(arraylib.ones((5, 5)).astype(arraylib.uint8)))
+    assert hash(frozen_array) == hash(frozen_array)

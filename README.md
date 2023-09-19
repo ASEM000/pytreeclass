@@ -11,11 +11,11 @@
 |[**Benchamrks**](#more)
 |[**Acknowledgements**](#acknowledgements)
 
+![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_default.yml/badge.svg)
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_jax.yml/badge.svg)
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_numpy.yml/badge.svg)
 ![Tests](https://github.com/ASEM000/pytreeclass/actions/workflows/test_torch.yml/badge.svg)
 ![pyver](https://img.shields.io/badge/python-3.8%203.9%203.10%203.11_-blue)
-![pyver](https://img.shields.io/badge/jax->=0.4.7-blue)
 ![codestyle](https://img.shields.io/badge/codestyle-black-black)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ASEM000/pytreeclass/blob/main/assets/intro.ipynb)
 [![Downloads](https://static.pepy.tech/badge/pytreeclass)](https://pepy.tech/project/pytreeclass)
