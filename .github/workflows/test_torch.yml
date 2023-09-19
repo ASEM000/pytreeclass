@@ -1,4 +1,4 @@
-name: torch+optree backend
+name: torch backend
 
 on:
   - push
