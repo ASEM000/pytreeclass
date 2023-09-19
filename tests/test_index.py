@@ -19,8 +19,7 @@ from typing import NamedTuple
 
 import pytest
 
-from pytreeclass._src.backend import backend
-from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import arraylib, backend
 from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.code_build import autoinit
 from pytreeclass._src.tree_base import (
@@ -30,6 +29,22 @@ from pytreeclass._src.tree_base import (
 )
 from pytreeclass._src.tree_index import AtIndexer, BaseKey
 from pytreeclass._src.tree_util import is_tree_equal, leafwise
+
+if backend == "jax":
+    import jax.numpy as arraylib
+
+    default_int = arraylib.int32
+elif backend == "numpy":
+    import numpy as arraylib
+
+    default_int = arraylib.int64
+elif backend == "torch":
+    import torch as arraylib
+
+    arraylib.array = arraylib.tensor
+    default_int = arraylib.int64
+else:
+    raise ImportError("no backend installed")
 
 
 @leafwise
@@ -68,11 +83,9 @@ tree7 = dict(a=1, b=[2, 3], c=4)
 tree8 = dict(a=1, b=ClassSubTree(c=2, d=3), e=4)
 
 # by mask
-tree9 = ClassTree(1, dict(c=2, d=3), np.array([4, 5, 6]))
+tree9 = ClassTree(1, dict(c=2, d=3), arraylib.array([4, 5, 6]))
 
 _X = 1_000
-
-default_int = np.int32 if backend == "jax" else np.int64
 
 
 @pytest.mark.parametrize(
@@ -95,12 +108,22 @@ default_int = np.int32 if backend == "jax" else np.int64
         [tree2, ClassTree(None, dict(c=2, d=None), None), ("b", re.compile("c"))],
         [tree3, ClassTree(None, ClassSubTree(2, None), None), ("b", re.compile("c"))],
         # by boolean mask
-        [tree9, ClassTree(None, dict(c=None, d=3), np.array([4, 5, 6])), (tree9 > 2,)],
-        [tree9, ClassTree(None, dict(c=None, d=None), np.array([5, 6])), (tree9 > 4,)],
+        [
+            tree9,
+            ClassTree(None, dict(c=None, d=3), arraylib.array([4, 5, 6])),
+            (tree9 > 2,),
+        ],
+        [
+            tree9,
+            ClassTree(None, dict(c=None, d=None), arraylib.array([5, 6])),
+            (tree9 > 4,),
+        ],
         [tree9, tree9, (tree9 == tree9,)],
         [
             tree9,
-            ClassTree(None, dict(c=None, d=None), np.array([], dtype=default_int)),
+            ClassTree(
+                None, dict(c=None, d=None), arraylib.array([], dtype=default_int)
+            ),
             (tree9 != tree9,),
         ],
         # by ellipsis
@@ -143,14 +166,19 @@ def test_indexer_get(tree, expected, where):
         # by boolean mask
         [
             tree9,
-            ClassTree(1, dict(c=2, d=_X), np.array([_X, _X, _X])),
+            ClassTree(1, dict(c=2, d=_X), arraylib.array([_X, _X, _X])),
             (tree9 > 2,),
             _X,
         ],
-        [tree9, ClassTree(1, dict(c=2, d=3), np.array([4, _X, _X])), (tree9 > 4,), _X],
         [
             tree9,
-            ClassTree(_X, dict(c=_X, d=_X), np.array([_X, _X, _X])),
+            ClassTree(1, dict(c=2, d=3), arraylib.array([4, _X, _X])),
+            (tree9 > 4,),
+            _X,
+        ],
+        [
+            tree9,
+            ClassTree(_X, dict(c=_X, d=_X), arraylib.array([_X, _X, _X])),
             (tree9 == tree9,),
             _X,
         ],
@@ -202,11 +230,19 @@ def test_indexer_set(tree, expected, where, set_value):
         [tree2, ClassTree(1, dict(c=_X, d=3), 4), ("b", re.compile("c"))],
         [tree3, ClassTree(1, ClassSubTree(_X, 3), 4), ("b", re.compile("c"))],
         # by boolean mask
-        [tree9, ClassTree(1, dict(c=2, d=_X), np.array([_X, _X, _X])), (tree9 > 2,)],
-        [tree9, ClassTree(1, dict(c=2, d=3), np.array([4, _X, _X])), (tree9 > 4,)],
         [
             tree9,
-            ClassTree(_X, dict(c=_X, d=_X), np.array([_X, _X, _X])),
+            ClassTree(1, dict(c=2, d=_X), arraylib.array([_X, _X, _X])),
+            (tree9 > 2,),
+        ],
+        [
+            tree9,
+            ClassTree(1, dict(c=2, d=3), arraylib.array([4, _X, _X])),
+            (tree9 > 4,),
+        ],
+        [
+            tree9,
+            ClassTree(_X, dict(c=_X, d=_X), arraylib.array([_X, _X, _X])),
             (tree9 == tree9,),
         ],
         [tree9, tree9, (tree9 != tree9,)],
@@ -248,12 +284,12 @@ def test_indexer_apply(tree, expected, where):
         [tree2, 5, ("b", re.compile("c|d"))],
         [tree3, 5, ("b", re.compile("c|d"))],
         # by boolean mask
-        [tree9, 3 + np.array([4, 5, 6]), (tree9 > 2,)],
-        [tree9, np.array([5, 6]), (tree9 > 4,)],
-        [tree9, 1 + 2 + 3 + np.array([4, 5, 6]), (tree9 == tree9,)],
+        [tree9, 3 + arraylib.array([4, 5, 6]), (tree9 > 2,)],
+        [tree9, arraylib.array([5, 6]), (tree9 > 4,)],
+        [tree9, 1 + 2 + 3 + arraylib.array([4, 5, 6]), (tree9 == tree9,)],
         [
             tree9,
-            0 + np.array([], dtype=default_int),
+            0 + arraylib.array([], dtype=default_int),
             (tree9 != tree9,),
         ],
         # by ellipsis
@@ -265,7 +301,7 @@ def test_indexer_apply(tree, expected, where):
         [tree6, 1 + 2 + 3 + 4, (...,)],
         [tree7, 1 + 2 + 3 + 4, (...,)],
         [tree8, 1 + 2 + 3 + 4, (...,)],
-        [tree9, 1 + 2 + 3 + np.array([4, 5, 6]), (...,)],
+        [tree9, 1 + 2 + 3 + arraylib.array([4, 5, 6]), (...,)],
     ],
 )
 def test_indexer_reduce(tree, expected, where):
@@ -408,7 +444,7 @@ def test_custom_key():
             flatten_with_keys=tree_flatten_with_keys,
             unflatten_func=tree_unflatten,
         )
-    elif backend == "numpy":
+    elif backend in ["numpy", "torch"]:
         import optree as ot
 
         def tree_flatten(tree):

@@ -17,11 +17,11 @@ from __future__ import annotations
 import dataclasses as dc
 import re
 from collections import namedtuple
+from typing import Any
 
 import pytest
 
 from pytreeclass._src.backend import backend
-from pytreeclass._src.backend import numpy as np
 from pytreeclass._src.code_build import autoinit, field
 from pytreeclass._src.tree_base import TreeClass
 from pytreeclass._src.tree_pprint import (
@@ -35,6 +35,17 @@ from pytreeclass._src.tree_pprint import (
     tree_summary,
 )
 from pytreeclass._src.tree_util import leafwise
+
+if backend == "jax":
+    import jax.numpy as arraylib
+elif backend == "numpy":
+    import numpy as arraylib
+elif backend == "torch":
+    import torch as arraylib
+
+    arraylib.array = arraylib.tensor
+else:
+    raise ImportError("no backend installed")
 
 
 def test_table():
@@ -68,23 +79,26 @@ class Repr1(TreeClass):
     e: list = None
     f: set = None
     g: dict = None
-    h: np.ndarray = None
-    i: np.ndarray = None
-    j: np.ndarray = None
+    h: Any = None
+    i: Any = None
+    j: Any = None
     k: tuple = field(repr=False, default=(1, 2, 3))
     l: tuple = namedtuple("a", ["b", "c"])(1, 2)
-    m: np.array = np.ones((5, 5), dtype=np.float32)
-    n: np.array = np.array(True)
-    o: np.array = np.array([1, 2.0], dtype=np.complex64)
+    m: Any = arraylib.ones((5, 5), dtype=arraylib.float32)
+    n: Any = arraylib.array(True)
+    o: Any = arraylib.array([1, 2.0], dtype=arraylib.complex64)
 
     def __post_init__(self):
-        self.h = np.ones((5, 1), dtype=np.float32)
-        self.i = np.ones((1, 6), dtype=np.float32)
-        self.j = np.ones((1, 1, 4, 5), dtype=np.float32)
-
+        self.h = arraylib.ones((5, 1), dtype=arraylib.float32)
+        self.i = arraylib.ones((1, 6), dtype=arraylib.float32)
+        self.j = arraylib.ones((1, 1, 4, 5), dtype=arraylib.float32)
         self.e = [10] * 5
         self.f = {1, 2, 3}
-        self.g = {"a": "a" * 50, "b": "b" * 50, "c": np.ones([5, 5], dtype=np.float32)}
+        self.g = {
+            "a": "a" * 50,
+            "b": "b" * 50,
+            "c": arraylib.ones([5, 5], dtype=arraylib.float32),
+        }
 
 
 r1 = Repr1()
@@ -185,7 +199,7 @@ def test_misc():
     # )
 
     assert (
-        tree_repr(np.ones([1, 2], dtype=np.uint16))
+        tree_repr(arraylib.ones([1, 2], dtype=arraylib.uint16))
         == "ui16[1,2](μ=1.00, σ=0.00, ∈[1,1])"
     )
 

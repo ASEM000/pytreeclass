@@ -22,7 +22,7 @@ from copy import copy
 from math import ceil, floor, trunc
 from typing import Any, Callable, Hashable, Iterator, Sequence, Tuple, TypeVar, Union
 
-from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import arraylib
 from pytreeclass._src.backend import tree_util as tu
 
 T = TypeVar("T")
@@ -53,7 +53,7 @@ def has_shape_dtype(node: Any) -> bool:
     return hasattr(node, "shape") and hasattr(node, "dtype")
 
 
-def _is_leaf_rhs_equal(leaf, rhs) -> bool | np.ndarray:
+def _is_leaf_rhs_equal(leaf, rhs) -> bool | arraylib.ndarray:
     if has_shape_dtype(leaf):
         if has_shape_dtype(rhs):
             if leaf.shape != rhs.shape:
@@ -61,14 +61,14 @@ def _is_leaf_rhs_equal(leaf, rhs) -> bool | np.ndarray:
             if leaf.dtype != rhs.dtype:
                 return False
             try:
-                return bool(verdict := np.all(leaf == rhs))
+                return bool(verdict := arraylib.all(leaf == rhs))
             except Exception:
                 return verdict  # fail under `jit`
         return False
     return leaf == rhs
 
 
-def is_tree_equal(*trees: Any) -> bool | np.ndarray:
+def is_tree_equal(*trees: Any) -> bool | arraylib.ndarray:
     """Return ``True`` if all pytrees are equal.
 
     Note:

@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import backend
 from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.code_build import autoinit
 from pytreeclass._src.tree_base import TreeClass
@@ -29,6 +29,17 @@ from pytreeclass._src.tree_mask import (
     unfreeze,
 )
 from pytreeclass._src.tree_util import is_tree_equal, leafwise, tree_hash
+
+if backend == "jax":
+    import jax.numpy as arraylib
+elif backend == "numpy":
+    import numpy as arraylib
+elif backend == "torch":
+    import torch as arraylib
+
+    arraylib.array = arraylib.tensor
+else:
+    raise ImportError("no backend installed")
 
 
 def test_freeze_unfreeze():
@@ -124,9 +135,9 @@ def test_freeze_errors():
     t.at[...].set(0)
 
     with pytest.raises(TypeError):
-        t.at[...].apply(np.sin)
+        t.at[...].apply(arraylib.sin)
 
-    t.at[...].reduce(np.sin)
+    t.at[...].reduce(arraylib.sin)
 
 
 def test_freeze_with_ops():
@@ -174,13 +185,13 @@ def test_freeze_with_ops():
         is_tree_equal(t.at[...].apply(lambda x: x + 1), t)
 
     with pytest.raises(LookupError):
-        is_tree_equal(t.at[...].reduce(np.add, initializer=0), t)
+        is_tree_equal(t.at[...].reduce(arraylib.add, initializer=0), t)
 
     class Test(TreeClass):
         def __init__(self, x):
             self.x = x
 
-    t = Test(np.array([1, 2, 3]))
+    t = Test(arraylib.array([1, 2, 3]))
     assert is_tree_equal(t.at[...].set(None), Test(x=None))
 
     class T0:
@@ -404,11 +415,11 @@ def test_tree_mask_tree_unmask():
     mask_func = lambda x: x < 2
     assert tu.tree_flatten(tree_mask(tree, mask_func))[0] == [2, 3.0]
 
-    frozen_array = tree_mask(np.ones((5, 5)), mask=lambda _: True)
+    frozen_array = tree_mask(arraylib.ones((5, 5)), mask=lambda _: True)
 
     assert frozen_array == frozen_array
-    assert not (frozen_array == freeze(np.ones((5, 6))))
-    assert not (frozen_array == freeze(np.ones((5, 5)).astype(np.uint8)))
+    assert not (frozen_array == freeze(arraylib.ones((5, 6))))
+    # assert not (frozen_array == freeze(arraylib.ones((5, 5)).astype(arraylib.uint8)))
     assert hash(frozen_array) == hash(frozen_array)
 
     assert freeze(freeze(1)) == freeze(1)

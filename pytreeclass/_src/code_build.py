@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import functools as ft
 import sys
 from collections import defaultdict
 from collections.abc import Callable, MutableMapping, MutableSequence, MutableSet
@@ -29,6 +30,18 @@ PyTree = Any
 EllipsisType = type(Ellipsis)
 ArgKindType = Literal["POS_ONLY", "POS_OR_KW", "VAR_POS", "KW_ONLY", "VAR_KW"]
 ArgKind = get_args(ArgKindType)
+
+
+@ft.singledispatch
+def check_excluded_type(value: T) -> None:
+    ...
+
+
+@check_excluded_type.register(MutableSequence)
+@check_excluded_type.register(MutableMapping)
+@check_excluded_type.register(MutableSet)
+def _(value) -> None:
+    raise TypeError(f"Mutable {value=} is not allowed.")
 
 
 class Null:
@@ -326,10 +339,9 @@ def build_field_map(klass: type) -> MappingProxyType[str, Field]:
             # non-autoinit base class type hints are ignored
             continue
 
-        if isinstance(value.default, (MutableSequence, MutableMapping, MutableSet)):
-            # https://github.com/google/jax/issues/14295
-            # example case: `x: Any = field(default=[1, 2, 3])`
-            raise TypeError(f"Mutable {value.default=} is not allowed.")
+        # in case the user uses mutable defaults or any other user-defined
+        # excluded types, raise an error
+        check_excluded_type(value.default)
 
         # case: `x: Any = field(default=1)`
         field_map[key] = value.replace(name=key, type=hint)
@@ -495,6 +507,22 @@ def autoinit(klass: type[T]) -> type[T]:
         use ``jax.Array`` as a field default value. As ``dataclasses.dataclass``
         will incorrectly raise an error starting from python 3.11 complaining
         that ``jax.Array`` is not immutable.
+
+    Note:
+        By default ``autoinit`` will raise an error if the user uses mutable defaults
+        in the field annotations. To register an additional type to be excluded from
+        ``autoinit``, use :func:`register_excluded_type`, with an optional reason
+        for excluding the type.
+
+        >>> import pytreeclass as tc
+        >>> class T:
+        ...     pass
+        >>> tc.autoinit.register_excluded_type(T, reason="not allowed")
+        >>> @tc.autoinit
+        ... class Tree:
+        ...     x: T = tc.field(default=T())  # doctest: +SKIP
+        Traceback (most recent call last):
+            ...
     """
     return (
         klass
@@ -506,3 +534,20 @@ def autoinit(klass: type[T]) -> type[T]:
         # and any base classes that are decorated with `autoinit`
         else build_init_method(convert_hints_to_fields(klass))
     )
+
+
+def register_excluded_type(klass: type, reason: str | None = None) -> None:
+    """Exclude a type from being used in the ``autoinit`` decorator.
+
+    Args:
+        klass: The type to be excluded.
+        reason: The reason for excluding the type.
+    """
+    reason = f" {reason=}" if reason else ""
+
+    @check_excluded_type.register(klass)
+    def _(value) -> None:
+        raise TypeError(f"{value=} is excluded from `autoinit`.{reason}")
+
+
+autoinit.register_excluded_type = register_excluded_type

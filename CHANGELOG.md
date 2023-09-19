@@ -5,9 +5,11 @@
 - Supports multibackend:
   - `numpy` + `optree` via `export PYTREECLASS_BACKEND=numpy` (lightweight option)
   - `jax` via `export PYTREECLASS_BACKEND=jax` - The default -
+  - `torch` + `optree` via `export PYTREECLASS_BACKEND=torch`
 
 - drop `callback` option in parallel options in `is_parallel`
 - Add parallel processing via `is_parallel` to `.{get,set}`
+- `register_excluded_type` to `autoinit` to exclude certain types to be in `field` defaults.
 
 
 ## v0.9.2

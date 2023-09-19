@@ -21,7 +21,7 @@ from typing import Any, Hashable, TypeVar
 
 from typing_extensions import Unpack
 
-from pytreeclass._src.backend import numpy as np
+from pytreeclass._src.backend import arraylib
 from pytreeclass._src.backend import tree_util as tu
 from pytreeclass._src.code_build import fields
 from pytreeclass._src.tree_index import AtIndexer
@@ -306,7 +306,7 @@ class TreeClass(metaclass=TreeClassMeta):
     def __hash__(self) -> int:
         return tree_hash(self)
 
-    def __eq__(self, other: Any) -> bool | np.ndarray:
+    def __eq__(self, other: Any) -> bool | arraylib.ndarray:
         return is_tree_equal(self, other)
 
 

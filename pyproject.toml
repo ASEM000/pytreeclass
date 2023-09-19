@@ -29,6 +29,7 @@ classifiers=[
 [project.optional-dependencies]
 jax = ["jax>=0.4.7"]
 numpy = ["numpy", "optree"]
+torch = ["torch", "optree"]
 
 [tool.setuptools.dynamic]
 version = {attr = "pytreeclass.__version__" }
