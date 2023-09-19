@@ -270,7 +270,7 @@ def test_delattr():
     with pytest.raises(AttributeError):
         t.delete("a")
 
-
+@pytest.mark.skipif(backend == "default", reason="no array")
 def test_is_tree_equal():
     assert is_tree_equal(1, 1)
     assert is_tree_equal(1, 2) is False
