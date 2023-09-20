@@ -67,7 +67,7 @@ class _FrozenBase(Generic[T]):
         return type(self)(tree_copy(self.__wrapped__))
 
     def __init_subclass__(klass, **k) -> None:
-        # register subclass as an empty pytree node
+        # register subclasses as an empty pytree node
         super().__init_subclass__(**k)
         # register with the proper backend
         treelib.register_static(klass)
@@ -159,12 +159,14 @@ freeze.def_type = freeze.type_dispatcher.register
 
 @freeze.def_type(arraylib.ndarray)
 def _(value: T) -> _FrozenArray[T]:
+    # wrap arrays with a custom wrapper that implements hash and equality
+    # arrays can be hashed by converting them to bytes and hashing the bytes
     return _FrozenArray(value)
 
 
 @freeze.def_type(_FrozenBase)
 def _(value: _FrozenBase[T]) -> _FrozenBase[T]:
-    # idempotent freeze
+    # idempotent freeze operation
     return value
 
 
@@ -267,14 +269,16 @@ def _tree_mask_map(
     _, rhsdef = treelib.tree_flatten(mask, is_leaf=is_leaf)
 
     if (lhsdef == rhsdef) and (type(mask) is type(tree)):
-
+        # a tree with the same structure as tree with boolean values
+        # and also a callable.
         def map_func(x, y):
             return func(x) if y else x
 
         return treelib.tree_map(map_func, tree, mask, is_leaf=is_leaf)
 
     if isinstance(mask, Callable):
-
+        # a callable that accepts a leaf and returns a boolean
+        # but *not* a tree with the same structure as tree with boolean values.
         def map_func(x):
             return func(x) if mask(x) else x
 

@@ -14,6 +14,15 @@
 
 """Constructor code generation from type annotations."""
 
+# this modules contains lots of functionality similar to `dataclasses` and attrs.
+# however, notable differences are:
+# - allow marking fields as positional only, keyword only, variable positional,...
+# - allow applying functions on the field values during initialization using descriptors.
+# - does not allow mutable defaults.
+# - allow registering additional types to be excluded from `autoinit`. e.g. raise an error.
+# - only code generation is supported is done. other functionality like `__repr__`,
+#   `__eq__`, `__hash__`, etc. are not done here.
+
 from __future__ import annotations
 
 import functools as ft
@@ -510,7 +519,7 @@ def autoinit(klass: type[T]) -> type[T]:
 
     Note:
         By default ``autoinit`` will raise an error if the user uses mutable defaults.
-        To register an additional type to be excluded from ``autoinit``, use 
+        To register an additional type to be excluded from ``autoinit``, use
         :func:`autoinit.register_excluded_type`, with an optional ``reason``
         for excluding the type.
 

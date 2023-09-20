@@ -62,7 +62,6 @@ def pp_dispatcher(node: Any, **spec: Unpack[PPSpec]) -> str:
 
 def dataclass_pp(node: Any, **spec: Unpack[PPSpec]) -> str:
     name = type(node).__name__
-
     kvs = ((f.name, vars(node)[f.name]) for f in dc.fields(node) if f.repr)
     return name + "(" + pps(kvs, pp=attr_value_pp, **spec) + ")"
 

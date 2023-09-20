@@ -194,6 +194,8 @@ class NameKey(BaseKey):
 
 
 class EllipsisKey(BaseKey):
+    """Match all leaves."""
+
     def __init__(self, _):
         del _
 
@@ -326,6 +328,9 @@ def _resolve_where(
     where: tuple[Any, ...],  # type: ignore
     is_leaf: Callable[[Any], None] | None = None,
 ) -> T | None:
+    # given a pytree `tree` and a `where` path, that is composed of keys or
+    # boolean masks, generate a boolean mask that will be eventually used to
+    # with `tree_map` to select the leaves at the specified location.
     mask = None
     bool_masks: list[T] = []
     path_masks: list[BaseKey] = []
@@ -362,7 +367,12 @@ def _resolve_where(
 
     for level_keys in where:
         # each for loop iteration is a level in the where path
+        # this means that if where = ("a", "b", "c") then this means
+        # we are travering the tree at level "a" then level "b" then level "c"
         treelib.tree_flatten(level_keys, is_leaf=verify_and_aggregate_is_leaf)
+        # if len(level_paths) > 1 then this means that we have multiple keys
+        # at the same level, for example where = ("a", ("b", "c")) then this
+        # means that for a parent "a", select "b" and "c".
         path_masks += [MultiKey(*level_paths)] if len(level_paths) > 1 else level_paths
         level_paths = []
         seen_tuple = False
@@ -437,6 +447,10 @@ class AtIndexer(NamedTuple):
     where: tuple[BaseKey | PyTree] | tuple[()] = ()
 
     def __getitem__(self, where: Any) -> AtIndexer:
+        # AtIndexer[where] will extend the current path with `where`
+        # for example AtIndexer[where1][where2] will extend the current path
+        # with `where1` and `where2` to indicate the path to the leaves to
+        # select.
         return type(self)(self.tree, (*self.where, where))
 
     def get(
@@ -462,10 +476,10 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as tc
-            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
-            >>> indexer = tc.AtIndexer(tree)
-            >>> indexer["level1_0"]["level2_0"].get()
-            {'level1_0': {'level2_0': 100, 'level2_1': None}, 'level1_1': None}
+            >>> tree = {"a": 1, "b": [1, 2, 3]}
+            >>> indexer = tc.AtIndexer(tree)  # construct an indexer
+            >>> indexer["b"][0].get()  # get the first element of "b"
+            {'a': None, 'b': [1, None, None]}
 
         Example:
             >>> import pytreeclass as tc
@@ -483,8 +497,14 @@ class AtIndexer(NamedTuple):
         config = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_get(leaf: Any, where: Any):
+            # support both array and non-array leaves
+            # for array boolean mask we select **parts** of the array that
+            # matches the mask, for example if the mask is Array([True, False, False])
+            # and the leaf is Array([1, 2, 3]) then the result is Array([1])
             if isinstance(where, arraylib.ndarray) and arraylib.ndim(where) != 0:
                 return leaf[where]
+            # non-array boolean mask we select the leaf if the mask is True
+            # and `None` otherwise
             return leaf if where else None
 
         return treelib.tree_map(leaf_get, self.tree, where, **config)
@@ -514,10 +534,10 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as tc
-            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
+            >>> tree = {"a": 1, "b": [1, 2, 3]}
             >>> indexer = tc.AtIndexer(tree)
-            >>> indexer["level1_0"]["level2_0"].set('SET')
-            {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
+            >>> indexer["b"][0].set(100)  # set the first element of "b" to 100
+            {'a': 1, 'b': [100, 2, 3]}
 
         Example:
             >>> import pytreeclass as tc
@@ -535,6 +555,11 @@ class AtIndexer(NamedTuple):
         config = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_set(leaf: Any, where: Any, set_value: Any):
+            # support both array and non-array leaves
+            # for array boolean mask we select **parts** of the array that
+            # matches the mask, for example if the mask is Array([True, False, False])
+            # and the leaf is Array([1, 2, 3]) then the result is Array([1, 100, 100])
+            # with set_value = 100
             if isinstance(where, arraylib.ndarray):
                 return arraylib.where(where, set_value, leaf)
             return set_value if where else leaf
@@ -580,10 +605,10 @@ class AtIndexer(NamedTuple):
 
         Example:
             >>> import pytreeclass as tc
-            >>> tree = {"level1_0": {"level2_0": 100, "level2_1": 200}, "level1_1": 300}
+            >>> tree = {"a": 1, "b": [1, 2, 3]}
             >>> indexer = tc.AtIndexer(tree)
-            >>> indexer["level1_0"]["level2_0"].apply(lambda _: 'SET')
-            {'level1_0': {'level2_0': 'SET', 'level2_1': 200}, 'level1_1': 300}
+            >>> indexer["b"][0].apply(lambda x: x + 100)  # add 100 to the first element of "b"
+            {'a': 1, 'b': [101, 2, 3]}
 
         Example:
             >>> import pytreeclass as tc
@@ -608,6 +633,10 @@ class AtIndexer(NamedTuple):
         config = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_apply(leaf: Any, where: bool):
+            # same as `leaf_set` but with `func` applied to the leaf
+            # one thing to note is that, the where mask select an array
+            # then the function needs work properly when applied to the selected
+            # array elements
             if isinstance(where, arraylib.ndarray):
                 return arraylib.where(where, func(leaf), leaf)
             return func(leaf) if where else leaf
