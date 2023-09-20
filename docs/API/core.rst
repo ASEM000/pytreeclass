@@ -5,7 +5,8 @@
 .. currentmodule:: pytreeclass 
 
 .. autoclass:: TreeClass 
-.. autoclass:::members: at
+    :members:
+        at
 .. autofunction:: autoinit
 .. autofunction:: leafwise
 .. autofunction:: is_tree_equal 

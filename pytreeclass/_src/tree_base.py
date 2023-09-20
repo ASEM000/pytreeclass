@@ -61,30 +61,7 @@ def recursive_getattr(tree: Any, where: tuple[str, ...]):
 
 class TreeClassIndexer(AtIndexer):
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
-        """Call a method on the tree instance and return result and new instance.
-
-        Returns:
-            A tuple of the result of the function call and a copy of the a
-             new instance of the tree with the modified values.
-
-        Example:
-            >>> import pytreeclass as tc
-            >>> @tc.autoinit
-            ... class Tree(tc.TreeClass):
-            ...     a: int
-            ...     def add(self, x:int) -> int:
-            ...         self.a += x
-            ...         return self.a
-            >>> tree = Tree(a=1)
-            >>> # call `add` and return a tuple of
-            >>> # (return value, new instance)
-            >>> tree.at['add'](99)
-            (100, Tree(a=100))
-
-        Note:
-            - `AttributeError` is raised, If the function mutates the instance.
-            - Use .at["method_name"](*, **) to call a method that mutates the instance.
-        """
+        """Call a method on the tree instance and return result and new instance."""
         tree = tree_copy(self.tree)
         treelib.tree_map(lambda _: _, tree, is_leaf=add_mutable_entry)
         value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
@@ -321,7 +298,7 @@ class TreeClass(metaclass=TreeClassMeta):
         - ``.at['method'](*a, **k)``:
             Call a ``method`` and return a (return value, new instance) tuple.
 
-        `***` acceptable indexing types are:
+        *Acceptable indexing types are:*
             - ``str`` for mapping keys or class attributes.
             - ``int`` for positional indexing for sequences.
             - ``...`` to select all leaves.
@@ -332,26 +309,31 @@ class TreeClass(metaclass=TreeClassMeta):
 
         Example:
             >>> import pytreeclass as tc
+            <BLANKLINE>
             >>> @tc.autoinit
             ... class Tree(tc.TreeClass):
-            ...     a:int = 1
-            ...     b:float = 2.0
-            ...     def add(self, x:int) -> int:
-            ...         self.a += x
-            ...         return self.a
+            ...    a: int = 1
+            ...    b: float = 2.0
+            ...    def add(self, x: int) -> int:
+            ...        self.a += x
+            ...        return self.a
             >>> tree = Tree()
+            <BLANKLINE>
             >>> # get `a` and return a new instance
             >>> # with `None` for all other leaves
             >>> tree.at["a"].get()
             Tree(a=1, b=None)
+            <BLANKLINE>
             >>> # set `a` and return a new instance
             >>> # with all other leaves unchanged
             >>> tree.at["a"].set(100)
             Tree(a=100, b=2.0)
+            <BLANKLINE>
             >>> # apply to `a` and return a new instance
             >>> # with all other leaves unchanged
             >>> tree.at["a"].apply(lambda x: 100)
             Tree(a=100, b=2.0)
+            <BLANKLINE>
             >>> # call `add` and return a tuple of
             >>> # (return value, new instance)
             >>> tree.at["add"](99)
@@ -360,6 +342,31 @@ class TreeClass(metaclass=TreeClassMeta):
         Note:
             - ``pytree.at[*][**]`` is equivalent to selecting pytree.*.** .
             - ``pytree.at[*, **]`` is equivalent selecting pytree.* and pytree.**
+
+        Note:
+            - ``AttributeError`` is raised, If a method that mutates the instance
+              is called directly. Instead use ``at["method_name"]`` to call a method
+              that mutates the instance. 
+
+        Example:
+            Building immutable chainable methods with ``at``:
+
+            The following example shows how to build a chainable methods using
+            ``at`` property. Note that while the methods are mutating the instance,
+            the mutation is applied on a copy of the tree and the original tree
+            is not mutated.
+
+            >>> import pytreeclass as tc
+            >>> class Tree(tc.TreeClass):
+            ...    def set_x(self, x):
+            ...        self.x = x
+            ...    def set_y(self, y):
+            ...        self.y = y
+            ...    def calculate(self):
+            ...        return self.x + self.y
+            >>> tree = Tree()
+            >>> tree.at["set_x"](x=1)[1].at["set_y"](y=2)[1].calculate()
+            3
         """
         return TreeClassIndexer(self)
 
