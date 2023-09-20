@@ -18,7 +18,7 @@ import functools as ft
 import os
 from importlib.util import find_spec
 
-backend = os.environ.get("PYTREECLASS_BACKEND", "default").lower()
+backend = os.environ.get("PYTREECLASS_BACKEND", "").lower()
 
 
 @ft.lru_cache(maxsize=None)
@@ -26,8 +26,8 @@ def is_available(backend):
     return find_spec(backend) is not None
 
 
-if backend == "default":
-    # do backend promotion if possible
+if backend == "":
+    # backend promotion
     if is_available("jax"):
         backend = "jax"
     elif is_available("torch"):
@@ -35,18 +35,21 @@ if backend == "default":
     elif is_available("numpy"):
         backend = "numpy"
     else:
-        # no backend is available
-        if not is_available("optree"):
-            raise ImportError("No backend is available. Please install `optree`.")
-
-        from pytreeclass._src.backend.arraylib.noarray import NoArray
-        from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
-
-        arraylib = NoArray()
-        treelib = OpTreeTreeLib()
+        backend = "default"
 
 
-if backend == "jax":
+if backend == "default":
+    # no backend is available
+    if not is_available("optree"):
+        raise ImportError("No backend is available. Please install `optree`.")
+
+    from pytreeclass._src.backend.arraylib.noarray import NoArray
+    from pytreeclass._src.backend.treelib.optree import OpTreeTreeLib
+
+    arraylib = NoArray()
+    treelib = OpTreeTreeLib()
+
+elif backend == "jax":
     if not is_available("jax"):
         raise ImportError("`jax` backend requires `jax` to be installed.")
 

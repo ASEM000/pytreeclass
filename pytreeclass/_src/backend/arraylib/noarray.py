@@ -14,36 +14,34 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pytreeclass._src.backend.arraylib.base import AbstractArray
-
-
-class GenericArray(AbstractArray):
-    ...
 
 
 class NoArray(AbstractArray):
     @staticmethod
-    def tobytes(array: GenericArray) -> bytes:
+    def tobytes(array: Any) -> bytes:
         raise NotImplementedError
 
     @property
-    def ndarray(self) -> GenericArray:
-        return GenericArray
+    def ndarray(self) -> "NoArray":
+        return type(self)
 
     @staticmethod
     def where(condition, x, y):
         raise NotImplementedError
 
     @staticmethod
-    def nbytes(array: GenericArray):
+    def nbytes(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def size(array: GenericArray):
+    def size(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def ndim(array: GenericArray):
+    def ndim(array: Any):
         raise NotImplementedError
 
     @staticmethod
@@ -51,41 +49,41 @@ class NoArray(AbstractArray):
         raise NotImplementedError
 
     @staticmethod
-    def dtype(array: GenericArray):
+    def dtype(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def min(array: GenericArray):
+    def min(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def max(array: GenericArray):
+    def max(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def mean(array: GenericArray):
+    def mean(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def std(array: GenericArray):
+    def std(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def all(array: GenericArray):
+    def all(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def is_floating(array: GenericArray):
+    def is_floating(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def is_integer(array: GenericArray):
+    def is_integer(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def is_inexact(array: GenericArray):
+    def is_inexact(array: Any):
         raise NotImplementedError
 
     @staticmethod
-    def is_bool(array: GenericArray):
+    def is_bool(array: Any):
         raise NotImplementedError
