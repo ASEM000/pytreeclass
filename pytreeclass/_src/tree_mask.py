@@ -45,6 +45,10 @@ class _FrozenError(NamedTuple):
 
 
 class _FrozenBase(Generic[T]):
+    # the objective of this class is to wrap a pytree node with a custom wrapper
+    # that yields no leaves when flattened. This is useful to avoid updating
+    # the node by effectivly *hiding it* from function transformations that operates
+    # on flattened pytrees.
     __slots__ = ["__wrapped__", "__weakref__"]
     __wrapped__: T
 
@@ -106,6 +110,10 @@ class _FrozenHashable(_FrozenBase):
 
 
 class _FrozenArray(_FrozenBase):
+    # wrap arrays with a custom wrapper that implements hash and equality
+    # using the wrapped array's bytes representation and sha256 hash function
+    # this is useful to select some array to hold without updating in the process
+    # of training a model.
     def __hash__(self) -> int:
         bytes = arraylib.tobytes(self.__wrapped__)
         return int(hashlib.sha256(bytes).hexdigest(), 16)
@@ -113,8 +121,8 @@ class _FrozenArray(_FrozenBase):
     def __eq__(self, other) -> bool:
         if not isinstance(other, _FrozenArray):
             return False
-
         lhs, rhs = self.__wrapped__, other.__wrapped__
+        # fast path to avoid calling `all` on large arrays
         if arraylib.shape(lhs) != arraylib.shape(rhs):
             return False
         if arraylib.dtype(lhs) != arraylib.dtype(rhs):
@@ -150,6 +158,11 @@ def freeze(value: T) -> _FrozenBase[T]:
         >>> jtu.tree_map(lambda x:x+100, a)
         [101, #2, 103]
     """
+    # dispatching is used to customize the type of the wrapper based on the type
+    # of the value. For instance, hashable values dont need custom hash and
+    # equality implementations, so they are wrapped with a simpler wrapper.
+    # this approach avoids type logic in the wrapper equality and hash methods,
+    # thus effectively improving performance of the wrapper.
     return freeze.type_dispatcher(value)
 
 
@@ -166,7 +179,9 @@ def _(value: T) -> _FrozenArray[T]:
 
 @freeze.def_type(_FrozenBase)
 def _(value: _FrozenBase[T]) -> _FrozenBase[T]:
-    # idempotent freeze operation
+    # idempotent freeze operation, meaning that freeze(freeze(x)) == freeze(x)
+    # this is useful to avoid recursive unwrapping of frozen values, plus its
+    # meaningless to freeze a frozen value.
     return value
 
 

@@ -654,3 +654,10 @@ def test_on_getattr():
 
     assert child.a == 2
     assert vars(child)["a"] == 1
+
+
+def test_unannotated_field():
+    class T:
+        a = field(default=1)
+
+    assert str(T.a.type) == "NULL"

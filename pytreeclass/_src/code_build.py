@@ -23,6 +23,12 @@
 # - only code generation is supported is done. other functionality like `__repr__`,
 #   `__eq__`, `__hash__`, etc. are not done here.
 
+# one design choice is that `autoinit` and `Field` are not tightly coupled.
+# Field` can be used without `autoinit` as a descriptor to apply functions on
+# the field values during initialization. Moreover, `TreeClass` is not coupled with
+# `autoinit` or `Field` and can be used without them. this simplifies the code
+# by separating the functionality.
+
 from __future__ import annotations
 
 import functools as ft
@@ -133,14 +139,21 @@ class Field:
 
     def replace(self, **kwargs) -> Field:
         """Replace the field attributes."""
+        # define a `replace` method similar to `dataclasses.replace` or namedtuple
+        # to allow the user to replace the field attributes.
         return type(self)(**{k: kwargs.get(k, getattr(self, k)) for k in slots(Field)})
 
     def pipe(self, funcs: Sequence[Callable[[Any], Any]], value: Any):
         """Apply a sequence of functions on the field value."""
         for func in funcs:
+            # for a given sequence of unary functions, apply them on the field value
+            # and return the result. if an error is raised, emit a descriptive error
             try:
                 value = func(value)
             except Exception as e:
+                # emit a *descriptive* error message with the name of the attribute
+                # associated with the field and the name of the function that raised 
+                # the error.
                 cname = getattr(func, "__name__", func)
                 raise type(e)(f"On applying {cname} for field=`{self.name}`:\n{e}")
         return value
@@ -152,8 +165,13 @@ class Field:
 
     def __set_name__(self, owner, name: str) -> None:
         """Set the field name."""
+        # set the name of the field to the attribute name in the class
+        # and the type to the type hint of the attribute if it exists
         self.name = name
-        self.type = vars(owner)["__annotations__"].get(name, NULL)
+        # in case the user uses `field` as a descriptor without annotating the class
+        if "__annotations__" in (variables := vars(owner)):
+            # set the type to the type hint of the attribute if it exists
+            self.type = variables.get(name, NULL)
 
     def __get__(self: T, instance, _) -> T | Any:
         """Return the field value."""
@@ -552,7 +570,7 @@ def register_excluded_type(klass: type, reason: str | None = None) -> None:
         klass: The type to be excluded.
         reason: The reason for excluding the type.
     """
-    reason = f" {reason=}" if reason else ""
+    reason = f" {reason=}" if reason is not None else ""
 
     @check_excluded_type.register(klass)
     def _(value) -> None:

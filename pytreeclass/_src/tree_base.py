@@ -38,6 +38,8 @@ T = TypeVar("T", bound=Hashable)
 S = TypeVar("S")
 PyTree = Any
 EllipsisType = type(Ellipsis)  # TODO: use typing.EllipsisType when available
+# set of instance ids that are marked as mutable.
+# being marked as mutable allows setattr/delattr to set/delete attributes.
 _mutable_instance_registry: set[int] = set()
 
 
@@ -62,9 +64,19 @@ def recursive_getattr(tree: Any, where: tuple[str, ...]):
 class TreeClassIndexer(AtIndexer):
     def __call__(self, *a, **k) -> tuple[Any, PyTree]:
         """Call a method on the tree instance and return result and new instance."""
+        # to apply mutable methods on the tree instance, first, the original
+        # tree is copied.
         tree = tree_copy(self.tree)
+        # the copy is marked as mutable. since the method
+        # can mutate either a leaf or a container, `is_leaf` is used to traverse
+        # the tree depth-first and mark the ids of the tree nodes as mutable
         treelib.tree_map(lambda _: _, tree, is_leaf=add_mutable_entry)
+        # execute the method on the copy of the tree with all of its nodes
+        # (leaves and containers) marked as mutable. this allows the method
+        # to mutate the tree instance at any level and from any inherited class.
         value = recursive_getattr(tree, self.where)(*a, **k)  # type: ignore
+        # finally remove the mutable entries from the tree to disallow
+        # setattr/delattr to set/delete attributes after the modfications.
         treelib.tree_map(lambda _: _, tree, is_leaf=discard_mutable_entry)
         return value, tree
 
@@ -240,11 +252,16 @@ class TreeClass(metaclass=TreeClassMeta):
         # disallow setattr/delattr to be overridden as they are used
         # to implement the immutable/controlled mutability behavior.
         if "__setattr__" in vars(klass):
-            raise TypeError(f"Reserved methods: `__setattr__` defined in `{klass}`.")
+            raise TypeError(f"Reserved method `__setattr__` defined in `{klass}`.")
         if "__delattr__" in vars(klass):
-            raise TypeError(f"Reserved methods: `__delattr__` defined in `{klass}`.")
+            raise TypeError(f"Reserved method `__delattr__` defined in `{klass}`.")
         super().__init_subclass__(**k)
         # register the class with the proper tree backend.
+        # the registration envolves defining two rules: how to flatten the nested
+        # structure of the class and how to unflatten the flattened structure.
+        # The flatten rule for `TreeClass` is equivalent to vars(self). and the
+        # unflatten rule is equivalent to `klass(**flat_tree)`. The flatten/unflatten
+        # rule is exactly same as the flatten rule for normal dictionaries.
         treelib.register_treeclass(klass)
 
     def __setattr__(self, key: str, value: Any) -> None:
@@ -346,7 +363,7 @@ class TreeClass(metaclass=TreeClassMeta):
         Note:
             - ``AttributeError`` is raised, If a method that mutates the instance
               is called directly. Instead use ``at["method_name"]`` to call a method
-              that mutates the instance. 
+              that mutates the instance.
 
         Example:
             Building immutable chainable methods with ``at``:

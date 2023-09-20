@@ -14,6 +14,18 @@
 
 """Define lens-like indexing/masking for pytrees."""
 
+# enable get/set/apply/scan/reduce operations on selected parts of a nested
+# structure -pytree- in out-of-place manner. this process invovles defining two
+# parts: 1) *where* to select the parts of the pytree and 2) *what* to do with
+# the selected parts. the *where* part is defined either by a path or a boolean
+# mask. the *what* part is defined by a set value, or a function to apply to
+# the selected parts. once we have a *final* boolean mask that encompasses all
+# path and the boolean mask, we can use `tree_map` to apply the *what* part to
+# the *where* part. for example, for a tree = [[1, 2], 3, 4] and boolean mask
+# [[True, False], False, True] and path mask [0][1], then we select only leaf
+# 1 that is at the intersection of the boolean mask and the path mask. then we
+# apply the *what* part to the *where* part.
+
 from __future__ import annotations
 
 import abc
