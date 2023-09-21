@@ -152,7 +152,7 @@ class Field:
                 value = func(value)
             except Exception as e:
                 # emit a *descriptive* error message with the name of the attribute
-                # associated with the field and the name of the function that raised 
+                # associated with the field and the name of the function that raised
                 # the error.
                 cname = getattr(func, "__name__", func)
                 raise type(e)(f"On applying {cname} for field=`{self.name}`:\n{e}")
@@ -415,19 +415,21 @@ def build_init_method(klass: type[T]) -> type[T]:
     for field in (field_map := build_field_map(klass)).values():
         default = "" if field.default is NULL else f"=field_map['{field.name}'].default"
 
-        if field.init:
-            if field.kind in ("VAR_POS", "VAR_KW"):
-                # disallow multiple `VAR_POS` and `VAR_KW`
-                if field.kind in seen:
-                    raise TypeError(f"Duplicate {field.kind=} for {field.name=}")
-                seen.add(field.kind)
-
-            alias = field.alias or field.name
-            hints[field.name] = field.type
-            body += [f"self.{field.name}={alias}"]
-            heads[field.kind] += [f"{alias}{default}"]
-        else:
+        if not field.init:
             body += [f"self.{field.name}{default}"]
+            continue
+
+        if field.kind in ("VAR_POS", "VAR_KW"):
+            # disallow multiple `VAR_POS` and `VAR_KW` arguments
+            # for example more than one field(kind="VAR_POS") is not allowed
+            if field.kind in seen:
+                raise TypeError(f"Duplicate {field.kind=} for {field.name=}")
+            seen.add(field.kind)
+
+        alias = field.alias or field.name
+        hints[field.name] = field.type
+        body += [f"self.{field.name}={alias}"]
+        heads[field.kind] += [f"{alias}{default}"]
 
     hints["return"] = None
     # add the post init call if the class has it, otherwise add a pass
@@ -450,6 +452,7 @@ def build_init_method(klass: type[T]) -> type[T]:
     code += f"\n\t\t{';'.join(body)}"
     code += f"\n\t__init__.__qualname__ = '{klass.__qualname__}.__init__'"
     code += "\n\treturn __init__"
+
     exec(code, vars(sys.modules[klass.__module__]), ns := dict())
     setattr(init := ns["closure"](field_map), "__annotations__", hints)
     setattr(klass, "__init__", init)
