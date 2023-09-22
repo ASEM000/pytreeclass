@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-default=["optree"]
+default = ["optree"]
 jax = ["jax>=0.4.7"]
 numpy = ["numpy", "optree"]
 torch = ["torch", "optree"]
@@ -59,6 +59,8 @@ ignore = [
   "D411",
   "N813",
   "D105",
+  "C901",
+  "B102",
 ]
 
 [tool.ruff.pydocstyle]

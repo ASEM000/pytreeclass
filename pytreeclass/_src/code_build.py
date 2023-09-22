@@ -35,8 +35,7 @@ import functools as ft
 import sys
 from collections import defaultdict
 from collections.abc import Callable, MutableMapping, MutableSequence, MutableSet
-from types import MappingProxyType
-from typing import Any, Literal, Sequence, TypeVar, get_args
+from typing import Any, Literal, Mapping, Sequence, TypeVar, Union, get_args
 
 from typing_extensions import dataclass_transform
 
@@ -44,6 +43,7 @@ T = TypeVar("T")
 PyTree = Any
 EllipsisType = type(Ellipsis)
 ArgKindType = Literal["POS_ONLY", "POS_OR_KW", "VAR_POS", "KW_ONLY", "VAR_KW"]
+InitType = Literal[True, False, "HEAD", "BODY", "HEAD_AND_BODY"]
 ArgKind = get_args(ArgKindType)
 
 
@@ -95,7 +95,7 @@ class Field:
         name: str | Null = NULL,
         type: type | Null = NULL,
         default: Any = NULL,
-        init: bool = True,
+        init: InitType = True,
         repr: bool = True,
         kind: ArgKind = "POS_OR_KW",
         metadata: dict[str, Any] | None = None,
@@ -191,7 +191,7 @@ class Field:
 def field(
     *,
     default: Any = NULL,
-    init: bool = True,
+    init: InitType = True,
     repr: bool = True,
     kind: ArgKindType = "POS_OR_KW",
     metadata: dict[str, Any] | None = None,  # type: ignore
@@ -315,20 +315,29 @@ def field(
     """
     if not isinstance(alias, (str, type(None))):
         raise TypeError(f"Non-string {alias=} argument provided to `field`")
+
     if not isinstance(metadata, (dict, type(None))):
         raise TypeError(f"Non-dict {metadata=} argument provided to `field`")
+
     if kind not in ArgKind:
         raise ValueError(f"{kind=} not in {ArgKind}")
+
     if not isinstance(on_setattr, Sequence):
         raise TypeError(f"Non-sequence {on_setattr=} argument provided to `field`")
+
     if not isinstance(on_getattr, Sequence):
         raise TypeError(f"Non-sequence {on_getattr=} argument provided to `field`")
+
+    if init not in get_args(InitType):
+        raise ValueError(f"{init=} not in {get_args(InitType)}")
+
     for func in on_setattr:
         if not isinstance(func, Callable):  # type: ignore
-            raise TypeError(f"Non-callable {func=} provided to `field`")
+            raise TypeError(f"Non-callable {func=} provided to `field` on_setattr")
+
     for func in on_getattr:
         if not isinstance(func, Callable):
-            raise TypeError(f"Non-callable {func=} provided to `field`")
+            raise TypeError(f"Non-callable {func=} provided to `field` on_getattr")
 
     return Field(
         default=default,
@@ -342,20 +351,21 @@ def field(
     )
 
 
-def build_field_map(klass: type) -> MappingProxyType[str, Field]:
+def build_field_map(klass: type) -> dict[str, Field]:
     field_map: dict[str, Field] = dict()
+    excluded = set(["self", "__post_init__"])
 
     if klass is object:
-        return MappingProxyType(field_map)
+        return dict(field_map)
 
     for base in reversed(klass.__mro__[1:]):
         field_map.update(build_field_map(base))
 
     if (hint_map := vars(klass).get("__annotations__", NULL)) is NULL:
-        return MappingProxyType(field_map)
+        return dict(field_map)
 
-    if "self" in hint_map:
-        raise ValueError("`Field` name cannot be `self`.")
+    if excluded.intersection(hint_map):
+        raise ValueError(f"`Field` name cannot be in {excluded=}")
 
     for key, hint in hint_map.items():
         # get the current base key
@@ -373,7 +383,7 @@ def build_field_map(klass: type) -> MappingProxyType[str, Field]:
         # case: `x: Any = field(default=1)`
         field_map[key] = value.replace(name=key, type=hint)
 
-    return MappingProxyType(field_map)
+    return field_map
 
 
 def fields(x: Any) -> tuple[Field, ...]:
@@ -401,24 +411,10 @@ def convert_hints_to_fields(klass: type[T]) -> type[T]:
     return klass
 
 
-def build_init_method(klass: type[T]) -> type[T]:
-    # generate a code object for the __init__ method and compile it
-    # for the given class and return the function object
-    body: list[str] = []
-    hints: dict[str, str | type | None] = dict()
-    head = ["self"]
-    heads: dict[str, list[str]] = defaultdict(list)
-    has_post = "__post_init__" in vars(klass)
-
-    seen = set()
-
-    for field in (field_map := build_field_map(klass)).values():
-        default = "" if field.default is NULL else f"=field_map['{field.name}'].default"
-
-        if not field.init:
-            body += [f"self.{field.name}{default}"]
-            continue
-
+def check_duplicate_var_kind(field_map: dict[str, Field]) -> None:
+    # check for duplicate `VAR_POS` and `VAR_KW` arguments
+    seen: set[Literal["VAR_POS", "VAR_KW"]] = set()
+    for field in field_map.values():
         if field.kind in ("VAR_POS", "VAR_KW"):
             # disallow multiple `VAR_POS` and `VAR_KW` arguments
             # for example more than one field(kind="VAR_POS") is not allowed
@@ -426,15 +422,28 @@ def build_init_method(klass: type[T]) -> type[T]:
                 raise TypeError(f"Duplicate {field.kind=} for {field.name=}")
             seen.add(field.kind)
 
-        alias = field.alias or field.name
-        hints[field.name] = field.type
-        body += [f"self.{field.name}={alias}"]
-        heads[field.kind] += [f"{alias}{default}"]
 
-    hints["return"] = None
-    # add the post init call if the class has it, otherwise add a pass
-    # in case all fields are not initialized in the __init__ method
-    body += ["self.__post_init__()"] if has_post else ["pass"]
+def codegen(field_map: dict[str, Field]) -> str:
+    check_duplicate_var_kind(field_map)
+
+    body: list[str] = []
+    head: list[str] = []
+    heads: dict[str, list[str]] = defaultdict(list)
+
+    for field in field_map.values():
+        if field.default is NULL:
+            default = ""
+        else:
+            default = f"=refmap['{field.name}'].default"
+
+        if field.init in [True, "HEAD_AND_BODY"]:
+            alias = field.alias or field.name
+            heads[field.kind] += [f"{alias}{default}"]
+            body += [f"self.{field.name}={alias}"]
+        elif field.init == "HEAD":
+            heads[field.kind] += [f"{field.alias or field.name}{default}"]
+        elif field.init in [False, "BODY"]:
+            body += [f"self.{field.name}{default}"]
 
     # organize the arguments order:
     # (POS_ONLY, POS_OR_KW, VAR_POS, KW_ONLY, VAR_KW)
@@ -446,16 +455,36 @@ def build_init_method(klass: type[T]) -> type[T]:
     head += heads["KW_ONLY"]
     head += ["**" + "".join(heads["VAR_KW"])] if heads["VAR_KW"] else []
 
-    # generate the code for the __init__ method
-    code = "def closure(field_map):\n"
-    code += f"\tdef __init__({','.join(head)}):"
-    code += f"\n\t\t{';'.join(body)}"
-    code += f"\n\t__init__.__qualname__ = '{klass.__qualname__}.__init__'"
-    code += "\n\treturn __init__"
+    # generate the code for the method
+    code = "def closure(refmap):\n"
+    code += f"\tdef method({','.join(head)}):"
+    code += f"\n\t\t{';'.join(body)}" + ";pass"
+    code += f"\n\treturn method"
+    return code
 
-    exec(code, vars(sys.modules[klass.__module__]), ns := dict())
-    setattr(init := ns["closure"](field_map), "__annotations__", hints)
-    setattr(klass, "__init__", init)
+
+def build_init_method(klass: type[T]) -> type[T]:
+    # add `self` at the beginning of the field map
+    field_map = dict(self=Field(name="self", init="HEAD", kind="POS_ONLY"))
+    # add the non-self fields to the field map
+    field_map.update(build_field_map(klass))
+    # in case the user uses `__post_init__` method, add it to the field map
+    # at body only and make the name of the field `__post_init__()` to invoke
+    # the method after the initialization of the object.
+    if (key := "__post_init__") in vars(klass):
+        field_map.update(dict(key=Field(name=f"{key}()", init="BODY")))
+
+    exec(codegen(field_map), vars(sys.modules[klass.__module__]), namespace := dict())
+    method = namespace["closure"](field_map)
+
+    # fix the method annotations, qualname, and name
+    hints = {f: f.type for f in field_map.values() if f.init and f.type is not NULL}
+    setattr(method, "__annotations__", hints)
+    setattr(method, "__qualname__", f"{klass.__qualname__}.__init__")
+    setattr(method, "__name__", "__init__")
+
+    # add the method to the class
+    setattr(klass, "__init__", method)
     return klass
 
 
