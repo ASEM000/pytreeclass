@@ -43,7 +43,6 @@ T = TypeVar("T")
 PyTree = Any
 EllipsisType = type(Ellipsis)
 ArgKindType = Literal["POS_ONLY", "POS_OR_KW", "VAR_POS", "KW_ONLY", "VAR_KW"]
-InitType = Literal[True, False, "HEAD", "BODY", "HEAD_AND_BODY"]
 ArgKind = get_args(ArgKindType)
 
 
@@ -94,7 +93,7 @@ class Field:
         name: str | Null = NULL,
         type: type | Null = NULL,
         default: Any = NULL,
-        init: InitType = True,
+        init: bool = True,
         repr: bool = True,
         kind: ArgKind = "POS_OR_KW",
         metadata: dict[str, Any] | None = None,
@@ -190,7 +189,7 @@ class Field:
 def field(
     *,
     default: Any = NULL,
-    init: InitType = True,
+    init: bool = True,
     repr: bool = True,
     kind: ArgKindType = "POS_OR_KW",
     metadata: dict[str, Any] | None = None,  # type: ignore
@@ -327,8 +326,8 @@ def field(
     if not isinstance(on_getattr, Sequence):
         raise TypeError(f"Non-sequence {on_getattr=} argument provided to `field`")
 
-    if init not in get_args(InitType):
-        raise ValueError(f"{init=} not in {get_args(InitType)}")
+    if not isinstance(init, bool):
+        raise TypeError(f"Non-bool {init=} argument provided to `field`")
 
     for func in on_setattr:
         if not isinstance(func, Callable):  # type: ignore
@@ -352,7 +351,7 @@ def field(
 
 def build_field_map(klass: type) -> dict[str, Field]:
     field_map: dict[str, Field] = dict()
-    excluded = set(["self", "__post_init__"])
+    excluded = set(["self", "__post_init__", "__annotations__"])
 
     if klass is object:
         return dict(field_map)
@@ -422,27 +421,38 @@ def check_duplicate_var_kind(field_map: dict[str, Field]) -> None:
             seen.add(field.kind)
 
 
-def codegen(field_map: dict[str, Field]) -> str:
+def build_init_method(klass: type[T]) -> type[T]:
+    field_map: dict[str, Field] = build_field_map(klass)
     check_duplicate_var_kind(field_map)
+    hints = {"return": None}  # annotations
 
     body: list[str] = []
-    head: list[str] = []
+    head: list[str] = ["self"]
     heads: dict[str, list[str]] = defaultdict(list)
 
     for field in field_map.values():
-        if field.default is NULL:
-            default = ""
-        else:
-            default = f"=refmap['{field.name}'].default"
-
-        if field.init in [True, "HEAD_AND_BODY"]:
+        if field.init:
+            # add to field to head and body
+            hints[field.name] = field.type
+            # how to name the field in the constructor
             alias = field.alias or field.name
-            heads[field.kind] += [f"{alias}{default}"]
             body += [f"self.{field.name}={alias}"]
-        elif field.init == "HEAD":
-            heads[field.kind] += [f"{field.alias or field.name}{default}"]
-        elif field.init in [False, "BODY"]:
-            body += [f"self.{field.name}{default}"]
+
+            if field.default is NULL:
+                # e.g. def __init__(.., x)
+                heads[field.kind] += [alias]
+            else:
+                # e.g def __init__(.., x=value) but
+                # pass reference to the default value
+                heads[field.kind] += [f"{alias}=refmap['{field.name}'].default"]
+        else:
+            if field.default is not NULL:
+                # case for fields with `init=False` and no default value
+                # usaully declared in __post_init__
+                body += [f"self.{field.name}=refmap['{field.name}'].default"]
+
+    has_post = (key := "__post_init__") in vars(klass)
+    body += [f"self.{key}()"] if has_post else ["pass"]
 
     # organize the arguments order:
     # (POS_ONLY, POS_OR_KW, VAR_POS, KW_ONLY, VAR_KW)
@@ -456,33 +466,17 @@ def codegen(field_map: dict[str, Field]) -> str:
 
     # generate the code for the method
     code = "def closure(refmap):\n"
-    code += f"\tdef method({','.join(head)}):"
-    code += f"\n\t\t{';'.join(body)}" + ";pass"
-    code += f"\n\treturn method"
-    return code
+    code += f"\tdef __init__({','.join(head)}):"
+    field_map["__annotations__"] = hints
 
+    code += f"\n\t\t{';'.join(body)}"
+    code += f"\n\t__init__.__qualname__ = '{klass.__qualname__}.__init__'"
+    code += f"\n\t__init__.__annotations__ = refmap['__annotations__']"
+    code += "\n\treturn __init__"
 
-def build_init_method(klass: type[T]) -> type[T]:
-    # add `self` at the beginning of the field map
-    field_map = dict(self=Field(name="self", init="HEAD", kind="POS_ONLY"))
-    # add the non-self fields to the field map
-    field_map.update(build_field_map(klass))
-    # in case the user uses `__post_init__` method, add it to the field map
-    # at body only and make the name of the field `__post_init__()` to invoke
-    # the method after the initialization of the object.
-    if (key := "__post_init__") in vars(klass):
-        field_map.update(dict(key=Field(name=f"{key}()", init="BODY")))
-
-    exec(codegen(field_map), vars(sys.modules[klass.__module__]), namespace := dict())
+    # execute the code in the class namespace to generate the method
+    exec(code, vars(sys.modules[klass.__module__]), namespace := dict())
     method = namespace["closure"](field_map)
-
-    # fix the method annotations, qualname, and name
-    hints = {f.name: f.type for f in field_map.values() if f.init and f.type}
-
-    setattr(method, "__annotations__", {**hints, "return": None})
-    setattr(method, "__qualname__", f"{klass.__qualname__}.__init__")
-    setattr(method, "__name__", "__init__")
-
     # add the method to the class
     setattr(klass, "__init__", method)
     return klass
