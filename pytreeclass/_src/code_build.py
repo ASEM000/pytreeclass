@@ -61,9 +61,8 @@ def _(value) -> None:
 
 class Null:
     __slots__ = []
-
-    def __repr__(self) -> str:
-        return "NULL"
+    __repr__ = lambda _: "NULL"
+    __bool__ = lambda _: False
 
 
 NULL = Null()
@@ -478,8 +477,9 @@ def build_init_method(klass: type[T]) -> type[T]:
     method = namespace["closure"](field_map)
 
     # fix the method annotations, qualname, and name
-    hints = {f: f.type for f in field_map.values() if f.init and f.type is not NULL}
-    setattr(method, "__annotations__", hints)
+    hints = {f.name: f.type for f in field_map.values() if f.init and f.type}
+
+    setattr(method, "__annotations__", {**hints, "return": None})
     setattr(method, "__qualname__", f"{klass.__qualname__}.__init__")
     setattr(method, "__name__", "__init__")
 
