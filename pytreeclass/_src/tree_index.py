@@ -31,7 +31,7 @@ from __future__ import annotations
 import abc
 import functools as ft
 import re
-from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Generic
+from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Self
 
 from pytreeclass._src.backend import arraylib, treelib
 from pytreeclass._src.backend.treelib.base import ParallelConfig
@@ -398,8 +398,8 @@ def _resolve_where(
 
     return mask
 
-TIndexer = TypeVar('TIndexer', bound='AtIndexer')
-class AtIndexer(NamedTuple, Generic[TIndexer]):
+
+class AtIndexer(NamedTuple):
     """Index a pytree at a given path using a path or mask.
 
     Args:
@@ -458,7 +458,7 @@ class AtIndexer(NamedTuple, Generic[TIndexer]):
     tree: PyTree
     where: tuple[BaseKey | PyTree] | tuple[()] = ()
 
-    def __getitem__(self, where: Any) -> TIndexer:
+    def __getitem__(self, where: Any) -> Self:
         # AtIndexer[where] will extend the current path with `where`
         # for example AtIndexer[where1][where2] will extend the current path
         # with `where1` and `where2` to indicate the path to the leaves to
