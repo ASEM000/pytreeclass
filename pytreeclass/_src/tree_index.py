@@ -31,7 +31,8 @@ from __future__ import annotations
 import abc
 import functools as ft
 import re
-from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar, Self
+from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar
+from typing_extensions import Self
 
 from pytreeclass._src.backend import arraylib, treelib
 from pytreeclass._src.backend.treelib.base import ParallelConfig
