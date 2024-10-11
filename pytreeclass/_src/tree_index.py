@@ -32,6 +32,7 @@ import abc
 import functools as ft
 import re
 from typing import Any, Callable, Hashable, NamedTuple, Tuple, TypeVar
+from typing_extensions import Self
 
 from pytreeclass._src.backend import arraylib, treelib
 from pytreeclass._src.backend.treelib.base import ParallelConfig
@@ -458,7 +459,7 @@ class AtIndexer(NamedTuple):
     tree: PyTree
     where: tuple[BaseKey | PyTree] | tuple[()] = ()
 
-    def __getitem__(self, where: Any) -> AtIndexer:
+    def __getitem__(self, where: Any) -> Self:
         # AtIndexer[where] will extend the current path with `where`
         # for example AtIndexer[where1][where2] will extend the current path
         # with `where1` and `where2` to indicate the path to the leaves to

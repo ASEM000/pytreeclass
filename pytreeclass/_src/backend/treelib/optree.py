@@ -125,11 +125,16 @@ class OpTreeTreeLib(AbstractTreeLib):
             entries = tuple(NamedSequenceKey(*ik) for ik in enumerate(keys))
             return (tuple(dynamic.values()), keys, entries)
 
-        ot.register_pytree_node(klass, flatten, unflatten, namespace)
+        ot.register_pytree_node(klass, flatten, unflatten, namespace=namespace)
 
     @staticmethod
     def register_static(klass: type[Tree]) -> None:
-        ot.register_pytree_node(klass, lambda x: ((), x), lambda x, _: x, namespace)
+        ot.register_pytree_node(
+            klass,
+            lambda x: ((), x),
+            lambda x, _: x,
+            namespace=namespace,
+        )
 
     @staticmethod
     def attribute_key(name: str) -> GetAttrKey:
