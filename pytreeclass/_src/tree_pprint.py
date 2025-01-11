@@ -143,20 +143,16 @@ def array_pp(node: arraylib.ndarray, **spec: Unpack[PPSpec]) -> str:
     # this part of the function is inspired by
     # lovely-jax https://github.com/xl0/lovely-jax
 
-    with suppress(Exception):
-        # maybe the array is a jax tracers
-        low, high = arraylib.min(node), arraylib.max(node)
-        interval = "(" if math.isinf(low) else "["
-        interval += (
-            f"{low},{high}" if arraylib.is_integer(node) else f"{low:.2f},{high:.2f}"
-        )
-        interval += ")" if math.isinf(high) else "]"
-        interval = interval.replace("inf", "∞")
+    low, high = arraylib.min(node), arraylib.max(node)
+    interval = "(" if math.isinf(low) else "["
+    interval += (
+        f"{low},{high}" if arraylib.is_integer(node) else f"{low:.2f},{high:.2f}"
+    )
+    interval += ")" if math.isinf(high) else "]"
+    interval = interval.replace("inf", "∞")
 
-        mean, std = f"{arraylib.mean(node):.2f}", f"{arraylib.std(node):.2f}"
-        return f"{base}(μ={mean}, σ={std}, ∈{interval})"
-
-    return base
+    mean, std = f"{arraylib.mean(node):.2f}", f"{arraylib.std(node):.2f}"
+    return f"{base}(μ={mean}, σ={std}, ∈{interval})"
 
 
 @pp_dispatcher.register(FunctionType)
@@ -623,7 +619,7 @@ def tree_summary(
             continue
 
         paths, _ = trace
-        pstr = treelib.keystr(paths)
+        pstr = "".join(tree_repr(path) for path in paths)
         tstr = tree_summary.type_dispatcher(leaf)
         cstr = f"{count:,}" if count else ""
         sstr = size_pp(size) if size else ""
@@ -682,6 +678,7 @@ def tree_count(tree: PyTree) -> int:
 if importlib.util.find_spec("jax"):
     # jax pretty printing extra handlers
     import jax
+    import jax.tree_util as jtu
 
     # register jax types for pretty printing
     pp_dispatcher.register(jax.custom_jvp, func_pp)
@@ -689,3 +686,22 @@ if importlib.util.find_spec("jax"):
 
     # register jax for tree_summary
     tree_summary.def_type(jax.ShapeDtypeStruct, tree_summary_array)
+
+    @pp_dispatcher.register(jtu.GetAttrKey)
+    def get_attr_key_pp(node: jtu.GetAttrKey, **spec: Unpack[PPSpec]) -> str:
+        return f".{node.name}"
+
+    @pp_dispatcher.register(jtu.SequenceKey)
+    def sequence_key_pp(node: jtu.SequenceKey, **spec: Unpack[PPSpec]) -> str:
+        return f"[{node.idx}]"
+
+    @pp_dispatcher.register(jtu.DictKey)
+    def dict_key_pp(node: jtu.DictKey, **spec: Unpack[PPSpec]) -> str:
+        return f"[{node.key!r}]"
+
+    @pp_dispatcher.register(jax.core.Tracer)
+    def tracer_pp(node: jax.core.Tracer, **spec: Unpack[PPSpec]) -> str:
+        shape = node.aval.shape
+        dtype = node.aval.dtype
+        string = pp_dispatcher.dispatch(ShapeDtypePP(shape, dtype), **spec)
+        return f"{type(node).__name__}({string})"

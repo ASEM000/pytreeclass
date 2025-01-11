@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.11.0
+
+## Breaking Changes:
+
+Due to changes in `jax` tree api, `TreeClass` no longer treated as named tuple when indexing using `AtIndexer`/`.at`.
+
+```python
+import pytreeclass as tc
+class Tree(tc.TreeClass):
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+
+tree = Tree(1, 2)
+print(tree.at["a"].get())  # 1
+print(tree.at[0].get())  # 1 -> no longer valid
+```
+
 ## v0.10.0
 
 - Supports multibackend:

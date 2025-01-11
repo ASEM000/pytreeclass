@@ -185,6 +185,7 @@ class IntKey(BaseKey):
         return self.idx == other.idx
 
 
+
 class NameKey(BaseKey):
     def __init__(self, name: str) -> None:
         self.name = name
@@ -205,6 +206,8 @@ class NameKey(BaseKey):
     def _(self, other: DictKeyType) -> bool:
         return self.name == other.key
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.name!r})"
 
 class EllipsisKey(BaseKey):
     """Match all leaves."""
@@ -223,8 +226,13 @@ class MultiKey(BaseKey):
         self.keys = tuple(keys)
 
     def __eq__(self, entry) -> bool:
-        return any(entry == key for key in self.keys)
-
+        for key in self.keys:
+            if key == entry:
+                return True
+        return False
+    
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.keys!r})"
 
 class RegexKey(BaseKey):
     """Match a leaf with a regex pattern inside 'at' property.
@@ -302,6 +310,7 @@ def _generate_path_mask(
     match = False
 
     def map_func(path, _: Any):
+        
         if len(where) > len(path):
             # path is shorter than `where` path. for example
             # where=("a", "b") and the current path is ("a",) then
@@ -314,6 +323,8 @@ def _generate_path_mask(
         nonlocal match
         match = True
         return match
+
+    
 
     mask = treelib.tree_path_map(map_func, tree, is_leaf=is_leaf)
 
@@ -507,6 +518,7 @@ class AtIndexer(NamedTuple):
             Tree(a=1, b=None)
         """
         where = _resolve_where(self.tree, self.where, is_leaf)
+        
         config = dict(is_leaf=is_leaf, is_parallel=is_parallel)
 
         def leaf_get(leaf: Any, where: Any):
