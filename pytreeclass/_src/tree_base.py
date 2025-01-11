@@ -206,8 +206,6 @@ class TreeClass(metaclass=TreeClassMeta):
         >>> tree = Tree()
         >>> tree.at["a"].get()
         Tree(a=1, b=None)
-        >>> tree.at[0].get()
-        Tree(a=1, b=None)
 
     Note:
         - Under ``jax.tree_util.***`` all :class:`.TreeClass` attributes are

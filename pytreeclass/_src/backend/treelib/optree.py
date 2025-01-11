@@ -33,30 +33,15 @@ from pytreeclass._src.backend.treelib.base import (
 class SequenceKey:
     idx: int
 
-    def __str__(self):
-        return f"[{repr(self.idx)}]"
-
 
 @dc.dataclass(frozen=True)
 class DictKey:
     key: Hashable
 
-    def __str__(self):
-        return f"[{repr(self.key)}]"
-
 
 @dc.dataclass(frozen=True)
 class GetAttrKey:
     name: str
-
-    def __str__(self):
-        return f".{self.name}"
-
-
-@dc.dataclass(frozen=True)
-class NamedSequenceKey(GetAttrKey, SequenceKey):
-    def __str__(self) -> str:
-        return f".{self.name}"
 
 
 class OpTreeTreeLib(AbstractTreeLib):
@@ -122,7 +107,7 @@ class OpTreeTreeLib(AbstractTreeLib):
         def flatten(tree: Tree):
             dynamic = dict(vars(tree))
             keys = tuple(dynamic.keys())
-            entries = tuple(NamedSequenceKey(*ik) for ik in enumerate(keys))
+            entries = tuple(GetAttrKey(k) for _, k in enumerate(keys))
             return (tuple(dynamic.values()), keys, entries)
 
         ot.register_pytree_node(klass, flatten, unflatten, namespace=namespace)
@@ -147,7 +132,3 @@ class OpTreeTreeLib(AbstractTreeLib):
     @staticmethod
     def dict_key(key: Hashable) -> DictKey:
         return DictKey(key)
-
-    @staticmethod
-    def keystr(keys: Any) -> str:
-        return "".join(str(key) for key in keys)
