@@ -623,6 +623,10 @@ def test_autoinit_and_user_defined_init():
     assert True
 
 
+def test_autoinit_dataclass_transform_defaults():
+    assert autoinit.__dataclass_transform__["eq_default"] is False
+
+
 def test_nohints():
     assert convert_hints_to_fields(int) is int
 
