@@ -205,9 +205,9 @@ def unfreeze(value: T) -> T:
         >>> frozen_value = tc.freeze(1)
         >>> tc.unfreeze(frozen_value)
         1
-        >>> # usage with `jax.tree_map`
-        >>> frozen_tree = jax.tree_map(tc.freeze, {"a": 1, "b": 2})
-        >>> unfrozen_tree = jax.tree_map(tc.unfreeze, frozen_tree, is_leaf=tc.is_frozen)
+        >>> # usage with `jax.tree_util.tree_map`
+        >>> frozen_tree = jax.tree_util.tree_map(tc.freeze, {"a": 1, "b": 2})
+        >>> unfrozen_tree = jax.tree_util.tree_map(tc.unfreeze, frozen_tree, is_leaf=tc.is_frozen)
         >>> unfrozen_tree
         {'a': 1, 'b': 2}
     """
@@ -246,7 +246,7 @@ def is_nondiff(value: Any) -> bool:
         False
 
     Note:
-        This function is meant to be used with ``jax.tree_map`` to
+        This function is meant to be used with ``jax.tree_util.tree_map`` to
         create a mask for non-differentiable nodes in a tree, that can be used
         to freeze the non-differentiable nodes before passing the tree to a
         ``jax`` transformation.
@@ -338,7 +338,7 @@ def tree_mask(
             >>> # mask all non-differentiable nodes by default
             >>> def mask_if_nondiff(x):
             ...     return tc.freeze(x) if tc.is_nondiff(x) else x
-            >>> masked_tree = jax.tree_map(mask_if_nondiff, tree)
+            >>> masked_tree = jax.tree_util.tree_map(mask_if_nondiff, tree)
 
         - Use masking on tree containing non-differentiable nodes before passing
           the tree to a ``jax`` transformation.
@@ -411,6 +411,6 @@ def tree_unmask(tree: T, mask: MaskType = lambda _: True):
             >>> import jax
             >>> tree = [1, 2, {"a": 3, "b": 4.}]
             >>> # unmask all nodes
-            >>> tree = jax.tree_map(tc.unfreeze, tree, is_leaf=tc.is_frozen)
+            >>> tree = jax.tree_util.tree_map(tc.unfreeze, tree, is_leaf=tc.is_frozen)
     """
     return _tree_mask_map(tree, mask=mask, func=unfreeze, is_leaf=is_frozen)
