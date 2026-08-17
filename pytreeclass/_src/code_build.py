@@ -482,7 +482,7 @@ def build_init_method(klass: type[T]) -> type[T]:
     return klass
 
 
-@dataclass_transform(field_specifiers=(Field, field))
+@dataclass_transform(field_specifiers=(Field, field), eq_default=False)
 def autoinit(klass: type[T]) -> type[T]:
     """A class decorator that generates the ``__init__`` method from type hints.
 

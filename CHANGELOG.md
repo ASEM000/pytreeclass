@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.11.1
+
+- Preserve inherited `TreeClass` hashability in static analysis for `@autoinit` classes.
+
 ## v0.11.0
 
 ## Breaking Changes:
